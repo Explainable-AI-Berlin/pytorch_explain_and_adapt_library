@@ -1,0 +1,7 @@
+'block_type'              : 'resnet'
+'dimension_reduction'     : 'mean'
+'activation'              : 'ReLU'
+'neuron_numbers'          : [64, 64, 128, 256, 512] # 128, 64, 32, 16, 8
+'blocks_per_layer'        : 2
+'use_batchnorm'           : True
+'dropout'                 : 0.0

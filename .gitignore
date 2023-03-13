@@ -1,0 +1,11 @@
+peal_env
+*__pycache__*
+notebooks/.ipynb_checkpoints
+notebooks/datasets
+notebooks/peal_runs
+notebooks/*.png
+notebooks/static
+notebooks/templates
+tests/outputs
+*.fuse_hidden*
+.vscode

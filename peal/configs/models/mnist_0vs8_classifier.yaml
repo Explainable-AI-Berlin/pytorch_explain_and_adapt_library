@@ -1,0 +1,10 @@
+#
+'training'          : '$PEAL/configs/training/img_classifier.yaml'
+'architecture'      : '$PEAL/configs/architectures/resnet18.yaml'
+'task':
+  'criterions':
+    'ce'     : 1.0
+    'l1'     : 10000.0
+  'output_type'             : 'singleclass'
+  'output_size'             : 2
+  'selection'               : ['Feature']

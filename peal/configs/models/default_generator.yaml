@@ -1,0 +1,9 @@
+#
+'training'          : '$PEAL/configs/training/img_generator.yaml'
+'architecture'      : '$PEAL/configs/architectures/glow_default.yaml'
+'task':
+  'criterions':
+    'logprob'       : 1.0
+    'ldj'           : 1.0
+    'constant'      : 1.0
+  'selection'       : {}

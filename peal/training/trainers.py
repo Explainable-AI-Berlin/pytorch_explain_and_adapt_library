@@ -1,0 +1,290 @@
+import torch
+import code # code.interact(local=dict(globals(), **locals()))
+import json
+import os
+import copy
+import yaml
+import math
+import datetime
+import torchvision
+import torch.nn.functional as F
+import torch.nn as nn
+import argparse
+import numpy as np
+import shutil
+import inspect
+import platform
+
+from pathlib import Path
+from tensorboardX import SummaryWriter
+from torchvision.transforms import ToTensor, Lambda
+from PIL import Image
+from torch.autograd import Variable
+from tqdm import tqdm
+from torch.utils.data import DataLoader
+
+from peal.utils import (
+	orthogonal_initialization,
+	requires_grad_,
+	move_to_device,
+	load_yaml_config
+)
+from peal.architectures.generators import Glow
+from peal.training.loggers import Logger
+from peal.training.criterions import get_criterions
+from peal.data.dataloaders import create_dataloaders_from_datasource
+
+def calculate_test_accuracy(model, test_dataloader, device):
+    # determine the test accuracy of the student
+    correct = 0
+    num_samples = 0
+    with tqdm(enumerate(test_dataloader)) as pbar:
+        for it, (X, y) in pbar:
+            y_pred = model(X.to(device)).argmax(-1).detach().to('cpu')
+            correct += float(torch.sum(y_pred == y))
+            num_samples += X.shape[0]
+            pbar.set_description('test_correct: ' + str(correct / num_samples) + ', it: ' + str(it * X.shape[0]))
+
+    return correct / test_dataloader.dataset.__len__()
+
+class ModelTrainer:
+	'''
+
+	'''
+	def __init__(
+			self,
+			model_name,
+			model,
+			datasource,
+			config,
+			optimizer = None,
+			base_dir = 'peal_runs',
+			criterions = None,
+			logger = None,
+			unit_test_train_loop = False,
+			unit_test_single_sample = False,
+			log_frequency = 1000,
+			gigabyte_vram = None,
+			val_dataloader_weights = [1.0]
+		):
+		'''
+
+		'''
+		#
+		self.config = load_yaml_config(config)
+		self.val_dataloader_weights = val_dataloader_weights
+
+		#
+		self.model_name = model_name
+
+		# TODO check whether model is consistent with given config
+		self.model = model
+
+		# either the dataloaders have to be given or the path to the dataset
+		self.train_dataloader, self.val_dataloaders, _ = create_dataloaders_from_datasource(datasource, self.config, gigabyte_vram = gigabyte_vram)
+
+		if not isinstance(self.val_dataloaders, list):
+			self.val_dataloaders = [self.val_dataloaders]
+
+		#
+		if optimizer is None:
+			if self.config['training']['optimizer'] == 'sgd':
+				self.optimizer = torch.optim.SGD(model.parameters(), lr=self.config['training']['learning_rate'])
+
+			elif self.config['training']['optimizer'] == 'adam':
+				self.optimizer = torch.optim.Adam(model.parameters(), lr=self.config['training']['learning_rate'])
+
+			else:
+				raise Exception('optimizer not available!')
+
+		else:
+			self.optimizer = optimizer
+
+		self.base_dir = os.path.join(base_dir, model_name)
+		self.device = 'cuda' if next(self.model.parameters()).is_cuda else 'cpu'
+		if criterions is None:
+			criterions = get_criterions(config)
+			self.criterions = {}
+			for criterion_key in self.config['task']['criterions']:
+				if inspect.isclass(criterions[criterion_key]): # and issubclass(criterions[criterion_key], nn.Module):
+					self.criterions[criterion_key] = criterions[criterion_key](self.config, None, self.device)
+
+				else:
+					self.criterions[criterion_key] = criterions[criterion_key]
+
+		else:
+			self.criterions = criterions
+
+		if logger is None:
+			self.logger = Logger(
+			    config = self.config, 
+			    model = self.model,
+			    optimizer = self.optimizer, 
+			    device = self.device, 
+			    base_dir = self.base_dir,
+			    criterions = self.criterions,
+			    val_dataloader = self.val_dataloaders[0],
+			    writer = None,
+			)
+
+		else:
+			self.logger = logger
+
+		self.unit_test_train_loop = unit_test_train_loop
+		self.unit_test_single_sample = unit_test_single_sample
+		self.log_frequency = log_frequency
+		self.regularization_level = 0
+
+	def run_epoch(self, dataloader, mode = 'train'):
+		'''
+
+		'''
+		with tqdm(enumerate(dataloader)) as pbar:
+			for batch_idx, (X, y) in pbar:
+				#
+				if self.unit_test_train_loop and batch_idx >= 2:
+					break
+
+				if self.unit_test_single_sample and not self.logger is None:
+					X = self.logger.test_X
+					y = self.logger.test_y
+
+				self.optimizer.zero_grad()
+				# Compute prediction and loss
+				pred = self.model(move_to_device(X, self.device))
+				loss = torch.tensor(0.0).to(self.device)
+				loss_logs = {}
+				for criterion in self.config['task']['criterions'].keys():
+					criterion_loss = self.config['task']['criterions'][criterion] * self.criterions[criterion](self.model, pred, y.to(self.device))
+					if criterion in ['l1', 'l2', 'orthogonality']:
+						criterion_loss *= self.regularization_level
+					loss_logs[criterion] = criterion_loss.detach().item()
+					loss += criterion_loss
+
+				loss_logs['loss'] = loss.detach().item()
+
+				if self.config['training']['verbosity'] >= 1: self.logger.log_step(mode, pred, y, loss_logs)
+
+				# Backpropagation
+				loss.backward()
+
+				pbar.set_description('Model Training: ' + mode + '_it: ' + str(batch_idx) + ', loss: ' + str(loss.detach().item()))
+
+				#
+				if mode == 'train':
+					self.optimizer.step()
+
+		#
+		accuracy = self.logger.log_epoch(mode)
+
+		return loss.detach().item(), accuracy
+
+
+	def fit(self, continue_training = False, is_initialized = False):
+		'''
+
+		'''
+		if not continue_training and 'orthogonality' in self.config['task']['criterions'].keys():
+			orthogonal_initialization(self.model)
+
+		if not is_initialized:
+			shutil.rmtree(self.base_dir, ignore_errors = True)
+			Path(os.path.join(self.base_dir, 'logs')).mkdir(parents=True, exist_ok=True)
+			writer = SummaryWriter(os.path.join(self.base_dir, 'logs'))
+			self.logger.writer = writer
+			os.makedirs(os.path.join(self.base_dir, 'outputs'))
+			os.makedirs(os.path.join(self.base_dir, 'checkpoints'))
+			open(os.path.join(self.base_dir, 'platform.txt'), 'w').write(platform.node())
+
+			train_iterator = iter(self.train_dataloader)
+			val_iterator = iter(self.val_dataloaders[0])
+			for i in range(3):
+				try:
+					sample_train_imgs, sample_train_y = next(train_iterator)
+					if hasattr(self.train_dataloader.dataset, 'project_to_pytorch_default'):
+						sample_train_imgs = self.train_dataloader.dataset.project_to_pytorch_default(sample_train_imgs)
+
+					else:
+						print('Warning! If your dataloader uses another normalization than the PyTorch default [0,1] range data might be visualized incorrect!' + \
+							'In that case add function project_to_pytorch_default() to your underlying dataset to correct visualization!')
+
+					sample_batch_label_str = "sample_train_batch" + str(i) + '_'
+					if len(sample_train_y.shape) == 1:
+						sample_batch_label_str += '_' + str(list(map(lambda x: int(x), list(sample_train_y))))
+
+					self.logger.writer.add_image(
+						sample_batch_label_str,
+						torchvision.utils.make_grid(sample_train_imgs, sample_train_imgs.shape[0])
+					)
+					sample_val_imgs, sample_val_y = next(val_iterator)
+					if hasattr(self.val_dataloaders[0].dataset, 'project_to_pytorch_default'):
+						sample_val_imgs = self.val_dataloaders[0].dataset.project_to_pytorch_default(sample_val_imgs)
+
+					else:
+						print('Warning! If your dataloader uses another normalization than the PyTorch default [0,1] range data might be visualized incorrect!' + \
+							'In that case add function project_to_pytorch_default() to your underlying dataset to correct visualization!')
+
+					sample_batch_label_str = "sample_val_batch" + str(i) + '_'
+					if len(sample_val_y.shape) == 1:
+						sample_batch_label_str += '_' + str(list(map(lambda x: int(x), list(sample_train_y))))
+
+					self.logger.writer.add_image(
+						sample_batch_label_str,
+						torchvision.utils.make_grid(sample_val_imgs, sample_train_imgs.shape[0])
+					)
+
+				except Exception:
+					break
+
+			# TODO log the current config file
+			with open(os.path.join(self.base_dir, 'config.yaml'), 'w') as file:
+				yaml.dump(self.config, file)
+
+		val_accuracy_max = 0.0
+		train_accuracy_max = 0.0
+		'''self.model.eval()
+		val_loss, val_accuracy_max = self.run_epoch(self.val_dataloaders, mode = 'validation')
+		torch.save(self.model.state_dict(), os.path.join(self.base_dir, 'checkpoints', 'seed.cpl'))'''
+		self.config['training']['epoch'] = 0
+		while self.config['training']['epoch'] < self.config['training']['max_epochs']:
+			print('')
+			print('Epoch: ' +  str(self.config['training']['epoch']))
+			#
+			self.model.train()
+			train_loss, train_accuracy = self.run_epoch(self.train_dataloader)
+			#
+			self.model.eval()
+			val_accuracy = 0.0
+			for idx, val_dataloader in enumerate(self.val_dataloaders):
+				val_loss, val_accuracy = self.run_epoch(val_dataloader, mode = 'validation_' + str(idx))
+				val_accuracy += self.val_dataloader_weights[idx] * val_accuracy
+
+			self.logger.writer.add_scalar('val_accuracy', val_accuracy, self.config['training']['epoch'])
+			#
+			torch.save(self.model.state_dict(), os.path.join(self.base_dir, 'checkpoints', str(self.config['training']['epoch']) + '.cpl'))
+
+			if val_accuracy > val_accuracy_max:
+				torch.save(self.model.to('cpu').state_dict(), os.path.join(self.base_dir, 'checkpoints', 'final.cpl'))
+				torch.save(self.model.to('cpu'), os.path.join(self.base_dir, 'model.cpl'))
+				val_accuracy_max = val_accuracy
+				self.model.to(self.device)
+
+			# increase regularization and reset checkpoint if overfitting occurs
+			if train_accuracy > train_accuracy_max:
+				if val_accuracy < val_accuracy_max:
+					if self.regularization_level == 0:
+						self.regularization_level = 1
+
+					else:
+						self.regularization_level *= 2
+
+					checkpoint = torch.load(os.path.join(self.base_dir, 'checkpoints', str(self.config['training']['epoch'] - 1) + '.cpl'), map_location=torch.device(self.device))
+					self.model.load_state_dict(checkpoint)
+
+				else:
+					train_accuracy_max = train_accuracy
+
+			with open(os.path.join(self.base_dir, 'config.yaml'), 'w') as file:
+				yaml.dump(self.config, file)
+
+			self.config['training']['epoch'] += 1

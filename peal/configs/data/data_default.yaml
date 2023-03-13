@@ -1,0 +1,10 @@
+'num_samples'             : 'None'
+'split'                   : [0.8, 1.0]
+'input_type'              : 'image'
+'input_size'              : 'None'
+'output_type'             : 'singleclass'
+'output_size'             : 'None'
+'invariances'             : []
+'use_normalization'       : False
+'normalization'           : []
+'downsize'                : 'Resize'
