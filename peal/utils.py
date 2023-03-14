@@ -4,19 +4,17 @@ import torch
 import os
 import yaml
 import socket
-import wget
 import shutil
 import torchvision
+import wget
 
 from pkg_resources import resource_filename
-
-def download_colorectal_cancer_dataset(raw_data_dir = 'datasets/colorectal_cancer_raw'):
-    filename = wget('https: // zenodo.org/record/1214456/files/NCT-CRC-HE-100K-NONORM.zip?download=1')
-    shutil.unpack_archive(filename, raw_data_dir)
-
+from pathlib import Path
 
 def download_celeba_dataset(raw_data_dir = 'datasets/celeba_raw'):
-    torchvision.datasets.CelebA(raw_data_dir, download = True)
+    Path(raw_data_dir).mkdir(parents=True, exist_ok=True)
+    img_filename = wget.download('https://drive.google.com/drive/folders/0B7EVK8r0v71pWEZsZE9oNnFzTm8?resourcekey=0-5BR16BdXnb8hVj6CNHKzLg&usp=sharing', out=raw_data_dir)
+    label_filename = wget.download('https://drive.google.com/drive/folders/0B7EVK8r0v71pWEZsZE9oNnFzTm8?resourcekey=0-5BR16BdXnb8hVj6CNHKzLg&usp=sharing', out=raw_data_dir)
 
 
 def download_mnist_dataset(raw_data_dir='datasets/mnist_raw'):

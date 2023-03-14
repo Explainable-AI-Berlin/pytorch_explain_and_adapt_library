@@ -192,7 +192,7 @@ class StainingConfounderGenerator:
 
 	'''
 
-	def __init__(self, base_dataset_dir='datasets', dataset_name='colerectal_cancer', delimiter=',', num_samples=40000):
+	def __init__(self, raw_data_dir, base_dataset_dir='datasets', dataset_name='cancer_tissue_no_norm', delimiter=',', num_samples=40000):
 		'''
 
 		'''
@@ -201,15 +201,15 @@ class StainingConfounderGenerator:
 		self.delimiter = delimiter
 		self.dataset_dir = os.path.join('datasets', self.dataset_name)
 		self.num_samples = num_samples
+		self.raw_data_dir = raw_data_dir
 
 	def generate_dataset(self):
-		raw_data_dir = self.base_dataset_dir + '/colerectal_cancer_raw'
 		os.makedirs(self.dataset_dir)
 		# move the MUS and the STR classes to a new folder and convert them to .png images
 		for folder_name in ['MUS', 'STR']:
 			os.makedirs(os.path.join(self.dataset_dir, folder_name))
-			for img_name in os.listdir(os.path.join(raw_data_dir, folder_name)):
-				img = Image.open(os.path.join(raw_data_dir, folder_name, img_name))
+			for img_name in os.listdir(os.path.join(self.raw_data_dir, folder_name)):
+				img = Image.open(os.path.join(self.raw_data_dir, folder_name, img_name))
 				img.save(os.path.join(
 					self.dataset_dir, folder_name, img_name[:-4] + '.png'
 				))
