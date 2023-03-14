@@ -160,7 +160,11 @@ class ConfounderDatasetGenerator:
 			elif self.confounder_type == 'color':
 				color_change = 64 * confounder_intensity * (2 * int(has_confounder) - 1)
 				img = np.array(img)
-				img = np.stack([(img[:,:,0] + color_change + 64) * (255 / (255 + 2 * 64)), img[:,:,1], (img[:,:,2] - color_change + 64) * (255 / (255 + 2 * 64))], axis = -1)
+				img = np.stack([
+					(img[:,:,0] + color_change + 64) * (255 / (255 + 2 * 64)),
+					img[:,:,1],
+					(img[:,:,2] - color_change + 64) * (255 / (255 + 2 * 64))
+				], axis = -1)
 				img_out = Image.fromarray(np.array(img, dtype = np.uint8))
 			
 			elif self.confounder_type == 'copyrighttag':
@@ -181,3 +185,131 @@ class ConfounderDatasetGenerator:
 			attribute_vs_no_attribute_idxs[has_attribute] += 1
 
 		open(os.path.join(self.dataset_dir, 'data.csv'), 'w').write('\n'.join(lines_out))
+
+
+class StainingConfounderGenerator:
+	'''
+
+	'''
+
+	def __init__(self, base_dataset_dir='datasets', dataset_name='colerectal_cancer', delimiter=',', num_samples=40000):
+		'''
+
+		'''
+		self.base_dataset_dir = base_dataset_dir
+		self.dataset_name = dataset_name
+		self.delimiter = delimiter
+		self.dataset_dir = os.path.join('datasets', self.dataset_name)
+		self.num_samples = num_samples
+
+	def generate_dataset(self):
+		raw_data_dir = self.base_dataset_dir + '/colerectal_cancer_raw'
+		os.makedirs(self.dataset_dir)
+		# move the MUS and the STR classes to a new folder and convert them to .png images
+		for folder_name in ['MUS', 'STR']:
+			os.makedirs(os.path.join(self.dataset_dir, folder_name))
+			for img_name in os.listdir(os.path.join(raw_data_dir, folder_name)):
+				img = Image.open(os.path.join(raw_data_dir, folder_name, img_name))
+				img.save(os.path.join(
+					self.dataset_dir, folder_name, img_name[:-4] + '.png'
+				))
+
+		# find staining of images
+		sample_list = []
+		class_names = ['MUS', 'STR']
+		for y in range(2):
+			class_name = class_names[y]
+			for idx, file_name in enumerate(os.listdir(os.path.join(self.dataset_dir, class_name))):
+				if idx % 100 == 0:
+					print(str(idx) + ' / ' +
+                                            str(len(os.listdir(os.path.join(self.dataset_dir, class_name)))))
+				# TODO by class
+				# idx = int(np.random.randint(0, len(poised_dataset_train)))
+				# X, y = poised_dataset_train[idx]
+				X = np.array(Image.open(os.path.join(
+					self.dataset_dir, class_name, file_name)), dtype=np.float32) / 255
+				img = np.expand_dims(X, 0)
+				patches = img
+
+				def RGB2OD(image: np.ndarray) -> np.ndarray:
+					mask = (image == 0)
+					image[mask] = 1
+					return np.maximum(-1 * np.log(image), 1e-5)
+
+				OD_raw = RGB2OD(np.stack(patches).reshape(-1, 3))
+				OD = (OD_raw[(OD_raw > 0.15).any(axis=1), :])
+
+				_, eigenVectors = np.linalg.eigh(np.cov(OD, rowvar=False))
+				# strip off residual stain component
+				eigenVectors = eigenVectors[:, [2, 1]]
+
+				if eigenVectors[0, 0] < 0:
+					eigenVectors[:, 0] *= -1
+
+				if eigenVectors[0, 1] < 0:
+					eigenVectors[:, 1] *= -1
+
+				T_hat = np.dot(OD, eigenVectors)
+
+				phi = np.arctan2(T_hat[:, 1], T_hat[:, 0])
+				min_Phi = np.percentile(phi, 1)
+				max_Phi = np.percentile(phi, 99)
+
+				v1 = np.dot(eigenVectors, np.array([np.cos(min_Phi), np.sin(min_Phi)]))
+				v2 = np.dot(eigenVectors, np.array([np.cos(max_Phi), np.sin(max_Phi)]))
+				if v1[0] > v2[0]:
+					stainVectors = np.array([v1, v2])
+				else:
+					stainVectors = np.array([v2, v1])
+
+				sample_list.append(
+					[os.path.join(class_name, file_name), X, y, stainVectors, OD_raw])
+		
+		hematoxylin_intensities_by_class = [[], []]
+		def cosine_similarity(a, b):
+			return np.dot(a, b) / (np.linalg.norm(a, axis=-1) * np.linalg.norm(b))
+
+		sample_list_new = []
+		for sample in sample_list:
+			path, X, y, stainVectors, OD_raw = sample
+			similarities_0 = cosine_similarity(OD_raw, stainVectors[0])
+			similarities_1 = cosine_similarity(OD_raw, stainVectors[1])
+			hematoxylin_greater_mask = similarities_0 > similarities_1
+			X_intensities = np.linalg.norm(X, axis=-1).flatten()
+			X_masked_intensities = X_intensities * hematoxylin_greater_mask
+			stable_maximum = np.percentile(X_masked_intensities, 99)
+			hematoxylin_intensities_by_class[y].append(stable_maximum)
+			sample_list_new.append([path, X, y, stainVectors, OD_raw, stable_maximum])
+
+		intensity_median = np.percentile(
+			np.concatenate([hematoxylin_intensities_by_class[0],
+						hematoxylin_intensities_by_class[1]]),
+			50
+		)
+
+		def check(sample, has_attribute, has_confounder):
+			return sample[2] == has_attribute and int((sample[-1] > intensity_median)) == has_confounder
+
+		lines_out = ['ImgPath,Cancer,Confounder,ConfounderStrength']
+		idxs = np.zeros([2, 2], dtype=np.int32)
+		for sample_idx in range(18000):
+			if sample_idx % 100 == 0:
+				print(sample_idx)
+				open(os.path.join(self.dataset_dir, 'data.csv'),
+					'w').write('\n'.join(lines_out))
+
+			has_attribute = int(sample_idx % 4 == 0 or sample_idx % 4 == 1)
+			has_confounder = int(sample_idx % 2 == 0)
+
+			while not check(sample_list_new[int(idxs[has_attribute][has_confounder])], has_attribute, has_confounder):
+				idxs[has_attribute][has_confounder] += 1
+
+			sample = sample_list_new[idxs[has_attribute][has_confounder]]
+			lines_out.append(sample[0] + ',' + str(has_attribute) +
+							',' + str(has_confounder) + ',' + str(sample[-1]))
+			print(str(has_attribute) + ' ' + str(has_confounder) +
+				' ' + str(idxs[has_attribute][has_confounder]))
+			idxs[has_attribute][has_confounder] += 1
+
+		open(os.path.join(self.dataset_dir, 'data.csv'),
+		     'w').write('\n'.join(lines_out))

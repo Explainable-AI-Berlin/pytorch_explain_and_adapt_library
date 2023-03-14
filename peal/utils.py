@@ -4,15 +4,33 @@ import torch
 import os
 import yaml
 import socket
+import wget
+import shutil
+import torchvision
 
 from pkg_resources import resource_filename
+
+def download_colorectal_cancer_dataset(raw_data_dir = 'datasets/colorectal_cancer_raw'):
+    filename = wget('https: // zenodo.org/record/1214456/files/NCT-CRC-HE-100K-NONORM.zip?download=1')
+    shutil.unpack_archive(filename, raw_data_dir)
+
+
+def download_celeba_dataset(raw_data_dir = 'datasets/celeba_raw'):
+    torchvision.datasets.CelebA(raw_data_dir, download = True)
+
+
+def download_mnist_dataset(raw_data_dir='datasets/mnist_raw'):
+    torchvision.datasets.MNIST(raw_data_dir, download=True)
+
 
 def embed_numberstring(number_str, num_digits = 6):
     return '0' * (num_digits - len(number_str)) + number_str
 
+
 def is_port_in_use(port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         return s.connect_ex(('localhost', port)) == 0
+
 
 def request(name, default):
     answer = input('Do you want to change value of ' + str(name) + '? [y/n]')
@@ -28,6 +46,7 @@ def request(name, default):
         
         else:
             return input('To what value do you want to change ' + str(name) + '?')
+
 
 def get_project_resource_dir():
     # TODO why are there two arguments too much??
