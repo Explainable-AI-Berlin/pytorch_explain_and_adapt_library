@@ -14,7 +14,9 @@
 'max_validation_samples'               :  200 # [10, 500]
 'replace_model'                        :  True
 'fa_1sided_prime'                      :  0.0
-'replacement_strategy'                 :  'direct'
+# for celeba we found empirically, that the test accuracies are highest when using the model that was trained on the data with the best feedback accuracy
+# instead of using the model achieving the best feedback accuracy
+'replacement_strategy'                 :  'delayed'
 'explainer'                            :  '$PEAL/configs/explainers/counterfactual_default.yaml'
 'training'                             :  '$PEAL/configs/training/finetune_classifier.yaml'
 'data'                                 :  '$PEAL/configs/data/data_default.yaml'

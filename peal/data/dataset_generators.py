@@ -162,8 +162,8 @@ class ConfounderDatasetGenerator:
 				img = np.array(img)
 				img = np.stack([
 					(img[:,:,0] + color_change + 64) * (255 / (255 + 2 * 64)),
-					img[:,:,1],
-					(img[:,:,2] - color_change + 64) * (255 / (255 + 2 * 64))
+					(img[:,:,2] - (color_change / 2) + 64) * (255 / (255 + 2 * 64)),
+					(img[:,:,2] - (color_change / 2) + 64) * (255 / (255 + 2 * 64))
 				], axis = -1)
 				img_out = Image.fromarray(np.array(img, dtype = np.uint8))
 			
@@ -215,17 +215,15 @@ class StainingConfounderGenerator:
 				))
 
 		# find staining of images
+		# based on https://towardsdatascience.com/stain-estimation-on-microscopy-whole-slide-images-2b5a57062268
 		sample_list = []
 		class_names = ['MUS', 'STR']
 		for y in range(2):
 			class_name = class_names[y]
 			for idx, file_name in enumerate(os.listdir(os.path.join(self.dataset_dir, class_name))):
 				if idx % 100 == 0:
-					print(str(idx) + ' / ' +
-                                            str(len(os.listdir(os.path.join(self.dataset_dir, class_name)))))
-				# TODO by class
-				# idx = int(np.random.randint(0, len(poised_dataset_train)))
-				# X, y = poised_dataset_train[idx]
+					print(str(idx) + ' / ' + str(len(os.listdir(os.path.join(self.dataset_dir, class_name)))))
+
 				X = np.array(Image.open(os.path.join(
 					self.dataset_dir, class_name, file_name)), dtype=np.float32) / 255
 				img = np.expand_dims(X, 0)
@@ -292,7 +290,7 @@ class StainingConfounderGenerator:
 
 		lines_out = ['ImgPath,Cancer,Confounder,ConfounderStrength']
 		idxs = np.zeros([2, 2], dtype=np.int32)
-		for sample_idx in range(18000):
+		for sample_idx in range(16000):
 			if sample_idx % 100 == 0:
 				print(sample_idx)
 				open(os.path.join(self.dataset_dir, 'data.csv'),

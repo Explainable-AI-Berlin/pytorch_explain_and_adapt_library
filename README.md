@@ -53,6 +53,8 @@ $PEAL marks the directory peal of the library where the code and the configs are
 
 More detailed examples that reproduce the results from the paper can be found in the jupyter notebooks.
 
+The Follicle dataset from the paper and how to work with it is propriertary and can thereby not be disclosed in detail here.
+
 **Structure of the Project:**
 
 peal/configs - generic config files, that can be either directly used, extended, adapted or exchanged

@@ -786,11 +786,14 @@ class CounterfactualKnowledgeDistillation:
                 os.path.join(self.base_dir, 'visualization.png')
             ])
 
-            if self.adaptor_config['replace_model']:
+            if self.adaptor_config['replacement_strategy'] == 'delayed' and self.adaptor_config['replace_model']:
                 torch.save(self.student , os.path.join(self.base_dir, 'model.cpl'))
 
             if fa_1sided > self.adaptor_config['fa_1sided_prime']:
                 self.adaptor_config['fa_1sided_prime'] = fa_1sided
+                if self.adaptor_config['replacement_strategy'] == 'direct':
+                    torch.save(self.student , os.path.join(self.base_dir, 'model.cpl'))
+
                 self.adaptor_config['replace_model'] = True
 
             else:
