@@ -1,21 +1,118 @@
-import code # code.interact(local=dict(globals(), **locals()))
 import random
-import pygame
-import torch
-import torchvision
-import json
 import os
 import shutil
 import random
 import numpy as np
-import pkgutil
 
+from pathlib import Path
 from PIL import Image
-from torchvision.transforms import ToTensor
-from IPython.core.debugger import set_trace # set_trace()
-
-from peal.data.dataloaders import get_dataloader
 from peal.utils import get_project_resource_dir
+
+class ArtificialConfounderTabularDatasetGenerator:
+	'''
+	Generates a tabular dataset with a confounder that is a symbolic attribute.
+
+	Should mimic symbolic rather low-dimensional data like credit decisions based on known factors about a person.
+
+	Should enable straight foward check for minimality of counterfactuals.
+	'''
+	def __init__(self, dataset_name, base_dataset_dir = 'datasets', num_samples = 1000, input_size = 10, label_noise = 0.01, seed = 0):
+		'''
+		Generates a tabular dataset with a confounder that is a symbolic attribute.
+
+		Args:
+			dataset_name (str): The name of the dataset.
+			base_dataset_dir (Path): The path to the directory where the datasets are stored.
+			num_samples (int, optional): The number of samples in the dataset. Defaults to 1000.
+			input_size (int, optional): The number of features in the dataset. Defaults to 10.
+			label_noise (float, optional): The probability that the label is flipped. Defaults to 0.01.
+			seed (int, optional): The seed for the random number generator. Defaults to 0.
+		'''
+		self.base_dataset_dir = base_dataset_dir
+		self.dataset_name = dataset_name
+		self.dataset_dir = os.path.join(self.base_dataset_dir, self.dataset_name)
+		self.num_samples = num_samples
+		self.input_size = input_size
+		self.label_noise = label_noise
+		self.seed = seed
+		name = str(self.num_samples) + '_' + str(self.input_size) + '_'
+		name += str(int(100 * label_noise)) + '_' + str(seed)
+		self.label_dir = os.path.join(self.dataset_dir, name + '.csv')
+	
+	def generate_dataset(self):
+		'''
+		Generates the dataset.
+
+		There are self.num_samples rows.
+		In each row there are self.input_size random numbers between 0 and 1.
+		The target is to determine whether there are more numbers bigger than 0.5 or smaller than 0.5 in the the row in question.
+		It is written into as an additional column into the dataset.
+		The confounder just gives potentially spurious information about the number of ones and zeros in the row.
+		It is also written into as an additional column into the dataset.
+		In the end the dataset is saved in self.label_dir as a csv file.
+		'''
+		Path(self.dataset_dir).mkdir(parents=True, exist_ok=True)
+		np.random.seed(self.seed)
+		dataset = ','.join(['x' + str(it) for it in range(self.input_size)]) + ',Confounder,Target\n'
+		for sample_idx in range(self.num_samples):
+			has_attribute = int(sample_idx % 4 == 0 or sample_idx % 4 == 1)
+			has_confounder = int(sample_idx % 2 == 0)
+			flipped_label = int(int(200 * (1 - self.label_noise)) % 2 == 0 or int(200 * (1 - self.label_noise)) % 2 == 1)
+
+			values = np.random.uniform(0, 1, self.input_size)
+			target = int(np.sum(values >= 0.5) > np.sum(values < 0.5))
+			while not target == has_attribute:
+				values = np.random.uniform(0, 1, self.input_size)
+				target = int(np.sum(values >= 0.5) > np.sum(values < 0.5))
+
+			dataset += ','.join([str(val) for val in values])
+			if flipped_label:
+				target = abs(1 - target)
+				has_confounder = abs(1 - has_confounder)
+			
+			dataset += ',' + str(has_confounder) + ',' + str(target) + '\n'
+		
+		with open(self.label_dir, 'w') as f:
+			f.write(dataset)
+
+
+class ArtificialConfounderSequenceDatasetGenerator:
+	'''
+	Generates a sequence dataset with a confounder that is a symbolic attribute.
+
+	Should mimic sequential data like natural language.
+
+	Should enable straight foward check for minimality of counterfactuals.
+	'''
+	def __init__(self, dataset_name, base_dataset_dir, label_dir=None, delimiter=',', confounder_type='intensity', num_samples=40000):
+		'''
+
+		'''
+		self.base_dataset_dir = base_dataset_dir
+		self.confounder_type = confounder_type
+		self.dataset_name = dataset_name
+		if label_dir is None:
+			self.label_dir = os.path.join(base_dataset_dir, 'data.csv')
+
+		else:
+			self.label_dir = label_dir
+
+		self.delimiter = delimiter
+		self.dataset_dir = os.path.join('datasets', self.dataset_name)
+		self.num_samples = num_samples
+
+	def generate_dataset(self):
+		'''
+		Generates the dataset.
+
+		Each item of the sequence one-hot encodes a integer number between 0 and n.
+		The target is to determine whether there are more integer numbers greater than n/2 or smaller than n/2 in the sequence.
+		The confounder is the last token in the sequence that gives potentially spurious information about the number 
+		of integers greater than n/2 and smaller than n/2 in the sequence.
+		'''
+		shutil.rmtree(self.dataset_dir, ignore_errors=True)
+
+
 
 class MNISTConfounderDatasetGenerator:
 	def __init__(self, dataset_name, mnist_dir = 'datasets/mnist', digits = ['0', '8']):

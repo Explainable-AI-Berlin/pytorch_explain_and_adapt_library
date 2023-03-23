@@ -1,0 +1,3 @@
+'activation'              : 'ReLU'
+'neuron_numbers_encoder'  : [10, 10]
+'neuron_numbers_decoder'  : [10]

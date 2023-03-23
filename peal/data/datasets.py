@@ -75,11 +75,7 @@ class Image2ClassDataset(torch.utils.data.Dataset):
                     self.urls_with_hints.append((label_str, file))
 
     def class_idx_to_name(self, class_idx):
-        if self.config['dataset_name'] == 'imagenet':
-            return imagenet_map[class_idx]
-
-        else:
-            return self.idx_to_name[class_idx]
+        return self.idx_to_name[class_idx]
 
     def enable_hints(self):
         self.urls = copy.deepcopy(self.urls_with_hints)
@@ -117,11 +113,155 @@ class Image2ClassDataset(torch.utils.data.Dataset):
             return img, (label, mask)
 
 
+def parse_csv(data_dir, config, mode):
+    raw_data = open(data_dir, 'r').read().split('\n')
+    attributes = raw_data[0].split(',')[1:]
+    raw_data = raw_data[1:]
+    # raw_data = raw_data[:config['num_samples']]
+    data = {}
+    if not len(config['confounding_factors']) == 0:
+        selection_idx1 = attributes.index(
+            config['confounding_factors'][0])
+        selection_idx2 = attributes.index(
+            config['confounding_factors'][1])
+        n_attribute_confounding = np.array([[0, 0], [0, 0]])
+        max_attribute_confounding = np.array([[0, 0], [0, 0]])
+        max_attribute_confounding[0][0] = int(
+            config['num_samples'] * config['confounder_probability'] * 0.5)
+        max_attribute_confounding[1][0] = int(
+            config['num_samples'] * round(1 - config['confounder_probability'], 2) * 0.5)
+        max_attribute_confounding[0][1] = int(
+            config['num_samples'] * round(1 - config['confounder_probability'], 2) * 0.5)
+        max_attribute_confounding[1][1] = int(
+            config['num_samples'] * config['confounder_probability'] * 0.5)
+        keys = [[[], []], [[], []]]
+
+    for line in raw_data:
+        instance_attributes = line.split(',')
+        instance_attributes_int = list(
+            map(lambda x: int(float(x)), instance_attributes[1:]))
+        instances_tensor = torch.tensor(instance_attributes_int)
+        if len(config['confounding_factors']) == 0:
+            data[instance_attributes[0]] = torch.maximum(
+                torch.zeros_like(instances_tensor), instances_tensor)
+
+        else:
+            attribute = instance_attributes_int[selection_idx1]
+            confounder = instance_attributes_int[selection_idx2]
+            if n_attribute_confounding[attribute][confounder] < max_attribute_confounding[attribute][confounder]:
+                data[instance_attributes[0]] = torch.maximum(
+                    torch.zeros_like(instances_tensor), instances_tensor)
+                keys[attribute][confounder].append(instance_attributes[0])
+                n_attribute_confounding[attribute][confounder] += 1
+
+            if np.sum(n_attribute_confounding == max_attribute_confounding) == 4:
+                break
+
+    if not len(config['confounding_factors']) == 0:
+        assert np.sum(n_attribute_confounding ==
+                        max_attribute_confounding) == 4, 'something went wrong with filling up the attributes'
+        assert np.sum(
+            n_attribute_confounding) == config['num_samples'], 'wrong number of samples!'
+        assert len(keys[0][0]) + len(keys[0][1]) + len(keys[1][0]) + \
+            len(keys[1][1]) == config['num_samples'], 'wrong number of keys!'
+        if mode == 'train':
+            keys = keys[0][0][:int(
+                len(keys[0][0]) * config['split'][0])]
+            keys += keys[0][1][:int(len(keys[0][1])
+                                            * config['split'][0])]
+            keys += keys[1][0][:int(len(keys[1][0])
+                                            * config['split'][0])]
+            keys += keys[1][1][:int(len(keys[1][1])
+                                            * config['split'][0])]
+            random.shuffle(keys)
+
+        elif mode == 'val':
+            keys = keys[0][0][int(len(
+                keys[0][0]) * config['split'][0]):int(len(keys[0][0]) * config['split'][1])]
+            keys += keys[0][1][int(len(keys[0][1]) * config['split'][0]):int(
+                len(keys[0][1]) * config['split'][1])]
+            keys += keys[1][0][int(len(keys[1][0]) * config['split'][0]):int(
+                len(keys[1][0]) * config['split'][1])]
+            keys += keys[1][1][int(len(keys[1][1]) * config['split'][0]):int(
+                len(keys[1][1]) * config['split'][1])]
+            random.shuffle(keys)
+
+        elif mode == 'test':
+            keys = keys[0][0][int(
+                len(keys[0][0]) * config['split'][1]):]
+            keys += keys[0][1][int(len(keys[0][1])
+                                        * config['split'][1]):]
+            keys += keys[1][0][int(len(keys[1][0])
+                                        * config['split'][1]):]
+            keys += keys[1][1][int(len(keys[1][1])
+                                        * config['split'][1]):]
+            random.shuffle(keys)
+
+        else:
+            keys = keys[0][0] + keys[0][1] + keys[1][0] + keys[1][1]
+
+    else:
+        keys = list(data.keys())
+        if mode == 'train':
+            keys = keys[:int(
+                len(keys) * config['split'][0])]
+
+        elif mode == 'val':
+            keys = keys[int(len(
+                keys) * config['split'][0]):int(len(keys) * config['split'][1])]
+
+        elif mode == 'test':
+            keys = keys[int(
+                len(keys) * config['split'][1]):]
+
+        else:
+            keys = keys
+    
+    return attributes, data, keys
+
+
+class SymbolicDataset(torch.utils.data.Dataset):
+    def __init__(self, data_dir, mode, config, transform=ToTensor(), task_config = None):
+        self.config = config
+        self.transform = transform
+        self.task_config = task_config
+        self.attributes, self.data, self.keys = parse_csv(
+            data_dir,
+            config,
+            mode
+        )
+
+    def __len__(self):
+        return len(self.keys)
+
+    def __getitem__(self, idx):
+        name = self.keys[idx]
+
+        data = torch.tensor(self.data[name])
+
+        if not self.task_config is None and 'x_selection' in self.task_config.keys() and not len(self.task_config['x_selection']) == 0:
+            x = torch.zeros([len(self.task_config['selection'])])
+            for idx, selection in enumerate(self.task_config['selection']):
+                x[idx] = x[self.attributes.index(selection)]
+
+        else:
+            x = data[:-1]
+        
+        if not self.task_config is None and 'y_selection' in self.task_config.keys() and not len(self.task_config['y_selection']) == 0:
+            y = torch.zeros([len(self.task_config['y_selection'])])
+            for idx, selection in enumerate(self.task_config['y_selection']):
+                y[idx] = y[self.attributes.index(selection)]
+
+        else:
+            y = data[-1]
+
+        return x, y
+
+
 class Image2MixedDataset(torch.utils.data.Dataset):
     """
     The celeba dataset.
     """
-
     def __init__(self, root_dir, mode, config, transform=ToTensor(), task_config = None):
         """
         Args:
@@ -134,81 +274,12 @@ class Image2MixedDataset(torch.utils.data.Dataset):
         self.transform = transform
         self.task_config = task_config
         self.hints_enabled = False
-        raw_data = open(os.path.join(self.root_dir, 'data.csv'), 'r').read().split('\n')
-        self.attributes = raw_data[0].split(',')[1:]
-        raw_data = raw_data[1:]
-        #raw_data = raw_data[:self.self.config['num_samples']]
-        self.data = {}
-        if not len(self.config['confounding_factors']) == 0:
-            selection_idx1 = self.attributes.index(self.config['confounding_factors'][0])
-            selection_idx2 = self.attributes.index(self.config['confounding_factors'][1])
-            n_attribute_confounding = np.array([[0,0],[0,0]])
-            max_attribute_confounding = np.array([[0,0],[0,0]])
-            max_attribute_confounding[0][0] = int(self.config['num_samples'] * self.config['confounder_probability'] * 0.5)
-            max_attribute_confounding[1][0] = int(self.config['num_samples'] * round(1 - self.config['confounder_probability'], 2) * 0.5)
-            max_attribute_confounding[0][1] = int(self.config['num_samples'] * round(1 - self.config['confounder_probability'], 2) * 0.5)
-            max_attribute_confounding[1][1] = int(self.config['num_samples'] * self.config['confounder_probability'] * 0.5)
-            keys = [[[], []],[[], []]]
-
-        for line in raw_data:
-            instance_attributes = line.split(',')
-            instance_attributes_int = list(map(lambda x: int(float(x)), instance_attributes[1:]))
-            instances_tensor = torch.tensor(instance_attributes_int)
-            if len(self.config['confounding_factors']) == 0:
-                self.data[instance_attributes[0]] = torch.maximum(torch.zeros_like(instances_tensor), instances_tensor)
-
-            else:
-                attribute = instance_attributes_int[selection_idx1]
-                confounder = instance_attributes_int[selection_idx2]
-                if n_attribute_confounding[attribute][confounder] < max_attribute_confounding[attribute][confounder]:
-                    self.data[instance_attributes[0]] = torch.maximum(torch.zeros_like(instances_tensor), instances_tensor)
-                    keys[attribute][confounder].append(instance_attributes[0])
-                    n_attribute_confounding[attribute][confounder] += 1
-
-                if np.sum(n_attribute_confounding == max_attribute_confounding) == 4:
-                    break
-
-        if not len(self.config['confounding_factors']) == 0:
-            assert np.sum(n_attribute_confounding == max_attribute_confounding) == 4, 'something went wrong with filling up the attributes'
-            assert np.sum(n_attribute_confounding) == self.config['num_samples'], 'wrong number of samples!'
-            assert len(keys[0][0]) + len(keys[0][1]) + len(keys[1][0]) + len(keys[1][1]) == self.config['num_samples'], 'wrong number of keys!'
-            if mode == 'train':
-                self.keys = keys[0][0][:int(len(keys[0][0]) * self.config['split'][0])]
-                self.keys += keys[0][1][:int(len(keys[0][1]) * self.config['split'][0])]
-                self.keys += keys[1][0][:int(len(keys[1][0]) * self.config['split'][0])]
-                self.keys += keys[1][1][:int(len(keys[1][1]) * self.config['split'][0])]
-                random.shuffle(self.keys)
-
-            elif mode == 'val':
-                self.keys = keys[0][0][int(len(keys[0][0]) * self.config['split'][0]):int(len(keys[0][0]) * self.config['split'][1])]
-                self.keys += keys[0][1][int(len(keys[0][1]) * self.config['split'][0]):int(len(keys[0][1]) * self.config['split'][1])]
-                self.keys += keys[1][0][int(len(keys[1][0]) * self.config['split'][0]):int(len(keys[1][0]) * self.config['split'][1])]
-                self.keys += keys[1][1][int(len(keys[1][1]) * self.config['split'][0]):int(len(keys[1][1]) * self.config['split'][1])]
-                random.shuffle(self.keys)
-
-            elif mode == 'test':
-                self.keys = keys[0][0][int(len(keys[0][0]) * self.config['split'][1]):]
-                self.keys += keys[0][1][int(len(keys[0][1]) * self.config['split'][1]):]
-                self.keys += keys[1][0][int(len(keys[1][0]) * self.config['split'][1]):]
-                self.keys += keys[1][1][int(len(keys[1][1]) * self.config['split'][1]):]
-                random.shuffle(self.keys)
-
-            else:
-                self.keys = keys[0][0] + keys[0][1] + keys[1][0] + keys[1][1]
-
-        else:
-            self.keys = list(self.data.keys())
-            if mode == 'train':
-                self.keys = self.keys[:int(len(self.keys) * self.config['split'][0])]
-
-            elif mode == 'val':
-                self.keys = self.keys[int(len(self.keys) * self.config['split'][0]):int(len(self.keys) * self.config['split'][1])]
-
-            elif mode == 'test':
-                self.keys = self.keys[int(len(self.keys) * self.config['split'][1]):]
-
-            else:
-                self.keys = keys
+        data_dir = os.path.join(root_dir, 'data.csv')
+        self.attributes, self.data, self.keys = parse_csv(
+            data_dir,
+            config,
+            mode
+        )
 
     def __len__(self):
         return len(self.keys)
@@ -217,7 +288,7 @@ class Image2MixedDataset(torch.utils.data.Dataset):
         self.hints_enabled = True
 
     def disable_hints(self):
-        self.hints_enabled = False        
+        self.hints_enabled = False
 
     def __getitem__(self, idx):
         name = self.keys[idx]
@@ -285,7 +356,7 @@ def get_datasets(config, base_dir):
     transform_list_train = []
     transform_list_test = []
     #
-    if 'circular_cut' in config['invariances']:
+    if config['input_type'] == 'image' and 'circular_cut' in config['invariances']:
         transform_list_train.append(CircularCut())
         transform_list_test.append(CircularCut())
 
@@ -294,36 +365,45 @@ def get_datasets(config, base_dir):
     transform_list_test.append(ToTensor())
     
     #
-    if 'crop_size' in config.keys():
-        transform_list_train.append(Padding(config['crop_size'][1:]))
-        transform_list_test.append(Padding(config['crop_size'][1:]))
+    if config['input_type'] == 'image':
+        if 'crop_size' in config.keys():
+            transform_list_train.append(Padding(config['crop_size'][1:]))
+            transform_list_test.append(Padding(config['crop_size'][1:]))
 
-    #
-    if 'rotation' in config['invariances']: transform_list_train.append(RandomRotation())
-    if 'hflipping' in config['invariances']: transform_list_train.append(transforms.RandomHorizontalFlip(p=0.5))
-    if 'vflipping' in config['invariances']: transform_list_train.append(transforms.RandomVerticalFlip(p=0.5))
+        #
+        if 'rotation' in config['invariances']: transform_list_train.append(RandomRotation())
+        if 'hflipping' in config['invariances']: transform_list_train.append(transforms.RandomHorizontalFlip(p=0.5))
+        if 'vflipping' in config['invariances']: transform_list_train.append(transforms.RandomVerticalFlip(p=0.5))
 
-    #
-    if 'crop_size' in config.keys():
-        transform_list_train.append(transforms.RandomCrop(config['crop_size'][1:]))
-        transform_list_test.append(transforms.CenterCrop(config['crop_size'][1:]))
+        #
+        if 'crop_size' in config.keys():
+            transform_list_train.append(transforms.RandomCrop(config['crop_size'][1:]))
+            transform_list_test.append(transforms.CenterCrop(config['crop_size'][1:]))
 
-    transform_list_train.append(transforms.Resize(config['input_size'][1:]))
-    transform_list_test.append(transforms.Resize(config['input_size'][1:]))
+        transform_list_train.append(transforms.Resize(config['input_size'][1:]))
+        transform_list_test.append(transforms.Resize(config['input_size'][1:]))
 
-    transform_list_train.append(SetChannels(config['input_size'][0]))
-    transform_list_test.append(SetChannels(config['input_size'][0]))
+        transform_list_train.append(SetChannels(config['input_size'][0]))
+        transform_list_test.append(SetChannels(config['input_size'][0]))
 
     #
     transform_train = transforms.Compose(transform_list_train)
     transform_test = transforms.Compose(transform_list_test)
 
-    if config['input_type'] == 'image' and config['output_type'] == 'singleclass': dataset = Image2ClassDataset
-    elif config['input_type'] == 'image' and config['output_type'] in ['multiclass', 'mixed']: dataset = Image2MixedDataset
-    else: raise ValueError(config['dataset_name'] + " is not valid data set name.")
+    if config['input_type'] == 'image' and config['output_type'] == 'singleclass':
+        dataset = Image2ClassDataset
+
+    elif config['input_type'] == 'image' and config['output_type'] in ['multiclass', 'mixed']:
+        dataset = Image2MixedDataset
+
+    elif config['input_type'] == 'symbolic' and config['output_type'] in ['multiclass', 'mixed']:
+        dataset = SymbolicDataset
+
+    else:
+        raise ValueError(config['dataset_name'] + " is not valid data set name.")
 
     #
-    if config['use_normalization']:
+    if config['input_type'] == 'image' and config['use_normalization']:
         stats_dataset = dataset(base_dir, 'train', config, transform_test)
         samples = []
         for idx in range(stats_dataset.__len__()):

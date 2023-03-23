@@ -1,5 +1,6 @@
 from torch import nn
 
+
 class InvertibleGenerator(nn.Module):
 	def encode(self, x):
 		pass
