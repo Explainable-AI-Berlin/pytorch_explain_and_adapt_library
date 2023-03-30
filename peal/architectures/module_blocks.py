@@ -1,10 +1,6 @@
-import torch
-import code # code.interact(local=dict(globals(), **locals()))
-
 from torch import nn
-from torch.autograd import Variable
 
-from peal.architectures.advanced_modules import (
+from peal.architectures.basic_modules import (
     SkipConnection
 )
 

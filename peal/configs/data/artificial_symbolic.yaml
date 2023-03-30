@@ -1,7 +1,7 @@
 'num_samples'                        : 2000
 'split'                              : [0.8, 0.9]
 'input_type'                         : 'symbolic'
-'input_size'                         : [10]
+'input_size'                         : [11]
 'label_noise'                        : 0.01
 'seed'                               : 0
 'output_type'                        : 'multiclass'

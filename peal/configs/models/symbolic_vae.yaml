@@ -1,8 +1,8 @@
 #
 'training'          : '$PEAL/configs/training/img_generator.yaml'
-'architecture'      : '$PEAL/configs/generators/symbolic_vae.yaml'
+'architecture'      : '$PEAL/configs/architectures/symbolic_vae.yaml'
 'task':
   'criterions':
-    'logprob'       : 1.0
+    'likelihood'    : 1.0
     'reconstruction': 1.0
   'selection'       : {}

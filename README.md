@@ -86,3 +86,23 @@ notebooks/datasets - the folder where the datasets like the augmented CelebA dat
 notebooks/templates - the folder for temporary files from the Flask app used for collecting user feedback
 
 notebooks/peal_runs - the folder where the executed runs are stored - some runs can take quite long, so there are checkpoint files as often as possible, that one can restart the the run where interrupted if needed.
+
+**Contribution Guidelines:**
+
+If you want to contribute to the project, please follow the following guidelines:
+
+1) Use the black formatter for python files
+
+2) Avoid code redundancy as much as possible
+
+3) Write unit tests for every new component
+
+4) Write documentation for every new component
+
+5) Write a jupyter notebook that shows how to use the new component
+
+6) Compositionality is key! Try to make the components as independent as possible and make sure that the whole pipeline still works if you replace a component with another one.
+
+7) Always use seeds for every experiment to make sure the results are reproducible
+
+8) Log all important information in the log files to make experiments comparable

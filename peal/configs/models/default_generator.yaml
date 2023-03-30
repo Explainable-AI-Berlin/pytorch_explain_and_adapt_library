@@ -1,4 +1,5 @@
 #
+'type'              : 'Glow'
 'training'          : '$PEAL/configs/training/img_generator.yaml'
 'architecture'      : '$PEAL/configs/architectures/glow_default.yaml'
 'task':
