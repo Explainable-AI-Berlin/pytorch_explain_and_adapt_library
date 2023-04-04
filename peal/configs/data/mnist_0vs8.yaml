@@ -10,3 +10,4 @@
 'confounder_probability'  : 0.5
 'confounding_factors'     : ['Feature', 'Confounder']
 'downsize'                : 'Resize'
+'known_confounder'        : True

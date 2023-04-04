@@ -73,8 +73,8 @@ class ArtificialConfounderTabularDatasetGenerator:
             has_attribute = int(sample_idx % 4 == 0 or sample_idx % 4 == 1)
             has_confounder = int(sample_idx % 2 == 0)
             flipped_label = int(
-                int(200 * (1 - self.label_noise)) % 2 == 0
-                or int(200 * (1 - self.label_noise)) % 2 == 1
+                sample_idx % int(200 * (1 - self.label_noise)) == 0
+                or sample_idx % int(200 * (1 - self.label_noise)) == 1
             )
 
             values = np.random.uniform(0, 1, self.input_size)
@@ -133,7 +133,8 @@ class ArtificialConfounderSequenceDatasetGenerator:
         self.input_size = input_size
         self.label_noise = label_noise
         self.seed = seed
-        name = str(self.num_samples) + "_" + str(self.input_size) + "_"
+        name = str(self.num_samples) + "_" + str(self.input_size[0])
+        name += 'x' + str(self.input_size[1]) + "_"
         name += str(int(100 * label_noise)) + "_" + str(seed)
         self.label_dir = os.path.join(self.dataset_dir, name + ".json")
 
@@ -153,21 +154,26 @@ class ArtificialConfounderSequenceDatasetGenerator:
             has_attribute = int(sample_idx % 4 == 0 or sample_idx % 4 == 1)
             has_confounder = int(sample_idx % 2 == 0)
             flipped_label = int(
-                int(200 * (1 - self.label_noise)) % 2 == 0
-                or int(200 * (1 - self.label_noise)) % 2 == 1
+                sample_idx % int(400 * (1 - self.label_noise)) in range(4)
             )
 
-            num_values = np.random.randint(self.input_size[0])
+            num_values = np.random.randint(1, self.input_size[0])
             values = np.random.randint(
-                self.input_size[1], size=num_values, dtype=np.int32)
+                self.input_size[1], size=num_values, dtype=np.int32
+            )
             target = int(
-                np.sum(values >= self.input_size[1] / 2) > np.sum(values < self.input_size[1] / 2))
-            while not target == has_attribute:
-                num_values = np.random.randint(self.input_size[0])
+                np.sum(values >= self.input_size[1] / 2)
+                > np.sum(values < self.input_size[1] / 2)
+            )
+            while not (target == has_attribute and int(values[-1] >= self.input_size[1] / 2) == has_confounder):
+                num_values = np.random.randint(1, self.input_size[0])
                 values = np.random.randint(
-                    self.input_size[1], size=num_values, dtype=np.int32)
+                    self.input_size[1], size=num_values, dtype=np.int32
+                )
                 target = int(
-                    np.sum(values >= self.input_size[1] / 2) > np.sum(values < self.input_size[1] / 2))
+                    np.sum(values >= self.input_size[1] / 2)
+                    > np.sum(values < self.input_size[1] / 2)
+                )
 
             if flipped_label:
                 target = abs(1 - target)

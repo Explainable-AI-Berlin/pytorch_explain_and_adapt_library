@@ -12,3 +12,4 @@
 'confounder_probability'  : 0.5
 'confounding_factors'     : ['Cancer', 'Confounder']
 'has_hints'               : False
+'known_confounder'        : True

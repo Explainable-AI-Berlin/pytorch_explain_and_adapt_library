@@ -8,3 +8,4 @@
 'output_size'                        : 2
 'confounder_probability'             : 0.5
 'confounding_factors'                : ['Target', 'Confounder']
+'known_confounder'                   : True

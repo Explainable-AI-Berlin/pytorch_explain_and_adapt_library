@@ -1,0 +1,8 @@
+#
+'training'          : '$PEAL/configs/training/sequence_generator.yaml'
+'architecture'      : '$PEAL/configs/architectures/sequence_vae.yaml'
+'task':
+  'criterions':
+    'likelihood'    : 1.0
+    'reconstruction': 1.0
+  'selection'       : {}

@@ -20,52 +20,138 @@ from peal.data.transformations import (
 )
 
 
-class ImageDataset(torch.utils.data.Dataset):
-    pass
+def get_datasets(config, base_dir):
+    '''
+    _summary_
 
+    Args:
+        config (_type_): _description_
+        base_dir (_type_): _description_
 
-class SequenceDataset(torch.utils.data.Dataset):
-    """Sequence dataset."""
+    Raises:
+        ValueError: _description_
 
-    def __init__(self, data_dir, mode, config, transform=ToTensor(), task_config=None):
-        '''
-        Initialize the dataset.
+    Returns:
+        _type_: _description_
+    '''
+    config = load_yaml_config(config)
 
-        Args:
-            data_dir (Path): The path to the data directory.
-            mode (str): The mode of the dataset. Can be "train", "val", "test" or "all".
-            config (obj): The data config object.
-            transform (torchvision.transform, optional): The transform to apply to the data. Defaults to ToTensor().
-            task_config (obj, optional): The task config object. Defaults to None.
-        '''
-        self.config = config
-        self.transform = transform
-        self.task_config = task_config
-        self.data, self.keys = parse_json(
-            data_dir,
-            config,
-            mode
+    #
+    transform_list_train = []
+    transform_list_test = []
+    #
+    if config["input_type"] == "image" and "circular_cut" in config["invariances"]:
+        transform_list_train.append(CircularCut())
+        transform_list_test.append(CircularCut())
+
+    #
+    transform_list_train.append(ToTensor())
+    transform_list_test.append(ToTensor())
+
+    #
+    if config["input_type"] == "image":
+        if "crop_size" in config.keys():
+            transform_list_train.append(Padding(config["crop_size"][1:]))
+            transform_list_test.append(Padding(config["crop_size"][1:]))
+
+        #
+        if "rotation" in config["invariances"]:
+            transform_list_train.append(RandomRotation())
+        if "hflipping" in config["invariances"]:
+            transform_list_train.append(transforms.RandomHorizontalFlip(p=0.5))
+        if "vflipping" in config["invariances"]:
+            transform_list_train.append(transforms.RandomVerticalFlip(p=0.5))
+
+        #
+        if "crop_size" in config.keys():
+            transform_list_train.append(
+                transforms.RandomCrop(config["crop_size"][1:]))
+            transform_list_test.append(
+                transforms.CenterCrop(config["crop_size"][1:]))
+
+        transform_list_train.append(
+            transforms.Resize(config["input_size"][1:]))
+        transform_list_test.append(transforms.Resize(config["input_size"][1:]))
+
+        transform_list_train.append(SetChannels(config["input_size"][0]))
+        transform_list_test.append(SetChannels(config["input_size"][0]))
+
+    #
+    transform_train = transforms.Compose(transform_list_train)
+    transform_test = transforms.Compose(transform_list_test)
+
+    if config["input_type"] == "image" and config["output_type"] == "singleclass":
+        dataset = Image2ClassDataset
+
+    elif config["input_type"] == "image" and config["output_type"] in [
+        "multiclass",
+        "mixed",
+    ]:
+        dataset = Image2MixedDataset
+
+    elif config["input_type"] == "symbolic" and config["output_type"] in [
+        "multiclass",
+        "mixed",
+    ]:
+        dataset = SymbolicDataset
+
+    elif config["input_type"] == "sequence" and config["output_type"] in [
+        "singleclass",
+    ]:
+        dataset = SequenceDataset
+
+    else:
+        raise ValueError("input_type: " + config["input_type"] + ", output_type: " +
+                         config["output_type"] + " combination is not supported!")
+
+    #
+    if config["input_type"] == "image" and config["use_normalization"]:
+        stats_dataset = dataset(base_dir, "train", config, transform_test)
+        samples = []
+        for idx in range(stats_dataset.__len__()):
+            samples.append(stats_dataset.__getitem__(idx)[0])
+
+        samples = torch.stack(samples)
+        config["normalization"].append(
+            list(torch.mean(samples, [0, 2, 3]).numpy()))
+        config["normalization"].append(
+            list(torch.std(samples, [0, 2, 3]).numpy()))
+
+        #
+        normalization = Normalization(
+            config["normalization"][0], config["normalization"][1]
         )
 
-    def __len__(self):
-        return len(self.keys)
+    else:
+        normalization = IdentityNormalization()
 
-    def __getitem__(self, idx):
-        name = self.keys[idx]
+    transform_train = transforms.Compose([transform_train, normalization])
+    transform_test = transforms.Compose([transform_test, normalization])
 
-        data = torch.tensor(self.data[name], dtype=torch.float32)
+    train_data = dataset(base_dir, "train", config, transform_train)
+    val_data = dataset(base_dir, "val", config, transform_train)
+    test_data = dataset(base_dir, "test", config, transform_test)
 
-        x = data[:-1]
-        x = torch.cat([
-            x,
-            self.input_size[1] * torch.ones([self.input_size[0] - x.shape[0]])
-        ])
-        y = data[-1]
+    # this is kind of dirty
+    train_data.normalization = normalization
+    val_data.normalization = normalization
+    test_data.normalization = normalization
 
-        return x, y
+    return train_data, val_data, test_data
 
 
 def parse_json(data_dir, config, mode):
+    '''
+    _summary_
+
+    Args:
+        data_dir (_type_): _description_
+        config (_type_): _description_
+        mode (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    '''
     with open(data_dir, "r") as f:
         raw_data = json.load(f)
 
@@ -89,6 +175,18 @@ def parse_json(data_dir, config, mode):
 
 
 def parse_csv(data_dir, config, mode, key_type="idx"):
+    '''
+    _summary_
+
+    Args:
+        data_dir (_type_): _description_
+        config (_type_): _description_
+        mode (_type_): _description_
+        key_type (str, optional): _description_. Defaults to "idx".
+
+    Returns:
+        _type_: _description_
+    '''
     raw_data = open(data_dir, "r").read().split("\n")
     attributes = raw_data[0].split(",")
     if key_type == "name":
@@ -167,6 +265,18 @@ def parse_csv(data_dir, config, mode, key_type="idx"):
 
 
 def process_confounder_data_controlled(raw_data, config, mode, extract_instances_tensor):
+    '''
+    _summary_
+
+    Args:
+        raw_data (_type_): _description_
+        config (_type_): _description_
+        mode (_type_): _description_
+        extract_instances_tensor (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    '''
     data = {}
     n_attribute_confounding = np.array([[0, 0], [0, 0]])
     max_attribute_confounding = np.array([[0, 0], [0, 0]])
@@ -258,6 +368,54 @@ def process_confounder_data_controlled(raw_data, config, mode, extract_instances
         random.shuffle(keys_out)
 
     return data, keys_out
+
+
+class ImageDataset(torch.utils.data.Dataset):
+    pass
+
+
+class SequenceDataset(torch.utils.data.Dataset):
+    """Sequence dataset."""
+
+    def __init__(self, data_dir, mode, config, transform=ToTensor(), task_config=None):
+        '''
+        Initialize the dataset.
+
+        Args:
+            data_dir (Path): The path to the data directory.
+            mode (str): The mode of the dataset. Can be "train", "val", "test" or "all".
+            config (obj): The data config object.
+            transform (torchvision.transform, optional): The transform to apply to the data. Defaults to ToTensor().
+            task_config (obj, optional): The task config object. Defaults to None.
+        '''
+        self.config = config
+        self.transform = transform
+        self.task_config = task_config
+        self.data, self.keys = parse_json(
+            data_dir,
+            config,
+            mode
+        )
+
+    def __len__(self):
+        return len(self.keys)
+
+    def __getitem__(self, idx):
+        name = self.keys[idx]
+
+        data = torch.tensor(self.data[name], dtype=torch.int64)
+
+        x = data[:-1]
+        # pad with EOS tokens
+        x = torch.cat([
+            x,
+            self.config['input_size'][1] * torch.ones(
+                [self.config['input_size'][0] - x.shape[0]], dtype=torch.int64
+            )
+        ])
+        y = data[-1]
+
+        return x, y
 
 
 class SymbolicDataset(torch.utils.data.Dataset):
@@ -419,109 +577,6 @@ class VAEDatasetWrapper(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         x, y = self.base_dataset.__getitem__(idx)
         return x, x
-
-
-def get_datasets(config, base_dir):
-    """ """
-    config = load_yaml_config(config)
-
-    #
-    transform_list_train = []
-    transform_list_test = []
-    #
-    if config["input_type"] == "image" and "circular_cut" in config["invariances"]:
-        transform_list_train.append(CircularCut())
-        transform_list_test.append(CircularCut())
-
-    #
-    transform_list_train.append(ToTensor())
-    transform_list_test.append(ToTensor())
-
-    #
-    if config["input_type"] == "image":
-        if "crop_size" in config.keys():
-            transform_list_train.append(Padding(config["crop_size"][1:]))
-            transform_list_test.append(Padding(config["crop_size"][1:]))
-
-        #
-        if "rotation" in config["invariances"]:
-            transform_list_train.append(RandomRotation())
-        if "hflipping" in config["invariances"]:
-            transform_list_train.append(transforms.RandomHorizontalFlip(p=0.5))
-        if "vflipping" in config["invariances"]:
-            transform_list_train.append(transforms.RandomVerticalFlip(p=0.5))
-
-        #
-        if "crop_size" in config.keys():
-            transform_list_train.append(
-                transforms.RandomCrop(config["crop_size"][1:]))
-            transform_list_test.append(
-                transforms.CenterCrop(config["crop_size"][1:]))
-
-        transform_list_train.append(
-            transforms.Resize(config["input_size"][1:]))
-        transform_list_test.append(transforms.Resize(config["input_size"][1:]))
-
-        transform_list_train.append(SetChannels(config["input_size"][0]))
-        transform_list_test.append(SetChannels(config["input_size"][0]))
-
-    #
-    transform_train = transforms.Compose(transform_list_train)
-    transform_test = transforms.Compose(transform_list_test)
-
-    if config["input_type"] == "image" and config["output_type"] == "singleclass":
-        dataset = Image2ClassDataset
-
-    elif config["input_type"] == "image" and config["output_type"] in [
-        "multiclass",
-        "mixed",
-    ]:
-        dataset = Image2MixedDataset
-
-    elif config["input_type"] == "symbolic" and config["output_type"] in [
-        "multiclass",
-        "mixed",
-    ]:
-        dataset = SymbolicDataset
-
-    else:
-        raise ValueError(config["dataset_name"] +
-                         " is not valid data set name.")
-
-    #
-    if config["input_type"] == "image" and config["use_normalization"]:
-        stats_dataset = dataset(base_dir, "train", config, transform_test)
-        samples = []
-        for idx in range(stats_dataset.__len__()):
-            samples.append(stats_dataset.__getitem__(idx)[0])
-
-        samples = torch.stack(samples)
-        config["normalization"].append(
-            list(torch.mean(samples, [0, 2, 3]).numpy()))
-        config["normalization"].append(
-            list(torch.std(samples, [0, 2, 3]).numpy()))
-
-        #
-        normalization = Normalization(
-            config["normalization"][0], config["normalization"][1]
-        )
-
-    else:
-        normalization = IdentityNormalization()
-
-    transform_train = transforms.Compose([transform_train, normalization])
-    transform_test = transforms.Compose([transform_test, normalization])
-
-    train_data = dataset(base_dir, "train", config, transform_train)
-    val_data = dataset(base_dir, "val", config, transform_train)
-    test_data = dataset(base_dir, "test", config, transform_test)
-
-    # this is kind of dirty
-    train_data.normalization = normalization
-    val_data.normalization = normalization
-    test_data.normalization = normalization
-
-    return train_data, val_data, test_data
 
 
 class Image2ClassDataset(ImageDataset):
