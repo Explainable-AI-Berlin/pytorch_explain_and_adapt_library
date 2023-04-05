@@ -39,7 +39,7 @@ class VAE(InvertibleGenerator):
                     num_blocks=config["architecture"]['num_blocks'],
                     embedding_dim=config["architecture"]["neuron_numbers_encoder"][-1],
                     num_heads=config["architecture"]['num_heads'],
-                    input_channels=config["data"]['input_size'][-1],
+                    input_channels=config["data"]['input_size'][-1] + 2,
                     activation=nn.ReLU,
                 )
 
@@ -64,7 +64,7 @@ class VAE(InvertibleGenerator):
                     num_blocks=config["architecture"]['num_blocks'],
                     embedding_dim=config["architecture"]["neuron_numbers_encoder"][-1],
                     num_heads=config["architecture"]['num_heads'],
-                    input_channels=config["data"]['input_size'][-1],
+                    input_channels=config["data"]['input_size'][-1] + 2,
                     activation=nn.ReLU,
                     max_length=self.config["data"]['input_size'][0],
                     embedding=list(self.encoder.children())[0],

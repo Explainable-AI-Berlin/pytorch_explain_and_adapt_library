@@ -4,7 +4,7 @@ from torch import nn
 from zennit.layer import Sum
 
 from peal.architectures.module_blocks import VGGBlock, ResnetBlock, TransformerBlock
-from peal.architectures.basic_modules import Squeeze, Mean
+from peal.architectures.basic_modules import Squeeze, Mean, Transpose
 from peal.architectures.basic_modules import DimensionSwitchAttentionLayer
 
 
@@ -213,7 +213,7 @@ class Latent2ImgDecoder(nn.Sequential):
         super().__init__(*layers)
 
 
-class Latent2SequenceDecoder:
+class Latent2SequenceDecoder(nn.Module):
     '''
     Decodes a latent vector into a sequence of vectors
     '''
@@ -251,12 +251,14 @@ class Latent2SequenceDecoder:
                 )
             )
 
-        layers.append(nn.Conv1d(input_channels, embedding_dim, 1))
+        layers.append(Transpose(1, 2))
+        layers.append(nn.Conv1d(embedding_dim, input_channels, 1))
+        layers.append(Transpose(1, 2))
         #
         super(Latent2SequenceDecoder, self).__init__()
         self.network = nn.Sequential(*layers)
         self.embedding = embedding
-        self.unkown_token = self.embedding.num_embeddings - 1
+        self.unknown_token = self.embedding.num_embeddings - 1
         self.max_length = max_length
 
     def forward(self, z, max_length=None):
@@ -272,14 +274,18 @@ class Latent2SequenceDecoder:
         if isinstance(z, list):
             tokens_in = z[1]
             tokens_in = torch.cat(
-                [self.unkown_token * torch.ones([z.shape[0]]), tokens_in[:-1]],
+                [
+                    self.unknown_token *
+                    torch.ones([z[1].shape[0], 1]).to(tokens_in),
+                    tokens_in[:, :-1]
+                ],
                 dim=1,
             )
             z = z[0]
 
         else:
-            tokens_in = self.unkown_token * torch.ones(
-                [max_length if max_length is not None else self.max_length]
+            tokens_in = self.unknown_token * torch.ones(
+                [z.shape[0], max_length if max_length is not None else self.max_length]
             )
 
         z = self.embedding(tokens_in) + z

@@ -217,7 +217,7 @@ class SelfAttentionLayer(nn.Module):
         pos_enc[:, 1::2] = torch.cos(pos * div)
         pos_enc = pos_enc.unsqueeze(0)
 
-        x = x + pos_enc
+        x = x + pos_enc.to(x)
 
         #
         if self.use_masking:

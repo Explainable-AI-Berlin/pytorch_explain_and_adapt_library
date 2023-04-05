@@ -4,5 +4,5 @@
 'task':
   'criterions':
     'likelihood'    : 1.0
-    'reconstruction': 1.0
+    'ce'            : 1.0
   'selection'       : {}
