@@ -16,6 +16,18 @@ class Transpose(nn.Module):
         return x.transpose(self.dim1, self.dim2)
 
 
+class OneHotEncoding(nn.Module):
+    def __init__(self, num_classes):
+        super(OneHotEncoding, self).__init__()
+        self.num_classes = num_classes
+
+    def forward(self, x):
+        if len(x.shape) == 2:
+            x = torch.nn.functional.one_hot(x, num_classes=self.num_classes)
+
+        return x
+
+
 class Unsqueeze(nn.Module):
     '''
     _summary_

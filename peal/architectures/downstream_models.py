@@ -5,10 +5,10 @@ import torch
 import numpy as np
 
 from peal.architectures.model_parts import (
+    Vector2LatentEncoder,
+    Sequence2LatentEncoder,
     Img2LatentEncoder,
     Latent2VectorDecoder,
-    Latent2ImgDecoder,
-    Vector2LatentEncoder,
 )
 
 
@@ -61,11 +61,52 @@ class Symbolic2VectorModel(torch.nn.Sequential):
         super(Symbolic2VectorModel, self).__init__(*[encoder, decoder])
 
 
-class Img2VectorModel(torch.nn.Sequential):
+class Sequence2VectorModel(torch.nn.Sequential):
     """ """
 
     def __init__(self, config):
         """ """
+        if config["architecture"]["activation"] == "LeakyReLU":
+            activation = torch.nn.LeakyReLU
+
+        elif config["architecture"]["activation"] == "ReLU":
+            activation = torch.nn.ReLU
+
+        elif config["architecture"]["activation"] == "Softplus":
+            activation = torch.nn.Softplus
+
+        encoder = Sequence2LatentEncoder(
+            num_blocks=config["architecture"]['num_blocks'],
+            embedding_dim=config["architecture"]["neuron_numbers_encoder"][-1],
+            num_heads=config["architecture"]['num_heads'],
+            input_channels=config["data"]['input_size'][-1] + 2,
+            activation=activation,
+        )
+        decoder = Latent2VectorDecoder(
+            output_size=config["task"]["output_size"],
+            activation=activation,
+            num_hidden_in=config["architecture"]["neuron_numbers_encoder"][-1],
+            neuron_numbers=config["architecture"]["neuron_numbers_decoder"],
+        )
+
+        super(Sequence2VectorModel, self).__init__(*[encoder, decoder])
+
+
+class Img2VectorModel(torch.nn.Sequential):
+    '''
+    _summary_
+
+    Args:
+        torch (_type_): _description_
+    '''
+
+    def __init__(self, config):
+        '''
+        _summary_
+
+        Args:
+            config (_type_): _description_
+        '''
         #
         if config["architecture"]["activation"] == "LeakyReLU":
             activation = torch.nn.LeakyReLU
@@ -92,47 +133,14 @@ class Img2VectorModel(torch.nn.Sequential):
         )
 
         #
-        if (
-            len(
-                set(config["task"]["criterions"].keys()).intersection(
-                    ["ce", "bce", "mse", "mae", "mixed", "supervised"]
-                )
-            )
-            >= 1
-        ):
-            #
-            latent2target_decoder = Latent2VectorDecoder(
-                output_size=config["task"]["output_size"],
-                num_hidden_in=config["architecture"]["neuron_numbers"][-1],
-                dimension_reduction=config["architecture"]["dimension_reduction"],
-                dropout=config["architecture"]["dropout"],
-                activation=activation,
-                latent_height=latent_height,
-            )
-
-        elif "ldj" in config["task"]["criterions"].keys():
-            # solely generative normalizing flow
-            downsampling_factor = math.pow(
-                2, len(config["architecture"]["neuron_numbers"])
-            )
-            latent2target_decoder = NFFlatten(
-                input_shape=[
-                    config["architecture"]["neuron_numbers"][-1],
-                    int(config["data"]["input_size"][1] / downsampling_factor),
-                    int(config["data"]["input_size"][2] / downsampling_factor),
-                ]
-            )
-
-        elif "reconstruction" in config["task"]["criterions"].keys():
-            #
-            latent2target_decoder = Latent2ImgDecoder(
-                neuron_numbers=config["architecture"]["neuron_numbers"][::-1],
-                blocks_per_layer=config["architecture"]["blocks_per_layer"],
-                block_type=config["architecture"]["block_type"],
-                output_size=config["data"]["input_size"][0],
-                use_batchnorm=config["architecture"]["use_batchnorm"],
-                activation=activation,
-            )
+        latent2target_decoder = Latent2VectorDecoder(
+            output_size=config["task"]["output_size"],
+            num_hidden_in=config["architecture"]["neuron_numbers"][-1],
+            dimension_reduction=config["architecture"]["dimension_reduction"],
+            dropout=config["architecture"]["dropout"],
+            activation=activation,
+            latent_height=latent_height,
+        )
 
         super(Img2VectorModel, self).__init__(
             *[img2latent_encoder, latent2target_decoder]

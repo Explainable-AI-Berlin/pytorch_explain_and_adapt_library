@@ -4,7 +4,7 @@ from torch import nn
 from zennit.layer import Sum
 
 from peal.architectures.module_blocks import VGGBlock, ResnetBlock, TransformerBlock
-from peal.architectures.basic_modules import Squeeze, Mean, Transpose
+from peal.architectures.basic_modules import Squeeze, Mean, Transpose, OneHotEncoding
 from peal.architectures.basic_modules import DimensionSwitchAttentionLayer
 
 
@@ -118,7 +118,11 @@ class Sequence2LatentEncoder(nn.Sequential):
             activation (nn.Module): The activation function to use
         '''
         layers = []
-        layers.append(nn.Embedding(input_channels + 2, embedding_dim))
+        # layers.append(nn.Embedding(input_channels + 2, embedding_dim))
+        layers.append(OneHotEncoding(input_channels))
+        layers.append(Transpose(dims=[1, 2]))
+        layers.append(nn.Conv1d(input_channels, embedding_dim))
+        layers.append(Transpose(dims=[1, 2]))
         for i in range(num_blocks):
             layers.append(
                 TransformerBlock(
