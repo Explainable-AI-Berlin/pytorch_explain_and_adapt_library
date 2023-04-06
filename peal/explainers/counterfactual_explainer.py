@@ -70,39 +70,9 @@ class CounterfactualExplainer:
         self.loss = torch.nn.CrossEntropyLoss()
         self.from_pytorch_canonical = from_pytorch_canonical
         self.to_pytorch_canonical = to_pytorch_canonical
-        if (
-            "lrp_regularization" in self.explainer_config.keys()
-            and self.explainer_config["lrp_regularization"] > 0
-        ):
-            self.lrp_explainer = LRPExplainer(self.downstream_model, num_classes)
-
-    def explain_batch(
-        self,
-        batch_in,
-        target_classes,
-        target_confidence_goal_in=None,
-        source_classes=None,
-    ):
-        """ """
-        if target_confidence_goal_in is None:
-            target_confidence_goal = self.explainer_config["target_confidence_goal"]
-
-        else:
-            target_confidence_goal = target_confidence_goal_in
-
-        if (
-            "lrp_regularization" in self.explainer_config.keys()
-            and self.explainer_config["lrp_regularization"] > 0
-        ):
-            lrp_heatmaps = self.lrp_explainer.explain_batch(batch_in, source_classes)[0]
-            regularization_mask = torch.pow(
-                lrp_heatmaps + 0.0000000001, -1
-            )  # torch.ones_like(lrp_heatmaps) - lrp_heatmaps
-            regularization_mask = regularization_mask.to(self.device)
-
-        batch = batch_in.clone()
+    
+    def gradient_based_counterfactual(batch):
         batch = self.from_pytorch_canonical(batch)
-
         v_original = self.generator.encode(batch.to(self.device))
         if isinstance(v_original, list):
             v = []
@@ -206,7 +176,40 @@ class CounterfactualExplainer:
         counterfactual = self.generator.decode(latent_code).detach().cpu()
         counterfactual = self.to_pytorch_canonical(counterfactual)
 
-        if self.input_type == "symbolic":
+        attributions = []
+        for v_idx in range(len(v_original)):
+            attributions.append(
+                torch.flatten(
+                    v_original[v_idx].detach().cpu() - v[v_idx].detach().cpu(), 1
+                )
+            )
+
+        attributions = torch.cat(attributions, 1)
+
+        return counterfactual, attributions
+
+    def explain_batch(
+        self,
+        batch_in,
+        target_classes,
+        target_confidence_goal_in=None,
+        source_classes=None,
+    ):
+        """ """
+        if target_confidence_goal_in is None:
+            target_confidence_goal = self.explainer_config["target_confidence_goal"]
+
+        else:
+            target_confidence_goal = target_confidence_goal_in
+
+        batch = batch_in.clone()
+
+        if isinstance(self.generator, InvertibleGenerator):
+            counterfactual, attributions = self.gradient_based_counterfactual(batch)        
+
+        # TODO insert this via a decorator!
+        self.generate_contrastive_collage(batch_in, counterfactual)
+        '''if self.input_type == "symbolic":
             result_img_collage, heatmap = generate_symbolic_collage(
                 batch_in,
                 counterfactual,
@@ -222,19 +225,7 @@ class CounterfactualExplainer:
             result_img_collage, heatmap = generate_image_collage(
                 batch_in,
                 counterfactual,
-            )
-
-        attributions = []
-        for v_idx in range(len(v_original)):
-            attributions.append(
-                torch.flatten(
-                    v_original[v_idx].detach().cpu() - v[v_idx].detach().cpu(), 1
-                )
-            )
-
-        attributions = torch.cat(attributions, 1)  # .unsqueeze(-1).unsqueeze(-1)
-        # TODO does removing this breaks something?
-        # attributions = torch.reshape(attributions, list(batch_in.shape))
+            )'''
 
         return (
             result_img_collage,

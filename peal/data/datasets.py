@@ -19,6 +19,19 @@ from peal.data.transformations import (
     SetChannels,
 )
 
+class PealDataset(torch.utils.data.Dataset):
+    def generate_contrastive_collage(batch_in, counterfactual):
+        return torch.zeros([3,64,64])
+    
+    def serialize_dataset(output_dir, x_list, y_list, sample_names = None):
+        pass
+    
+    def project_to_pytorch_default(x):
+        return x
+    
+    def project_from_pytorch_default(x):
+        return x
+
 
 def get_datasets(config, base_dir):
     '''

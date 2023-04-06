@@ -49,13 +49,13 @@ class CounterfactualKnowledgeDistillation:
         output_size=None,
         generator="$PEAL/configs/models/default_generator.yaml",
         base_dir=os.path.join("peal_runs", "counterfactual_knowledge_distillation"),
-        teacher="Human@8000",
+        teacher="human@8000",
         adaptor_config="$PEAL/configs/adaptors/counterfactual_knowledge_distillation_default.yaml",
         gigabyte_vram=None,
         overwrite=False,
         use_visualization=True,
     ):
-        #
+        # TODO make sure to use seeds everywhere!
         self.base_dir = base_dir
         #
         self.original_student = student
@@ -64,6 +64,7 @@ class CounterfactualKnowledgeDistillation:
             "cuda" if next(self.original_student.parameters()).is_cuda else "cpu"
         )
         self.overwrite = overwrite
+        # either copy or load the student
         if self.overwrite or not os.path.exists(
             os.path.join(self.base_dir, "config.yaml")
         ):
@@ -84,6 +85,8 @@ class CounterfactualKnowledgeDistillation:
 
         self.student.eval()
 
+        self.output_size = integrate_data_config_into_adaptor_config(self.adaptor_config, datasource, output_size)
+        '''
         if not output_size is None:
             self.output_size = output_size
             self.adaptor_config["data"]["output_size"] = output_size
@@ -120,10 +123,10 @@ class CounterfactualKnowledgeDistillation:
 
         else:
             assert self.adaptor_config["data"]["input_size"] != "None"
+        '''
 
-        self.input_size = self.adaptor_config["data"]["input_size"]
-
-        if "base_batch_size" in self.adaptor_config.keys():
+        set_adaptive_batch_size(self.adaptor_config)
+        '''if "base_batch_size" in self.adaptor_config.keys():
             multiplier = float(
                 np.prod(self.adaptor_config["assumed_input_size"])
                 / np.prod(self.adaptor_config["data"]["input_size"])
@@ -147,7 +150,7 @@ class CounterfactualKnowledgeDistillation:
                         / batch_size_adapted
                     )
                     + 1
-                )
+                )'''
 
         #
         self.enable_hints = bool(teacher == "SegmentationMask")
@@ -164,7 +167,8 @@ class CounterfactualKnowledgeDistillation:
         )
         self.dataloaders_val = [self.val_dataloader, None]
 
-        # in case the used dataloader has a non-default data normalization it is assumed the inverse function of this normalization is attribute of the underlying dataset
+        # in case the used dataloader has a non-default data normalization it is assumed
+        # the inverse function of this normalization is attribute of the underlying dataset
         if hasattr(self.train_dataloader.dataset, "project_to_pytorch_default"):
             self.project_to_pytorch_default = (
                 self.train_dataloader.dataset.project_to_pytorch_default
@@ -174,7 +178,8 @@ class CounterfactualKnowledgeDistillation:
             self.project_to_pytorch_default = lambda x: x
 
         #
-        if isinstance(generator, InvertibleGenerator):
+        self.generator = get_generator(generator, self.adaptor_config["data"])
+        '''if isinstance(generator, InvertibleGenerator):
             self.generator = generator
 
         else:
@@ -195,10 +200,11 @@ class CounterfactualKnowledgeDistillation:
             print("Train generator model!")
             generator_trainer.fit()
 
-        self.generator.eval()
+        self.generator.eval()'''
 
         #
-        if isinstance(teacher, TeacherInterface):
+        self.teacher = get_teacher(teacher)
+        '''if isinstance(teacher, TeacherInterface):
             self.teacher = teacher
 
         elif isinstance(teacher, nn.Module):
@@ -227,7 +233,7 @@ class CounterfactualKnowledgeDistillation:
         else:
             self.teacher = Model2ModelTeacher(
                 torch.load(os.path.join(teacher, "model.cpl"))
-            )
+            )'''
 
         self.dataloader_mixer = DataloaderMixer(
             self.adaptor_config["training"], self.train_dataloader
@@ -1332,6 +1338,8 @@ def create_dataset(
     mode="",
     hints=None,
 ):
+    # TODO source out to a decorator, such that it becomes dataset independent
+    # keep graphs and videos in mind hereby
     assert (
         len(counterfactuals)
         == len(feedback)
@@ -1340,7 +1348,48 @@ def create_dataset(
     ), "missmatch in list lengths"
 
     dataset_dir = os.path.join(base_dir, str(finetune_iteration), mode + "dataset")
-    if isinstance(dataset, SymbolicDataset):
+    #
+    current_sample_idx = 0
+    x_list = []
+    y_list = []
+    sample_names = []
+    for sample_idx in range(len(feedback)):
+        if feedback[sample_idx] == "ood":
+            continue
+
+        elif feedback[sample_idx] == "true":
+            sample_name = (
+                "true_"
+                + str(int(source_classes[sample_idx]))
+                + "_to_"
+                + str(int(target_classes[sample_idx]))
+                + "_"
+                + str(current_sample_idx)
+                + ".png"
+            )
+            x_list.append(counterfactuals[sample_idx])
+            y_list.append(int(target_classes[sample_idx]))
+            sample_names.append(sample_name)
+            current_sample_idx += 1
+
+        elif feedback[sample_idx] == "false":
+            sample_name = (
+                "false_"
+                + str(int(source_classes[sample_idx]))
+                + "_to_"
+                + str(int(target_classes[sample_idx]))
+                + "_"
+                + str(current_sample_idx)
+                + ".png"
+            )
+            x_list.append(counterfactuals[sample_idx])
+            y_list.append(int(source_classes[sample_idx]))
+            sample_names.append(sample_name)
+            current_sample_idx += 1
+    
+    serialize_dataset(dataset_dir, x_list, y_list, sample_names)
+
+    '''if isinstance(dataset, SymbolicDataset):
         Path(dataset_dir).mkdir(parents=True, exist_ok=True)
         samples = []
         positive_samples = list(
@@ -1482,4 +1531,4 @@ def create_dataset(
                 current_sample_idx += 1
 
             else:
-                print(feedback[sample_idx] + " is impossible feedback!")
+                print(feedback[sample_idx] + " is impossible feedback!")'''
