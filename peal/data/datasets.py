@@ -1,397 +1,22 @@
 import torch
 import random
 import os
-import json
 import copy
 import numpy as np
-import torchvision.transforms as transforms
 
 from torchvision.transforms import ToTensor
 from PIL import Image
+from pathlib import Path
 
-from peal.utils import load_yaml_config
-from peal.data.transformations import (
-    CircularCut,
-    Padding,
-    RandomRotation,
-    Normalization,
-    IdentityNormalization,
-    SetChannels,
-)
+from peal.data.dataset_interfaces import PealDataset
+from peal.data.dataset_utils import parse_json, parse_csv
 
-class PealDataset(torch.utils.data.Dataset):
-    def generate_contrastive_collage(batch_in, counterfactual):
-        return torch.zeros([3,64,64])
-    
-    def serialize_dataset(output_dir, x_list, y_list, sample_names = None):
-        pass
-    
-    def project_to_pytorch_default(x):
-        return x
-    
-    def project_from_pytorch_default(x):
-        return x
 
-
-def get_datasets(config, base_dir):
-    '''
-    _summary_
-
-    Args:
-        config (_type_): _description_
-        base_dir (_type_): _description_
-
-    Raises:
-        ValueError: _description_
-
-    Returns:
-        _type_: _description_
-    '''
-    config = load_yaml_config(config)
-
-    #
-    transform_list_train = []
-    transform_list_test = []
-    #
-    if config["input_type"] == "image" and "circular_cut" in config["invariances"]:
-        transform_list_train.append(CircularCut())
-        transform_list_test.append(CircularCut())
-
-    #
-    transform_list_train.append(ToTensor())
-    transform_list_test.append(ToTensor())
-
-    #
-    if config["input_type"] == "image":
-        if "crop_size" in config.keys():
-            transform_list_train.append(Padding(config["crop_size"][1:]))
-            transform_list_test.append(Padding(config["crop_size"][1:]))
-
-        #
-        if "rotation" in config["invariances"]:
-            transform_list_train.append(RandomRotation())
-        if "hflipping" in config["invariances"]:
-            transform_list_train.append(transforms.RandomHorizontalFlip(p=0.5))
-        if "vflipping" in config["invariances"]:
-            transform_list_train.append(transforms.RandomVerticalFlip(p=0.5))
-
-        #
-        if "crop_size" in config.keys():
-            transform_list_train.append(
-                transforms.RandomCrop(config["crop_size"][1:]))
-            transform_list_test.append(
-                transforms.CenterCrop(config["crop_size"][1:]))
-
-        transform_list_train.append(
-            transforms.Resize(config["input_size"][1:]))
-        transform_list_test.append(transforms.Resize(config["input_size"][1:]))
-
-        transform_list_train.append(SetChannels(config["input_size"][0]))
-        transform_list_test.append(SetChannels(config["input_size"][0]))
-
-    #
-    transform_train = transforms.Compose(transform_list_train)
-    transform_test = transforms.Compose(transform_list_test)
-
-    if config["input_type"] == "image" and config["output_type"] == "singleclass":
-        dataset = Image2ClassDataset
-
-    elif config["input_type"] == "image" and config["output_type"] in [
-        "multiclass",
-        "mixed",
-    ]:
-        dataset = Image2MixedDataset
-
-    elif config["input_type"] == "symbolic" and config["output_type"] in [
-        "multiclass",
-        "mixed",
-    ]:
-        dataset = SymbolicDataset
-
-    elif config["input_type"] == "sequence" and config["output_type"] in [
-        "singleclass",
-    ]:
-        dataset = SequenceDataset
-
-    else:
-        raise ValueError("input_type: " + config["input_type"] + ", output_type: " +
-                         config["output_type"] + " combination is not supported!")
-
-    #
-    if config["input_type"] == "image" and config["use_normalization"]:
-        stats_dataset = dataset(base_dir, "train", config, transform_test)
-        samples = []
-        for idx in range(stats_dataset.__len__()):
-            samples.append(stats_dataset.__getitem__(idx)[0])
-
-        samples = torch.stack(samples)
-        config["normalization"].append(
-            list(torch.mean(samples, [0, 2, 3]).numpy()))
-        config["normalization"].append(
-            list(torch.std(samples, [0, 2, 3]).numpy()))
-
-        #
-        normalization = Normalization(
-            config["normalization"][0], config["normalization"][1]
-        )
-
-    else:
-        normalization = IdentityNormalization()
-
-    transform_train = transforms.Compose([transform_train, normalization])
-    transform_test = transforms.Compose([transform_test, normalization])
-
-    train_data = dataset(base_dir, "train", config, transform_train)
-    val_data = dataset(base_dir, "val", config, transform_train)
-    test_data = dataset(base_dir, "test", config, transform_test)
-
-    # this is kind of dirty
-    train_data.normalization = normalization
-    val_data.normalization = normalization
-    test_data.normalization = normalization
-
-    return train_data, val_data, test_data
-
-
-def parse_json(data_dir, config, mode):
-    '''
-    _summary_
-
-    Args:
-        data_dir (_type_): _description_
-        config (_type_): _description_
-        mode (_type_): _description_
-
-    Returns:
-        _type_: _description_
-    '''
-    with open(data_dir, "r") as f:
-        raw_data = json.load(f)
-
-    if config['known_confounder']:
-        def extract_instances_tensor_confounder(idx, line):
-            key = str(idx)
-            instances_tensor = torch.tensor(line["values"])
-            attribute = line["target"]
-            confounder = line["has_confounder"]
-            instances_tensor = torch.cat(
-                [instances_tensor, torch.tensor([attribute])]
-            )
-            return key, instances_tensor, attribute, confounder
-
-        return process_confounder_data_controlled(
-            raw_data=raw_data.values(),
-            config=config,
-            mode=mode,
-            extract_instances_tensor=extract_instances_tensor_confounder,
-        )
-
-
-def parse_csv(data_dir, config, mode, key_type="idx"):
-    '''
-    _summary_
-
-    Args:
-        data_dir (_type_): _description_
-        config (_type_): _description_
-        mode (_type_): _description_
-        key_type (str, optional): _description_. Defaults to "idx".
-
-    Returns:
-        _type_: _description_
-    '''
-    raw_data = open(data_dir, "r").read().split("\n")
-    attributes = raw_data[0].split(",")
-    if key_type == "name":
-        attributes = attributes[1:]
-
-    raw_data = raw_data[1:]
-
-    def extract_instances_tensor(idx, line):
-        instance_attributes = line.split(",")
-
-        if key_type == "idx":
-            key = str(idx)
-
-        elif key_type == "name":
-            key = instance_attributes[0]
-            instance_attributes = instance_attributes[1:]
-
-        instance_attributes_int = list(
-            map(
-                lambda x: float(x),
-                instance_attributes,
-            )
-        )
-        instances_tensor = torch.tensor(instance_attributes_int)
-        return key, instances_tensor
-
-    if not len(config["confounding_factors"]) == 0:
-        def extract_instances_tensor_confounder(idx, line):
-            selection_idx1 = attributes.index(config["confounding_factors"][0])
-            selection_idx2 = attributes.index(config["confounding_factors"][1])
-            key, instances_tensor = extract_instances_tensor(
-                idx,
-                line
-            )
-            attribute = int(instances_tensor[selection_idx1])
-            confounder = int(instances_tensor[selection_idx2])
-            return key, instances_tensor, attribute, confounder
-
-        data, keys_out = process_confounder_data_controlled(
-            raw_data=raw_data,
-            config=config,
-            mode=mode,
-            extract_instances_tensor=extract_instances_tensor_confounder,
-        )
-
-    else:
-        data = {}
-        for idx, line in enumerate(raw_data):
-            key, instances_tensor = extract_instances_tensor(
-                idx,
-                line
-            )
-            data[key] = torch.maximum(
-                torch.zeros_like(instances_tensor),
-                instances_tensor,
-            )
-
-        keys = list(data.keys())
-        if mode == "train":
-            keys_out = keys[: int(len(keys) * config["split"][0])]
-
-        elif mode == "val":
-            keys_out = keys[
-                int(len(keys) * config["split"][0]): int(
-                    len(keys) * config["split"][1]
-                )
-            ]
-
-        elif mode == "test":
-            keys_out = keys[int(len(keys) * config["split"][1]):]
-
-        else:
-            keys_out = keys
-
-    return attributes, data, keys_out
-
-
-def process_confounder_data_controlled(raw_data, config, mode, extract_instances_tensor):
-    '''
-    _summary_
-
-    Args:
-        raw_data (_type_): _description_
-        config (_type_): _description_
-        mode (_type_): _description_
-        extract_instances_tensor (_type_): _description_
-
-    Returns:
-        _type_: _description_
-    '''
-    data = {}
-    n_attribute_confounding = np.array([[0, 0], [0, 0]])
-    max_attribute_confounding = np.array([[0, 0], [0, 0]])
-    max_attribute_confounding[0][0] = int(
-        config["num_samples"] * config["confounder_probability"] * 0.5
-    )
-    max_attribute_confounding[1][0] = int(
-        config["num_samples"] *
-        round(1 - config["confounder_probability"], 2) * 0.5
-    )
-    max_attribute_confounding[0][1] = int(
-        config["num_samples"] *
-        round(1 - config["confounder_probability"], 2) * 0.5
-    )
-    max_attribute_confounding[1][1] = int(
-        config["num_samples"] * config["confounder_probability"] * 0.5
-    )
-    keys = [[[], []], [[], []]]
-
-    for idx, line in enumerate(raw_data):
-        key, instances_tensor, attribute, confounder = extract_instances_tensor(
-            idx=idx,
-            line=line
-        )
-        if (
-            n_attribute_confounding[attribute][confounder]
-            < max_attribute_confounding[attribute][confounder]
-        ):
-            data[key] = torch.maximum(
-                torch.zeros_like(instances_tensor),
-                instances_tensor,
-            )
-            keys[attribute][confounder].append(key)
-            n_attribute_confounding[attribute][confounder] += 1
-
-        if np.sum(n_attribute_confounding == max_attribute_confounding) == 4:
-            break
-
-    assert (
-        np.sum(n_attribute_confounding == max_attribute_confounding) == 4
-    ), "something went wrong with filling up the attributes"
-    assert (
-        np.sum(n_attribute_confounding) == config["num_samples"]
-    ), "wrong number of samples!"
-    assert (
-        len(keys[0][0]) + len(keys[0][1]) +
-        len(keys[1][0]) + len(keys[1][1])
-        == config["num_samples"]
-    ), "wrong number of keys!"
-    if mode == "train":
-        keys_out = keys[0][0][: int(len(keys[0][0]) * config["split"][0])]
-        keys_out += keys[0][1][: int(len(keys[0][1]) * config["split"][0])]
-        keys_out += keys[1][0][: int(len(keys[1][0]) * config["split"][0])]
-        keys_out += keys[1][1][: int(len(keys[1][1]) * config["split"][0])]
-        random.shuffle(keys_out)
-
-    elif mode == "val":
-        keys_out = keys[0][0][
-            int(len(keys[0][0]) * config["split"][0]): int(
-                len(keys[0][0]) * config["split"][1]
-            )
-        ]
-        keys_out += keys[0][1][
-            int(len(keys[0][1]) * config["split"][0]): int(
-                len(keys[0][1]) * config["split"][1]
-            )
-        ]
-        keys_out += keys[1][0][
-            int(len(keys[1][0]) * config["split"][0]): int(
-                len(keys[1][0]) * config["split"][1]
-            )
-        ]
-        keys_out += keys[1][1][
-            int(len(keys[1][1]) * config["split"][0]): int(
-                len(keys[1][1]) * config["split"][1]
-            )
-        ]
-        random.shuffle(keys_out)
-
-    elif mode == "test":
-        keys_out = keys[0][0][int(len(keys[0][0]) * config["split"][1]):]
-        keys_out += keys[0][1][int(len(keys[0][1]) * config["split"][1]):]
-        keys_out += keys[1][0][int(len(keys[1][0]) * config["split"][1]):]
-        keys_out += keys[1][1][int(len(keys[1][1]) * config["split"][1]):]
-        random.shuffle(keys_out)
-
-    else:
-        keys_out = keys[0][0] + keys[0][1] + keys[1][0] + keys[1][1]
-        random.shuffle(keys_out)
-
-    return data, keys_out
-
-
-class ImageDataset(torch.utils.data.Dataset):
-    pass
-
-
-class SequenceDataset(torch.utils.data.Dataset):
+class SequenceDataset(PealDataset):
     """Sequence dataset."""
 
     def __init__(self, data_dir, mode, config, transform=ToTensor(), task_config=None):
-        '''
+        """
         Initialize the dataset.
 
         Args:
@@ -400,15 +25,11 @@ class SequenceDataset(torch.utils.data.Dataset):
             config (obj): The data config object.
             transform (torchvision.transform, optional): The transform to apply to the data. Defaults to ToTensor().
             task_config (obj, optional): The task config object. Defaults to None.
-        '''
+        """
         self.config = config
         self.transform = transform
         self.task_config = task_config
-        self.data, self.keys = parse_json(
-            data_dir,
-            config,
-            mode
-        )
+        self.data, self.keys = parse_json(data_dir, config, mode)
 
     def __len__(self):
         return len(self.keys)
@@ -420,22 +41,33 @@ class SequenceDataset(torch.utils.data.Dataset):
 
         x = data[:-1]
         # pad with EOS tokens
-        x = torch.cat([
-            x,
-            self.config['input_size'][1] * torch.ones(
-                [self.config['input_size'][0] - x.shape[0]], dtype=torch.int64
-            )
-        ])
+        x = torch.cat(
+            [
+                x,
+                self.config["input_size"][1]
+                * torch.ones(
+                    [self.config["input_size"][0] - x.shape[0]], dtype=torch.int64
+                ),
+            ]
+        )
         y = data[-1]
 
         return x, y
 
+    def generate_contrastive_collage(batch_in, counterfactual):
+        # TODO
+        return torch.zeros([batch_in.shape[0], 3, 64, 64]), torch.zeros_like(batch_in)
 
-class SymbolicDataset(torch.utils.data.Dataset):
+    def serialize_dataset(output_dir, x_list, y_list, sample_names=None):
+        # TODO implement this!
+        pass
+
+
+class SymbolicDataset(PealDataset):
     """Symbolic dataset."""
 
     def __init__(self, data_dir, mode, config, transform=ToTensor(), task_config=None):
-        '''
+        """
         Initialize the dataset.
 
         Args:
@@ -444,15 +76,11 @@ class SymbolicDataset(torch.utils.data.Dataset):
             config (obj): The data config object.
             transform (torchvision.transform, optional): The transform to apply to the data. Defaults to ToTensor().
             task_config (obj, optional): The task config object. Defaults to None.
-        '''
+        """
         self.config = config
         self.transform = transform
         self.task_config = task_config
-        self.attributes, self.data, self.keys = parse_csv(
-            data_dir,
-            config,
-            mode
-        )
+        self.attributes, self.data, self.keys = parse_csv(data_dir, config, mode)
 
     def __len__(self):
         return len(self.keys)
@@ -467,8 +95,7 @@ class SymbolicDataset(torch.utils.data.Dataset):
             and "x_selection" in self.task_config.keys()
             and not len(self.task_config["x_selection"]) == 0
         ):
-            x = torch.zeros(
-                [len(self.task_config["selection"])], dtype=torch.float32)
+            x = torch.zeros([len(self.task_config["selection"])], dtype=torch.float32)
             for idx, selection in enumerate(self.task_config["selection"]):
                 x[idx] = x[self.attributes.index(selection)]
 
@@ -489,18 +116,144 @@ class SymbolicDataset(torch.utils.data.Dataset):
 
         return x, y
 
+    def generate_contrastive_collage(self, batch_in, counterfactual):
+        # TODO
+        return torch.zeros([batch_in.shape[0], 3, 64, 64]), torch.zeros_like(batch_in)
+
+    def serialize_dataset(self, output_dir, x_list, y_list, sample_names=None):
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+        x = torch.cat(x_list, dim=0)
+        y = torch.cat(y_list, dim=0)
+        data = torch.cat([x, y], dim=1)
+        np.savetxt(
+            os.path.join(output_dir, "data.csv"),
+            data.numpy(),
+            delimiter=",",
+            header=",".join(self.attributes),
+        )
+
+
+class ImageDataset(PealDataset):
+    def generate_contrastive_collage(self, batch_in, counterfactual):
+        heatmap_red = torch.maximum(
+            torch.tensor(0.0),
+            torch.sum(batch_in, dim=1) - torch.sum(counterfactual, dim=1),
+        )
+        heatmap_blue = torch.maximum(
+            torch.tensor(0.0),
+            torch.sum(counterfactual, dim=1) - torch.sum(batch_in, dim=1),
+        )
+        if counterfactual.shape[1] == 3:
+            heatmap_green = torch.abs(counterfactual[:, 0] - batch_in[:, 0])
+            heatmap_green = heatmap_green + torch.abs(
+                counterfactual[:, 1] - batch_in[:, 1]
+            )
+            heatmap_green = heatmap_green + torch.abs(
+                counterfactual[:, 2] - batch_in[:, 2]
+            )
+            heatmap_green = heatmap_green - heatmap_red - heatmap_blue
+            counterfactual_rgb = counterfactual
+
+        else:
+            heatmap_green = torch.zeros_like(heatmap_red)
+            batch_in = torch.tile(batch_in, [1, 3, 1, 1])
+            counterfactual_rgb = torch.tile(torch.clone(counterfactual), [1, 3, 1, 1])
+
+        heatmap = torch.stack([heatmap_red, heatmap_green, heatmap_blue], dim=1)
+        if torch.abs(heatmap.sum() - torch.abs(batch_in - counterfactual).sum()) > 0.1:
+            print("Error: Heatmap does not match counterfactual")
+
+        heatmap_high_contrast = torch.clamp(heatmap / heatmap.max(), 0.0, 1.0)
+        result_img_collage = torch.cat(
+            [batch_in, counterfactual_rgb, heatmap_high_contrast], -1
+        )
+        current_collage = self.project_to_pytorch_default(
+            result_img_collages[batch_idx][sample_idx]
+        )
+        current_collage = torchvision.utils.make_grid(
+            current_collage, nrow=self.adaptor_config["batch_size"]
+        )
+        plt.gcf()
+        plt.imshow(current_collage.permute(1, 2, 0))
+        title_string = (
+            str(int(ys[batch_idx][sample_idx]))
+            + " -> "
+            + str(targets[batch_idx][sample_idx].item())
+        )
+        title_string += (
+            ", Target: "
+            + str(
+                round(
+                    float(start_target_confidences[batch_idx][sample_idx]),
+                    2,
+                )
+            )
+            + " -> "
+        )
+        title_string += str(
+            round(float(end_target_confidences[batch_idx][sample_idx]), 2)
+        )
+        plt.title(title_string)
+        collage_path = os.path.join(
+            self.base_dir,
+            str(finetune_iteration),
+            "validation_collages",
+            embed_numberstring(str(sample_idx_iteration)) + ".png",
+        )
+        plt.axis("off")
+        plt.savefig(collage_path)
+        img_np = np.array(Image.open(collage_path))[:, 80:-80]
+        img = Image.fromarray(img_np)
+        img.save(collage_path)
+        return result_img_collage, heatmap_high_contrast
+
+    def serialize_dataset(self, output_dir, x_list, y_list, sample_names=None):
+        for class_name in range(self.config["output_size"]):
+            Path(os.path.join(output_dir, "imgs", str(class_name))).mkdir(
+                parents=True, exist_ok=True
+            )
+
+        data = []
+        for idx, x in enumerate(x_list):
+            class_name = int(y_list[idx])
+            img = Image.fromarray(x.cpu().numpy().transpose(1, 2, 0))
+            img.save(
+                os.path.join(output_dir, "imgs", str(class_name), sample_names[idx])
+            )
+            data.append(
+                [
+                    os.path.join("imgs", str(class_name), sample_names[idx]),
+                    class_name,
+                ]
+            )
+
+        np.savetxt(
+            os.path.join(output_dir, "data.csv"),
+            data.numpy(),
+            delimiter=",",
+            header=",".join(self.attributes),
+        )
+
 
 class Image2MixedDataset(ImageDataset):
     """
-    The celeba dataset.
+    This class is used to load a dataset with images and other data.
+
+    Args:
+        ImageDataset (_type_): _description_
     """
 
     def __init__(self, root_dir, mode, config, transform=ToTensor(), task_config=None):
         """
+        This class is used to load a dataset with images and other data.
+
         Args:
-            root_dir (string): Directory with all the images.
-            transform (callable, optional): Optional transform to be applied
-                on a sample.
+            root_dir (_type_): _description_
+            mode (_type_): _description_
+            config (_type_): _description_
+            transform (_type_, optional): _description_. Defaults to ToTensor().
+            task_config (_type_, optional): _description_. Defaults to None.
         """
         self.root_dir = root_dir
         self.config = config
@@ -508,8 +261,7 @@ class Image2MixedDataset(ImageDataset):
         self.task_config = task_config
         self.hints_enabled = False
         data_dir = os.path.join(root_dir, "data.csv")
-        self.attributes, self.data, self.keys = parse_csv(
-            data_dir, config, mode)
+        self.attributes, self.data, self.keys = parse_csv(data_dir, config, mode)
 
     def __len__(self):
         return len(self.keys)
@@ -556,51 +308,24 @@ class Image2MixedDataset(ImageDataset):
             return img_tensor, (target, mask_tensor)
 
 
-class GlowDatasetWrapper(torch.utils.data.Dataset):
-    def __init__(self, base_dataset, n_bits):
-        self.base_dataset = base_dataset
-        self.n_bits = n_bits
-        self.n_bins = 2.0**n_bits
-
-    def __len__(self):
-        return self.base_dataset.__len__()
-
-    def __getitem__(self, idx):
-        image, label = self.base_dataset.__getitem__(idx)
-        image = image * 255
-        image = torch.floor(image / 2 ** (8 - self.n_bits))
-        image = image / self.n_bins - 0.5
-        image = image + torch.rand_like(image) / self.n_bins
-        return image, label
-
-    def project_to_pytorch_default(self, image):
-        """
-        This function maps processed image back to human visible image
-        """
-        return image + 0.5
-
-
-class VAEDatasetWrapper(torch.utils.data.Dataset):
-    def __init__(self, base_dataset):
-        self.base_dataset = base_dataset
-
-    def __len__(self):
-        return self.base_dataset.__len__()
-
-    def __getitem__(self, idx):
-        x, y = self.base_dataset.__getitem__(idx)
-        return x, x
-
-
 class Image2ClassDataset(ImageDataset):
-    """Shape Attribute dataset."""
+    """
+    This dataset is used for image classification tasks.
+
+    Args:
+        ImageDataset (_type_): _description_
+    """
 
     def __init__(self, root_dir, mode, config, transform=ToTensor(), task_config=None):
         """
+        This method initializes the dataset.
+
         Args:
-            root_dir (string): Directory with all the images.
-            transform (callable, optional): Optional transform to be applied
-                on a sample.
+            root_dir (_type_): _description_
+            mode (_type_): _description_
+            config (_type_): _description_
+            transform (_type_, optional): _description_. Defaults to ToTensor().
+            task_config (_type_, optional): _description_. Defaults to None.
         """
         self.config = config
         if "has_hints" in self.config.keys() and self.config["has_hints"]:
@@ -633,13 +358,13 @@ class Image2ClassDataset(ImageDataset):
 
         elif mode == "val":
             self.urls = self.urls[
-                int(config["split"][0] * len(self.urls)): int(
+                int(config["split"][0] * len(self.urls)) : int(
                     config["split"][1] * len(self.urls)
                 )
             ]
 
         elif mode == "test":
-            self.urls = self.urls[int(config["split"][1] * len(self.urls)):]
+            self.urls = self.urls[int(config["split"][1] * len(self.urls)) :]
 
         if "has_hints" in self.config.keys() and self.config["has_hints"]:
             self.all_urls = copy.deepcopy(self.urls)

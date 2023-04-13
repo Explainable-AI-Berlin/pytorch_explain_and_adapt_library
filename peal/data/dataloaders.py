@@ -7,7 +7,18 @@ from peal.data.datasets import get_datasets, GlowDatasetWrapper
 
 
 class DataStack:
+    """
+    This class is used to create a stack of data for each class.
+    """
+
     def __init__(self, datasource, num_classes):
+        """
+        This function is used to initialize the DataStack class.
+
+        Args:
+            datasource (_type_): _description_
+            num_classes (_type_): _description_
+        """
         self.datasource = datasource
         if isinstance(datasource, torch.utils.data.Dataset):
             self.dataset = datasource
@@ -24,6 +35,9 @@ class DataStack:
         self.fill_stack()
 
     def fill_stack(self):
+        """
+        This function is used to fill the stack with data.
+        """
         while np.min(list(map(lambda x: len(x), self.data))) == 0:
             if isinstance(self.datasource, torch.utils.data.Dataset):
                 X, y = self.dataset.__getitem__(self.current_idx)
@@ -53,11 +67,23 @@ class DataStack:
                         self.data[int(y[i])].append([X[i], int(y[i])])
 
     def pop(self, class_idx):
+        """
+        This function is used to pop a sample from the stack.
+
+        Args:
+            class_idx (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
         sample = self.data[class_idx].pop(0)
         self.fill_stack()
         return sample
 
     def reset(self):
+        """
+        This function is used to reset the stack.
+        """
         self.data = []
         for idx in range(self.num_classes):
             self.data.append([])
@@ -66,14 +92,31 @@ class DataStack:
 
 
 class DataIterator:
-    """Iterator class"""
+    """
+    This class is used to iterate over the data in a dataset.
+    """
 
     def __init__(self, dataloader):
+        """
+        _summary_
+
+        Args:
+            dataloader (_type_): _description_
+        """
         self.dataloader = dataloader
         # member variable to keep track of current index
         self._index = 0
 
     def __next__(self):
+        """
+        _summary_
+
+        Raises:
+            StopIteration: _description_
+
+        Returns:
+            _type_: _description_
+        """
         if self._index < self.dataloader.train_config["iterations_per_episode"]:
             self._index += 1
             return self.dataloader.sample()
@@ -83,7 +126,21 @@ class DataIterator:
 
 
 class DataloaderMixer(DataLoader):
+    """
+    _summary_
+
+    Args:
+        DataLoader (_type_): _description_
+    """
+
     def __init__(self, train_config, initial_dataloader):
+        """
+        _summary_
+
+        Args:
+            train_config (_type_): _description_
+            initial_dataloader (_type_): _description_
+        """
         self.train_config = train_config
         self.dataloaders = [initial_dataloader]
         self.batch_size = initial_dataloader.batch_size
@@ -92,6 +149,13 @@ class DataloaderMixer(DataLoader):
         self.iterators = [iter(self.dataloaders[0])]
 
     def append(self, dataloader, priority=1):
+        """
+        _summary_
+
+        Args:
+            dataloader (_type_): _description_
+            priority (int, optional): _description_. Defaults to 1.
+        """
         self.dataloaders.append(dataloader)
         self.iterators.append(iter(self.dataloaders[-1]))
         self.priorities = np.zeros(len(self.dataloaders))
@@ -137,11 +201,17 @@ def get_dataloader(dataset, training_config, mode, task_config=None, batch_size=
     dataset.task_config = task_config
     if batch_size is None:
         dataloader = DataLoader(
-            dataset, batch_size=training_config[mode + "_batch_size"]
+            dataset,
+            batch_size=training_config[mode + "_batch_size"],
+            num_workers=4,
         )
 
     else:
-        dataloader = DataLoader(dataset, batch_size=batch_size)
+        dataloader = DataLoader(
+            dataset,
+            batch_size=batch_size,
+            num_workers=4,
+        )
 
     if mode == "train" and "iterations_per_episode" in training_config.keys():
         dataloader = DataloaderMixer(training_config, dataloader)

@@ -1,17 +1,47 @@
 # This whole file contains all the stuff, that is written too bad and had no clear position where it should be located in the project!
 
+import argparse
+import numpy as np
+import sys
+import logging
 import torch
 import os
 import yaml
 import socket
 import shutil
-import torchvision
-import wget
 
 from pkg_resources import resource_filename
 
 
-def embed_numberstring(number_str, num_digits = 6):
+def set_adaptive_batch_size(config, gigabyte_vram):
+    if "base_batch_size" in config.keys():
+        multiplier = float(
+            np.prod(config["assumed_input_size"])
+            / np.prod(config["data"]["input_size"])
+        )
+        if (
+            not gigabyte_vram is None
+            and "gigabyte_vram" in config.keys()
+        ):
+            multiplier = multiplier * (
+                gigabyte_vram / config["gigabyte_vram"]
+            )
+
+        batch_size_adapted = max(
+            1, int(config["base_batch_size"] * multiplier)
+        )
+        if config["batch_size"] == -1:
+            config["batch_size"] = batch_size_adapted
+            config["num_batches"] = (
+                int(
+                    config["samples_per_iteration"]
+                    / batch_size_adapted
+                )
+                + 1
+            )
+
+
+def embed_numberstring(number_str, num_digits=6):
     return '0' * (num_digits - len(number_str)) + number_str
 
 
@@ -24,14 +54,14 @@ def request(name, default):
     answer = input('Do you want to change value of ' + str(name) + '? [y/n]')
     if answer == 'n':
         return default
-    
-    else:        
+
+    else:
         if isinstance(default, bool):
             return not default
-        
+
         elif isinstance(default, list):
             return input('To what list of values do you want to change ' + str(name) + '?').split(',')
-        
+
         else:
             return input('To what value do you want to change ' + str(name) + '?')
 
@@ -48,8 +78,9 @@ def load_yaml_config(config_path):
 
     elif config_path[-5:] == '.yaml':
         split_path = config_path.split('/')
-        if split_path[0] == '$PEAL':            
-            config_path = os.path.join(get_project_resource_dir(), *split_path[1:])
+        if split_path[0] == '$PEAL':
+            config_path = os.path.join(
+                get_project_resource_dir(), *split_path[1:])
 
         with open(config_path, "r") as stream:
             try:
@@ -61,7 +92,8 @@ def load_yaml_config(config_path):
 
         for key in config.keys():
             if isinstance(config[key], str) and config[key][-5:] == '.yaml':
-                config[key] = load_yaml_config(os.path.join(*config[key].split('/')))
+                config[key] = load_yaml_config(
+                    os.path.join(*config[key].split('/')))
 
         return config
 
@@ -71,10 +103,10 @@ def load_yaml_config(config_path):
 
 def move_to_device(X, device):
     if isinstance(X, list):
-        return [torch.clone(x).to(device) for x in X] 
+        return [torch.clone(x).to(device) for x in X]
     else:
         return torch.clone(X).to(device)
-        
+
 
 def requires_grad_(model, requires_grad):
     for param in model.parameters():
@@ -91,20 +123,13 @@ def orthogonal_initialization(model):
         else:
             torch.nn.init.orthogonal_(parameter)
 
-import argparse
-import traceback
-import shutil
-import logging
-import yaml
-import sys
-import os
-import torch
-import numpy as np
-#import torch.utils.tensorboard as tb
+
+# import torch.utils.tensorboard as tb
+
 
 def parse_args_and_config(config_path):
     split_path = config_path.split('/')
-    if split_path[0] == '$PEAL':            
+    if split_path[0] == '$PEAL':
         config_path = os.path.join(get_project_resource_dir(), *split_path[1:])
 
     with open(config_path, "r") as f:
@@ -135,7 +160,8 @@ def parse_args_and_config(config_path):
         default="info",
         help="Verbose level: info | debug | warning | critical",
     )
-    parser.add_argument("--test", action="store_true", help="Whether to test the model")
+    parser.add_argument("--test", action="store_true",
+                        help="Whether to test the model")
     parser.add_argument(
         "--sample",
         action="store_true",
@@ -223,7 +249,8 @@ def parse_args_and_config(config_path):
             raise ValueError("level {} not supported".format(args.verbose))
 
         handler1 = logging.StreamHandler()
-        handler2 = logging.FileHandler(os.path.join(args.log_path, "stdout.txt"))
+        handler2 = logging.FileHandler(
+            os.path.join(args.log_path, "stdout.txt"))
         formatter = logging.Formatter(
             "%(levelname)s - %(filename)s - %(asctime)s - %(message)s"
         )
@@ -275,7 +302,8 @@ def parse_args_and_config(config_path):
                         sys.exit(0)
 
     # add device
-    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    device = torch.device(
+        "cuda") if torch.cuda.is_available() else torch.device("cpu")
     logging.info("Using device: {}".format(device))
     new_config.device = device
 

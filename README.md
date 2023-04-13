@@ -95,14 +95,20 @@ If you want to contribute to the project, please follow the following guidelines
 
 2) Avoid code redundancy as much as possible
 
-3) Write unit tests for every new component
+3) Write unit tests for every new component that have high code coverage
 
-4) Write documentation for every new component
+4) Write sphinx parsable documentation for every new component in the NumPy documentation style
 
 5) Write a jupyter notebook that shows how to use the new component
 
 6) Compositionality is key! Try to make the components as independent as possible and make sure that the whole pipeline still works if you replace a component with another one.
 
-7) Always use seeds for every experiment to make sure the results are reproducible
+7) Always use seeds for every experiment to make sure the results are exactly reproducible
 
 8) Log all important information in the log files to make experiments comparable
+
+9) No classes longer than 500 lines of code and no methods longer than 100 lines of code
+
+10) Use design patterns like the factory or visitor pattern to make the code more readable and maintainable
+
+11) Benchmark your code that gpu utilization is high enough instead of being to busy with loading data or moving it between cpu and gpu

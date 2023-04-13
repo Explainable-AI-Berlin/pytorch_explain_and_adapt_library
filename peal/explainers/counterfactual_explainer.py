@@ -2,64 +2,38 @@ import torch
 
 from torch import nn
 from tqdm import tqdm
+from pathlib import Path
 
 from peal.utils import load_yaml_config
-from peal.explainers.lrp_explainer import LRPExplainer
-
-
-def generate_image_collage(batch_in, counterfactual):
-    heatmap_red = torch.maximum(
-        torch.tensor(0.0),
-        torch.sum(batch_in, dim=1) - torch.sum(counterfactual, dim=1),
-    )
-    heatmap_blue = torch.maximum(
-        torch.tensor(0.0),
-        torch.sum(counterfactual, dim=1) - torch.sum(batch_in, dim=1),
-    )
-    if counterfactual.shape[1] == 3:
-        heatmap_green = torch.abs(counterfactual[:, 0] - batch_in[:, 0])
-        heatmap_green = heatmap_green + torch.abs(counterfactual[:, 1] - batch_in[:, 1])
-        heatmap_green = heatmap_green + torch.abs(counterfactual[:, 2] - batch_in[:, 2])
-        heatmap_green = heatmap_green - heatmap_red - heatmap_blue
-        counterfactual_rgb = counterfactual
-
-    else:
-        heatmap_green = torch.zeros_like(heatmap_red)
-        batch_in = torch.tile(batch_in, [1, 3, 1, 1])
-        counterfactual_rgb = torch.tile(torch.clone(counterfactual), [1, 3, 1, 1])
-
-    heatmap = torch.stack([heatmap_red, heatmap_green, heatmap_blue], dim=1)
-    if torch.abs(heatmap.sum() - torch.abs(batch_in - counterfactual).sum()) > 0.1:
-        print("Error: Heatmap does not match counterfactual")
-
-    heatmap_high_contrast = torch.clamp(heatmap / heatmap.max(), 0.0, 1.0)
-    result_img_collage = torch.cat(
-        [batch_in, counterfactual_rgb, heatmap_high_contrast], -1
-    )
-    return result_img_collage, heatmap_high_contrast
-
-
-def generate_symbolic_collage(batch_in, counterfactual):
-    # TODO these are still placeholders
-    return torch.zeros([batch_in.shape[0], 3, 64, 64]), torch.zeros_like(batch_in)
-
-
-def generate_sequence_collage(batch_in, counterfactual):
-    # TODO these are still placeholders
-    return torch.zeros([batch_in.shape[0], 3, 64, 64]), torch.zeros_like(batch_in)
+from peal.generators.interfaces import InvertibleGenerator
 
 
 class CounterfactualExplainer:
+    """
+    This class implements the counterfactual explanation method
+    """
+
     def __init__(
         self,
         downstream_model,
         generator,
         input_type,
+        generate_contrastive_collage,
         explainer_config="$PEAL/configs/explainers/counterfactual_default.yaml",
-        num_classes=2,
         from_pytorch_canonical=lambda x: x,
         to_pytorch_canonical=lambda x: x,
     ):
+        """
+        This class implements the counterfactual explanation method
+
+        Args:
+            downstream_model (_type_): _description_
+            generator (_type_): _description_
+            input_type (_type_): _description_
+            explainer_config (str, optional): _description_. Defaults to "/configs/explainers/counterfactual_default.yaml".
+            from_pytorch_canonical (_type_, optional): _description_. Defaults to lambdax:x.
+            to_pytorch_canonical (_type_, optional): _description_. Defaults to lambdax:x.
+        """
         self.downstream_model = downstream_model
         self.generator = generator
         self.explainer_config = load_yaml_config(explainer_config)
@@ -70,8 +44,21 @@ class CounterfactualExplainer:
         self.loss = torch.nn.CrossEntropyLoss()
         self.from_pytorch_canonical = from_pytorch_canonical
         self.to_pytorch_canonical = to_pytorch_canonical
-    
-    def gradient_based_counterfactual(batch):
+        self.generate_contrastive_collage = generate_contrastive_collage
+
+    def gradient_based_counterfactual(
+        self, batch_in, target_confidence_goal, target_classes
+    ):
+        """
+        This function generates a counterfactual for a given batch of inputs.
+
+        Args:
+            batch (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        batch = torch.clone(batch_in)
         batch = self.from_pytorch_canonical(batch)
         v_original = self.generator.encode(batch.to(self.device))
         if isinstance(v_original, list):
@@ -136,10 +123,6 @@ class CounterfactualExplainer:
                     self.generator.log_prob_z(latent_code)
                 )
 
-                if self.explainer_config["img_regularization"] > 0:
-                    difference = img - torch.clone(batch).to(self.device).detach()
-                    loss += torch.mean(torch.abs(difference) * regularization_mask)
-
                 logit_confidences = torch.nn.Softmax()(logits).detach().cpu()
                 target_confidences = [
                     float(logit_confidences[i][target_classes[i]])
@@ -186,51 +169,140 @@ class CounterfactualExplainer:
 
         attributions = torch.cat(attributions, 1)
 
-        return counterfactual, attributions
+        return counterfactual, attributions, target_confidences
 
     def explain_batch(
         self,
         batch_in,
         target_classes,
+        output_filenames: list[Path],
         target_confidence_goal_in=None,
+        remove_below_threshold=True,
         source_classes=None,
     ):
-        """ """
+        """
+        _summary_
+
+        Args:
+            batch_in (_type_): _description_
+            target_classes (_type_): _description_
+            target_confidence_goal_in (_type_, optional): _description_. Defaults to None.
+            source_classes (_type_, optional): _description_. Defaults to None.
+
+        Returns:
+            _type_: _description_
+        """
         if target_confidence_goal_in is None:
             target_confidence_goal = self.explainer_config["target_confidence_goal"]
 
         else:
             target_confidence_goal = target_confidence_goal_in
 
-        batch = batch_in.clone()
+        x = batch_in.clone()
 
         if isinstance(self.generator, InvertibleGenerator):
-            counterfactual, attributions = self.gradient_based_counterfactual(batch)        
-
-        # TODO insert this via a decorator!
-        self.generate_contrastive_collage(batch_in, counterfactual)
-        '''if self.input_type == "symbolic":
-            result_img_collage, heatmap = generate_symbolic_collage(
-                batch_in,
+            (
                 counterfactual,
-            )
+                attribution,
+                target_confidences,
+            ) = self.gradient_based_counterfactual(x, target_confidence_goal)
 
-        elif self.input_type == "sequence":
-            result_img_collage, heatmap = generate_sequence_collage(
-                batch_in,
-                counterfactual,
-            )
+        # TODO remove rows in counterfactual, attribution and x where target_confidences < target_confidence_goal
 
-        elif self.input_type == "image":
-            result_img_collage, heatmap = generate_image_collage(
-                batch_in,
-                counterfactual,
-            )'''
-
-        return (
-            result_img_collage,
-            counterfactual.detach().cpu(),
+        (
+            collage,
             heatmap,
             target_confidences,
+        ) = self.dataset.generate_contrastive_collage(
+            x,
+            counterfactual,
+            target_confidence_goal,
+            target_classes,
+            source_classes,
+            output_filenames,
+        )
+
+        return {
+            "x": x,
+            "collage": collage,
+            "counterfactual": counterfactual.detach().cpu(),
+            "heatmap": heatmap,
+            "target_confidences": target_confidences,
+            "attribution": attribution,
+        }
+
+    def generate_counterfactuals_iteration(
+        self,
+        num_samples: int,
+        error_distribution: torch.distributions.Distribution,
+        confidence_score_stats: torch.tensor,
+        finetune_iteration: int,
+        sample_idx_iteration: int,
+        dataloder: torch.utils.data.DataLoader,
+        tracked_keys: list[str],
+        target_confidence_goal: torch.tensor = None,
+    ):
+        """
+        _summary_
+
+        Args:
+            num_samples (int): _description_
+            error_distribution (torch.distributions.Distribution): _description_
+            confidence_score_stats (torch.tensor): _description_
+            finetune_iteration (int): _description_
+            sample_idx_iteration (int): _description_
+            target_confidence_goal (torch.tensor, optional): _description_. Defaults to None.
+
+        Returns:
+            _type_: _description_
+        """
+        tracked_values = {key: [] for key in tracked_keys}
+        collage_paths = []
+        counterfactuals = []
+        heatmaps = []
+        source_classes = []
+        target_classes = []
+        hints = []
+        attributions = []
+        ys = []
+        num_batches = int(num_samples / self.adaptor_config["batch_size"]) + 1
+
+        for batch_idx in range(num_batches):
+            print(str(batch_idx) + "/" + str(num_batches))
+            get_batch(batch_idx)
+            #
+            (
+                collage,
+                counterfactual,
+                heatmaps_current_batch,
+                end_target_confidences,
+                current_attributions,
+            ) = self.explainer.explain_batch(
+                batch_in=current_img_batch,
+                target_classes=target_classes_current_batch,
+                source_classes=torch.tensor(source_classes_current_batch),
+                target_confidence_goal_in=target_confidence_goal,
+            )
+
+            #
+            for sample_idx in range(collage.shape[0]):
+                if (
+                    end_target_confidences[sample_idx]
+                    >= self.adaptor_config["explainer"]["target_confidence_goal"]
+                ):
+                    # TODO bad smell! high-level and low-level functionality is mixed here...creation of collage should be factored out!
+                    ys.append(ys_current_batch[sample_idx])
+                    hints.append(current_hint_batch[sample_idx])
+                    attributions.append(current_attributions[sample_idx])
+                    sample_idx_iteration += 1
+
+        return (
+            collage_paths,
+            counterfactuals,
+            heatmaps,
+            source_classes,
+            target_classes,
+            hints,
             attributions,
+            ys,
         )
