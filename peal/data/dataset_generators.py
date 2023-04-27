@@ -7,7 +7,7 @@ import numpy as np
 
 from pathlib import Path
 from PIL import Image
-from peal.utils import get_project_resource_dir
+from peal.utils import get_project_resource_dir, embed_numberstring
 
 
 class ArtificialConfounderTabularDatasetGenerator:
@@ -25,7 +25,7 @@ class ArtificialConfounderTabularDatasetGenerator:
         base_dataset_dir="datasets",
         num_samples=1000,
         input_size=10,
-        label_noise=0.01,
+        label_noise=0.0,
         seed=0,
     ):
         """
@@ -36,19 +36,18 @@ class ArtificialConfounderTabularDatasetGenerator:
                 base_dataset_dir (Path): The path to the directory where the datasets are stored.
                 num_samples (int, optional): The number of samples in the dataset. Defaults to 1000.
                 input_size (int, optional): The number of features in the dataset. Defaults to 10.
-                label_noise (float, optional): The probability that the label is flipped. Defaults to 0.01.
+                label_noise (float, optional): The probability that the label is flipped. Defaults to 0.0.
                 seed (int, optional): The seed for the random number generator. Defaults to 0.
         """
         self.base_dataset_dir = base_dataset_dir
         self.dataset_name = dataset_name
-        self.dataset_dir = os.path.join(
-            self.base_dataset_dir, self.dataset_name)
+        self.dataset_dir = os.path.join(self.base_dataset_dir, self.dataset_name)
         self.num_samples = num_samples
         self.input_size = input_size - 1
         self.label_noise = label_noise
         self.seed = seed
         name = str(self.num_samples) + "_" + str(self.input_size) + "_"
-        name += str(int(100 * label_noise)) + "_" + str(seed)
+        name += embed_numberstring(str(int(100 * label_noise)), 3) + "_" + str(seed)
         self.label_dir = os.path.join(self.dataset_dir, name + ".csv")
 
     def generate_dataset(self):
@@ -72,10 +71,16 @@ class ArtificialConfounderTabularDatasetGenerator:
         for sample_idx in range(self.num_samples):
             has_attribute = int(sample_idx % 4 == 0 or sample_idx % 4 == 1)
             has_confounder = int(sample_idx % 2 == 0)
-            flipped_label = int(
-                sample_idx % int(200 * (1 - self.label_noise)) == 0
-                or sample_idx % int(200 * (1 - self.label_noise)) == 1
-            )
+            """
+            if self.label_noise == 0.0:
+                flipped_label = int(
+                    sample_idx % int(200 * (1 - self.label_noise)) == 0
+                    or sample_idx % int(200 * (1 - self.label_noise)) == 1
+                )
+
+            else:
+                flipped_label = 0
+            """
 
             values = np.random.uniform(0, 1, self.input_size)
             target = int(np.sum(values >= 0.5) > np.sum(values < 0.5))
@@ -84,11 +89,13 @@ class ArtificialConfounderTabularDatasetGenerator:
                 target = int(np.sum(values >= 0.5) > np.sum(values < 0.5))
 
             dataset += ",".join([str(val) for val in values])
-            if flipped_label:
-                target = abs(1 - target)
+            """
+            if flipped_label == 1:
+                has_attribute = abs(1 - has_attribute)
                 has_confounder = abs(1 - has_confounder)
+            """
 
-            dataset += "," + str(has_confounder) + "," + str(target) + "\n"
+            dataset += "," + str(has_confounder) + "," + str(has_attribute) + "\n"
 
         with open(self.label_dir, "w") as f:
             f.write(dataset)
@@ -125,16 +132,13 @@ class ArtificialConfounderSequenceDatasetGenerator:
         """
         self.base_dataset_dir = base_dataset_dir
         self.dataset_name = dataset_name
-        self.dataset_dir = os.path.join(
-            self.base_dataset_dir,
-            self.dataset_name
-        )
+        self.dataset_dir = os.path.join(self.base_dataset_dir, self.dataset_name)
         self.num_samples = num_samples
         self.input_size = input_size
         self.label_noise = label_noise
         self.seed = seed
         name = str(self.num_samples) + "_" + str(self.input_size[0])
-        name += 'x' + str(self.input_size[1]) + "_"
+        name += "x" + str(self.input_size[1]) + "_"
         name += str(int(100 * label_noise)) + "_" + str(seed)
         self.label_dir = os.path.join(self.dataset_dir, name + ".json")
 
@@ -165,7 +169,10 @@ class ArtificialConfounderSequenceDatasetGenerator:
                 np.sum(values >= self.input_size[1] / 2)
                 > np.sum(values < self.input_size[1] / 2)
             )
-            while not (target == has_attribute and int(values[-1] >= self.input_size[1] / 2) == has_confounder):
+            while not (
+                target == has_attribute
+                and int(values[-1] >= self.input_size[1] / 2) == has_confounder
+            ):
                 num_values = np.random.randint(1, self.input_size[0])
                 values = np.random.randint(
                     self.input_size[1], size=num_values, dtype=np.int32
@@ -182,7 +189,7 @@ class ArtificialConfounderSequenceDatasetGenerator:
             dataset[sample_idx] = {
                 "values": list(map(lambda i: int(values[i]), range(num_values))),
                 "target": target,
-                "has_confounder": has_confounder
+                "has_confounder": has_confounder,
             }
 
         with open(self.label_dir, "w") as f:
@@ -233,8 +240,7 @@ class MNISTConfounderDatasetGenerator:
                 img_np = np.expand_dims(img_np, -1)
                 img_np = np.tile(img_np, [1, 1, 3])
                 background_intensity = np.random.randint(0, 255)
-                img_np = np.maximum(
-                    img_np, background_intensity * confounder_np)
+                img_np = np.maximum(img_np, background_intensity * confounder_np)
                 has_confounder = bool(background_intensity >= 128)
 
                 line = [
@@ -270,8 +276,7 @@ class ConfounderDatasetGenerator:
         self.confounder_type = confounder_type
         if dataset_name is None:
             self.dataset_name = (
-                os.path.split(base_dataset_dir)[-1] +
-                "_" + self.confounder_type
+                os.path.split(base_dataset_dir)[-1] + "_" + self.confounder_type
             )
 
         else:
@@ -395,13 +400,11 @@ class ConfounderDatasetGenerator:
                 img_out = Image.fromarray(np.array(img, dtype=np.uint8))
 
             elif self.confounder_type == "color":
-                color_change = 64 * confounder_intensity * \
-                    (2 * int(has_confounder) - 1)
+                color_change = 64 * confounder_intensity * (2 * int(has_confounder) - 1)
                 img = np.array(img)
                 img = np.stack(
                     [
-                        (img[:, :, 0] + color_change + 64) *
-                        (255 / (255 + 2 * 64)),
+                        (img[:, :, 0] + color_change + 64) * (255 / (255 + 2 * 64)),
                         (img[:, :, 2] - (color_change / 2) + 64)
                         * (255 / (255 + 2 * 64)),
                         (img[:, :, 2] - (color_change / 2) + 64)
@@ -413,10 +416,8 @@ class ConfounderDatasetGenerator:
 
             elif self.confounder_type == "copyrighttag":
                 img_copyrighttag = np.maximum(np.array(img), copyright_tag_bg)
-                img_copyrighttag = np.minimum(
-                    np.array(img_copyrighttag), copyright_tag)
-                alpha = 0.5 + 0.5 * confounder_intensity * \
-                    (2 * int(has_confounder) - 1)
+                img_copyrighttag = np.minimum(np.array(img_copyrighttag), copyright_tag)
+                alpha = 0.5 + 0.5 * confounder_intensity * (2 * int(has_confounder) - 1)
                 img = alpha * img_copyrighttag + (1 - alpha) * np.array(img)
                 img_out = Image.fromarray(np.array(img, dtype=np.uint8))
 
@@ -424,8 +425,7 @@ class ConfounderDatasetGenerator:
             if self.confounder_type == "copyrighttag":
                 mask = Image.fromarray(
                     np.array(
-                        np.abs(np.array(copyright_tag_bg,
-                               dtype=np.float32) / 255 - 1)
+                        np.abs(np.array(copyright_tag_bg, dtype=np.float32) / 255 - 1)
                         * 255,
                         dtype=np.uint8,
                     )
@@ -435,8 +435,7 @@ class ConfounderDatasetGenerator:
             sample.append(has_confounder)
             sample.append(confounder_intensity)
             lines_out.append(
-                name + "," +
-                ",".join(list(map(lambda x: str(float(x)), sample)))
+                name + "," + ",".join(list(map(lambda x: str(float(x)), sample)))
             )
             attribute_vs_no_attribute_idxs[has_attribute] += 1
 
@@ -470,11 +469,9 @@ class StainingConfounderGenerator:
         for folder_name in ["MUS", "STR"]:
             os.makedirs(os.path.join(self.dataset_dir, folder_name))
             for img_name in os.listdir(os.path.join(self.raw_data_dir, folder_name)):
-                img = Image.open(os.path.join(
-                    self.raw_data_dir, folder_name, img_name))
+                img = Image.open(os.path.join(self.raw_data_dir, folder_name, img_name))
                 img.save(
-                    os.path.join(self.dataset_dir, folder_name,
-                                 img_name[:-4] + ".png")
+                    os.path.join(self.dataset_dir, folder_name, img_name[:-4] + ".png")
                 )
 
         # find staining of images
@@ -491,16 +488,14 @@ class StainingConfounderGenerator:
                         str(idx)
                         + " / "
                         + str(
-                            len(os.listdir(os.path.join(
-                                self.dataset_dir, class_name)))
+                            len(os.listdir(os.path.join(self.dataset_dir, class_name)))
                         )
                     )
 
                 X = (
                     np.array(
                         Image.open(
-                            os.path.join(self.dataset_dir,
-                                         class_name, file_name)
+                            os.path.join(self.dataset_dir, class_name, file_name)
                         ),
                         dtype=np.float32,
                     )
@@ -533,18 +528,15 @@ class StainingConfounderGenerator:
                 min_Phi = np.percentile(phi, 1)
                 max_Phi = np.percentile(phi, 99)
 
-                v1 = np.dot(eigenVectors, np.array(
-                    [np.cos(min_Phi), np.sin(min_Phi)]))
-                v2 = np.dot(eigenVectors, np.array(
-                    [np.cos(max_Phi), np.sin(max_Phi)]))
+                v1 = np.dot(eigenVectors, np.array([np.cos(min_Phi), np.sin(min_Phi)]))
+                v2 = np.dot(eigenVectors, np.array([np.cos(max_Phi), np.sin(max_Phi)]))
                 if v1[0] > v2[0]:
                     stainVectors = np.array([v1, v2])
                 else:
                     stainVectors = np.array([v2, v1])
 
                 sample_list.append(
-                    [os.path.join(class_name, file_name), X,
-                     y, stainVectors, OD_raw]
+                    [os.path.join(class_name, file_name), X, y, stainVectors, OD_raw]
                 )
 
         hematoxylin_intensities_by_class = [[], []]
@@ -562,8 +554,7 @@ class StainingConfounderGenerator:
             X_masked_intensities = X_intensities * hematoxylin_greater_mask
             stable_maximum = np.percentile(X_masked_intensities, 99)
             hematoxylin_intensities_by_class[y].append(stable_maximum)
-            sample_list_new.append(
-                [path, X, y, stainVectors, OD_raw, stable_maximum])
+            sample_list_new.append([path, X, y, stainVectors, OD_raw, stable_maximum])
 
         intensity_median = np.percentile(
             np.concatenate(

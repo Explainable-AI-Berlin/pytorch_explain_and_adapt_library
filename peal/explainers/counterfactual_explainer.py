@@ -173,18 +173,17 @@ class CounterfactualExplainer:
 
     def explain_batch(
         self,
-        batch_in,
-        target_classes,
-        output_filenames: list[Path],
+        batch: dict,
+        base_path="collages",
+        start_idx=0,
         target_confidence_goal_in=None,
         remove_below_threshold=True,
-        source_classes=None,
     ):
         """
         _summary_
 
         Args:
-            batch_in (_type_): _description_
+            x (_type_): _description_
             target_classes (_type_): _description_
             target_confidence_goal_in (_type_, optional): _description_. Defaults to None.
             source_classes (_type_, optional): _description_. Defaults to None.
@@ -198,111 +197,36 @@ class CounterfactualExplainer:
         else:
             target_confidence_goal = target_confidence_goal_in
 
-        x = batch_in.clone()
-
         if isinstance(self.generator, InvertibleGenerator):
             (
-                counterfactual,
-                attribution,
-                target_confidences,
-            ) = self.gradient_based_counterfactual(x, target_confidence_goal)
+                batch["x_counterfactual"],
+                batch["z_difference"],
+                batch["y_target_confidence"],
+            ) = self.gradient_based_counterfactual(batch["x"], target_confidence_goal)
 
-        # TODO remove rows in counterfactual, attribution and x where target_confidences < target_confidence_goal
+        batch_out = {}
+        if remove_below_threshold:
+            # TODO remove rows in counterfactual, attribution and x where target_confidences < target_confidence_goal
+            for key in batch.keys():
+                batch_out[key] = []
+                for sample_idx in range(len(batch[key])):
+                    if (
+                        batch["y_target_confidence"][sample_idx]
+                        < target_confidence_goal
+                    ):
+                        batch_out[key].append(batch[key][sample_idx])
 
-        (
-            collage,
-            heatmap,
-            target_confidences,
-        ) = self.dataset.generate_contrastive_collage(
-            x,
-            counterfactual,
-            target_confidence_goal,
-            target_classes,
-            source_classes,
-            output_filenames,
+        else:
+            batch_out = batch
+
+        batch_out["x_attribution"] = self.dataset.generate_contrastive_collage(
+            x=batch_out["x"],
+            x_counterfactual=batch_out["x_counterfactual"],
+            target_confidence_goal=target_confidence_goal,
+            y_target=batch_out["y_target"],
+            y_source=batch_out["y_source"],
+            base_path=base_path,
+            start_idx=start_idx,
         )
 
-        return {
-            "x": x,
-            "collage": collage,
-            "counterfactual": counterfactual.detach().cpu(),
-            "heatmap": heatmap,
-            "target_confidences": target_confidences,
-            "attribution": attribution,
-        }
-
-    def generate_counterfactuals_iteration(
-        self,
-        num_samples: int,
-        error_distribution: torch.distributions.Distribution,
-        confidence_score_stats: torch.tensor,
-        finetune_iteration: int,
-        sample_idx_iteration: int,
-        dataloder: torch.utils.data.DataLoader,
-        tracked_keys: list[str],
-        target_confidence_goal: torch.tensor = None,
-    ):
-        """
-        _summary_
-
-        Args:
-            num_samples (int): _description_
-            error_distribution (torch.distributions.Distribution): _description_
-            confidence_score_stats (torch.tensor): _description_
-            finetune_iteration (int): _description_
-            sample_idx_iteration (int): _description_
-            target_confidence_goal (torch.tensor, optional): _description_. Defaults to None.
-
-        Returns:
-            _type_: _description_
-        """
-        tracked_values = {key: [] for key in tracked_keys}
-        collage_paths = []
-        counterfactuals = []
-        heatmaps = []
-        source_classes = []
-        target_classes = []
-        hints = []
-        attributions = []
-        ys = []
-        num_batches = int(num_samples / self.adaptor_config["batch_size"]) + 1
-
-        for batch_idx in range(num_batches):
-            print(str(batch_idx) + "/" + str(num_batches))
-            get_batch(batch_idx)
-            #
-            (
-                collage,
-                counterfactual,
-                heatmaps_current_batch,
-                end_target_confidences,
-                current_attributions,
-            ) = self.explainer.explain_batch(
-                batch_in=current_img_batch,
-                target_classes=target_classes_current_batch,
-                source_classes=torch.tensor(source_classes_current_batch),
-                target_confidence_goal_in=target_confidence_goal,
-            )
-
-            #
-            for sample_idx in range(collage.shape[0]):
-                if (
-                    end_target_confidences[sample_idx]
-                    >= self.adaptor_config["explainer"]["target_confidence_goal"]
-                ):
-                    # TODO bad smell! high-level and low-level functionality is mixed here...creation of collage should be factored out!
-                    ys.append(ys_current_batch[sample_idx])
-                    hints.append(current_hint_batch[sample_idx])
-                    attributions.append(current_attributions[sample_idx])
-                    sample_idx_iteration += 1
-
-        return (
-            collage_paths,
-            counterfactuals,
-            heatmaps,
-            source_classes,
-            target_classes,
-            hints,
-            attributions,
-            ys,
-        )
+        return batch_out

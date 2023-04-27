@@ -5,7 +5,7 @@ import numpy as np
 
 
 def parse_json(data_dir, config, mode):
-    '''
+    """
     _summary_
 
     Args:
@@ -15,19 +15,18 @@ def parse_json(data_dir, config, mode):
 
     Returns:
         _type_: _description_
-    '''
+    """
     with open(data_dir, "r") as f:
         raw_data = json.load(f)
 
-    if config['known_confounder']:
+    if config["known_confounder"]:
+
         def extract_instances_tensor_confounder(idx, line):
             key = str(idx)
             instances_tensor = torch.tensor(line["values"])
             attribute = line["target"]
             confounder = line["has_confounder"]
-            instances_tensor = torch.cat(
-                [instances_tensor, torch.tensor([attribute])]
-            )
+            instances_tensor = torch.cat([instances_tensor, torch.tensor([attribute])])
             return key, instances_tensor, attribute, confounder
 
         return process_confounder_data_controlled(
@@ -39,7 +38,7 @@ def parse_json(data_dir, config, mode):
 
 
 def parse_csv(data_dir, config, mode, key_type="idx"):
-    '''
+    """
     _summary_
 
     Args:
@@ -50,7 +49,7 @@ def parse_csv(data_dir, config, mode, key_type="idx"):
 
     Returns:
         _type_: _description_
-    '''
+    """
     raw_data = open(data_dir, "r").read().split("\n")
     attributes = raw_data[0].split(",")
     if key_type == "name":
@@ -68,6 +67,7 @@ def parse_csv(data_dir, config, mode, key_type="idx"):
             key = instance_attributes[0]
             instance_attributes = instance_attributes[1:]
 
+        instance_attributes.remove("") if "" in instance_attributes else None
         instance_attributes_int = list(
             map(
                 lambda x: float(x),
@@ -78,13 +78,11 @@ def parse_csv(data_dir, config, mode, key_type="idx"):
         return key, instances_tensor
 
     if not len(config["confounding_factors"]) == 0:
+
         def extract_instances_tensor_confounder(idx, line):
             selection_idx1 = attributes.index(config["confounding_factors"][0])
             selection_idx2 = attributes.index(config["confounding_factors"][1])
-            key, instances_tensor = extract_instances_tensor(
-                idx,
-                line
-            )
+            key, instances_tensor = extract_instances_tensor(idx, line)
             attribute = int(instances_tensor[selection_idx1])
             confounder = int(instances_tensor[selection_idx2])
             return key, instances_tensor, attribute, confounder
@@ -99,10 +97,7 @@ def parse_csv(data_dir, config, mode, key_type="idx"):
     else:
         data = {}
         for idx, line in enumerate(raw_data):
-            key, instances_tensor = extract_instances_tensor(
-                idx,
-                line
-            )
+            key, instances_tensor = extract_instances_tensor(idx, line)
             data[key] = torch.maximum(
                 torch.zeros_like(instances_tensor),
                 instances_tensor,
@@ -114,13 +109,13 @@ def parse_csv(data_dir, config, mode, key_type="idx"):
 
         elif mode == "val":
             keys_out = keys[
-                int(len(keys) * config["split"][0]): int(
+                int(len(keys) * config["split"][0]) : int(
                     len(keys) * config["split"][1]
                 )
             ]
 
         elif mode == "test":
-            keys_out = keys[int(len(keys) * config["split"][1]):]
+            keys_out = keys[int(len(keys) * config["split"][1]) :]
 
         else:
             keys_out = keys
@@ -128,8 +123,10 @@ def parse_csv(data_dir, config, mode, key_type="idx"):
     return attributes, data, keys_out
 
 
-def process_confounder_data_controlled(raw_data, config, mode, extract_instances_tensor):
-    '''
+def process_confounder_data_controlled(
+    raw_data, config, mode, extract_instances_tensor
+):
+    """
     _summary_
 
     Args:
@@ -140,7 +137,7 @@ def process_confounder_data_controlled(raw_data, config, mode, extract_instances
 
     Returns:
         _type_: _description_
-    '''
+    """
     data = {}
     n_attribute_confounding = np.array([[0, 0], [0, 0]])
     max_attribute_confounding = np.array([[0, 0], [0, 0]])
@@ -148,12 +145,10 @@ def process_confounder_data_controlled(raw_data, config, mode, extract_instances
         config["num_samples"] * config["confounder_probability"] * 0.5
     )
     max_attribute_confounding[1][0] = int(
-        config["num_samples"] *
-        round(1 - config["confounder_probability"], 2) * 0.5
+        config["num_samples"] * round(1 - config["confounder_probability"], 2) * 0.5
     )
     max_attribute_confounding[0][1] = int(
-        config["num_samples"] *
-        round(1 - config["confounder_probability"], 2) * 0.5
+        config["num_samples"] * round(1 - config["confounder_probability"], 2) * 0.5
     )
     max_attribute_confounding[1][1] = int(
         config["num_samples"] * config["confounder_probability"] * 0.5
@@ -161,9 +156,11 @@ def process_confounder_data_controlled(raw_data, config, mode, extract_instances
     keys = [[[], []], [[], []]]
 
     for idx, line in enumerate(raw_data):
+        if line == "":
+            continue
+
         key, instances_tensor, attribute, confounder = extract_instances_tensor(
-            idx=idx,
-            line=line
+            idx=idx, line=line
         )
         if (
             n_attribute_confounding[attribute][confounder]
@@ -186,8 +183,7 @@ def process_confounder_data_controlled(raw_data, config, mode, extract_instances
         np.sum(n_attribute_confounding) == config["num_samples"]
     ), "wrong number of samples!"
     assert (
-        len(keys[0][0]) + len(keys[0][1]) +
-        len(keys[1][0]) + len(keys[1][1])
+        len(keys[0][0]) + len(keys[0][1]) + len(keys[1][0]) + len(keys[1][1])
         == config["num_samples"]
     ), "wrong number of keys!"
     if mode == "train":
@@ -199,32 +195,32 @@ def process_confounder_data_controlled(raw_data, config, mode, extract_instances
 
     elif mode == "val":
         keys_out = keys[0][0][
-            int(len(keys[0][0]) * config["split"][0]): int(
+            int(len(keys[0][0]) * config["split"][0]) : int(
                 len(keys[0][0]) * config["split"][1]
             )
         ]
         keys_out += keys[0][1][
-            int(len(keys[0][1]) * config["split"][0]): int(
+            int(len(keys[0][1]) * config["split"][0]) : int(
                 len(keys[0][1]) * config["split"][1]
             )
         ]
         keys_out += keys[1][0][
-            int(len(keys[1][0]) * config["split"][0]): int(
+            int(len(keys[1][0]) * config["split"][0]) : int(
                 len(keys[1][0]) * config["split"][1]
             )
         ]
         keys_out += keys[1][1][
-            int(len(keys[1][1]) * config["split"][0]): int(
+            int(len(keys[1][1]) * config["split"][0]) : int(
                 len(keys[1][1]) * config["split"][1]
             )
         ]
         random.shuffle(keys_out)
 
     elif mode == "test":
-        keys_out = keys[0][0][int(len(keys[0][0]) * config["split"][1]):]
-        keys_out += keys[0][1][int(len(keys[0][1]) * config["split"][1]):]
-        keys_out += keys[1][0][int(len(keys[1][0]) * config["split"][1]):]
-        keys_out += keys[1][1][int(len(keys[1][1]) * config["split"][1]):]
+        keys_out = keys[0][0][int(len(keys[0][0]) * config["split"][1]) :]
+        keys_out += keys[0][1][int(len(keys[0][1]) * config["split"][1]) :]
+        keys_out += keys[1][0][int(len(keys[1][0]) * config["split"][1]) :]
+        keys_out += keys[1][1][int(len(keys[1][1]) * config["split"][1]) :]
         random.shuffle(keys_out)
 
     else:

@@ -3,7 +3,8 @@ import numpy as np
 
 from torch.utils.data import DataLoader
 
-from peal.data.datasets import get_datasets, GlowDatasetWrapper
+from peal.data.dataset_wrappers import GlowDatasetWrapper
+from peal.data.dataset_factory import get_datasets
 
 
 class DataStack:

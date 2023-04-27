@@ -3,13 +3,17 @@ import random
 import os
 import copy
 import numpy as np
+import matplotlib
 
 from torchvision.transforms import ToTensor
 from PIL import Image
 from pathlib import Path
+from matplotlib import pyplot as plt
 
 from peal.data.dataset_interfaces import PealDataset
 from peal.data.dataset_utils import parse_json, parse_csv
+
+matplotlib.use("Agg")
 
 
 class SequenceDataset(PealDataset):
@@ -165,12 +169,12 @@ class ImageDataset(PealDataset):
             print("Error: Heatmap does not match counterfactual")
 
         heatmap_high_contrast = torch.clamp(heatmap / heatmap.max(), 0.0, 1.0)
-        result_img_collage = torch.cat(
+        current_collage = torch.cat(
             [batch_in, counterfactual_rgb, heatmap_high_contrast], -1
         )
-        current_collage = self.project_to_pytorch_default(
+        """current_collage = self.project_to_pytorch_default(
             result_img_collages[batch_idx][sample_idx]
-        )
+        )"""
         current_collage = torchvision.utils.make_grid(
             current_collage, nrow=self.adaptor_config["batch_size"]
         )
@@ -261,7 +265,9 @@ class Image2MixedDataset(ImageDataset):
         self.task_config = task_config
         self.hints_enabled = False
         data_dir = os.path.join(root_dir, "data.csv")
-        self.attributes, self.data, self.keys = parse_csv(data_dir, config, mode)
+        self.attributes, self.data, self.keys = parse_csv(
+            data_dir, config, mode, key_type="name"
+        )
 
     def __len__(self):
         return len(self.keys)
