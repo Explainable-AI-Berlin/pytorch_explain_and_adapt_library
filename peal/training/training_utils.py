@@ -1,9 +1,23 @@
 import torch
+import numpy as np
 
 from tqdm import tqdm
 
 
-def calculate_validation_statistics(self, tracked_values):
+def calculate_validation_statistics(
+    model,
+    dataloader,
+    tracked_keys,
+    base_path,
+    output_size,
+    device,
+    logits_to_prediction,
+    use_confusion_matrix,
+    explainer,
+    max_validation_samples,
+    min_start_target_percentile,
+):
+    tracked_values = {key: [] for key in tracked_keys}
     confusion_matrix = np.zeros([output_size, output_size])
     correct = 0
     num_samples = 0
@@ -11,9 +25,9 @@ def calculate_validation_statistics(self, tracked_values):
     for i in range(output_size):
         confidence_scores.append([])
 
-    with tqdm(enumerate(dataloaders_val[0])) as pbar:
+    with tqdm(enumerate(dataloader)) as pbar:
         for it, (X, y) in pbar:
-            pred_confidences = torch.nn.Softmax()(student(X.to(device))).detach().cpu()
+            pred_confidences = torch.nn.Softmax()(model(X.to(device))).detach().cpu()
             y_pred = logits_to_prediction(pred_confidences)
             for i in range(y.shape[0]):
                 if y_pred[i] == y[i]:
@@ -43,12 +57,18 @@ def calculate_validation_statistics(self, tracked_values):
                 torch.stack(batch_target_start_confidences, 0)
             )
             results = explainer.explain_batch(
-                batch_in=X, target_classes=batch_targets, source_classes=y_pred
+                batch_in=X,
+                target_classes=batch_targets,
+                source_classes=y_pred,
+                base_path=os.path.join(
+                    base_path,
+                    "collages",
+                ),
             )
             for key in set(results.keys()).intersection(set(tracked_values.keys())):
                 tracked_values[key].append(results[key])
 
-            if num_samples >= adaptor_config["max_validation_samples"]:
+            if num_samples >= max_validation_samples:
                 break
 
     confidence_score_stats = []
@@ -57,7 +77,7 @@ def calculate_validation_statistics(self, tracked_values):
             confidence_score_stats.append(
                 torch.quantile(
                     torch.stack(confidence_scores[i], dim=1),
-                    adaptor_config["min_start_target_percentile"],
+                    min_start_target_percentile,
                     dim=1,
                 )
             )
@@ -68,7 +88,7 @@ def calculate_validation_statistics(self, tracked_values):
     confidence_score_stats = torch.stack(confidence_score_stats)
     accuracy = correct / num_samples
 
-    if adaptor_config["use_confusion_matrix"] and not accuracy == 1.0:
+    if use_confusion_matrix and not accuracy == 1.0:
         error_matrix = np.copy(confusion_matrix)
         for i in range(error_matrix.shape[0]):
             error_matrix[i][i] = 0.0
@@ -84,4 +104,10 @@ def calculate_validation_statistics(self, tracked_values):
         error_matrix = error_matrix.flatten() / error_matrix.sum()
         error_distribution = torch.distributions.categorical.Categorical(error_matrix)
 
-    return accuracy, confidence_score_stats, error_distribution
+    validation_stats = {
+        "accuracy": accuracy,
+        "confidence_score_stats": confidence_score_stats,
+        "error_distribution": error_distribution,
+    }
+
+    return tracked_values, validation_stats

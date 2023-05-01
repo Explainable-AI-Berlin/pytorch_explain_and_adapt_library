@@ -1,32 +1,25 @@
 import os
 import torch
-import torchvision
 import copy
 import yaml
 import shutil
 import numpy as np
-import matplotlib
 import platform
 
-from tensorboardx import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter
 from pathlib import Path
 from tqdm import tqdm
-from matplotlib import pyplot as plt
-from PIL import Image
 from typing import Union
 from torch import nn
 
-from peal.utils import load_yaml_config, embed_numberstring, set_adaptive_batch_size
+from peal.utils import load_yaml_config, set_adaptive_batch_size
 from peal.data.dataloaders import (
     DataStack,
     DataloaderMixer,
-    create_dataloaders_from_datay_source,
+    create_dataloaders_from_data_source,
 )
 from peal.training.trainers import ModelTrainer, calculate_test_accuracy
 from peal.explainers.counterfactual_explainer import CounterfactualExplainer
-from peal.data.datasets import (
-    Image2MixedDataset,
-)
 from peal.data.dataset_interfaces import PealDataset
 from peal.visualization.model_comparison import create_comparison
 from peal.teachers.segmentation_mask_teacher import SegmentationMaskTeacher
@@ -36,11 +29,8 @@ from peal.generators.interfaces import InvertibleGenerator
 from peal.generators.generator_factory import get_generator
 from peal.adaptors.adaptor_utils import integrate_data_config_into_adaptor_config
 from peal.training.training_utils import (
-    retrieve_validation_statistics,
-    visualize_progress,
+    calculate_validation_statistics,
 )
-
-matplotlib.use("Agg")
 
 
 class CounterfactualKnowledgeDistillation:
@@ -51,7 +41,7 @@ class CounterfactualKnowledgeDistillation:
     def __init__(
         self,
         student: nn.Module,
-        datay_source: Union(
+        data_source: Union(
             list[torch.utils.data.DataLoader],
             list[torch.utils.data.Dataset],
             list[PealDataset],
@@ -76,7 +66,7 @@ class CounterfactualKnowledgeDistillation:
 
         Args:
             student (nn.Module): The student model that is improved with CFKD
-            datay_source (Union): The datay_source that is used for training
+            data_source (Union): The data_source that is used for training
             output_size (int, optional): The output size of the student model. Defaults to None.
             generator (Union, optional): The generator that is used for CFKD. Defaults to "$PEAL/configs/models/default_generator.yaml".
             base_dir (Union, optional): The base directory for the run. Defaults to os.path.join("peal_runs", "counterfactual_knowledge_distillation").
@@ -117,7 +107,7 @@ class CounterfactualKnowledgeDistillation:
         self.student.eval()
 
         self.output_size = integrate_data_config_into_adaptor_config(
-            self.adaptor_config, datay_source, output_size
+            self.adaptor_config, data_source, output_size
         )
 
         set_adaptive_batch_size(self.adaptor_config, gigabyte_vram)
@@ -129,8 +119,8 @@ class CounterfactualKnowledgeDistillation:
             self.train_dataloader,
             self.val_dataloader,
             self.test_dataloader,
-        ) = create_dataloaders_from_datay_source(
-            datay_source=datay_source,
+        ) = create_dataloaders_from_data_source(
+            data_source=data_source,
             config=self.adaptor_config,
             enable_hint=self.enable_hint,
             gigabyte_vram=gigabyte_vram,
@@ -246,10 +236,10 @@ class CounterfactualKnowledgeDistillation:
     ):
         # TODO this should be done with a context manager
         if isinstance(self.teacher, SegmentationMaskTeacher):
-            for dataloader in self.datastack.datay_source.dataloaders:
+            for dataloader in self.datastack.data_source.dataloaders:
                 dataloader.dataset.enable_hint()
 
-            self.datastack.datay_source.reset()
+            self.datastack.data_source.reset()
 
         self.datastack.reset()
 
@@ -303,10 +293,10 @@ class CounterfactualKnowledgeDistillation:
                 continue_collecting = False
 
         if isinstance(self.teacher, SegmentationMaskTeacher):
-            for dataloader in self.datastack.datay_source.dataloaders:
+            for dataloader in self.datastack.data_source.dataloaders:
                 dataloader.dataset.disable_hint()
 
-            self.datastack.datay_source.reset()
+            self.datastack.data_source.reset()
 
         return tracked_values
 
@@ -332,14 +322,47 @@ class CounterfactualKnowledgeDistillation:
             test_accuracy = calculate_test_accuracy(
                 self.student, self.test_dataloader, self.device
             )
-            validation_stats = retrieve_validation_statistics(0, self.tracked_keys)
+            (
+                validation_tracked_values,
+                validation_stats,
+            ) = calculate_validation_statistics(
+                model=self.student,
+                dataloader=self.dataloaders_val[0],
+                tracked_keys=self.tracked_keys,
+                base_path=os.path.join(self.base_dir, "0", "validation"),
+                output_size=self.output_size,
+                explainer=self.explainer,
+                device=self.device,
+                logits_to_prediction=self.logits_to_prediction,
+                use_confusion_matrix=self.adaptor_config["use_confusion_matrix"],
+                max_validation_samples=self.adaptor_config["max_validation_samples"],
+                min_start_target_percentile=self.adaptor_config[
+                    "min_start_target_percentile"
+                ],
+            )
+            # TODO save values
 
         else:
             with open(os.path.join(self.base_dir, "platform.txt"), "w") as f:
                 f.write(platform.node())
 
-            validation_stats = retrieve_validation_statistics(
-                self.adaptor_config["iteration"], self.tracked_keys
+            # TODO load values
+            (
+                validation_tracked_values,
+                validation_stats,
+            ) = calculate_validation_statistics(
+                model=self.student,
+                dataloader=self.dataloaders_val[0],
+                tracked_keys=self.tracked_keys,
+                output_size=self.output_size,
+                explainer=self.explainer,
+                device=self.device,
+                logits_to_prediction=self.logits_to_prediction,
+                use_confusion_matrix=self.adaptor_config["use_confusion_matrix"],
+                max_validation_samples=self.adaptor_config["max_validation_samples"],
+                min_start_target_percentile=self.adaptor_config[
+                    "min_start_target_percentile"
+                ],
             )
 
         return validation_stats, test_accuracy
@@ -550,7 +573,7 @@ class CounterfactualKnowledgeDistillation:
             #
             data_config = copy.deepcopy(self.adaptor_config)
             data_config["training"]["split"] = [1.0, 1.0]
-            dataloader, _, _ = create_dataloaders_from_datay_source(
+            dataloader, _, _ = create_dataloaders_from_data_source(
                 dataset_path, data_config
             )
 
@@ -560,7 +583,7 @@ class CounterfactualKnowledgeDistillation:
             )
             validation_data_config = copy.deepcopy(self.adaptor_config)
             validation_data_config["training"]["split"] = [0.0, 1.0]
-            _, dataloader_val, _ = create_dataloaders_from_datay_source(
+            _, dataloader_val, _ = create_dataloaders_from_data_source(
                 val_dataset_path, data_config  # TODO: why dataset_path???
             )
 
@@ -593,7 +616,7 @@ class CounterfactualKnowledgeDistillation:
             finetune_trainer = ModelTrainer(
                 config=copy.deepcopy(self.adaptor_config),
                 model=self.student,
-                datay_source=(self.dataloader_mixer, self.dataloaders_val),
+                data_source=(self.dataloader_mixer, self.dataloaders_val),
                 model_name="finetuned_model",
                 base_dir=os.path.join(self.base_dir, str(finetune_iteration)),
                 val_dataloader_weights=[
@@ -665,7 +688,20 @@ class CounterfactualKnowledgeDistillation:
             (
                 validation_tracked_values,
                 validation_stats,
-            ) = retrieve_validation_statistics(finetune_iteration, self.tracked_keys)
+            ) = calculate_validation_statistics(
+                model=self.student,
+                dataloader=self.dataloaders_val[0],
+                tracked_keys=self.tracked_keys,
+                output_size=self.output_size,
+                explainer=self.explainer,
+                device=self.device,
+                logits_to_prediction=self.logits_to_prediction,
+                use_confusion_matrix=self.adaptor_config["use_confusion_matrix"],
+                max_validation_samples=self.adaptor_config["max_validation_samples"],
+                min_start_target_percentile=self.adaptor_config[
+                    "min_start_target_percentile"
+                ],
+            )
             validation_feedback, validation_feedback_stats = self.retrieve_feedback(
                 tracked_values=validation_tracked_values,
                 finetune_iteration=finetune_iteration,

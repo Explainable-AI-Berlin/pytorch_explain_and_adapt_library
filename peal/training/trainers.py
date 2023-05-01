@@ -7,7 +7,7 @@ import inspect
 import platform
 
 from pathlib import Path
-from tensorboardX import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from peal.utils import orthogonal_initialization, move_to_device, load_yaml_config
@@ -96,7 +96,8 @@ class ModelTrainer:
             self.optimizer = optimizer
 
         self.base_dir = os.path.join(base_dir, model_name)
-        self.device = "cuda" if next(self.model.parameters()).is_cuda else "cpu"
+        self.device = "cuda" if next(
+            self.model.parameters()).is_cuda else "cpu"
         if criterions is None:
             criterions = get_criterions(config)
             self.criterions = {}
@@ -196,7 +197,8 @@ class ModelTrainer:
 
         if not is_initialized:
             shutil.rmtree(self.base_dir, ignore_errors=True)
-            Path(os.path.join(self.base_dir, "logs")).mkdir(parents=True, exist_ok=True)
+            Path(os.path.join(self.base_dir, "logs")).mkdir(
+                parents=True, exist_ok=True)
             writer = SummaryWriter(os.path.join(self.base_dir, "logs"))
             self.logger.writer = writer
             os.makedirs(os.path.join(self.base_dir, "outputs"))
@@ -225,7 +227,8 @@ class ModelTrainer:
                             + "In that case add function project_to_pytorch_default() to your underlying dataset to correct visualization!"
                         )
 
-                    sample_batch_label_str = "sample_train_batch" + str(i) + "_"
+                    sample_batch_label_str = "sample_train_batch" + \
+                        str(i) + "_"
                     if len(sample_train_y.shape) == 1:
                         sample_batch_label_str += "_" + str(
                             list(map(lambda x: int(x), list(sample_train_y)))
@@ -311,7 +314,8 @@ class ModelTrainer:
                     os.path.join(self.base_dir, "checkpoints", "final.cpl"),
                 )
                 torch.save(
-                    self.model.to("cpu"), os.path.join(self.base_dir, "model.cpl")
+                    self.model.to("cpu"), os.path.join(
+                        self.base_dir, "model.cpl")
                 )
                 val_accuracy_max = val_accuracy
                 self.model.to(self.device)
