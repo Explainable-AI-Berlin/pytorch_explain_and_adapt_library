@@ -4,11 +4,11 @@
 'base_batch_size'         : 50 # for 64 x 64 image with 40GB VRAM
 'gigabyte_vram'           : 40
 'assumed_input_size'      : [3, 64, 64]
-'max_epochs'              : 12 # 20
-'learning_rate'           : 0.00005
+'max_epochs'              : 1 # [1, 12]
+'learning_rate'           : 0.0 # [0.00005, 0.0001]
 'optimizer'               : 'adam'
 'global_train_step'       : 0
 'global_validation_step'  : 0
 'epoch'                   : -1
-'iterations_per_episode'  : 1000
+'iterations_per_episode'  : 1 # [10, 1000]
 'verbosity'               : 1

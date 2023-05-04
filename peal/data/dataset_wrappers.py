@@ -37,3 +37,9 @@ class VAEDatasetWrapper(PealDataset):
     def __getitem__(self, idx):
         x, y = self.base_dataset.__getitem__(idx)
         return x, x
+
+
+def wrap_dataset(dataset, config):
+    # TODO implement correct wrapping
+    print("dataset wrapping not implemented yet")
+    return dataset

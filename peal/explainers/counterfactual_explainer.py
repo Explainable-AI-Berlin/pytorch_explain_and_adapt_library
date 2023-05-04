@@ -2,52 +2,51 @@ import torch
 
 from torch import nn
 from tqdm import tqdm
-from pathlib import Path
+from typing import Union
 
 from peal.utils import load_yaml_config
 from peal.generators.interfaces import InvertibleGenerator
+from peal.data.dataset_interfaces import PealDataset
+from peal.explainers.explainer_interface import ExplainerInterface
 
 
-class CounterfactualExplainer:
+class CounterfactualExplainer(ExplainerInterface):
     """
     This class implements the counterfactual explanation method
     """
 
     def __init__(
         self,
-        downstream_model,
-        generator,
-        input_type,
-        generate_contrastive_collage,
-        explainer_config="$PEAL/configs/explainers/counterfactual_default.yaml",
-        from_pytorch_canonical=lambda x: x,
-        to_pytorch_canonical=lambda x: x,
+        downstream_model: nn.Module,
+        generator: InvertibleGenerator,
+        input_type: str,
+        dataset: PealDataset,
+        explainer_config: Union[
+            dict, str
+        ] = "$PEAL/configs/explainers/counterfactual_default.yaml",
     ):
         """
         This class implements the counterfactual explanation method
 
         Args:
-            downstream_model (_type_): _description_
-            generator (_type_): _description_
-            input_type (_type_): _description_
-            explainer_config (str, optional): _description_. Defaults to "/configs/explainers/counterfactual_default.yaml".
-            from_pytorch_canonical (_type_, optional): _description_. Defaults to lambdax:x.
-            to_pytorch_canonical (_type_, optional): _description_. Defaults to lambdax:x.
+            downstream_model (nn.Module): _description_
+            generator (InvertibleGenerator): _description_
+            input_type (str): _description_
+            dataset (PealDataset): _description_
+            explainer_config (Union[ dict, str ], optional): _description_. Defaults to "/configs/explainers/counterfactual_default.yaml".
         """
         self.downstream_model = downstream_model
         self.generator = generator
+        self.dataset = dataset
         self.explainer_config = load_yaml_config(explainer_config)
         self.device = (
             "cuda" if next(self.downstream_model.parameters()).is_cuda else "cpu"
         )
         self.input_type = input_type
         self.loss = torch.nn.CrossEntropyLoss()
-        self.from_pytorch_canonical = from_pytorch_canonical
-        self.to_pytorch_canonical = to_pytorch_canonical
-        self.generate_contrastive_collage = generate_contrastive_collage
 
     def gradient_based_counterfactual(
-        self, batch_in, target_confidence_goal, target_classes
+        self, x_in, target_confidence_goal, target_classes
     ):
         """
         This function generates a counterfactual for a given batch of inputs.
@@ -58,9 +57,9 @@ class CounterfactualExplainer:
         Returns:
             _type_: _description_
         """
-        batch = torch.clone(batch_in)
-        batch = self.from_pytorch_canonical(batch)
-        v_original = self.generator.encode(batch.to(self.device))
+        x = torch.clone(x_in)
+        x = self.dataset.project_from_pytorch_default(x)
+        v_original = self.generator.encode(x.to(self.device))
         if isinstance(v_original, list):
             v = []
 
@@ -97,7 +96,7 @@ class CounterfactualExplainer:
 
                 img = self.generator.decode(latent_code)
 
-                img = self.to_pytorch_canonical(img)
+                img = self.dataset.project_to_pytorch_default(img)
 
                 logits = self.downstream_model(
                     img
@@ -137,7 +136,7 @@ class CounterfactualExplainer:
                     + ", target_confidences: "
                     + str(list(target_confidences)[:2])
                     + ", visual_difference: "
-                    + str(torch.mean(torch.abs(batch_in - img.detach().cpu())).item())
+                    + str(torch.mean(torch.abs(x_in - img.detach().cpu())).item())
                 )
 
                 loss.backward()
@@ -157,7 +156,7 @@ class CounterfactualExplainer:
 
         latent_code = [v_elem.to(self.device) for v_elem in v]
         counterfactual = self.generator.decode(latent_code).detach().cpu()
-        counterfactual = self.to_pytorch_canonical(counterfactual)
+        counterfactual = self.dataset.project_to_pytorch_default(counterfactual)
 
         attributions = []
         for v_idx in range(len(v_original)):
@@ -174,59 +173,63 @@ class CounterfactualExplainer:
     def explain_batch(
         self,
         batch: dict,
-        base_path="collages",
-        start_idx=0,
-        target_confidence_goal_in=None,
-        remove_below_threshold=True,
-    ):
+        base_path: str = "collages",
+        start_idx: int = 0,
+        y_target_goal_confidence_in: int = None,
+        remove_below_threshold: bool = True,
+    ) -> dict:
         """
-        _summary_
+        This function generates a counterfactual for a given batch of inputs.
 
         Args:
-            x (_type_): _description_
-            target_classes (_type_): _description_
-            target_confidence_goal_in (_type_, optional): _description_. Defaults to None.
-            source_classes (_type_, optional): _description_. Defaults to None.
+            batch (dict): The batch to explain.
+            base_path (str, optional): The base path to save the counterfactuals to. Defaults to "collages".
+            start_idx (int, optional): The start index for the counterfactuals. Defaults to 0.
+            y_target_goal_confidence_in (int, optional): The target confidence for the counterfactuals. Defaults to None.
+            remove_below_threshold (bool, optional): The flag to remove counterfactuals with a confidence below the target confidence. Defaults to True.
 
         Returns:
-            _type_: _description_
+            dict: The batch with the counterfactuals added.
         """
-        if target_confidence_goal_in is None:
-            target_confidence_goal = self.explainer_config["target_confidence_goal"]
+        if y_target_goal_confidence_in is None:
+            target_confidence_goal = self.explainer_config["y_target_goal_confidence"]
 
         else:
-            target_confidence_goal = target_confidence_goal_in
+            target_confidence_goal = y_target_goal_confidence_in
 
         if isinstance(self.generator, InvertibleGenerator):
             (
-                batch["x_counterfactual"],
-                batch["z_difference"],
-                batch["y_target_confidence"],
-            ) = self.gradient_based_counterfactual(batch["x"], target_confidence_goal)
+                batch["x_counterfactual_list"],
+                batch["z_difference_list"],
+                batch["y_target_end_confidence_list"],
+            ) = self.gradient_based_counterfactual(
+                x_in=batch["x_list"],
+                target_confidence_goal=target_confidence_goal,
+                target_classes=batch["y_target_list"],
+            )
 
         batch_out = {}
         if remove_below_threshold:
-            # TODO remove rows in counterfactual, attribution and x where target_confidences < target_confidence_goal
             for key in batch.keys():
                 batch_out[key] = []
                 for sample_idx in range(len(batch[key])):
                     if (
-                        batch["y_target_confidence"][sample_idx]
-                        < target_confidence_goal
+                        batch["y_target_end_confidence_list"][sample_idx]
+                        >= target_confidence_goal
                     ):
                         batch_out[key].append(batch[key][sample_idx])
 
         else:
             batch_out = batch
 
-        batch_out["x_attribution"] = self.dataset.generate_contrastive_collage(
-            x=batch_out["x"],
-            x_counterfactual=batch_out["x_counterfactual"],
+        (
+            batch_out["x_attribution_list"],
+            batch_out["collage_path_list"],
+        ) = self.dataset.generate_contrastive_collage(
             target_confidence_goal=target_confidence_goal,
-            y_target=batch_out["y_target"],
-            y_source=batch_out["y_source"],
             base_path=base_path,
             start_idx=start_idx,
+            **batch_out,
         )
 
         return batch_out

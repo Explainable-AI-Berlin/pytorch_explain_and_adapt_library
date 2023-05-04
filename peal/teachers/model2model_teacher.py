@@ -1,25 +1,24 @@
 from peal.teachers.teacher_interface import TeacherInterface
 
+
 class Model2ModelTeacher(TeacherInterface):
     def __init__(self, model):
         self.model = model
-        self.device = 'cuda' if next(
-            self.model.parameters()).is_cuda else 'cpu'
+        self.device = "cuda" if next(self.model.parameters()).is_cuda else "cpu"
 
-    def get_feedback(self, counterfactuals, source_classes, target_classes, **args):
+    def get_feedback(self, x_counterfactual_list, y_source_list, y_target_list, **args):
         feedback = []
         is_train = self.model.training
         self.model.eval()
-        for idx, counterfactual in enumerate(counterfactuals):
-            pred = self.model(counterfactual.unsqueeze(
-                0).to(self.device)).squeeze(0)
+        for idx, counterfactual in enumerate(x_counterfactual_list):
+            pred = self.model(counterfactual.unsqueeze(0).to(self.device)).squeeze(0)
 
             # TODO here has to be somehing added for OOD e.g. with FID score
-            if pred[target_classes[idx]] > pred[source_classes[idx]]:
-                feedback.append('true')
+            if pred[y_target_list[idx]] > pred[y_source_list[idx]]:
+                feedback.append("true")
 
             else:
-                feedback.append('false')
+                feedback.append("false")
 
         if is_train:
             self.model.train()

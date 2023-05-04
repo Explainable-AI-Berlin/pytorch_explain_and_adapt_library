@@ -2,7 +2,7 @@
 'learning_rate'                        :   0.001 # [0.01, 0.001]
 'gradient_steps'                       :   31 # [31, 51]
 'optimizer'                            :   'Adam'
-'target_confidence_goal'               :   0.65 # determines how far to go beyond the decision boundary
+'y_target_goal_confidence'             :   0.65 # determines how far to go beyond the decision boundary
 'use_masking'                          :   True
 'img_noise_injection'                  :   0.01
 'l1_regularization'                    :   1.0 # [0.0, 1.0]

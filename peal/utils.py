@@ -13,46 +13,33 @@ import shutil
 from pkg_resources import resource_filename
 
 
-def set_adaptive_batch_size(config, gigabyte_vram):
+def set_adaptive_batch_size(config, gigabyte_vram, samples_per_iteration):
     if "base_batch_size" in config.keys():
         multiplier = float(
             np.prod(config["assumed_input_size"])
             / np.prod(config["data"]["input_size"])
         )
-        if (
-            not gigabyte_vram is None
-            and "gigabyte_vram" in config.keys()
-        ):
-            multiplier = multiplier * (
-                gigabyte_vram / config["gigabyte_vram"]
-            )
+        if not gigabyte_vram is None and "gigabyte_vram" in config.keys():
+            multiplier = multiplier * (gigabyte_vram / config["gigabyte_vram"])
 
-        batch_size_adapted = max(
-            1, int(config["base_batch_size"] * multiplier)
-        )
+        batch_size_adapted = max(1, int(config["base_batch_size"] * multiplier))
         if config["batch_size"] == -1:
             config["batch_size"] = batch_size_adapted
-            config["num_batches"] = (
-                int(
-                    config["samples_per_iteration"]
-                    / batch_size_adapted
-                )
-                + 1
-            )
+            config["num_batches"] = int(samples_per_iteration / batch_size_adapted) + 1
 
 
 def embed_numberstring(number_str, num_digits=6):
-    return '0' * (num_digits - len(number_str)) + number_str
+    return "0" * (num_digits - len(number_str)) + number_str
 
 
 def is_port_in_use(port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        return s.connect_ex(('localhost', port)) == 0
+        return s.connect_ex(("localhost", port)) == 0
 
 
 def request(name, default):
-    answer = input('Do you want to change value of ' + str(name) + '? [y/n]')
-    if answer == 'n':
+    answer = input("Do you want to change value of " + str(name) + "? [y/n]")
+    if answer == "n":
         return default
 
     else:
@@ -60,15 +47,17 @@ def request(name, default):
             return not default
 
         elif isinstance(default, list):
-            return input('To what list of values do you want to change ' + str(name) + '?').split(',')
+            return input(
+                "To what list of values do you want to change " + str(name) + "?"
+            ).split(",")
 
         else:
-            return input('To what value do you want to change ' + str(name) + '?')
+            return input("To what value do you want to change " + str(name) + "?")
 
 
 def get_project_resource_dir():
     # TODO why are there two arguments too much??
-    return '/' + os.path.join(*resource_filename(__name__, 'peal').split('/')[:-1])
+    return "/" + os.path.join(*resource_filename(__name__, "peal").split("/")[:-1])
 
 
 def load_yaml_config(config_path):
@@ -76,11 +65,10 @@ def load_yaml_config(config_path):
         # config_path is already a config object
         return config_path
 
-    elif config_path[-5:] == '.yaml':
-        split_path = config_path.split('/')
-        if split_path[0] == '$PEAL':
-            config_path = os.path.join(
-                get_project_resource_dir(), *split_path[1:])
+    elif config_path[-5:] == ".yaml":
+        split_path = config_path.split("/")
+        if split_path[0] == "$PEAL":
+            config_path = os.path.join(get_project_resource_dir(), *split_path[1:])
 
         with open(config_path, "r") as stream:
             try:
@@ -91,14 +79,13 @@ def load_yaml_config(config_path):
                 raise
 
         for key in config.keys():
-            if isinstance(config[key], str) and config[key][-5:] == '.yaml':
-                config[key] = load_yaml_config(
-                    os.path.join(*config[key].split('/')))
+            if isinstance(config[key], str) and config[key][-5:] == ".yaml":
+                config[key] = load_yaml_config(os.path.join(*config[key].split("/")))
 
         return config
 
     else:
-        raise Exception(config_path + ' has no valid ending!')
+        raise Exception(config_path + " has no valid ending!")
 
 
 def move_to_device(X, device):
@@ -114,9 +101,7 @@ def requires_grad_(model, requires_grad):
 
 
 def orthogonal_initialization(model):
-    '''
-
-    '''
+    """ """
     for parameter_idx, parameter in enumerate(model.parameters()):
         if len(parameter.shape) == 1:
             parameter.data = torch.randn(parameter.shape).to(parameter.device)
@@ -128,8 +113,8 @@ def orthogonal_initialization(model):
 
 
 def parse_args_and_config(config_path):
-    split_path = config_path.split('/')
-    if split_path[0] == '$PEAL':
+    split_path = config_path.split("/")
+    if split_path[0] == "$PEAL":
         config_path = os.path.join(get_project_resource_dir(), *split_path[1:])
 
     with open(config_path, "r") as f:
@@ -160,8 +145,7 @@ def parse_args_and_config(config_path):
         default="info",
         help="Verbose level: info | debug | warning | critical",
     )
-    parser.add_argument("--test", action="store_true",
-                        help="Whether to test the model")
+    parser.add_argument("--test", action="store_true", help="Whether to test the model")
     parser.add_argument(
         "--sample",
         action="store_true",
@@ -249,8 +233,7 @@ def parse_args_and_config(config_path):
             raise ValueError("level {} not supported".format(args.verbose))
 
         handler1 = logging.StreamHandler()
-        handler2 = logging.FileHandler(
-            os.path.join(args.log_path, "stdout.txt"))
+        handler2 = logging.FileHandler(os.path.join(args.log_path, "stdout.txt"))
         formatter = logging.Formatter(
             "%(levelname)s - %(filename)s - %(asctime)s - %(message)s"
         )
@@ -302,8 +285,7 @@ def parse_args_and_config(config_path):
                         sys.exit(0)
 
     # add device
-    device = torch.device(
-        "cuda") if torch.cuda.is_available() else torch.device("cpu")
+    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     logging.info("Using device: {}".format(device))
     new_config.device = device
 

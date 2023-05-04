@@ -2,6 +2,7 @@ import os
 import torch
 
 from torch import nn
+from typing import Union
 
 from peal.teachers.teacher_interface import TeacherInterface
 from peal.teachers.model2model_teacher import Model2ModelTeacher
@@ -10,18 +11,22 @@ from peal.teachers.segmentation_mask_teacher import SegmentationMaskTeacher
 from peal.teachers.virelay_teacher import VirelayTeacher
 
 
-def get_teacher(teacher, output_size, adaptor_config):
-    '''
-    Creates a teacher object from a string.
+def get_teacher(
+    teacher: Union[TeacherInterface, nn.Module, str],
+    output_size: int,
+    adaptor_config: Union[dict, str],
+) -> TeacherInterface:
+    """
+    This function returns a teacher. It can be a teacher that is already.
 
     Args:
-        teacher (_type_): _description_
-        output_size (_type_): _description_
-        adaptor_config (_type_): _description_
+        teacher (Union[TeacherInterface, nn.Module, str]): This can be a teacher that is already
+        output_size (int): The output size.
+        adaptor_config (Union[dict, str]): The adaptor config.
 
     Returns:
-        _type_: _description_
-    '''
+        TeacherInterface: The teacher.
+    """
     if isinstance(teacher, TeacherInterface):
         teacher = teacher
 
@@ -39,18 +44,12 @@ def get_teacher(teacher, output_size, adaptor_config):
         teacher = Human2ModelTeacher(port)
 
     elif teacher == "SegmentationMask":
-        teacher = SegmentationMaskTeacher(
-            adaptor_config["attribution_threshold"]
-        )
+        teacher = SegmentationMaskTeacher(adaptor_config["attribution_threshold"])
 
     elif teacher[:7] == "virelay":
-        teacher = VirelayTeacher(
-            num_classes=output_size, port=int(teacher[-4:])
-        )
+        teacher = VirelayTeacher(num_classes=output_size, port=int(teacher[-4:]))
 
     else:
-        teacher = Model2ModelTeacher(
-            torch.load(os.path.join(teacher, "model.cpl"))
-        )
+        teacher = Model2ModelTeacher(torch.load(os.path.join(teacher, "model.cpl")))
 
     return teacher

@@ -12,6 +12,7 @@ from matplotlib import pyplot as plt
 
 from peal.data.dataset_interfaces import PealDataset
 from peal.data.dataset_utils import parse_json, parse_csv
+from peal.utils import embed_numberstring
 
 matplotlib.use("Agg")
 
@@ -84,6 +85,9 @@ class SymbolicDataset(PealDataset):
         self.config = config
         self.transform = transform
         self.task_config = task_config
+        if data_dir[-4:] != ".csv":
+            data_dir = data_dir + ".csv"
+
         self.attributes, self.data, self.keys = parse_csv(data_dir, config, mode)
 
     def __len__(self):
@@ -120,18 +124,35 @@ class SymbolicDataset(PealDataset):
 
         return x, y
 
-    def generate_contrastive_collage(self, batch_in, counterfactual):
+    def generate_contrastive_collage(
+        self,
+        x_list,
+        x_counterfactual_list,
+        y_target_list,
+        y_source_list,
+        target_confidence_goal,
+        base_path,
+        start_idx,
+        **args,
+    ):
         # TODO
-        return torch.zeros([batch_in.shape[0], 3, 64, 64]), torch.zeros_like(batch_in)
+        collage_paths = [
+            os.path.join(base_path, embed_numberstring(str(start_idx + i)))
+            for i in range(len(x_list))
+        ]
+        for path in collage_paths:
+            Path(path).mkdir(parents=True, exist_ok=True)
+
+        return x_list, collage_paths
 
     def serialize_dataset(self, output_dir, x_list, y_list, sample_names=None):
         Path(output_dir).mkdir(parents=True, exist_ok=True)
 
-        x = torch.cat(x_list, dim=0)
-        y = torch.cat(y_list, dim=0)
+        x = torch.stack(x_list, dim=0)
+        y = torch.stack([torch.tensor([y]) for y in y_list], dim=0)
         data = torch.cat([x, y], dim=1)
         np.savetxt(
-            os.path.join(output_dir, "data.csv"),
+            output_dir + ".csv",
             data.numpy(),
             delimiter=",",
             header=",".join(self.attributes),

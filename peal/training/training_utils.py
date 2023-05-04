@@ -1,22 +1,46 @@
 import torch
 import numpy as np
+import os
 
+from torch import nn
 from tqdm import tqdm
+from typing import Union
+
+from peal.explainers.explainer_interface import ExplainerInterface
 
 
 def calculate_validation_statistics(
-    model,
-    dataloader,
-    tracked_keys,
-    base_path,
-    output_size,
-    device,
-    logits_to_prediction,
-    use_confusion_matrix,
-    explainer,
-    max_validation_samples,
-    min_start_target_percentile,
+    model: nn.Module,
+    dataloader: torch.utils.data.DataLoader,
+    tracked_keys: list,
+    base_path: str,
+    output_size: int,
+    device: Union[str, torch.device],
+    logits_to_prediction: callable,
+    use_confusion_matrix: bool,
+    explainer: ExplainerInterface,
+    max_validation_samples: int,
+    min_start_target_percentile: torch.tensor,
 ):
+    """
+    This function calculates the validation statistics for a given model and dataloader.
+
+    Args:
+        model (nn.Module): _description_
+        dataloader (torch.utils.data.DataLoader): _description_
+        tracked_keys (list): _description_
+        base_path (str): _description_
+        output_size (int): _description_
+        device (Union[str, torch.device]): _description_
+        logits_to_prediction (callable): _description_
+        use_confusion_matrix (bool): _description_
+        explainer (ExplainerInterface): _description_
+        max_validation_samples (int): _description_
+        min_start_target_percentile (torch.tensor): _description_
+
+    Returns:
+        _type_: _description_
+    """
     tracked_values = {key: [] for key in tracked_keys}
     confusion_matrix = np.zeros([output_size, output_size])
     correct = 0
@@ -26,8 +50,8 @@ def calculate_validation_statistics(
         confidence_scores.append([])
 
     with tqdm(enumerate(dataloader)) as pbar:
-        for it, (X, y) in pbar:
-            pred_confidences = torch.nn.Softmax()(model(X.to(device))).detach().cpu()
+        for it, (x, y) in pbar:
+            pred_confidences = torch.nn.Softmax()(model(x.to(device))).detach().cpu()
             y_pred = logits_to_prediction(pred_confidences)
             for i in range(y.shape[0]):
                 if y_pred[i] == y[i]:
@@ -50,23 +74,21 @@ def calculate_validation_statistics(
                 batch_target_start_confidences.append(
                     pred_confidences[sample_idx][batch_targets[sample_idx]]
                 )
-            tracked_values["y"].append(y)
-            tracked_values["y_pred"].append(y_pred)
-            tracked_values["target"].append(batch_targets)
-            tracked_values["start_target_confidence"].append(
-                torch.stack(batch_target_start_confidences, 0)
+            batch = {}
+            batch["x_list"] = x
+            batch["y_list"] = y
+            batch["y_source_list"] = y_pred
+            batch["y_target_list"] = batch_targets
+            batch["y_target_start_confidence_list"] = torch.stack(
+                batch_target_start_confidences, 0
             )
             results = explainer.explain_batch(
-                batch_in=X,
-                target_classes=batch_targets,
-                source_classes=y_pred,
-                base_path=os.path.join(
-                    base_path,
-                    "collages",
-                ),
+                batch=batch,
+                base_path=base_path,
+                remove_below_threshold=False,
             )
             for key in set(results.keys()).intersection(set(tracked_values.keys())):
-                tracked_values[key].append(results[key])
+                tracked_values[key].extend(results[key])
 
             if num_samples >= max_validation_samples:
                 break

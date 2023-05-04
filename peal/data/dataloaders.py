@@ -5,6 +5,8 @@ from torch.utils.data import DataLoader
 
 from peal.data.dataset_wrappers import GlowDatasetWrapper
 from peal.data.dataset_factory import get_datasets
+from peal.data.dataset_wrappers import wrap_dataset
+from peal.data.dataset_interfaces import PealDataset
 
 
 class DataStack:
@@ -204,14 +206,14 @@ def get_dataloader(dataset, training_config, mode, task_config=None, batch_size=
         dataloader = DataLoader(
             dataset,
             batch_size=training_config[mode + "_batch_size"],
-            num_workers=4,
+            num_workers=1,
         )
 
     else:
         dataloader = DataLoader(
             dataset,
             batch_size=batch_size,
-            num_workers=4,
+            num_workers=1,
         )
 
     if mode == "train" and "iterations_per_episode" in training_config.keys():
@@ -331,5 +333,10 @@ def create_dataloaders_from_datasource(
     ):
         # TODO sanity check or warning
         config["data"] = train_dataloader.dataset.config
+
+    # TODO deal with other datasets
+    """for dataloader in [train_dataloader, val_dataloader, test_dataloader]:
+        if not isinstance(dataloader.dataset, PealDataset):
+            dataloader.dataset = wrap_dataset(dataloader.dataset, config["data"])"""
 
     return train_dataloader, val_dataloader, test_dataloader
