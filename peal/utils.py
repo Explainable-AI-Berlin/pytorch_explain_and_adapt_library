@@ -56,8 +56,9 @@ def request(name, default):
 
 
 def get_project_resource_dir():
-    # TODO why are there two arguments too much??
-    return "/" + os.path.join(*resource_filename(__name__, "peal").split("/")[:-1])
+    return os.path.abspath(os.sep) + os.path.join(
+        *resource_filename(__name__, "peal").replace("\\", "/").split("/")[:-1]
+    )
 
 
 def load_yaml_config(config_path):
