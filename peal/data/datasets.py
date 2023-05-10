@@ -160,8 +160,26 @@ class SymbolicDataset(PealDataset):
 
 
 class ImageDataset(PealDataset):
-    def generate_contrastive_collage(self, batch_in, counterfactual):
-        heatmap_red = torch.maximum(
+    def generate_contrastive_collage(
+        self,
+        x_list,
+        x_counterfactual_list,
+        y_target_list,
+        y_source_list,
+        target_confidence_goal,
+        base_path,
+        start_idx,
+        **args,
+    ):
+        collage_paths = [
+            os.path.join(base_path, embed_numberstring(str(start_idx + i)))
+            for i in range(len(x_list))
+        ]
+        for path in collage_paths:
+            Path(path).mkdir(parents=True, exist_ok=True)
+
+        return x_list, collage_paths
+        """heatmap_red = torch.maximum(
             torch.tensor(0.0),
             torch.sum(batch_in, dim=1) - torch.sum(counterfactual, dim=1),
         )
@@ -193,9 +211,6 @@ class ImageDataset(PealDataset):
         current_collage = torch.cat(
             [batch_in, counterfactual_rgb, heatmap_high_contrast], -1
         )
-        """current_collage = self.project_to_pytorch_default(
-            result_img_collages[batch_idx][sample_idx]
-        )"""
         current_collage = torchvision.utils.make_grid(
             current_collage, nrow=self.adaptor_config["batch_size"]
         )
@@ -231,7 +246,7 @@ class ImageDataset(PealDataset):
         img_np = np.array(Image.open(collage_path))[:, 80:-80]
         img = Image.fromarray(img_np)
         img.save(collage_path)
-        return result_img_collage, heatmap_high_contrast
+        return result_img_collage, heatmap_high_contrast"""
 
     def serialize_dataset(self, output_dir, x_list, y_list, sample_names=None):
         for class_name in range(self.config["output_size"]):
@@ -242,23 +257,21 @@ class ImageDataset(PealDataset):
         data = []
         for idx, x in enumerate(x_list):
             class_name = int(y_list[idx])
-            img = Image.fromarray(x.cpu().numpy().transpose(1, 2, 0))
-            img.save(
-                os.path.join(output_dir, "imgs", str(class_name), sample_names[idx])
+            img = Image.fromarray(
+                np.array(255 * x.cpu().numpy().transpose(1, 2, 0), dtype=np.uint8)
             )
+            img_name = os.path.join("imgs", str(class_name), sample_names[idx] + ".png")
+            img.save(os.path.join(output_dir, img_name))
             data.append(
                 [
-                    os.path.join("imgs", str(class_name), sample_names[idx]),
+                    img_name,
                     class_name,
                 ]
             )
 
-        np.savetxt(
-            os.path.join(output_dir, "data.csv"),
-            data.numpy(),
-            delimiter=",",
-            header=",".join(self.attributes),
-        )
+        data = "ImgPath,Class\n" + "\n".join([",".join(map(str, x)) for x in data])
+        with open(os.path.join(output_dir, "data.csv"), "w") as f:
+            f.write(data)
 
 
 class Image2MixedDataset(ImageDataset):

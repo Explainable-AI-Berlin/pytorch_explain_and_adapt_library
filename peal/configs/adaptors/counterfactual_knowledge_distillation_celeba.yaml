@@ -1,4 +1,4 @@
-'batch_size'                           :  -1 # what batch_size is used for creating the confounders?
+'batch_size'                           :  1 # [1,-1] what batch_size is used for creating the confounders?
 'num_batches'                          :  -1 # number of batches per iteration that confounders are calculated for
 'base_batch_size'                      :  10
 'gigabyte_vram'                        :  40

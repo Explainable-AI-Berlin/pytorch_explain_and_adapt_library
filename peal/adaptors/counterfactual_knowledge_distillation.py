@@ -179,6 +179,7 @@ class CounterfactualKnowledgeDistillation:
             "hint_list",
             "collage_path_list",
         ]
+        print(self.adaptor_config)
 
     def get_batch(
         self,
@@ -641,7 +642,10 @@ class CounterfactualKnowledgeDistillation:
                 sample_idx += 1
 
         self.train_dataloader.dataset.serialize_dataset(
-            dataset_dir, x_list, y_list, sample_names
+            output_dir=dataset_dir,
+            x_list=x_list,
+            y_list=y_list,
+            sample_names=sample_names,
         )
         return dataset_dir
 

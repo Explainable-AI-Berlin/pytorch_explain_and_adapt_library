@@ -1,6 +1,6 @@
-'train_batch_size'        : -1 #10
-'val_batch_size'          : -1 #10
-'test_batch_size'         : -1 #10
+'train_batch_size'        : 1 #[-1, 1, 10]
+'val_batch_size'          : 1 #[-1, 1, 10]
+'test_batch_size'         : 1 #[-1, 1, 10]
 'base_batch_size'         : 50 # for 64 x 64 image with 40GB VRAM
 'gigabyte_vram'           : 40
 'assumed_input_size'      : [3, 64, 64]

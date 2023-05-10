@@ -93,7 +93,6 @@ class CounterfactualExplainer(ExplainerInterface):
                 latent_code = [v_elem.to(self.device) for v_elem in v]
 
                 optimizer.zero_grad()
-
                 img = self.generator.decode(latent_code)
 
                 img = self.dataset.project_to_pytorch_default(img)
