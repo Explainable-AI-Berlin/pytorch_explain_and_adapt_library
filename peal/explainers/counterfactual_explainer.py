@@ -207,6 +207,18 @@ class CounterfactualExplainer(ExplainerInterface):
                 target_classes=batch["y_target_list"],
             )
 
+        elif isinstance(self.generator, EditCapablGenerator):
+            (
+                batch["x_counterfactual_list"],
+                batch["z_difference_list"],
+                batch["y_target_end_confidence_list"],
+            ) = self.generator.edit(
+                x_in=batch["x_list"],
+                target_confidence_goal=target_confidence_goal,
+                target_classes=batch["y_target_list"],
+                classifier=self.downstream_model,
+            )
+
         batch_out = {}
         if remove_below_threshold:
             for key in batch.keys():
