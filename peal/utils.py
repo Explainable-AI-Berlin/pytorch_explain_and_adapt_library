@@ -62,6 +62,15 @@ def get_project_resource_dir():
 
 
 def load_yaml_config(config_path):
+
+    def open_config(config_path):
+        with open(config_path, "r") as stream:
+            try:
+                config = yaml.safe_load(stream)
+                return config
+            except yaml.YAMLError as exc:
+                raise
+
     if not isinstance(config_path, str):
         # config_path is already a config object
         return config_path
@@ -71,13 +80,24 @@ def load_yaml_config(config_path):
         if split_path[0] == "$PEAL":
             config_path = os.path.join(get_project_resource_dir(), *split_path[1:])
 
-        with open(config_path, "r") as stream:
-            try:
-                config = yaml.safe_load(stream)
+        #with open(config_path, "r") as stream:
+        #    try:
+        #        config = yaml.safe_load(stream)
+        #
+        #    except yaml.YAMLError as exc:
+        #        print(exc)
+        #        raise
 
-            except yaml.YAMLError as exc:
-                print(exc)
-                raise
+        try:
+            config = open_config(config_path)
+        except Exception as e:
+            error, _, _ = sys.exc_info()
+            if error.__name__ == 'OSError' or error.__name__ == 'FileNotFoundError':
+                config_path = os.path.abspath(os.path.join('..', *split_path))
+                config_path = config_path.replace('$PEAL', 'peal')
+                config = open_config(config_path)
+            else:
+                raise e
 
         for key in config.keys():
             if isinstance(config[key], str) and config[key][-5:] == ".yaml":
