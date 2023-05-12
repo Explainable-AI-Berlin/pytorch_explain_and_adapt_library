@@ -117,7 +117,7 @@ class SymbolicDataset(PealDataset):
         ):
             y = torch.zeros([len(self.task_config["y_selection"])])
             for idx, selection in enumerate(self.task_config["y_selection"]):
-                y[idx] = y[self.attributes.index(selection)]
+                y[idx] = data[self.attributes.index(selection)]
 
         else:
             y = data[-1]
