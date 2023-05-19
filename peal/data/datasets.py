@@ -103,9 +103,9 @@ class SymbolicDataset(PealDataset):
             and "x_selection" in self.task_config.keys()
             and not len(self.task_config["x_selection"]) == 0
         ):
-            x = torch.zeros([len(self.task_config["selection"])], dtype=torch.float32)
-            for idx, selection in enumerate(self.task_config["selection"]):
-                x[idx] = x[self.attributes.index(selection)]
+            x = torch.zeros([len(self.task_config["x_selection"])], dtype=torch.float32)
+            for idx, selection in enumerate(self.task_config["x_selection"]):
+                x[idx] = data[self.attributes.index(selection)]
 
         else:
             x = data[:-1].to(torch.float32)
@@ -118,6 +118,9 @@ class SymbolicDataset(PealDataset):
             y = torch.zeros([len(self.task_config["y_selection"])])
             for idx, selection in enumerate(self.task_config["y_selection"]):
                 y[idx] = data[self.attributes.index(selection)]
+
+            if y.shape[0] == 1:
+                y = y[0]
 
         else:
             y = data[-1]

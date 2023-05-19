@@ -16,16 +16,14 @@ def orthogonality_criterion(model, pred, y):
                 parameter,
                 [
                     parameter.shape[0],
-                    parameter.shape[1] * parameter.shape[2] *
-                    parameter.shape[3],
+                    parameter.shape[1] * parameter.shape[2] * parameter.shape[3],
                 ],
             )
         else:
             parameter_reshaped = parameter
         loss += torch.linalg.matrix_norm(
             torch.matmul(parameter_reshaped, parameter_reshaped.t())
-            - torch.eye(parameter_reshaped.shape[0]
-                        ).to(next(model.parameters()).device)
+            - torch.eye(parameter_reshaped.shape[0]).to(next(model.parameters()).device)
         )
     return loss
 
@@ -59,8 +57,8 @@ def mixed_bce_mse_criterion(model, y_pred, y_target):
         y_target[: config["data"]["output_split"]],
     )
     loss_continuous = torch.nn.MSELoss()(
-        y_pred[config["data"]["output_split"]:],
-        y_target[config["data"]["output_split"]:],
+        y_pred[config["data"]["output_split"] :],
+        y_target[config["data"]["output_split"] :],
     )
     return loss_discrete + loss_continuous
 
@@ -189,19 +187,14 @@ def cross_entropy_criterion(model, y_pred, y_target):
     if isinstance(y_pred, tuple):
         y_pred = y_pred[0]
 
-    y_pred = y_pred.reshape([
-        int(np.prod(y_pred.shape[:-1])),
-        y_pred.shape[-1]
-    ])
+    y_pred = y_pred.reshape([int(np.prod(y_pred.shape[:-1])), y_pred.shape[-1]])
     y_target = y_target.flatten().to(torch.int64)
     return nn.CrossEntropyLoss()(y_pred, y_target)
 
 
 available_criterions = {
     "ce": cross_entropy_criterion,
-    "bce": lambda model, y_pred, y_target: nn.BCEWithLogitsLoss()(
-        y_pred, y_target.to(torch.int64)
-    ),
+    "bce": lambda model, y_pred, y_target: nn.BCEWithLogitsLoss()(y_pred, y_target),
     "mse": lambda model, y_pred, y_target: nn.MSELoss()(y_pred, y_target),
     "mae": lambda model, y_pred, y_target: nn.L1Loss()(y_pred, y_target),
     "mixed": mixed_bce_mse_criterion,
