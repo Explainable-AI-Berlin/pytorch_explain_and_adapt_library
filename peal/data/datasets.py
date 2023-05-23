@@ -88,7 +88,14 @@ class SymbolicDataset(PealDataset):
         if data_dir[-4:] != ".csv":
             data_dir = data_dir + ".csv"
 
-        self.attributes, self.data, self.keys = parse_csv(data_dir, config, mode)
+        self.attributes, self.data, self.keys = parse_csv(
+            data_dir=data_dir,
+            config=config,
+            mode=mode,
+            set_negative_to_zero=config["set_negative_to_zero"]
+            if "set_negative_to_zero" in config.keys()
+            else False,
+        )
 
     def __len__(self):
         return len(self.keys)

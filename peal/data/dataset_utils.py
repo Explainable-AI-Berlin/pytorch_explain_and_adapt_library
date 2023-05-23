@@ -4,7 +4,7 @@ import random
 import numpy as np
 
 
-def parse_json(data_dir, config, mode):
+def parse_json(data_dir, config, mode, set_negative_to_zero=True):
     """
     _summary_
 
@@ -34,10 +34,11 @@ def parse_json(data_dir, config, mode):
             config=config,
             mode=mode,
             extract_instances_tensor=extract_instances_tensor_confounder,
+            set_negative_to_zero=set_negative_to_zero,
         )
 
 
-def parse_csv(data_dir, config, mode, key_type="idx"):
+def parse_csv(data_dir, config, mode, key_type="idx", set_negative_to_zero=True):
     """
     _summary_
 
@@ -92,6 +93,7 @@ def parse_csv(data_dir, config, mode, key_type="idx"):
             config=config,
             mode=mode,
             extract_instances_tensor=extract_instances_tensor_confounder,
+            set_negative_to_zero=set_negative_to_zero,
         )
 
     else:
@@ -124,7 +126,11 @@ def parse_csv(data_dir, config, mode, key_type="idx"):
 
 
 def process_confounder_data_controlled(
-    raw_data, config, mode, extract_instances_tensor
+    raw_data,
+    config,
+    mode,
+    extract_instances_tensor,
+    set_negative_to_zero=True,
 ):
     """
     _summary_
@@ -166,10 +172,15 @@ def process_confounder_data_controlled(
             n_attribute_confounding[attribute][confounder]
             < max_attribute_confounding[attribute][confounder]
         ):
-            data[key] = torch.maximum(
-                torch.zeros_like(instances_tensor),
-                instances_tensor,
-            )
+            if set_negative_to_zero:
+                data[key] = torch.maximum(
+                    torch.zeros_like(instances_tensor),
+                    instances_tensor,
+                )
+
+            else:
+                data[key] = instances_tensor
+
             keys[attribute][confounder].append(key)
             n_attribute_confounding[attribute][confounder] += 1
 
