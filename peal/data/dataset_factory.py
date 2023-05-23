@@ -20,7 +20,7 @@ from peal.data.datasets import (
 )
 
 
-def get_datasets(config, base_dir):
+def get_datasets(config, base_dir, task_config=None):
     """
     This function is used to get the datasets for training, validation and testing.
 
@@ -136,5 +136,10 @@ def get_datasets(config, base_dir):
     train_data.normalization = normalization
     val_data.normalization = normalization
     test_data.normalization = normalization
+
+    # this is kind of dirty
+    train_data.task_config = task_config
+    val_data.task_config = task_config
+    test_data.task_config = task_config
 
     return train_data, val_data, test_data
