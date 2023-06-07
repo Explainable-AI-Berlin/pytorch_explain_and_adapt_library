@@ -9,5 +9,9 @@ notebooks/templates
 tests/outputs
 *.fuse_hidden*
 .vscode
+*.pt
+*.pth
+DiME/outputs
+ACE/outputs
 
 .idea/s
