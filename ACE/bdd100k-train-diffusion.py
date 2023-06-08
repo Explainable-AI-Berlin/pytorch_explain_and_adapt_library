@@ -35,17 +35,17 @@ def main():
     if args.init_step != -1:
         # when sampling t with the scheduler, there will be
         # a probability of 0 to extract a t > args.init_step
-        schedule_sampler._weights[args.init_step:] = 0
+        schedule_sampler._weights[args.init_step :] = 0
 
     logger.log("creating data loader...")
     data = load_data_bdd100k(
         data_dir=args.data_dir,
         batch_size=args.batch_size,
-        image_size='256,512',
+        image_size="256,512",
         class_cond=args.class_cond,
         random_crop=False,
         random_flip=False,
-        deterministic=True
+        deterministic=True,
     )
 
     logger.log("training...")
@@ -84,8 +84,8 @@ def create_argparser():
         resume_checkpoint="",
         use_fp16=False,
         fp16_scale_growth=1e-3,
-        output_path='/data/chercheurs/jeanner211/RESULTS/DCF-CelebA/ddpm',
-        gpus='',
+        output_path="/data/chercheurs/jeanner211/RESULTS/DCF-CelebA/ddpm",
+        gpus="",
     )
     defaults.update(model_and_diffusion_defaults())
     parser = argparse.ArgumentParser()

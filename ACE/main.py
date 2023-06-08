@@ -77,7 +77,7 @@ def create_args():
         save_images=True,  # Saving all images
         num_samples=500000000000,  # useful to sample few examples
         # setting this to true will slow the computation time but will have identic results
-        # when using the checkpoint backwards
+        # hwhen using the checkpoint backwards
         cudnn_deterministic=False,
         # path args
         model_path="",  # DDPM weights path
@@ -500,7 +500,8 @@ def main():
 
         if (idx + 1) == len(loader):
             print(
-                f"[Chunks ({args.chunk}+1) / {args.chunks}] {idx + 1} / {len(loader)} | " + "Time: {int(time() - start_time)}s"
+                f"[Chunks ({args.chunk}+1) / {args.chunks}] {idx + 1} / {len(loader)} | "
+                + "Time: {int(time() - start_time)}s"
             )
             print("\nDone")
             break

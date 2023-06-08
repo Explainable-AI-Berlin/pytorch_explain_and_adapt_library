@@ -200,7 +200,8 @@ class DataloaderMixer(DataLoader):
         return length
 
 
-def get_dataloader(dataset, training_config, mode, task_config=None, batch_size=None):
+def get_dataloader(dataset, training_config=None, mode='train', task_config=None, batch_size=None):
+    assert not training_config is None or not batch_size is None, "the batch size has to be given!"
     dataset.task_config = task_config
     if batch_size is None:
         dataloader = DataLoader(
@@ -216,7 +217,7 @@ def get_dataloader(dataset, training_config, mode, task_config=None, batch_size=
             num_workers=1,
         )
 
-    if mode == "train" and "iterations_per_episode" in training_config.keys():
+    if mode == "train" and not training_config is None and "iterations_per_episode" in training_config.keys():
         dataloader = DataloaderMixer(training_config, dataloader)
 
     return dataloader

@@ -268,15 +268,15 @@ class ConfounderDatasetGenerator:
         dataset_name=None,
         label_dir=None,
         delimiter=",",
-        confounder_type="intensity",
+        confounding="intensity",
         num_samples=40000,
     ):
         """ """
         self.base_dataset_dir = base_dataset_dir
-        self.confounder_type = confounder_type
+        self.confounding = confounding
         if dataset_name is None:
             self.dataset_name = (
-                os.path.split(base_dataset_dir)[-1] + "_" + self.confounder_type
+                os.path.split(base_dataset_dir)[-1] + "_" + self.confounding
             )
 
         else:
@@ -297,7 +297,7 @@ class ConfounderDatasetGenerator:
         shutil.rmtree(self.dataset_dir, ignore_errors=True)
         os.makedirs(self.dataset_dir)
         os.makedirs(os.path.join(self.dataset_dir, "imgs"))
-        if self.confounder_type == "copyrighttag":
+        if self.confounding == "copyrighttag":
             os.makedirs(os.path.join(self.dataset_dir, "masks"))
 
         raw_data = open(self.label_dir, "r").read().split("\n")
@@ -320,7 +320,7 @@ class ConfounderDatasetGenerator:
         num_has_confounder = 0
         lines_out = ["ImgPath," + ",".join(attributes)]
 
-        if self.confounder_type == "copyrighttag":
+        if self.confounding == "copyrighttag":
             resource_dir = get_project_resource_dir()
             copyright_tag = np.array(
                 Image.open(
@@ -391,7 +391,7 @@ class ConfounderDatasetGenerator:
             else:
                 confounder_intensity = 1.0
 
-            if self.confounder_type == "intensity":
+            if self.confounding == "intensity":
                 intensity_change = (
                     64 * confounder_intensity * (2 * int(has_confounder) - 1)
                 )
@@ -399,7 +399,7 @@ class ConfounderDatasetGenerator:
                 img = (img + intensity_change + 64) * (255 / (255 + 2 * 64))
                 img_out = Image.fromarray(np.array(img, dtype=np.uint8))
 
-            elif self.confounder_type == "color":
+            elif self.confounding == "color":
                 color_change = 64 * confounder_intensity * (2 * int(has_confounder) - 1)
                 img = np.array(img)
                 img = np.stack(
@@ -414,7 +414,7 @@ class ConfounderDatasetGenerator:
                 )
                 img_out = Image.fromarray(np.array(img, dtype=np.uint8))
 
-            elif self.confounder_type == "copyrighttag":
+            elif self.confounding == "copyrighttag":
                 img_copyrighttag = np.maximum(np.array(img), copyright_tag_bg)
                 img_copyrighttag = np.minimum(np.array(img_copyrighttag), copyright_tag)
                 alpha = 0.5 + 0.5 * confounder_intensity * (2 * int(has_confounder) - 1)
@@ -422,7 +422,7 @@ class ConfounderDatasetGenerator:
                 img_out = Image.fromarray(np.array(img, dtype=np.uint8))
 
             img_out.save(os.path.join(self.dataset_dir, "imgs", name))
-            if self.confounder_type == "copyrighttag":
+            if self.confounding == "copyrighttag":
                 mask = Image.fromarray(
                     np.array(
                         np.abs(np.array(copyright_tag_bg, dtype=np.float32) / 255 - 1)
