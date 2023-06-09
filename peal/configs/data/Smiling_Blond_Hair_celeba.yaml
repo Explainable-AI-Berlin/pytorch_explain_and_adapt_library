@@ -1,4 +1,4 @@
-'num_samples'             : 40000 #202599
+'num_samples'             : 14000 #202599
 'split'                   : [0.8, 0.9]
 'input_type'              : 'image'
 'input_size'              : [3, 128, 128]

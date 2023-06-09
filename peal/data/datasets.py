@@ -292,7 +292,14 @@ class Image2MixedDataset(ImageDataset):
         ImageDataset (_type_): _description_
     """
 
-    def __init__(self, root_dir, mode, config, transform=ToTensor(), task_config=None):
+    def __init__(
+        self,
+        root_dir,
+        mode,
+        config,
+        transform=ToTensor(),
+        task_config=None,
+    ):
         """
         This class is used to load a dataset with images and other data.
 
@@ -310,7 +317,7 @@ class Image2MixedDataset(ImageDataset):
         self.hints_enabled = False
         data_dir = os.path.join(root_dir, "data.csv")
         self.attributes, self.data, self.keys = parse_csv(
-            data_dir, config, mode, key_type="name"
+            data_dir, config, mode, key_type="name", delimiter=config["delimiter"]
         )
 
     def __len__(self):

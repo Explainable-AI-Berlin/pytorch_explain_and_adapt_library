@@ -31,5 +31,5 @@ class EditCapablGenerator(nn.Module):
         target_confidence_goal: float,
         target_classes: torch.Tensor,
         classifier: nn.Module,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ):
         pass

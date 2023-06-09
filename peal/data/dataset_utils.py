@@ -38,7 +38,9 @@ def parse_json(data_dir, config, mode, set_negative_to_zero=True):
         )
 
 
-def parse_csv(data_dir, config, mode, key_type="idx", set_negative_to_zero=True):
+def parse_csv(
+    data_dir, config, mode, key_type="idx", set_negative_to_zero=True, delimiter=","
+):
     """
     _summary_
 
@@ -47,19 +49,25 @@ def parse_csv(data_dir, config, mode, key_type="idx", set_negative_to_zero=True)
         config (_type_): _description_
         mode (_type_): _description_
         key_type (str, optional): _description_. Defaults to "idx".
+        set_negative_to_zero (bool, optional): _description_. Defaults to True.
+        delimiter (str, optional): _description_. Defaults to ",".
 
     Returns:
         _type_: _description_
     """
     raw_data = open(data_dir, "r").read().split("\n")
-    attributes = raw_data[0].split(",")
+    # in case there is e.g. the number of instances in the first line
+    if len(raw_data[0].split(delimiter)) < 2:
+        raw_data = raw_data[1:]
+
+    attributes = raw_data[0].split(delimiter)
     if key_type == "name":
         attributes = attributes[1:]
 
     raw_data = raw_data[1:]
 
     def extract_instances_tensor(idx, line):
-        instance_attributes = line.split(",")
+        instance_attributes = line.split(delimiter)
 
         if key_type == "idx":
             key = str(idx)
@@ -68,7 +76,9 @@ def parse_csv(data_dir, config, mode, key_type="idx", set_negative_to_zero=True)
             key = instance_attributes[0]
             instance_attributes = instance_attributes[1:]
 
-        instance_attributes.remove("") if "" in instance_attributes else None
+        while "" in instance_attributes:
+            instance_attributes.remove("")
+
         instance_attributes_int = list(
             map(
                 lambda x: float(x),
@@ -168,18 +178,21 @@ def process_confounder_data_controlled(
         key, instances_tensor, attribute, confounder = extract_instances_tensor(
             idx=idx, line=line
         )
+        if set_negative_to_zero:
+            data[key] = torch.maximum(
+                torch.zeros_like(instances_tensor),
+                instances_tensor,
+            )
+            confounder = max(0, confounder)
+            attribute = max(0, attribute)
+
+        else:
+            data[key] = instances_tensor
+
         if (
             n_attribute_confounding[attribute][confounder]
             < max_attribute_confounding[attribute][confounder]
         ):
-            if set_negative_to_zero:
-                data[key] = torch.maximum(
-                    torch.zeros_like(instances_tensor),
-                    instances_tensor,
-                )
-
-            else:
-                data[key] = instances_tensor
 
             keys[attribute][confounder].append(key)
             n_attribute_confounding[attribute][confounder] += 1
