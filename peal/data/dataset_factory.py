@@ -20,7 +20,7 @@ from peal.data.datasets import (
 )
 
 
-def get_datasets(config, base_dir, task_config=None):
+def get_datasets(config, base_dir, task_config=None, return_dict=False):
     """
     This function is used to get the datasets for training, validation and testing.
 
@@ -128,9 +128,9 @@ def get_datasets(config, base_dir, task_config=None):
     transform_train = transforms.Compose([transform_train, normalization])
     transform_test = transforms.Compose([transform_test, normalization])
 
-    train_data = dataset(base_dir, "train", config, transform_train)
-    val_data = dataset(base_dir, "val", config, transform_train)
-    test_data = dataset(base_dir, "test", config, transform_test)
+    train_data = dataset(base_dir, "train", config, transform_train, return_dict=return_dict)
+    val_data = dataset(base_dir, "val", config, transform_train, return_dict=return_dict)
+    test_data = dataset(base_dir, "test", config, transform_test, return_dict=return_dict)
 
     # this is kind of dirty
     train_data.normalization = normalization

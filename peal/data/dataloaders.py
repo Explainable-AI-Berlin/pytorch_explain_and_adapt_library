@@ -2,6 +2,8 @@ import torch
 import numpy as np
 
 from torch.utils.data import DataLoader
+import torch.multiprocessing
+torch.multiprocessing.set_sharing_strategy('file_system')
 
 from peal.data.dataset_wrappers import GlowDatasetWrapper
 from peal.data.dataset_factory import get_datasets

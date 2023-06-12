@@ -299,6 +299,7 @@ class Image2MixedDataset(ImageDataset):
         config,
         transform=ToTensor(),
         task_config=None,
+        return_dict=False,
     ):
         """
         This class is used to load a dataset with images and other data.
@@ -319,6 +320,7 @@ class Image2MixedDataset(ImageDataset):
         self.attributes, self.data, self.keys = parse_csv(
             data_dir, config, mode, key_type="name", delimiter=config["delimiter"]
         )
+        self.return_dict = return_dict
 
     def __len__(self):
         return len(self.keys)
@@ -356,13 +358,21 @@ class Image2MixedDataset(ImageDataset):
             target = torch.tensor(target[0], dtype=torch.int64)
 
         if not self.hints_enabled:
-            return img_tensor, target
+            if self.return_dict:
+                return img_tensor, {} # TODO  {"target": target}
+
+            else:
+                return img_tensor, target
 
         else:
             mask = Image.open(os.path.join(self.root_dir, "masks", name))
             torch.set_rng_state(state)
             mask_tensor = self.transform(mask)
-            return img_tensor, (target, mask_tensor)
+            if self.return_dict:
+                return img_tensor, {} # TODO  {"target": target, "mask": mask_tensor}
+
+            else:
+                return img_tensor, (target, mask_tensor)
 
 
 class Image2ClassDataset(ImageDataset):
@@ -373,7 +383,7 @@ class Image2ClassDataset(ImageDataset):
         ImageDataset (_type_): _description_
     """
 
-    def __init__(self, root_dir, mode, config, transform=ToTensor(), task_config=None):
+    def __init__(self, root_dir, mode, config, transform=ToTensor(), task_config=None, return_dict=False,):
         """
         This method initializes the dataset.
 
@@ -397,15 +407,16 @@ class Image2ClassDataset(ImageDataset):
         self.hints_enabled = False
         self.task_config = task_config
         self.transform = transform
+        self.return_dict = return_dict
         self.urls = []
         self.idx_to_name = os.listdir(self.root_dir)
 
         self.idx_to_name.sort()
-        for label_str in self.idx_to_name:
-            files = os.listdir(os.path.join(self.root_dir, label_str))
+        for target_str in self.idx_to_name:
+            files = os.listdir(os.path.join(self.root_dir, target_str))
             files.sort()
             for file in files:
-                self.urls.append((label_str, file))
+                self.urls.append((target_str, file))
 
         random.seed(0)
         random.shuffle(self.urls)
@@ -425,9 +436,9 @@ class Image2ClassDataset(ImageDataset):
 
         if "has_hints" in self.config.keys() and self.config["has_hints"]:
             self.all_urls = copy.deepcopy(self.urls)
-            for label_str, file in self.all_urls:
+            for target_str, file in self.all_urls:
                 if os.path.exists(os.path.join(self.mask_dir, file)):
-                    self.urls_with_hints.append((label_str, file))
+                    self.urls_with_hints.append((target_str, file))
 
     def class_idx_to_name(self, class_idx):
         return self.idx_to_name[class_idx]
@@ -444,25 +455,33 @@ class Image2ClassDataset(ImageDataset):
         return len(self.urls)
 
     def __getitem__(self, idx):
-        label_str, file = self.urls[idx]
+        target_str, file = self.urls[idx]
 
-        img = Image.open(os.path.join(self.root_dir, label_str, file))
+        img = Image.open(os.path.join(self.root_dir, target_str, file))
         state = torch.get_rng_state()
         img = self.transform(img)
 
         if img.shape[0] == 1 and self.config["input_size"][0] != 1:
             img = torch.tile(img, [self.config["input_size"][0], 1, 1])
 
-        # label = torch.zeros([len(self.idx_to_name)], dtype=torch.float32)
-        # label[self.idx_to_name.index(label_str)] = 1.0
-        label = torch.tensor(self.idx_to_name.index(label_str))
+        # target = torch.zeros([len(self.idx_to_name)], dtype=torch.float32)
+        # target[self.idx_to_name.index(target_str)] = 1.0
+        target = torch.tensor(self.idx_to_name.index(target_str))
 
         if not self.hints_enabled:
-            return img, label
+            if self.return_dict:
+                return img, {} # TODO {"target": target}
+
+            else:
+                return img, target
 
         else:
             # TODO how to apply same randomized transformation?
             mask = Image.open(os.path.join(self.mask_dir, file))
             torch.set_rng_state(state)
             mask = self.transform(mask)
-            return img, (label, mask)
+            if self.return_dict:
+                return img, {} # TODO  {"target": target, "mask": mask}
+
+            else:
+                return img, (target, mask)

@@ -25,8 +25,9 @@ class InvertibleGenerator(nn.Module):
         return self.log_prob_z(z)
 
 
-class EditCapablGenerator(nn.Module):
+class EditCapableGenerator(nn.Module):
     def edit(
+        self,
         x_in: torch.Tensor,
         target_confidence_goal: float,
         target_classes: torch.Tensor,

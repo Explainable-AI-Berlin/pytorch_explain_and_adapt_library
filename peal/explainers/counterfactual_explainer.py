@@ -5,7 +5,7 @@ from tqdm import tqdm
 from typing import Union
 
 from peal.utils import load_yaml_config
-from peal.generators.interfaces import InvertibleGenerator
+from peal.generators.interfaces import InvertibleGenerator, EditCapableGenerator
 from peal.data.dataset_interfaces import PealDataset
 from peal.explainers.explainer_interface import ExplainerInterface
 
@@ -207,7 +207,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 target_classes=batch["y_target_list"],
             )
 
-        elif isinstance(self.generator, EditCapablGenerator):
+        elif isinstance(self.generator, EditCapableGenerator):
             (
                 batch["x_counterfactual_list"],
                 batch["z_difference_list"],
