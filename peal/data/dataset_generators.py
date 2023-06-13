@@ -4,6 +4,7 @@ import json
 import shutil
 import random
 import numpy as np
+import pandas as pd
 
 from pathlib import Path
 from PIL import Image
@@ -613,3 +614,116 @@ class StainingConfounderGenerator:
         open(os.path.join(self.dataset_dir, "data.csv"), "w").write(
             "\n".join(lines_out)
         )
+
+
+class CircleDatasetGenerator:
+    """
+    Generates dataset based on a unit circle of radius r
+    """
+
+    def __init__(
+        self,
+        dataset_name,
+        base_dataset_dir="datasets",
+        num_samples=1024,
+        radius=1,
+        noise_scale=0.0,
+        # false_confounder_percentage=0.0,
+        seed=0,
+    ):
+        """
+        Initiates the dataset parameters
+
+        Args:
+            dataset_name (str): Name of the dataset
+            base_dataset_dir (Path): path to the directory where the dataset is stored
+            num_samples (int, optional): Number of samples to generate. Default is 1024.
+            noise_scale (float, optional): The value with which to scale the variance (set to 1 initially) of the noise. Default is 0.0 (no noise).
+            seed (int, optional): Seed for the random number generator. Defaults is 0.
+        """
+
+        self.data = None
+        self.dataset_name = dataset_name
+        self.base_dataset_dir = base_dataset_dir
+        self.dataset_dir = os.path.join(self.base_dataset_dir, self.dataset_name)
+        self.num_samples = num_samples
+        self.radius = radius
+        self.noise_scale = noise_scale
+        self.seed = seed
+        name = (
+            "size_"
+            + str(self.num_samples)
+            + "_"
+            + "radius_"
+            + str(round(radius, 1))
+            + "_"
+            + "seed_"
+            + str(seed)
+        )
+        self.label_dir = os.path.join(self.dataset_dir, name + ".csv")
+
+    def generate_dataset(self):
+        """
+        Generates the dataset.
+        """
+
+        Path(self.dataset_dir).mkdir(parents=True, exist_ok=True)
+        np.random.seed(self.seed)
+        theta = np.linspace(
+            0, 2 * np.pi, self.num_samples + round(self.num_samples * 0.09)
+        )
+        features = np.array(
+            [self.radius * np.cos(theta), self.radius * np.sin(theta)]
+        ).T
+
+        # target = (features[:, 1] > 0).astype('float32').reshape(-1, 1)
+        features += np.sqrt(self.noise_scale) * np.random.randn(
+            self.num_samples + round(self.num_samples * 0.09), 2
+        )
+        target = (features[:, 1] > 0).astype("float32").reshape(-1, 1)
+        data = np.concatenate((features, target), axis=1)
+        confounder = (
+            np.array([x1 > 0 for x1, x2, t in data]).astype("float32").reshape(-1, 1)
+        )
+
+        data = np.concatenate((data, confounder), axis=1)
+        target_1_confounder_1 = (data[:, 2] == 1.0) & (data[:, 3] == 1.0)
+        target_0_confounder_1 = (data[:, 2] == 0.0) & (data[:, 3] == 1.0)
+        target_1_confounder_0 = (data[:, 2] == 1.0) & (data[:, 3] == 0.0)
+        target_0_confounder_0 = (data[:, 2] == 0.0) & (data[:, 3] == 0.0)
+        sub_sample_size = round(self.num_samples / 4)
+        data = np.concatenate(
+            [
+                data[target_1_confounder_1, :][
+                    np.random.randint(
+                        0, data[target_1_confounder_1, :].shape[0], sub_sample_size
+                    )
+                ],
+                data[target_0_confounder_1, :][
+                    np.random.randint(
+                        0, data[target_0_confounder_1, :].shape[0], sub_sample_size
+                    )
+                ],
+                data[target_1_confounder_0, :][
+                    np.random.randint(
+                        0, data[target_1_confounder_0, :].shape[0], sub_sample_size
+                    )
+                ],
+                data[target_0_confounder_0, :][
+                    np.random.randint(
+                        0, data[target_0_confounder_0, :].shape[0], sub_sample_size
+                    )
+                ],
+            ],
+            axis=0,
+        )
+        # target = (features[:, 1] > 0).astype('float32').reshape(-1, 1)
+        # data = np.concatenate((data, target), axis=1)
+        pd.DataFrame(data, columns=["x1", "x2", "Target", "Confounder"])[
+            ["x1", "x2", "Confounder", "Target"]
+        ].to_csv(self.label_dir, index=False)
+
+        # self.false_boundary_grad = false_boundary_grad
+        self.data = data
+
+        return self

@@ -193,7 +193,6 @@ def process_confounder_data_controlled(
             n_attribute_confounding[attribute][confounder]
             < max_attribute_confounding[attribute][confounder]
         ):
-
             keys[attribute][confounder].append(key)
             n_attribute_confounding[attribute][confounder] += 1
 

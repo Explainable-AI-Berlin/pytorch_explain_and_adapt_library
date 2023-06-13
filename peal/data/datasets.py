@@ -161,11 +161,14 @@ class SymbolicDataset(PealDataset):
         x = torch.stack(x_list, dim=0)
         y = torch.stack([torch.tensor([y]) for y in y_list], dim=0)
         data = torch.cat([x, y], dim=1)
+        features = copy.deepcopy(self.task_config["x_selection"])  # change
+        targets = copy.deepcopy(self.task_config["y_selection"])  # change
         np.savetxt(
             output_dir + ".csv",
             data.numpy(),
             delimiter=",",
-            header=",".join(self.attributes),
+            # header=",".join(self.attributes),
+            header=",".join(features + targets),
         )
 
 
@@ -359,7 +362,7 @@ class Image2MixedDataset(ImageDataset):
 
         if not self.hints_enabled:
             if self.return_dict:
-                return img_tensor, {} # TODO  {"target": target}
+                return img_tensor, {}  # TODO  {"target": target}
 
             else:
                 return img_tensor, target
@@ -369,7 +372,7 @@ class Image2MixedDataset(ImageDataset):
             torch.set_rng_state(state)
             mask_tensor = self.transform(mask)
             if self.return_dict:
-                return img_tensor, {} # TODO  {"target": target, "mask": mask_tensor}
+                return img_tensor, {}  # TODO  {"target": target, "mask": mask_tensor}
 
             else:
                 return img_tensor, (target, mask_tensor)
@@ -383,7 +386,15 @@ class Image2ClassDataset(ImageDataset):
         ImageDataset (_type_): _description_
     """
 
-    def __init__(self, root_dir, mode, config, transform=ToTensor(), task_config=None, return_dict=False,):
+    def __init__(
+        self,
+        root_dir,
+        mode,
+        config,
+        transform=ToTensor(),
+        task_config=None,
+        return_dict=False,
+    ):
         """
         This method initializes the dataset.
 
@@ -470,7 +481,7 @@ class Image2ClassDataset(ImageDataset):
 
         if not self.hints_enabled:
             if self.return_dict:
-                return img, {} # TODO {"target": target}
+                return img, {}  # TODO {"target": target}
 
             else:
                 return img, target
@@ -481,7 +492,7 @@ class Image2ClassDataset(ImageDataset):
             torch.set_rng_state(state)
             mask = self.transform(mask)
             if self.return_dict:
-                return img, {} # TODO  {"target": target, "mask": mask}
+                return img, {}  # TODO  {"target": target, "mask": mask}
 
             else:
                 return img, (target, mask)

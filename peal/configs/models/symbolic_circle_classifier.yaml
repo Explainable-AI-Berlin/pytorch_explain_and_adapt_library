@@ -1,0 +1,12 @@
+#
+'training'          : '$PEAL/configs/training/symbolic_classifier.yaml'
+'architecture'      : '$PEAL/configs/architectures/symbolic2vector.yaml'
+'task':
+  'criterions':
+    'ce'     : 1.0
+    'l1'     : 10000.0
+  'output_type'             : 'multiclass'
+  'output_size'             : 2
+  'x_selection'             : ['x1', 'x2']
+  'y_selection'             : ['Target']
+  'selection'               : ['x1', 'x2']
