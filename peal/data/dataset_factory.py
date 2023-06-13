@@ -128,9 +128,15 @@ def get_datasets(config, base_dir, task_config=None, return_dict=False):
     transform_train = transforms.Compose([transform_train, normalization])
     transform_test = transforms.Compose([transform_test, normalization])
 
-    train_data = dataset(base_dir, "train", config, transform_train, return_dict=return_dict)
-    val_data = dataset(base_dir, "val", config, transform_train, return_dict=return_dict)
-    test_data = dataset(base_dir, "test", config, transform_test, return_dict=return_dict)
+    train_data = dataset(
+        base_dir, "train", config, transform_train, return_dict=return_dict
+    )
+    val_data = dataset(
+        base_dir, "val", config, transform_train, return_dict=return_dict
+    )
+    test_data = dataset(
+        base_dir, "test", config, transform_test, return_dict=return_dict
+    )
 
     # this is kind of dirty
     train_data.normalization = normalization

@@ -3,7 +3,8 @@ import numpy as np
 
 from torch.utils.data import DataLoader
 import torch.multiprocessing
-torch.multiprocessing.set_sharing_strategy('file_system')
+
+torch.multiprocessing.set_sharing_strategy("file_system")
 
 from peal.data.dataset_wrappers import GlowDatasetWrapper
 from peal.data.dataset_factory import get_datasets
@@ -202,8 +203,12 @@ class DataloaderMixer(DataLoader):
         return length
 
 
-def get_dataloader(dataset, training_config=None, mode='train', task_config=None, batch_size=None):
-    assert not training_config is None or not batch_size is None, "the batch size has to be given!"
+def get_dataloader(
+    dataset, training_config=None, mode="train", task_config=None, batch_size=None
+):
+    assert (
+        not training_config is None or not batch_size is None
+    ), "the batch size has to be given!"
     dataset.task_config = task_config
     if batch_size is None:
         dataloader = DataLoader(
@@ -219,7 +224,11 @@ def get_dataloader(dataset, training_config=None, mode='train', task_config=None
             num_workers=1,
         )
 
-    if mode == "train" and not training_config is None and "iterations_per_episode" in training_config.keys():
+    if (
+        mode == "train"
+        and not training_config is None
+        and "iterations_per_episode" in training_config.keys()
+    ):
         dataloader = DataloaderMixer(training_config, dataloader)
 
     return dataloader
@@ -341,5 +350,15 @@ def create_dataloaders_from_datasource(
     """for dataloader in [train_dataloader, val_dataloader, test_dataloader]:
         if not isinstance(dataloader.dataset, PealDataset):
             dataloader.dataset = wrap_dataset(dataloader.dataset, config["data"])"""
+    if isinstance(val_dataloader, torch.utils.data.dataloader.DataLoader):
+        if (
+            len(
+                val_dataloader.dataset.data[
+                    list(val_dataloader.dataset.data.keys())[-1]
+                ]
+            )
+            < 1
+        ):
+            val_dataloader.dataset.data.popitem()
 
     return train_dataloader, val_dataloader, test_dataloader
