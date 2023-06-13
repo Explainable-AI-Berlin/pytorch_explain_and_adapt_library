@@ -46,7 +46,7 @@ class CounterfactualExplainer(ExplainerInterface):
         self.loss = torch.nn.CrossEntropyLoss()
 
     def gradient_based_counterfactual(
-        self, x_in, target_confidence_goal, target_classes
+        self, x_in, target_confidence_goal, target_classes, pbar=None
     ):
         """
         This function generates a counterfactual for a given batch of inputs.
@@ -80,78 +80,81 @@ class CounterfactualExplainer(ExplainerInterface):
 
         target_confidences = [0.0 for i in range(len(target_classes))]
 
-        with tqdm(range(self.explainer_config["gradient_steps"])) as pbar:
-            for i in pbar:
-                if self.explainer_config["use_masking"]:
-                    mask = (
-                        torch.tensor(target_confidences).to(self.device)
-                        < target_confidence_goal
-                    )
-                    if torch.sum(mask) == 0.0:
-                        break
-
-                latent_code = [v_elem.to(self.device) for v_elem in v]
-
-                optimizer.zero_grad()
-                img = self.generator.decode(latent_code)
-
-                img = self.dataset.project_to_pytorch_default(img)
-
-                logits = self.downstream_model(
-                    img
-                    + self.explainer_config["img_noise_injection"]
-                    * torch.randn_like(img)
+        for i in range(self.explainer_config["gradient_steps"]):
+            if self.explainer_config["use_masking"]:
+                mask = (
+                    torch.tensor(target_confidences).to(self.device)
+                    < target_confidence_goal
                 )
-                loss = self.loss(logits, target_classes.to(self.device))
-                l1_losses = []
-                for v_idx in range(len(v_original)):
-                    l1_losses.append(
-                        torch.mean(
-                            torch.abs(
-                                v[v_idx].to(self.device)
-                                - torch.clone(v_original[v_idx]).detach()
-                            )
+                if torch.sum(mask) == 0.0:
+                    break
+
+            latent_code = [v_elem.to(self.device) for v_elem in v]
+
+            optimizer.zero_grad()
+            img = self.generator.decode(latent_code)
+
+            img = self.dataset.project_to_pytorch_default(img)
+
+            logits = self.downstream_model(
+                img
+                + self.explainer_config["img_noise_injection"] * torch.randn_like(img)
+            )
+            loss = self.loss(logits, target_classes.to(self.device))
+            l1_losses = []
+            for v_idx in range(len(v_original)):
+                l1_losses.append(
+                    torch.mean(
+                        torch.abs(
+                            v[v_idx].to(self.device)
+                            - torch.clone(v_original[v_idx]).detach()
                         )
                     )
-
-                loss += self.explainer_config["l1_regularization"] * torch.mean(
-                    torch.stack(l1_losses)
-                )
-                loss += self.explainer_config["log_prob_regularization"] * torch.mean(
-                    self.generator.log_prob_z(latent_code)
                 )
 
-                logit_confidences = torch.nn.Softmax()(logits).detach().cpu()
-                target_confidences = [
-                    float(logit_confidences[i][target_classes[i]])
-                    for i in range(len(target_classes))
-                ]
+            loss += self.explainer_config["l1_regularization"] * torch.mean(
+                torch.stack(l1_losses)
+            )
+            loss += self.explainer_config["log_prob_regularization"] * torch.mean(
+                self.generator.log_prob_z(latent_code)
+            )
 
+            logit_confidences = torch.nn.Softmax()(logits).detach().cpu()
+            target_confidences = [
+                float(logit_confidences[i][target_classes[i]])
+                for i in range(len(target_classes))
+            ]
+            if not pbar is None:
                 pbar.set_description(
-                    "Creating Counterfactuals: it: "
+                    "Creating Counterfactuals:\n"
+                    + "it: "
                     + str(i)
+                    + "/"
+                    + str(self.explainer_config["gradient_steps"])
                     + ", loss: "
                     + str(loss.detach().item())
                     + ", target_confidences: "
                     + str(list(target_confidences)[:2])
                     + ", visual_difference: "
-                    + str(torch.mean(torch.abs(x_in - img.detach().cpu())).item())
+                    + str(torch.mean(torch.abs(x_in - img.detach().cpu())).item()) + "\n"
+                    + ", ".join([key + ': ' + str(pbar.stored_values[key]) for key in pbar.stored_values])
                 )
+                pbar.udpate(1)
 
-                loss.backward()
+            loss.backward()
 
-                if self.explainer_config["use_masking"]:
-                    for sample_idx in range(len(target_confidences)):
-                        if target_confidences[sample_idx] >= target_confidence_goal:
-                            for variable_idx, v_elem in enumerate(v):
-                                if self.explainer_config["optimizer"] == "Adam":
-                                    optimizer = torch.optim.Adam(
-                                        v, lr=self.explainer_config["learning_rate"]
-                                    )
+            if self.explainer_config["use_masking"]:
+                for sample_idx in range(len(target_confidences)):
+                    if target_confidences[sample_idx] >= target_confidence_goal:
+                        for variable_idx, v_elem in enumerate(v):
+                            if self.explainer_config["optimizer"] == "Adam":
+                                optimizer = torch.optim.Adam(
+                                    v, lr=self.explainer_config["learning_rate"]
+                                )
 
-                                v_elem.grad[sample_idx].data.zero_()
+                            v_elem.grad[sample_idx].data.zero_()
 
-                optimizer.step()
+            optimizer.step()
 
         latent_code = [v_elem.to(self.device) for v_elem in v]
         counterfactual = self.generator.decode(latent_code).detach().cpu()

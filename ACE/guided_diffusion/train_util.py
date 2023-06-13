@@ -8,6 +8,7 @@ import torch as th
 import torch.distributed as dist
 from torch.nn.parallel.distributed import DistributedDataParallel as DDP
 from torch.optim import AdamW
+from tqdm import tqdm
 
 from . import dist_util, logger
 from .fp16_util import MixedPrecisionTrainer
@@ -126,7 +127,7 @@ class TrainLoop:
                         th.load(resume_checkpoint, map_location=dist_util.dev())
                     )
                 )
-                print('done')
+                print("done")
 
         dist_util.sync_params(self.model.parameters())
 
@@ -145,7 +146,7 @@ class TrainLoop:
                     th.load(ema_checkpoint, map_location=dist_util.dev())
                 )
                 ema_params = self.mp_trainer.state_dict_to_master_params(state_dict)
-                print('done')
+                print("done")
 
         dist_util.sync_params(ema_params)
         return ema_params
@@ -163,16 +164,19 @@ class TrainLoop:
             self.opt.load_state_dict(state_dict)
 
     def run_loop(self):
-        print('Running training loop')
+        print("Running training loop")
+        pbar = tqdm(total=self.data.dataloader.train_config['iterations_per_episode'] * self.batch_size / self.microbatch)
+        pbar.num_steps = self.data.dataloader.train_config['iterations_per_episode']
         while (
             not self.lr_anneal_steps
             or self.step + self.resume_step < self.lr_anneal_steps
         ):
+            pbar.step = self.step
             batch, cond = next(self.data)
-            self.run_step(batch, cond)
+            self.run_step(batch, cond, pbar)
             if self.step % self.log_interval == 0:
                 # logger.dumpkvs()
-                print('Step', self.step)
+                print("Step", self.step)
             if self.step % self.save_interval == 0:
                 self.save()
                 # Run for a finite amount of time in integration tests.
@@ -183,17 +187,22 @@ class TrainLoop:
         if (self.step - 1) % self.save_interval != 0:
             self.save()
 
-    def run_step(self, batch, cond):
-        self.forward_backward(batch, cond)
+    def run_step(self, batch, cond, pbar=None):
+        self.forward_backward(batch, cond, pbar)
         took_step = self.mp_trainer.optimize(self.opt)
         if took_step:
             self._update_ema()
         self._anneal_lr()
         # self.log_step()
 
-    def forward_backward(self, batch, cond):
+    def forward_backward(self, batch, cond, pbar=None):
         self.mp_trainer.zero_grad()
         for i in range(0, batch.shape[0], self.microbatch):
+            pbar.set_description(
+                f"Step: {pbar.step} / {pbar.num_steps}, "
+                + f"Batch: {i} / {int(batch.shape[0] / self.microbatch + 0.99)}"
+            )
+            pbar.update(1)
             micro = batch[i : i + self.microbatch].to(dist_util.dev())
             micro_cond = {
                 k: v[i : i + self.microbatch].to(dist_util.dev())
@@ -257,7 +266,7 @@ class TrainLoop:
 
         # delete old checkpoints
         if dist.get_rank() == 0:
-            for f in glob.glob(os.path.join(get_blob_logdir(), '*.pt')):
+            for f in glob.glob(os.path.join(get_blob_logdir(), "*.pt")):
                 os.remove(os.path.join(get_blob_logdir(), f))
 
         save_checkpoint(0, self.mp_trainer.master_params)

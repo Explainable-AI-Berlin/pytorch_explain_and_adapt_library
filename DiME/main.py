@@ -4,6 +4,7 @@ import yaml
 import math
 import random
 import argparse
+import shutil
 import itertools
 import numpy as np
 import os.path as osp
@@ -11,6 +12,7 @@ import matplotlib.pyplot as plt
 
 from PIL import Image
 from time import time
+from tqdm import tqdm
 from os import path as osp
 from multiprocessing import Pool
 
@@ -272,6 +274,7 @@ def main(args=None):
         args = create_args()
 
     print(args)
+    shutil.rmtree(args.output_path, ignore_errors=True)
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
     os.makedirs(osp.join(args.output_path, "Results", args.exp_name), exist_ok=True)
 
@@ -413,11 +416,12 @@ def main(args=None):
     classifier_scales = [float(x) for x in args.classifier_scales.split(",")]
 
     print("Starting Image Generation")
+    pbar = tqdm(total=len(loader) * len(classifier_scales) * (args.start_step ** 2) / 2)
     for idx, (indexes, img, lab) in enumerate(loader):
-        print(
+        """print(
             f"[Chunk {args.chunk + 1} / {args.num_chunks}] {idx}"
             + f"/ {min(args.num_batches, len(loader))} | Time: {int(time() - start_time)}s"
-        )
+        )"""
 
         img = img.to(dist_util.dev())
         I = (img / 2) + 0.5
@@ -428,7 +432,7 @@ def main(args=None):
         with torch.no_grad():
             logits = classifier(img)
             if args.classifier_path[-4:] == ".cpl":
-                logits = logits[:,1] - logits[:,0]
+                logits = logits[:, 1] - logits[:, 0]
 
             pred = (logits > 0).long()
 
@@ -446,18 +450,23 @@ def main(args=None):
         transformed = torch.zeros_like(lab).bool()
 
         for jdx, classifier_scale in enumerate(classifier_scales):
+            pbar.sample_idx = idx
+            pbar.num_samples = len(loader)
+            pbar.classifier_scale = jdx
+            pbar.num_classifier_scales = len(classifier_scales)
             # choose the target label
             model_kwargs = {}
             model_kwargs["y"] = target[~transformed]
 
             # sample image from the noisy_img
             cfs, xs_t_s, zs_t_s = sample_fn(
-                diffusion,
-                model_fn,
-                img[~transformed, ...].shape,
-                args.start_step,
-                img[~transformed, ...],
-                t,
+                diffusion=diffusion,
+                model=model_fn,
+                shape=img[~transformed, ...].shape,
+                num_timesteps=args.start_step,
+                img=img[~transformed, ...],
+                t=t,
+                pbar=pbar,
                 z_t=noise_img[~transformed, ...],
                 clip_denoised=args.clip_denoised,
                 model_kwargs=model_kwargs,
@@ -482,6 +491,7 @@ def main(args=None):
             # evaluate the cf and check whether the model flipped the prediction
             with torch.no_grad():
                 cfsl = classifier(cfs)
+                cfsl = cfsl if isinstance(classifier, ClassificationModel) else cfsl[:, 1] - cfsl[:, 0]
                 cfsp = cfsl > 0
 
             if jdx == 0:
@@ -506,6 +516,7 @@ def main(args=None):
 
         with torch.no_grad():
             logits_cf = classifier(cf)
+            logits_cf = logits_cf if isinstance(classifier, ClassificationModel) else logits_cf[:, 1] - logits_cf[:, 0]
             pred_cf = (logits_cf > 0).long()
 
             # process images

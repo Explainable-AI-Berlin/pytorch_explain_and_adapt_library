@@ -30,10 +30,9 @@ from peal.architectures.downstream_models import Img2VectorModel
 
 
 def load_from_DDP_model(state_dict):
-
     new_state_dict = {}
     for k, v in state_dict.items():
-        if k[:7] == 'module.':
+        if k[:7] == "module.":
             k = k[7:]
         new_state_dict[k] = v
     return new_state_dict
@@ -45,9 +44,8 @@ def load_from_DDP_model(state_dict):
 
 
 @torch.enable_grad()
-def clean_class_cond_fn(x_t, y, classifier,
-                        s, use_logits):
-    '''
+def clean_class_cond_fn(x_t, y, classifier, s, use_logits):
+    """
     Computes the classifier gradients for the guidance
 
     :param x_t: clean instance
@@ -55,12 +53,12 @@ def clean_class_cond_fn(x_t, y, classifier,
     :param classifier: classification model
     :param s: scaling classifier gradients parameter
     :param use_logits: compute the loss over the logits
-    '''
-    
+    """
+
     x_in = x_t.detach().requires_grad_(True)
     logits = classifier(x_in)
     if isinstance(classifier, Img2VectorModel):
-        logits = logits[:,1] - logits[:,0]
+        logits = logits[:, 1] - logits[:, 0]
 
     y = y.to(logits.device).float()
     # Select the target logits,
@@ -78,11 +76,8 @@ def clean_class_cond_fn(x_t, y, classifier,
     return grads
 
 
-
 @torch.enable_grad()
-def clean_multiclass_cond_fn(x_t, y, classifier,
-                             s, use_logits):
-    
+def clean_multiclass_cond_fn(x_t, y, classifier, s, use_logits):
     x_in = x_t.detach().requires_grad_(True)
     selected = classifier(x_in)
 
@@ -97,17 +92,14 @@ def clean_multiclass_cond_fn(x_t, y, classifier,
 
 
 @torch.enable_grad()
-def dist_cond_fn(x_tau, z_t, x_t, alpha_t,
-                 l1_loss, l2_loss,
-                 l_perc):
-
-    '''
+def dist_cond_fn(x_tau, z_t, x_t, alpha_t, l1_loss, l2_loss, l_perc):
+    """
     Computes the distance loss between x_t, z_t and x_tau
     :x_tau: initial image
     :z_t: current noisy instance
     :x_t: current clean instance
     :alpha_t: time dependant constant
-    '''
+    """
 
     z_in = z_t.detach().requires_grad_(True)
     x_in = x_t.detach().requires_grad_(True)
@@ -115,7 +107,7 @@ def dist_cond_fn(x_tau, z_t, x_t, alpha_t,
     m1 = l1_loss * torch.norm(z_in - x_tau, p=1, dim=1).sum() if l1_loss != 0 else 0
     m2 = l2_loss * torch.norm(z_in - x_tau, p=2, dim=1).sum() if l2_loss != 0 else 0
     mv = l_perc(x_in, x_tau) if l_perc is not None else 0
-    
+
     if isinstance(m1 + m2 + mv, int):
         return 0
 
@@ -136,7 +128,7 @@ def dist_cond_fn(x_tau, z_t, x_t, alpha_t,
 
 
 def get_DiME_iterative_sampling(use_sampling=False):
-    '''
+    """
     Returns DiME's main algorithm to construct counterfactuals.
     The returned function computes x_t in a recursive way.
     Easy way to set the optional parameters into the sampling
@@ -144,27 +136,30 @@ def get_DiME_iterative_sampling(use_sampling=False):
 
     :param use_sampling: use mu + sigma * N(0,1) when computing
      the next iteration when estimating x_t
-    '''
-    @torch.no_grad()
-    def p_sample_loop(diffusion,
-                      model,
-                      shape,
-                      num_timesteps,
-                      img,
-                      t,
-                      z_t=None,
-                      clip_denoised=True,
-                      model_kwargs=None,
-                      device=None,
-                      class_grad_fn=None,
-                      class_grad_kwargs=None,
-                      dist_grad_fn=None,
-                      dist_grad_kargs=None,
-                      x_t_sampling=True,
-                      is_x_t_sampling=False,
-                      guided_iterations=9999999):
+    """
 
-        '''
+    @torch.no_grad()
+    def p_sample_loop(
+        diffusion,
+        model,
+        shape,
+        num_timesteps,
+        img,
+        t,
+        pbar,
+        z_t=None,
+        clip_denoised=True,
+        model_kwargs=None,
+        device=None,
+        class_grad_fn=None,
+        class_grad_kwargs=None,
+        dist_grad_fn=None,
+        dist_grad_kargs=None,
+        x_t_sampling=True,
+        is_x_t_sampling=False,
+        guided_iterations=9999999,
+    ):
+        """
         :param :
         :param diffusion: diffusion algorithm
         :param model: DDPM model
@@ -184,7 +179,7 @@ def get_DiME_iterative_sampling(use_sampling=False):
         :param x_t_sampling: use sampling when computing x_t
         :param is_x_t_sampling: useful flag to distinguish when x_t is been generated
         :param guided_iterations: Early stop the guided iterations
-        '''
+        """
 
         x_t = img.clone()
         z_t = diffusion.q_sample(img, t) if z_t is None else z_t
@@ -194,7 +189,12 @@ def get_DiME_iterative_sampling(use_sampling=False):
         indices = list(range(num_timesteps))[::-1]
 
         for jdx, i in enumerate(indices):
-
+            pbar.set_description(
+                f"Sample: {pbar.sample_idx} / {pbar.num_samples},"
+                + f" Classifier Scale: {pbar.classifier_scale} / {pbar.num_classifier_scales}, "
+                + f"Time Idx: {jdx} / {len(indices)}"
+            )
+            pbar.update(1)
             t = torch.tensor([i] * shape[0], device=device)
             x_t_steps.append(x_t.detach())
             z_t_steps.append(z_t.detach())
@@ -211,42 +211,39 @@ def get_DiME_iterative_sampling(use_sampling=False):
             )
 
             # extract sqrtalphacum
-            alpha_t = _extract_into_tensor(diffusion.sqrt_alphas_cumprod,
-                                       t, shape)
+            alpha_t = _extract_into_tensor(diffusion.sqrt_alphas_cumprod, t, shape)
 
             nonzero_mask = (
                 (t != 0).float().view(-1, *([1] * (len(shape) - 1)))
             )  # no noise when t == 0
 
             grads = 0
-            
+
             if (class_grad_fn is not None) and (guided_iterations > jdx):
-                grads = grads + class_grad_fn(x_t=x_t,
-                                              **class_grad_kwargs) / alpha_t
+                grads = grads + class_grad_fn(x_t=x_t, **class_grad_kwargs) / alpha_t
 
             if (dist_grad_fn is not None) and (guided_iterations > jdx):
-                grads = grads + dist_grad_fn(z_t=z_t,
-                                             x_tau=img,
-                                             x_t=x_t,
-                                             alpha_t=alpha_t,
-                                             **dist_grad_kargs)
+                grads = grads + dist_grad_fn(
+                    z_t=z_t, x_tau=img, x_t=x_t, alpha_t=alpha_t, **dist_grad_kargs
+                )
 
-            out["mean"] = (
-                out["mean"].float() -
-                out["variance"] * grads
-            )
+            out["mean"] = out["mean"].float() - out["variance"] * grads
 
             if not x_t_sampling:
                 z_t = out["mean"]
 
             else:
-                z_t = (
-                    out["mean"] +
-                    nonzero_mask * torch.exp(0.5 * out["log_variance"]) * torch.randn_like(img)
-                )
+                z_t = out["mean"] + nonzero_mask * torch.exp(
+                    0.5 * out["log_variance"]
+                ) * torch.randn_like(img)
 
             # produce x_t in a brute force manner
-            if (num_timesteps - (jdx + 1) > 0) and (class_grad_fn is not None) and (dist_grad_fn is not None) and (guided_iterations > jdx):
+            if (
+                (num_timesteps - (jdx + 1) > 0)
+                and (class_grad_fn is not None)
+                and (dist_grad_fn is not None)
+                and (guided_iterations > jdx)
+            ):
                 x_t = p_sample_loop(
                     diffusion=diffusion,
                     model=model,
@@ -255,6 +252,7 @@ def get_DiME_iterative_sampling(use_sampling=False):
                     num_timesteps=num_timesteps - (jdx + 1),
                     img=img,
                     t=None,
+                    pbar=pbar,
                     z_t=z_t,
                     clip_denoised=True,
                     device=device,
@@ -286,8 +284,8 @@ class ChunkedDataset:
         return i
 
 
-class ImageSaver():
-    def __init__(self, output_path, exp_name, extention='.jpg'):
+class ImageSaver:
+    def __init__(self, output_path, exp_name, extention=".jpg"):
         self.output_path = output_path
         self.exp_name = exp_name
         self.idx = 0
@@ -295,93 +293,110 @@ class ImageSaver():
         self.construct_directory()
 
     def construct_directory(self):
+        os.makedirs(osp.join(self.output_path, "Original", "Correct"), exist_ok=True)
+        os.makedirs(osp.join(self.output_path, "Original", "Incorrect"), exist_ok=True)
 
-        os.makedirs(osp.join(self.output_path, 'Original', 'Correct'), exist_ok=True)
-        os.makedirs(osp.join(self.output_path, 'Original', 'Incorrect'), exist_ok=True)
+        for clst, cf, subf in itertools.product(
+            ["CC", "IC"], ["CCF", "ICF"], ["CF", "Noise", "Info", "SM"]
+        ):
+            os.makedirs(
+                osp.join(self.output_path, "Results", self.exp_name, clst, cf, subf),
+                exist_ok=True,
+            )
 
-        for clst, cf, subf in itertools.product(['CC', 'IC'],
-                                                ['CCF', 'ICF'],
-                                                ['CF', 'Noise', 'Info', 'SM']):
-            os.makedirs(osp.join(self.output_path, 'Results',
-                                 self.exp_name, clst,
-                                 cf, subf),
-                        exist_ok=True)
-
-    def __call__(self, imgs, cfs, noises, target, label,
-                 pred, pred_cf, bkl, l_1, indexes=None, masks=None):
-
+    def __call__(
+        self,
+        imgs,
+        cfs,
+        noises,
+        target,
+        label,
+        pred,
+        pred_cf,
+        bkl,
+        l_1,
+        indexes=None,
+        masks=None,
+    ):
         for idx in range(len(imgs)):
             current_idx = indexes[idx].item() if indexes is not None else idx + self.idx
             mask = None if masks is None else masks[idx]
-            self.save_img(img=imgs[idx],
-                          cf=cfs[idx],
-                          noise=noises[idx],
-                          idx=current_idx,
-                          target=target[idx].item(),
-                          label=label[idx].item(),
-                          pred=pred[idx].item(),
-                          pred_cf=pred_cf[idx].item(),
-                          bkl=bkl[idx].item(),
-                          l_1=l_1[idx].item(),
-                          mask=mask)
+            self.save_img(
+                img=imgs[idx],
+                cf=cfs[idx],
+                noise=noises[idx],
+                idx=current_idx,
+                target=target[idx].item(),
+                label=label[idx].item(),
+                pred=pred[idx].item(),
+                pred_cf=pred_cf[idx].item(),
+                bkl=bkl[idx].item(),
+                l_1=l_1[idx].item(),
+                mask=mask,
+            )
 
         self.idx += len(imgs)
 
     @staticmethod
     def select_folder(label, target, pred, pred_cf):
-        folder = osp.join('CC' if label == pred else 'IC',
-                          'CCF' if target == pred_cf else 'ICF')
+        folder = osp.join(
+            "CC" if label == pred else "IC", "CCF" if target == pred_cf else "ICF"
+        )
         return folder
 
     @staticmethod
     def preprocess(img):
-        '''
+        """
         remove last dimension if it is 1
-        '''
+        """
         if img.shape[2] > 1:
             return img
         else:
             return np.squeeze(img, 2)
 
-    def save_img(self, img, cf, noise, idx, target, label,
-                 pred, pred_cf, bkl, l_1, mask):
+    def save_img(
+        self, img, cf, noise, idx, target, label, pred, pred_cf, bkl, l_1, mask
+    ):
         folder = self.select_folder(label, target, pred, pred_cf)
-        output_path = osp.join(self.output_path, 'Results',
-                               self.exp_name, folder)
-        img_name = f'{idx}'.zfill(7)
-        orig_path = osp.join(self.output_path, 'Original',
-                             'Correct' if label == pred else 'Incorrect',
-                             img_name + self.extention)
+        output_path = osp.join(self.output_path, "Results", self.exp_name, folder)
+        img_name = f"{idx}".zfill(7)
+        orig_path = osp.join(
+            self.output_path,
+            "Original",
+            "Correct" if label == pred else "Incorrect",
+            img_name + self.extention,
+        )
 
         if mask is None:
-            l0 = np.abs(img.astype('float') - cf.astype('float'))
+            l0 = np.abs(img.astype("float") - cf.astype("float"))
             l0 = l0.sum(2, keepdims=True)
             l0 = 255 * l0 / l0.max()
-            l0 = np.concatenate([l0] * img.shape[2], axis=2).astype('uint8')
+            l0 = np.concatenate([l0] * img.shape[2], axis=2).astype("uint8")
             l0 = Image.fromarray(self.preprocess(l0))
-            l0.save(osp.join(output_path, 'SM', img_name + self.extention))
+            l0.save(osp.join(output_path, "SM", img_name + self.extention))
         else:
-            mask = mask.astype('uint8') * 255
+            mask = mask.astype("uint8") * 255
             mask = Image.fromarray(mask)
-            mask.save(osp.join(output_path, 'SM', img_name + self.extention))
+            mask.save(osp.join(output_path, "SM", img_name + self.extention))
 
         img = Image.fromarray(self.preprocess(img))
         img.save(orig_path)
 
         cf = Image.fromarray(self.preprocess(cf))
-        cf.save(osp.join(output_path, 'CF', img_name + self.extention))
+        cf.save(osp.join(output_path, "CF", img_name + self.extention))
 
         noise = Image.fromarray(self.preprocess(noise))
-        noise.save(osp.join(output_path, 'Noise', img_name + self.extention))
+        noise.save(osp.join(output_path, "Noise", img_name + self.extention))
 
-
-        to_write = (f'label: {label}' +
-                    f'\npred: {pred}' +
-                    f'\ntarget: {target}' +
-                    f'\ncf pred: {pred_cf}' +
-                    f'\nBKL: {bkl}' +
-                    f'\nl_1: {l_1}')
-        with open(osp.join(output_path, 'Info', img_name + '.txt'), 'w') as f:
+        to_write = (
+            f"label: {label}"
+            + f"\npred: {pred}"
+            + f"\ntarget: {target}"
+            + f"\ncf pred: {pred_cf}"
+            + f"\nBKL: {bkl}"
+            + f"\nl_1: {l_1}"
+        )
+        with open(osp.join(output_path, "Info", img_name + ".txt"), "w") as f:
             f.write(to_write)
 
 
@@ -389,8 +404,12 @@ class Normalizer(nn.Module):
     def __init__(self, classifier):
         super().__init__()
         self.classifier = classifier
-        self.register_buffer('mu', torch.tensor([0.485, 0.456, 0.406]).view(1, -1, 1, 1))
-        self.register_buffer('sigma', torch.tensor([0.229, 0.224, 0.225]).view(1, -1, 1, 1))
+        self.register_buffer(
+            "mu", torch.tensor([0.485, 0.456, 0.406]).view(1, -1, 1, 1)
+        )
+        self.register_buffer(
+            "sigma", torch.tensor([0.229, 0.224, 0.225]).view(1, -1, 1, 1)
+        )
 
     def forward(self, x):
         x = (torch.clamp(x, -1, 1) + 1) / 2
@@ -407,29 +426,24 @@ class SingleLabel(ImageFolder):
         # query label
 
         old_len = len(self)
-        instances = [self.targets[i] == query_label
-                     for i in range(old_len)]
-        self.samples = [self.samples[i]
-                        for i in range(old_len) if instances[i]]
-        self.targets = [self.targets[i]
-                        for i in range(old_len) if instances[i]]
-        self.imgs = [self.imgs[i]
-                     for i in range(old_len) if instances[i]]
+        instances = [self.targets[i] == query_label for i in range(old_len)]
+        self.samples = [self.samples[i] for i in range(old_len) if instances[i]]
+        self.targets = [self.targets[i] for i in range(old_len) if instances[i]]
+        self.imgs = [self.imgs[i] for i in range(old_len) if instances[i]]
 
 
-class SlowSingleLabel():
-    def __init__(self, query_label, dataset, maxlen=float('inf')):
+class SlowSingleLabel:
+    def __init__(self, query_label, dataset, maxlen=float("inf")):
         self.dataset = dataset
         self.indexes = []
         if isinstance(dataset, ImageFolder):
             self.indexes = np.where(np.array(dataset.targets) == query_label)[0]
             self.indexes = self.indexes[:maxlen]
         else:
-            print('Slow route. This may take some time!')
+            print("Slow route. This may take some time!")
             if query_label != -1:
                 for idx, (_, l) in enumerate(tqdm(dataset)):
-
-                    l = l['y'] if isinstance(l, dict) else l
+                    l = l["y"] if isinstance(l, dict) else l
                     if l == query_label:
                         self.indexes.append(idx)
 
@@ -457,12 +471,13 @@ class PerceptualLoss(nn.Module):
     def forward(self, x0, x1):
         B = x0.size(0)
 
-        l = F.mse_loss(self.model(x0).view(B, -1), self.model(x1).view(B, -1),
-                       reduction='none').mean(dim=1)
+        l = F.mse_loss(
+            self.model(x0).view(B, -1), self.model(x1).view(B, -1), reduction="none"
+        ).mean(dim=1)
         return self.c * l.sum()
 
 
-class extra_data_saver():
+class extra_data_saver:
     def __init__(self, output_path, exp_name):
         self.idx = 0
         self.exp_name = exp_name
@@ -473,7 +488,10 @@ class extra_data_saver():
 
         for i in range(n_images):
             current_idx = indexes[i].item() if indexes is not None else i + self.idx
-            os.makedirs(osp.join(self.output_path, self.exp_name, str(current_idx).zfill(6)), exist_ok=True)
+            os.makedirs(
+                osp.join(self.output_path, self.exp_name, str(current_idx).zfill(6)),
+                exist_ok=True,
+            )
 
             for j in range(n_steps):
                 cf = x_ts[j][i, ...]
@@ -483,38 +501,48 @@ class extra_data_saver():
                 cf = cf.permute(1, 2, 0)
                 cf = cf.contiguous().cpu().numpy()
                 cf = Image.fromarray(cf)
-                cf.save(osp.join(self.output_path, self.exp_name, str(current_idx).zfill(6), str(j).zfill(4) + '.jpg'))
+                cf.save(
+                    osp.join(
+                        self.output_path,
+                        self.exp_name,
+                        str(current_idx).zfill(6),
+                        str(j).zfill(4) + ".jpg",
+                    )
+                )
 
         self.idx += n_images
 
 
 class X_T_Saver(extra_data_saver):
-    def __init__(self, output_path, exp_path, extention='.jpg'):
+    def __init__(self, output_path, exp_path, extention=".jpg"):
         super().__init__(output_path, exp_path)
-        self.output_path = osp.join(output_path, 'x_t')
+        self.output_path = osp.join(output_path, "x_t")
 
 
 class Z_T_Saver(extra_data_saver):
-    def __init__(self, output_path, exp_path, extention='.jpg'):
+    def __init__(self, output_path, exp_path, extention=".jpg"):
         super().__init__(output_path, exp_path)
-        self.output_path = osp.join(output_path, 'z_t')
+        self.output_path = osp.join(output_path, "z_t")
 
 
 class Mask_Saver(extra_data_saver):
-    def __init__(self, output_path, exp_path, extention='.jpg'):
+    def __init__(self, output_path, exp_path, extention=".jpg"):
         super().__init__(output_path, exp_path)
-        self.output_path = osp.join(output_path, 'masks')
+        self.output_path = osp.join(output_path, "masks")
 
     def __call__(self, masks, indexes=None):
-        '''
-        Masks are non-binarized 
-        '''
+        """
+        Masks are non-binarized
+        """
         n_images = masks[0].size(0)
         n_steps = len(masks)
 
         for i in range(n_images):
             current_idx = indexes[i].item() if indexes is not None else i + self.idx
-            os.makedirs(osp.join(self.output_path, self.exp_name, str(current_idx).zfill(6)), exist_ok=True)
+            os.makedirs(
+                osp.join(self.output_path, self.exp_name, str(current_idx).zfill(6)),
+                exist_ok=True,
+            )
 
             for j in range(n_steps):
                 cf = masks[j][i, ...]
@@ -526,6 +554,13 @@ class Mask_Saver(extra_data_saver):
                 cf = cf.squeeze(dim=-1)
                 cf = cf.contiguous().cpu().numpy()
                 cf = Image.fromarray(cf)
-                cf.save(osp.join(self.output_path, self.exp_name, str(current_idx).zfill(6), str(j).zfill(4) + self.extention))
+                cf.save(
+                    osp.join(
+                        self.output_path,
+                        self.exp_name,
+                        str(current_idx).zfill(6),
+                        str(j).zfill(4) + self.extention,
+                    )
+                )
 
         self.idx += n_images
