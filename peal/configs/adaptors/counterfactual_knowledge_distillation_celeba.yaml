@@ -2,7 +2,7 @@
 'num_batches'                          :  -1 # number of batches per iteration that confounders are calculated for
 'base_batch_size'                      :  10
 'gigabyte_vram'                        :  40
-'samples_per_iteration'                :  500 # [10, 500]
+'max_train_samples'                    :  500 # [10, 500]
 'assumed_input_size'                   :  [3, 64, 64]
 'finetune_iterations'                  :  5 # [5, 12] # how many iterations is the counterfactual knowledge distillation applied?
 'current_iteration'                    :  0

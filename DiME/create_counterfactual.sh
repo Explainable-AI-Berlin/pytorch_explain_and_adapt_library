@@ -23,6 +23,7 @@ L1=0.05
 QUERYLABEL=31
 TARGETLABEL=-1
 IMAGESIZE=128  # dataset shape
+cd workspace/peal/DiME
 python3 -W ignore main.py \
     --query_label $QUERYLABEL --target_label $TARGETLABEL \
     --output_path $OUTPUT_PATH --num_batches $NUMBATCHES \

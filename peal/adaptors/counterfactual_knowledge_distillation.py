@@ -193,48 +193,41 @@ class CounterfactualKnowledgeDistillation:
         y_target_start_confidence_batch = []
         hint_batch = []
         sample_idx = 0
-        with tqdm(range(100 * self.train_dataloader.dataset.__len__())) as pbar:
-            for i in pbar:
-                if sample_idx >= self.adaptor_config["batch_size"]:
-                    break
+        while not sample_idx >= self.adaptor_config["batch_size"]:
+            cm_idx = error_distribution.sample()
+            # TODO verify that this is actually balancing itself!
+            y_source = int(cm_idx / self.output_size)
+            y_target = int(cm_idx % self.output_size)
+            try:
+                x, y = self.datastack.pop(int(y_source))
 
-                cm_idx = error_distribution.sample()
-                # TODO verify that this is actually balancing itself!
-                y_source = int(cm_idx / self.output_size)
-                y_target = int(cm_idx % self.output_size)
-                try:
-                    x, y = self.datastack.pop(int(y_source))
+            except Exception:
+                import pdb
 
-                except Exception:
-                    import pdb
+                pdb.set_trace()
+            """
+            TODO should be done with context manager
+            if isinstance(self.teacher, SegmentationMaskTeacher):
+                y, hint = y
+            """
 
-                    pdb.set_trace()
-                """
-                TODO should be done with context manager
-                if isinstance(self.teacher, SegmentationMaskTeacher):
-                    y, hint = y
-                """
-
-                logits = (
-                    self.student(x.to(self.device).unsqueeze(0))
-                    .squeeze(0)
-                    .detach()
-                    .cpu()
-                )
-                y_target_start_confidence = torch.nn.Softmax()(logits)[y_target]
-                prediction = self.logits_to_prediction(logits)
-                if (
-                    prediction == y == y_source
-                    and y_target_start_confidence
-                    > confidence_score_stats[y_source][y_target]
-                ):
-                    x_batch.append(x)
-                    y_source_batch.append(y_source)
-                    y_target_batch.append(torch.tensor(y_target))
-                    y_batch.append(y)
-                    y_target_start_confidence_batch.append(y_target_start_confidence)
-                    hint_batch.append(torch.zeros_like(x))
-                    sample_idx += 1
+            logits = (
+                self.student(x.to(self.device).unsqueeze(0)).squeeze(0).detach().cpu()
+            )
+            y_target_start_confidence = torch.nn.Softmax()(logits)[y_target]
+            prediction = self.logits_to_prediction(logits)
+            if (
+                prediction == y == y_source
+                and y_target_start_confidence
+                > confidence_score_stats[y_source][y_target]
+            ):
+                x_batch.append(x)
+                y_source_batch.append(y_source)
+                y_target_batch.append(torch.tensor(y_target))
+                y_batch.append(y)
+                y_target_start_confidence_batch.append(y_target_start_confidence)
+                hint_batch.append(torch.zeros_like(x))
+                sample_idx += 1
 
         x_batch = torch.stack(x_batch)
         y_target_batch = torch.stack(y_target_batch)
@@ -278,6 +271,14 @@ class CounterfactualKnowledgeDistillation:
             "y_target_goal_confidence"
         ]
 
+        pbar = tqdm(
+            total=int(
+                self.adaptor_config["max_train_samples"]
+                / self.adaptor_config["batch_size"]
+                + 0.99
+            )
+        )
+        pbar.stored_values = {}
         while continue_collecting:
             num_batches_per_iteration = int(
                 1
@@ -295,10 +296,17 @@ class CounterfactualKnowledgeDistillation:
                     start_idx=len(list(tracked_values.values())[0]),
                     y_target_goal_confidence_in=acceptance_threshold,
                     remove_below_threshold=True,
+                    pbar=pbar,
                 )
                 for key in tracked_keys:
                     tracked_values[key].extend(values[key])
 
+            pbar.stored_values["current_samples"] = (
+                str(len(list(tracked_values.values())[0]))
+                + "/"
+                + str(self.adaptor_config["max_train_samples"])
+            )
+            pbar.stored_values["acceptance_threshold"] = acceptance_threshold
             if (
                 len(list(tracked_values.values())[0])
                 < self.adaptor_config["max_train_samples"]
