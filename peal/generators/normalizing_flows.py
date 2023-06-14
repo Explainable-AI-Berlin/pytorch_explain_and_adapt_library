@@ -440,7 +440,7 @@ class Glow(InvertibleGenerator):
 
         n_pixel = np.prod(self.config["data"]["input_size"])
         log_p = log_p_sum - self.config["architecture"]["n_bits"] * n_pixel
-        return -torch.tensor(log_p / (math.log(2) * n_pixel))
+        return -torch.clone(log_p / (math.log(2) * n_pixel)).detach()
 
     def calc_z_shapes(self):
         z_shapes = []

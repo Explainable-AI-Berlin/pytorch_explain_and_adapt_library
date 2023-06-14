@@ -5,6 +5,7 @@ import torchvision
 import shutil
 import inspect
 import platform
+import numpy as np
 
 from pathlib import Path
 from torch.utils.tensorboard import SummaryWriter
@@ -20,17 +21,18 @@ def calculate_test_accuracy(model, test_dataloader, device):
     # determine the test accuracy of the student
     correct = 0
     num_samples = 0
-    with tqdm(enumerate(test_dataloader)) as pbar:
-        for it, (X, y) in pbar:
-            y_pred = model(X.to(device)).argmax(-1).detach().to("cpu")
-            correct += float(torch.sum(y_pred == y))
-            num_samples += X.shape[0]
-            pbar.set_description(
-                "test_correct: "
-                + str(correct / num_samples)
-                + ", it: "
-                + str(it * X.shape[0])
-            )
+    pbar = tqdm(total=test_dataloader.dataset.__len__())
+    for it, (X, y) in enumerate(test_dataloader):
+        y_pred = model(X.to(device)).argmax(-1).detach().to("cpu")
+        correct += float(torch.sum(y_pred == y))
+        num_samples += X.shape[0]
+        pbar.set_description(
+            "test_correct: "
+            + str(correct / num_samples)
+            + ", it: "
+            + str(it * X.shape[0])
+        )
+        pbar.update(1)
 
     return correct / test_dataloader.dataset.__len__()
 
@@ -96,8 +98,7 @@ class ModelTrainer:
             self.optimizer = optimizer
 
         self.base_dir = os.path.join(base_dir, model_name)
-        self.device = "cuda" if next(
-            self.model.parameters()).is_cuda else "cpu"
+        self.device = "cuda" if next(self.model.parameters()).is_cuda else "cpu"
         if criterions is None:
             criterions = get_criterions(config)
             self.criterions = {}
@@ -134,61 +135,62 @@ class ModelTrainer:
         self.log_frequency = log_frequency
         self.regularization_level = 0
 
-    def run_epoch(self, dataloader, mode="train"):
+    def run_epoch(self, dataloader, mode="train", pbar=None):
         """ """
-        with tqdm(enumerate(dataloader)) as pbar:
-            for batch_idx, (X, y) in pbar:
-                #
-                if self.unit_test_train_loop and batch_idx >= 2:
-                    break
+        for batch_idx, (X, y) in enumerate(dataloader):
+            #
+            if self.unit_test_train_loop and batch_idx >= 2:
+                break
 
-                if self.unit_test_single_sample and not self.logger is None:
-                    X = self.logger.test_X
-                    y = self.logger.test_y
+            if self.unit_test_single_sample and not self.logger is None:
+                X = self.logger.test_X
+                y = self.logger.test_y
 
-                self.optimizer.zero_grad()
-                # Compute prediction and loss
-                pred = self.model(move_to_device(X, self.device))
-                loss = torch.tensor(0.0).to(self.device)
-                loss_logs = {}
-                for criterion in self.config["task"]["criterions"].keys():
-                    criterion_loss = self.config["task"]["criterions"][
-                        criterion
-                    ] * self.criterions[criterion](self.model, pred, y.to(self.device))
-                    if criterion in ["l1", "l2", "orthogonality"]:
-                        criterion_loss *= self.regularization_level
+            self.optimizer.zero_grad()
+            # Compute prediction and loss
+            pred = self.model(move_to_device(X, self.device))
+            loss = torch.tensor(0.0).to(self.device)
+            loss_logs = {}
+            for criterion in self.config["task"]["criterions"].keys():
+                criterion_loss = self.config["task"]["criterions"][
+                    criterion
+                ] * self.criterions[criterion](self.model, pred, y.to(self.device))
+                if criterion in ["l1", "l2", "orthogonality"]:
+                    criterion_loss *= self.regularization_level
 
-                    loss_logs[criterion] = criterion_loss.detach().item()
-                    loss += criterion_loss
+                loss_logs[criterion] = criterion_loss.detach().item()
+                loss += criterion_loss
 
-                loss_logs["loss"] = loss.detach().item()
+            loss_logs["loss"] = loss.detach().item()
 
-                if self.config["training"]["verbosity"] >= 1:
-                    self.logger.log_step(mode, pred, y, loss_logs)
+            if self.config["training"]["verbosity"] >= 1:
+                self.logger.log_step(mode, pred, y, loss_logs)
 
-                # Backpropagation
-                loss.backward()
+            # Backpropagation
+            loss.backward()
 
-                pbar.set_description(
-                    "Model Training: "
-                    + mode
-                    + "_it: "
-                    + str(batch_idx)
-                    + ", loss: "
-                    + str(loss.detach().item())
-                )
+            pbar.set_description(
+                "Model Training: "
+                + mode
+                + "_it: "
+                + str(batch_idx)
+                + ", loss: "
+                + str(loss.detach().item())
+            )
+            pbar.update(1)
 
-                #
-                if mode == "train":
-                    self.optimizer.step()
+            #
+            if mode == "train":
+                self.optimizer.step()
 
         #
-        accuracy = self.logger.log_epoch(mode)
+        accuracy = self.logger.log_epoch(mode, pbar=pbar)
 
         return loss.detach().item(), accuracy
 
     def fit(self, continue_training=False, is_initialized=False):
         """ """
+        print("Training Config: " + str(self.config))
         if (
             not continue_training
             and "orthogonality" in self.config["task"]["criterions"].keys()
@@ -197,8 +199,7 @@ class ModelTrainer:
 
         if not is_initialized:
             shutil.rmtree(self.base_dir, ignore_errors=True)
-            Path(os.path.join(self.base_dir, "logs")).mkdir(
-                parents=True, exist_ok=True)
+            Path(os.path.join(self.base_dir, "logs")).mkdir(parents=True, exist_ok=True)
             writer = SummaryWriter(os.path.join(self.base_dir, "logs"))
             self.logger.writer = writer
             os.makedirs(os.path.join(self.base_dir, "outputs"))
@@ -227,8 +228,7 @@ class ModelTrainer:
                             + "In that case add function project_to_pytorch_default() to your underlying dataset to correct visualization!"
                         )
 
-                    sample_batch_label_str = "sample_train_batch" + \
-                        str(i) + "_"
+                    sample_batch_label_str = "sample_train_batch" + str(i) + "_"
                     if len(sample_train_y.shape) == 1:
                         sample_batch_label_str += "_" + str(
                             list(map(lambda x: int(x), list(sample_train_y)))
@@ -274,24 +274,28 @@ class ModelTrainer:
             with open(os.path.join(self.base_dir, "config.yaml"), "w") as file:
                 yaml.dump(self.config, file)
 
+        pbar = tqdm(
+            total=self.config["training"]["max_epochs"]
+            * (
+                len(self.train_dataloader)
+                + int(np.sum(list(map(lambda dl: len(dl), self.val_dataloaders))))
+            )
+        )
+        pbar.stored_values = {}
         val_accuracy_max = 0.0
         train_accuracy_max = 0.0
-        """self.model.eval()
-		val_loss, val_accuracy_max = self.run_epoch(self.val_dataloaders, mode = 'validation')
-		torch.save(self.model.state_dict(), os.path.join(self.base_dir, 'checkpoints', 'seed.cpl'))"""
         self.config["training"]["epoch"] = 0
         while self.config["training"]["epoch"] < self.config["training"]["max_epochs"]:
-            print("")
-            print("Epoch: " + str(self.config["training"]["epoch"]))
+            pbar.stored_values["Epoch"] = self.config["training"]["epoch"]
             #
             self.model.train()
-            train_loss, train_accuracy = self.run_epoch(self.train_dataloader)
+            train_loss, train_accuracy = self.run_epoch(self.train_dataloader, pbar=pbar)
             #
             self.model.eval()
             val_accuracy = 0.0
             for idx, val_dataloader in enumerate(self.val_dataloaders):
                 val_loss, val_accuracy = self.run_epoch(
-                    val_dataloader, mode="validation_" + str(idx)
+                    val_dataloader, mode="validation_" + str(idx), pbar=pbar
                 )
                 val_accuracy += self.val_dataloader_weights[idx] * val_accuracy
 
@@ -314,8 +318,7 @@ class ModelTrainer:
                     os.path.join(self.base_dir, "checkpoints", "final.cpl"),
                 )
                 torch.save(
-                    self.model.to("cpu"), os.path.join(
-                        self.base_dir, "model.cpl")
+                    self.model.to("cpu"), os.path.join(self.base_dir, "model.cpl")
                 )
                 val_accuracy_max = val_accuracy
                 self.model.to(self.device)

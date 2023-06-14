@@ -46,7 +46,7 @@ class CounterfactualExplainer(ExplainerInterface):
         self.loss = torch.nn.CrossEntropyLoss()
 
     def gradient_based_counterfactual(
-        self, x_in, target_confidence_goal, target_classes, pbar=None
+        self, x_in, target_confidence_goal, target_classes, pbar=None, mode=''
     ):
         """
         This function generates a counterfactual for a given batch of inputs.
@@ -119,27 +119,27 @@ class CounterfactualExplainer(ExplainerInterface):
                 self.generator.log_prob_z(latent_code)
             )
 
-            logit_confidences = torch.nn.Softmax()(logits).detach().cpu()
+            logit_confidences = torch.nn.Softmax(dim=-1)(logits).detach().cpu()
             target_confidences = [
                 float(logit_confidences[i][target_classes[i]])
                 for i in range(len(target_classes))
             ]
             if not pbar is None:
                 pbar.set_description(
-                    "Creating Counterfactuals:\n"
-                    + "it: "
-                    + str(i)
-                    + "/"
-                    + str(self.explainer_config["gradient_steps"])
-                    + ", loss: "
-                    + str(loss.detach().item())
-                    + ", target_confidences: "
-                    + str(list(target_confidences)[:2])
-                    + ", visual_difference: "
-                    + str(torch.mean(torch.abs(x_in - img.detach().cpu())).item()) + "\n"
-                    + ", ".join([key + ': ' + str(pbar.stored_values[key]) for key in pbar.stored_values])
+                    f"Creating {mode} Counterfactuals:"
+                    + f"it: {i}"
+                    + f"/{self.explainer_config['gradient_steps']}"
+                    + f", loss: {loss.detach().item():.2E}"
+                    + f", target_confidence: {target_confidences[0]:.2E}"
+                    + f", visual_difference: {torch.mean(torch.abs(x_in - img.detach().cpu())).item():.2E}"
+                    + ", ".join(
+                        [
+                            key + ": " + str(pbar.stored_values[key])
+                            for key in pbar.stored_values
+                        ]
+                    )
                 )
-                pbar.udpate(1)
+                pbar.update(1)
 
             loss.backward()
 
@@ -179,6 +179,8 @@ class CounterfactualExplainer(ExplainerInterface):
         start_idx: int = 0,
         y_target_goal_confidence_in: int = None,
         remove_below_threshold: bool = True,
+        pbar=None,
+        mode='',
     ) -> dict:
         """
         This function generates a counterfactual for a given batch of inputs.
@@ -208,6 +210,8 @@ class CounterfactualExplainer(ExplainerInterface):
                 x_in=batch["x_list"],
                 target_confidence_goal=target_confidence_goal,
                 target_classes=batch["y_target_list"],
+                pbar=pbar,
+                mode=mode
             )
 
         elif isinstance(self.generator, EditCapableGenerator):
@@ -220,6 +224,8 @@ class CounterfactualExplainer(ExplainerInterface):
                 target_confidence_goal=target_confidence_goal,
                 target_classes=batch["y_target_list"],
                 classifier=self.downstream_model,
+                pbar=pbar,
+                mode=mode,
             )
 
         batch_out = {}

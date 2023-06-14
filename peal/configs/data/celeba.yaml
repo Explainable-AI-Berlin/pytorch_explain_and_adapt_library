@@ -1,0 +1,10 @@
+'num_samples'             : 202599
+'split'                   : [0.8, 0.9]
+'input_type'              : 'image'
+'input_size'              : [3, 128, 128]
+'output_type'             : 'multiclass'
+'output_size'             : 41
+'invariances'             : []
+'use_normalization'       : False
+'normalization'           : []
+'downsize'                : 'Resize'

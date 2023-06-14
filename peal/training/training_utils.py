@@ -1,9 +1,8 @@
 import torch
 import numpy as np
-import os
 
 from torch import nn
-from tqdm import tqdm
+from tqdm.auto import tqdm
 from typing import Union
 
 from peal.explainers.explainer_interface import ExplainerInterface
@@ -49,50 +48,55 @@ def calculate_validation_statistics(
     for i in range(output_size):
         confidence_scores.append([])
 
-    with tqdm(enumerate(dataloader)) as pbar:
-        for it, (x, y) in pbar:
-            pred_confidences = torch.nn.Softmax()(model(x.to(device))).detach().cpu()
-            y_pred = logits_to_prediction(pred_confidences)
-            for i in range(y.shape[0]):
-                if y_pred[i] == y[i]:
-                    correct += 1
-                    confidence_scores[int(y[i])].append(pred_confidences[i])
+    pbar = tqdm(
+        total=int(
+            min(max_validation_samples, len(dataloader.dataset)) / dataloader.batch_size
+            + 0.9999
+        )
+        * explainer.explainer_config["gradient_steps"],
+    )
+    pbar.stored_values = {}
+    for it, (x, y) in enumerate(dataloader):
+        pred_confidences = torch.nn.Softmax(dim=-1)(model(x.to(device))).detach().cpu()
+        y_pred = logits_to_prediction(pred_confidences)
+        for i in range(y.shape[0]):
+            if y_pred[i] == y[i]:
+                correct += 1
+                confidence_scores[int(y[i])].append(pred_confidences[i])
 
-                confusion_matrix[int(y[i])][int(y_pred[i])] += 1
-                num_samples += 1
+            confusion_matrix[int(y[i])][int(y_pred[i])] += 1
+            num_samples += 1
 
-            pbar.set_description(
-                "Calculate Confusion Matrix: it: "
-                + str(it)
-                + ", current_accuracy: "
-                + str(correct / num_samples)
+        pbar.stored_values["acc"] = correct / num_samples
+
+        batch_targets = (y_pred + 1) % output_size
+        batch_target_start_confidences = []
+        for sample_idx in range(pred_confidences.shape[0]):
+            batch_target_start_confidences.append(
+                pred_confidences[sample_idx][batch_targets[sample_idx]]
             )
+        batch = {}
+        batch["x_list"] = x
+        batch["y_list"] = y
+        batch["y_source_list"] = y_pred
+        batch["y_target_list"] = batch_targets
+        batch["y_target_start_confidence_list"] = torch.stack(
+            batch_target_start_confidences, 0
+        )
+        results = explainer.explain_batch(
+            batch=batch,
+            base_path=base_path,
+            remove_below_threshold=False,
+            pbar=pbar,
+            mode="Validation",
+        )
+        for key in set(results.keys()).intersection(set(tracked_values.keys())):
+            tracked_values[key].extend(results[key])
 
-            batch_targets = (y_pred + 1) % output_size
-            batch_target_start_confidences = []
-            for sample_idx in range(pred_confidences.shape[0]):
-                batch_target_start_confidences.append(
-                    pred_confidences[sample_idx][batch_targets[sample_idx]]
-                )
-            batch = {}
-            batch["x_list"] = x
-            batch["y_list"] = y
-            batch["y_source_list"] = y_pred
-            batch["y_target_list"] = batch_targets
-            batch["y_target_start_confidence_list"] = torch.stack(
-                batch_target_start_confidences, 0
-            )
-            results = explainer.explain_batch(
-                batch=batch,
-                base_path=base_path,
-                remove_below_threshold=False,
-            )
-            for key in set(results.keys()).intersection(set(tracked_values.keys())):
-                tracked_values[key].extend(results[key])
+        if num_samples >= max_validation_samples:
+            break
 
-            if num_samples >= max_validation_samples:
-                break
-
+    pbar.close()
     confidence_score_stats = []
     for i in range(output_size):
         if len(confidence_scores[i]) >= 1:

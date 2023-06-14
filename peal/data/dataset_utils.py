@@ -88,8 +88,7 @@ def parse_csv(
         instances_tensor = torch.tensor(instance_attributes_int)
         return key, instances_tensor
 
-    if not len(config["confounding_factors"]) == 0:
-
+    if len(config.get("confounding_factors", [])) == 2:
         def extract_instances_tensor_confounder(idx, line):
             selection_idx1 = attributes.index(config["confounding_factors"][0])
             selection_idx2 = attributes.index(config["confounding_factors"][1])

@@ -96,7 +96,7 @@ class Logger:
 
         self.config["training"]["global_" + mode + "_step"] += 1
 
-    def log_epoch(self, mode):
+    def log_epoch(self, mode, pbar=None):
         """ """
         #
         loss_accumulated = torch.mean(torch.tensor(self.losses))
@@ -105,8 +105,8 @@ class Logger:
             loss_accumulated.item(),
             self.config["training"]["epoch"],
         )
-        print("")
-        print("epoch_" + mode + "_loss_accumulated", str(loss_accumulated.item()))
+        if not pbar is None:
+            pbar.stored_values[mode + "_loss_accumulated"] = loss_accumulated.item()
 
         if "ce" in self.config["task"]["criterions"].keys() and not isinstance(
             self.model, InvertibleGenerator
@@ -124,7 +124,9 @@ class Logger:
             targets_one_hot = torch.cat(self.targets)
             predictions_one_hot = torch.cat(self.predicted_classes)
             correct_per_class = torch.cat(self.correct).mean(0)
-            print("correct_per_class: " + str(correct_per_class))
+            if not pbar is None:
+                pbar.stored_values["correct_per_class"] = correct_per_class
+
             self.writer.add_histogram(
                 "epoch_" + mode + "_correct_per_class",
                 correct_per_class,
@@ -155,23 +157,17 @@ class Logger:
                 predictions_one_hot.mean(0).cpu() - targets_one_hot.mean(0).cpu(),
                 self.config["training"]["epoch"],
             )
-            print("epoch_" + mode + "_accuracy", str(accuracy))
-            print(
-                "epoch_"
-                + mode
-                + "_predicted_classes: "
-                + str(predictions_one_hot.mean(0)[:3])
-            )
-            print("epoch_" + mode + "_targets: " + str(targets_one_hot.mean(0)[:3]))
-            print(
-                "epoch_"
-                + mode
-                + "_classes_difference: "
-                + str(
-                    predictions_one_hot.mean(0).cpu()[:3]
-                    - targets_one_hot.mean(0).cpu()[:3]
-                )
-            )
+            if not pbar is None:
+                pbar.stored_values[mode + "_accuracy"] = accuracy
+                pbar.stored_values[
+                    mode + "_predicted_classes"
+                ] = predictions_one_hot.mean(0).cpu()[:2]
+                pbar.stored_values[mode + "_targets"] = targets_one_hot.mean(0).cpu()[
+                    :2
+                ]
+                pbar.stored_values[mode + "_classes_difference"] = (
+                    predictions_one_hot.mean(0).cpu() - targets_one_hot.mean(0).cpu()
+                )[:2]
             #
             self.predictions = []
             self.targets = []

@@ -8,7 +8,7 @@ import platform
 
 from torch.utils.tensorboard import SummaryWriter
 from pathlib import Path
-from tqdm import tqdm
+from tqdm.auto import tqdm
 from typing import Union
 from torch import nn
 
@@ -179,7 +179,6 @@ class CounterfactualKnowledgeDistillation:
             "hint_list",
             "collage_path_list",
         ]
-        print(self.adaptor_config)
 
     def get_batch(
         self,
@@ -277,8 +276,10 @@ class CounterfactualKnowledgeDistillation:
                 / self.adaptor_config["batch_size"]
                 + 0.99
             )
+            * self.adaptor_config["explainer"]["gradient_steps"],
         )
         pbar.stored_values = {}
+        pbar.stored_values["n_total"] = 0
         while continue_collecting:
             num_batches_per_iteration = int(
                 1
@@ -297,16 +298,22 @@ class CounterfactualKnowledgeDistillation:
                     y_target_goal_confidence_in=acceptance_threshold,
                     remove_below_threshold=True,
                     pbar=pbar,
+                    mode="Training"
                 )
                 for key in tracked_keys:
                     tracked_values[key].extend(values[key])
 
-            pbar.stored_values["current_samples"] = (
-                str(len(list(tracked_values.values())[0]))
-                + "/"
-                + str(self.adaptor_config["max_train_samples"])
-            )
-            pbar.stored_values["acceptance_threshold"] = acceptance_threshold
+                pbar.stored_values["n_valid"] = (
+                    str(len(list(tracked_values.values())[0]))
+                    + "/"
+                    + str(self.adaptor_config["max_train_samples"])
+                )
+                pbar.stored_values["th"] = acceptance_threshold
+                pbar.stored_values["n_total"] += self.adaptor_config["batch_size"]
+                pbar.stored_values["fr"] = (
+                    len(list(tracked_values.values())[0]) / pbar.stored_values["n_total"]
+                )
+
             if (
                 len(list(tracked_values.values())[0])
                 < self.adaptor_config["max_train_samples"]
@@ -333,7 +340,7 @@ class CounterfactualKnowledgeDistillation:
                 dataloader.dataset.disable_hint()
 
             self.datastack.datasource.reset()"""
-
+        pbar.close()
         return tracked_values
 
     def retrieve_validation_stats(self, finetune_iteration):
@@ -746,6 +753,7 @@ class CounterfactualKnowledgeDistillation:
         """
         Run the counterfactual knowledge distillation
         """
+        print("Adaptor Config: " + str(self.adaptor_config))
         validation_stats, test_accuracy = self.initialize_run()
         writer = SummaryWriter(os.path.join(self.base_dir, "logs"))
 
