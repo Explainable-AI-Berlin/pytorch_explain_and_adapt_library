@@ -1,8 +1,9 @@
 import torch
 import numpy as np
+import sys
 
 from torch import nn
-from tqdm.auto import tqdm
+from tqdm import tqdm_notebook as tqdm
 from typing import Union
 
 from peal.explainers.explainer_interface import ExplainerInterface

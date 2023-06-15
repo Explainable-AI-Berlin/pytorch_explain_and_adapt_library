@@ -37,7 +37,10 @@ def is_port_in_use(port: int) -> bool:
         return s.connect_ex(("localhost", port)) == 0
 
 
-def request(name, default):
+def request(name, default, is_asking=True):
+    if not is_asking:
+        return default
+
     answer = input("Do you want to change value of " + str(name) + "? [y/n]")
     if answer == "n":
         return default

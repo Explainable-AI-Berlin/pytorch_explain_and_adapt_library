@@ -176,6 +176,12 @@ class ModelTrainer:
                 + str(batch_idx)
                 + ", loss: "
                 + str(loss.detach().item())
+                + ", ".join(
+                    [
+                        key + ": " + str(pbar.stored_values[key])
+                        for key in pbar.stored_values
+                    ]
+                )
             )
             pbar.update(1)
 

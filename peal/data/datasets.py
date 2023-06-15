@@ -261,8 +261,8 @@ class ImageDataset(PealDataset):
         img.save(collage_path)
         return result_img_collage, heatmap_high_contrast"""
 
-    def serialize_dataset(self, output_dir, x_list, y_list, sample_names=None):
-        for class_name in range(self.config["output_size"]):
+    def serialize_dataset(self, output_dir, x_list, y_list, config, sample_names=None):
+        for class_name in range(config["output_size"]):
             Path(os.path.join(output_dir, "imgs", str(class_name))).mkdir(
                 parents=True, exist_ok=True
             )
@@ -273,8 +273,8 @@ class ImageDataset(PealDataset):
             img = Image.fromarray(
                 np.array(255 * x.cpu().numpy().transpose(1, 2, 0), dtype=np.uint8)
             )
-            img_name = os.path.join("imgs", str(class_name), sample_names[idx] + ".png")
-            img.save(os.path.join(output_dir, img_name))
+            img_name = os.path.join(str(class_name), sample_names[idx] + ".png")
+            img.save(os.path.join(output_dir, "imgs", img_name))
             data.append(
                 [
                     img_name,
@@ -358,7 +358,7 @@ class Image2MixedDataset(ImageDataset):
             assert (
                 target.shape[0] == 1
             ), "output shape inacceptable for singleclass classification"
-            target = torch.tensor(target[0], dtype=torch.int64)
+            target = target[0].to(torch.int64)
 
         if not self.hints_enabled:
             if self.return_dict:
@@ -406,14 +406,11 @@ class Image2ClassDataset(ImageDataset):
             task_config (_type_, optional): _description_. Defaults to None.
         """
         self.config = config
+        self.root_dir = os.path.join(root_dir, "imgs")
         if "has_hints" in self.config.keys() and self.config["has_hints"]:
-            self.root_dir = os.path.join(root_dir, "imgs")
             self.mask_dir = os.path.join(root_dir, "masks")
             self.all_urls = []
             self.urls_with_hints = []
-
-        else:
-            self.root_dir = root_dir
 
         self.hints_enabled = False
         self.task_config = task_config

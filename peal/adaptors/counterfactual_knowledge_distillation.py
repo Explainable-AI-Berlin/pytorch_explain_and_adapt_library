@@ -5,10 +5,11 @@ import yaml
 import shutil
 import numpy as np
 import platform
+import sys
 
 from torch.utils.tensorboard import SummaryWriter
 from pathlib import Path
-from tqdm.auto import tqdm
+from tqdm import tqdm
 from typing import Union
 from torch import nn
 
@@ -176,9 +177,21 @@ class CounterfactualKnowledgeDistillation:
             "y_target_start_confidence_list",
             "y_target_end_confidence_list",
             "z_difference_list",
-            "hint_list",
             "collage_path_list",
+            # "hint_list",
         ]
+        self.data_config = copy.deepcopy(self.adaptor_config)
+        self.data_config["data"]["split"] = [1.0, 1.0]
+        self.data_config["data"]["confounding_factors"] = []
+        self.data_config["data"]["confounder_probability"] = None
+        self.data_config["data"]["known_confounder"] = False
+        self.data_config["data"]["output_type"] = 'singleclass'
+        self.data_config["data"]["output_size"] = 2
+        self.data_config["data"]["delimiter"] = ','
+        self.data_config["data"]["num_samples"] = self.adaptor_config["max_train_samples"]
+        self.validation_data_config = copy.deepcopy(self.data_config)
+        self.validation_data_config["data"]["num_samples"] = self.adaptor_config["max_validation_samples"]
+        self.validation_data_config["data"]["split"] = [1.0, 1.0]
 
     def get_batch(
         self,
@@ -197,13 +210,7 @@ class CounterfactualKnowledgeDistillation:
             # TODO verify that this is actually balancing itself!
             y_source = int(cm_idx / self.output_size)
             y_target = int(cm_idx % self.output_size)
-            try:
-                x, y = self.datastack.pop(int(y_source))
-
-            except Exception:
-                import pdb
-
-                pdb.set_trace()
+            x, y = self.datastack.pop(int(y_source))
             """
             TODO should be done with context manager
             if isinstance(self.teacher, SegmentationMaskTeacher):
@@ -347,8 +354,18 @@ class CounterfactualKnowledgeDistillation:
         if os.path.exists(
             os.path.join(self.base_dir, str(finetune_iteration), "validation_stats.npz")
         ):
-            # TODO
-            pass
+            with open(
+                os.path.join(self.base_dir, str(finetune_iteration), "validation_stats.npz"),
+                "rb",
+            ) as f:
+                validation_stats = {}
+                validation_tracked_file = np.load(f, allow_pickle=True)
+                for key in validation_tracked_file.keys():
+                    validation_stats[key] = list(
+                        torch.tensor(validation_tracked_file[key])
+                    )
+
+                return validation_stats
 
         validation_values_path = os.path.join(
             self.base_dir, str(finetune_iteration), "validation_tracked_values.npz"
@@ -383,8 +400,8 @@ class CounterfactualKnowledgeDistillation:
                 "wb",
             ) as f:
                 for key in self.tracked_keys:
-                    if isinstance(validation_tracked_values[key], torch.Tensor):
-                        np.savez(f, key=validation_tracked_values[key].numpy())
+                    if isinstance(validation_tracked_values[key][0], torch.Tensor):
+                        np.savez(f, key=torch.stack(validation_tracked_values[key], dim=0).numpy())
 
         else:
             # TODO think about this again
@@ -429,6 +446,7 @@ class CounterfactualKnowledgeDistillation:
             feedback=validation_feedback,
             finetune_iteration=finetune_iteration + 1,
             mode="validation",
+            config=self.validation_data_config,
             **validation_tracked_values,
         )
 
@@ -468,10 +486,16 @@ class CounterfactualKnowledgeDistillation:
             test_accuracy = calculate_test_accuracy(
                 self.student, self.test_dataloader, self.device
             )
+            self.adaptor_config["test_accuracies"] = [test_accuracy]
 
         else:
             with open(os.path.join(self.base_dir, "platform.txt"), "w") as f:
                 f.write(platform.node())
+
+            validation_stats = self.retrieve_validation_stats(finetune_iteration=0)
+
+            # test_accuracy = self.adaptor_config["test_accuracies"][-1]
+            test_accuracy = -1.0
 
         return validation_stats, test_accuracy
 
@@ -492,8 +516,8 @@ class CounterfactualKnowledgeDistillation:
                 "wb",
             ) as f:
                 for key in self.tracked_keys:
-                    if isinstance(tracked_values[key], torch.Tensor):
-                        np.savez(f, key=tracked_values[key].numpy())
+                    if isinstance(tracked_values[key][0], torch.Tensor):
+                        np.savez(f, key=torch.stack(tracked_values[key], dim=0).numpy())
 
         else:
             with open(
@@ -606,6 +630,7 @@ class CounterfactualKnowledgeDistillation:
         y_source_list,
         y_target_list,
         finetune_iteration,
+        config,
         mode="",
         **args,
     ):
@@ -661,6 +686,7 @@ class CounterfactualKnowledgeDistillation:
             x_list=x_list,
             y_list=y_list,
             sample_names=sample_names,
+            config=config['data'],
         )
         return dataset_dir
 
@@ -681,22 +707,16 @@ class CounterfactualKnowledgeDistillation:
                 os.path.join(self.base_dir, str(finetune_iteration), "finetuned_model")
             ).mkdir(parents=True, exist_ok=True)
             #
-            data_config = copy.deepcopy(self.adaptor_config)
-            data_config["training"]["split"] = [1.0, 1.0]
-            data_config["data"]["confounding_factors"] = []
             dataloader, _, _ = create_dataloaders_from_datasource(
-                dataset_path, data_config
+                dataset_path, self.data_config
             )
 
             #
             val_dataset_path = os.path.join(
                 self.base_dir, str(finetune_iteration), "validation_dataset"
             )
-            validation_data_config = copy.deepcopy(self.adaptor_config)
-            validation_data_config["training"]["split"] = [0.0, 1.0]
-            validation_data_config["data"]["confounding_factors"] = []
             _, dataloader_val, _ = create_dataloaders_from_datasource(
-                val_dataset_path, validation_data_config  # TODO: why dataset_path???
+                val_dataset_path, self.validation_data_config  # TODO: why dataset_path???
             )
 
             #
@@ -804,6 +824,7 @@ class CounterfactualKnowledgeDistillation:
                 feedback=feedback,
                 finetune_iteration=finetune_iteration,
                 mode="train",
+                config=self.data_config,
                 **tracked_values,
             )
             self.finetune_student(
