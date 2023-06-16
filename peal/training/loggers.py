@@ -111,9 +111,13 @@ class Logger:
         if "ce" in self.config["task"]["criterions"].keys() and not isinstance(
             self.model, InvertibleGenerator
         ):
-            targets_one_hot = torch.nn.functional.one_hot(
-                torch.cat(self.targets).to(torch.int64), self.output_size
-            ).to(torch.float32)
+            try:
+                targets_one_hot = torch.nn.functional.one_hot(
+                    torch.cat(self.targets).to(torch.int64), self.output_size
+                ).to(torch.float32)
+            except Exception:
+                import pdb; pdb.set_trace()
+
             predictions_one_hot = torch.nn.functional.one_hot(
                 torch.cat(self.predicted_classes).to(torch.int64), self.output_size
             ).to(torch.float32)

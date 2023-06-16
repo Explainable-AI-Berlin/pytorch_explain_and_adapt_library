@@ -46,7 +46,7 @@ class CounterfactualExplainer(ExplainerInterface):
         self.loss = torch.nn.CrossEntropyLoss()
 
     def gradient_based_counterfactual(
-        self, x_in, target_confidence_goal, target_classes, pbar=None, mode=''
+        self, x_in, target_confidence_goal, target_classes, pbar=None, mode=""
     ):
         """
         This function generates a counterfactual for a given batch of inputs.
@@ -180,7 +180,7 @@ class CounterfactualExplainer(ExplainerInterface):
         y_target_goal_confidence_in: int = None,
         remove_below_threshold: bool = True,
         pbar=None,
-        mode='',
+        mode="",
     ) -> dict:
         """
         This function generates a counterfactual for a given batch of inputs.
@@ -211,7 +211,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 target_confidence_goal=target_confidence_goal,
                 target_classes=batch["y_target_list"],
                 pbar=pbar,
-                mode=mode
+                mode=mode,
             )
 
         elif isinstance(self.generator, EditCapableGenerator):

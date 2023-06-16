@@ -3,7 +3,7 @@
 'channel_mult' : ''
 'chunk' : 0
 'class_cond' : False
-'classifier_path' : '../notebooks/peal_runs/celeba_poisened100_Smiling_Blond_Hair_classifier/model.cpl'
+'classifier_path' : 'peal_runs/dime_outputs/classifier.cpl' #'../notebooks/peal_runs/celeba_poisened100_Smiling_Blond_Hair_classifier/model.cpl'
 'classifier_scales' : '8,10,15'
 'clip_denoised' : True
 'data_dir' : '/home/space/datasets/celeba'
@@ -30,7 +30,7 @@
 'num_heads_upsample' : -1
 'num_res_blocks' : 2
 'oracle_path' : '../ACE/oracle.pth'
-'output_path' : 'outputs'
+'output_path' : 'peal_runs/dime_outputs'
 'predict_xstart' : False
 'query_label' : 31
 'resblock_updown' : True

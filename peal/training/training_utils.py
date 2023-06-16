@@ -122,19 +122,16 @@ def calculate_validation_statistics(
 
         error_matrix = error_matrix.flatten()
         error_matrix = error_matrix / error_matrix.sum()
-        error_distribution = torch.distributions.categorical.Categorical(
-            torch.tensor(error_matrix)
-        )
+        error_matrix = torch.tensor(error_matrix)
 
     else:
         error_matrix = torch.ones([output_size, output_size]) - torch.eye(output_size)
         error_matrix = error_matrix.flatten() / error_matrix.sum()
-        error_distribution = torch.distributions.categorical.Categorical(error_matrix)
 
     validation_stats = {
         "accuracy": accuracy,
         "confidence_score_stats": confidence_score_stats,
-        "error_distribution": error_distribution,
+        "error_matrix": error_matrix,
     }
 
     return tracked_values, validation_stats

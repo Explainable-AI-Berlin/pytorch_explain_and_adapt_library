@@ -300,10 +300,11 @@ class ModelTrainer:
             self.model.eval()
             val_accuracy = 0.0
             for idx, val_dataloader in enumerate(self.val_dataloaders):
-                val_loss, val_accuracy = self.run_epoch(
-                    val_dataloader, mode="validation_" + str(idx), pbar=pbar
-                )
-                val_accuracy += self.val_dataloader_weights[idx] * val_accuracy
+                if len(val_dataloader) >= 1:
+                    val_loss, val_accuracy = self.run_epoch(
+                        val_dataloader, mode="validation_" + str(idx), pbar=pbar
+                    )
+                    val_accuracy += self.val_dataloader_weights[idx] * val_accuracy
 
             self.logger.writer.add_scalar(
                 "val_accuracy", val_accuracy, self.config["training"]["epoch"]
