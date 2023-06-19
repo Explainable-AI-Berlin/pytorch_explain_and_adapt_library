@@ -371,8 +371,6 @@ class CounterfactualKnowledgeDistillation:
                 for key in validation_tracked_file.keys():
                     validation_stats[key] = torch.tensor(validation_tracked_file[key])
 
-                import pdb; pdb.set_trace()
-
                 return validation_stats
 
         validation_values_path = os.path.join(
