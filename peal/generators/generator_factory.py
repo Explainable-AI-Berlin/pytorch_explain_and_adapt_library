@@ -2,7 +2,7 @@ import torch
 
 from typing import Union
 
-from peal.generators.interfaces import InvertibleGenerator
+from peal.generators.interfaces import InvertibleGenerator, EditCapableGenerator
 from peal.generators.normalizing_flows import Glow
 from peal.utils import load_yaml_config
 from peal.training.trainers import ModelTrainer
@@ -32,11 +32,7 @@ def get_generator(
     Returns:
         InvertibleGenerator: The generator.
     """
-    if isinstance(generator, InvertibleGenerator):
-        generator = generator
-
-    else:
-        # TODO add support for other generators
+    if not (isinstance(generator, InvertibleGenerator) or isinstance(generator, EditCapableGenerator)):
         generator_config = load_yaml_config(generator)
         generator_config["data"] = data_config
         generator = Glow(generator_config).to(device)

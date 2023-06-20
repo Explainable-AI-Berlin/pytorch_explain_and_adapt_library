@@ -261,8 +261,8 @@ class ImageDataset(PealDataset):
         img.save(collage_path)
         return result_img_collage, heatmap_high_contrast"""
 
-    def serialize_dataset(self, output_dir, x_list, y_list, config, sample_names=None):
-        for class_name in range(config["output_size"]):
+    def serialize_dataset(self, output_dir, x_list, y_list, sample_names=None):
+        for class_name in range(self.output_size):
             Path(os.path.join(output_dir, "imgs", str(class_name))).mkdir(
                 parents=True, exist_ok=True
             )
@@ -324,6 +324,14 @@ class Image2MixedDataset(ImageDataset):
             data_dir, config, mode, key_type="name", delimiter=config["delimiter"]
         )
         self.return_dict = return_dict
+
+    @property
+    def output_size(self):
+        if self.task_config is None:
+            return len(self.attributes)
+
+        else:
+            return len(self.task_config["selection"])
 
     def __len__(self):
         return len(self.keys)
@@ -458,6 +466,10 @@ class Image2ClassDataset(ImageDataset):
     def disable_hints(self):
         self.urls = copy.deepcopy(self.all_urls)
         self.hints_enabled = False
+
+    @property
+    def output_size(self):
+        return len(self.config["output_size"])
 
     def __len__(self):
         return len(self.urls)

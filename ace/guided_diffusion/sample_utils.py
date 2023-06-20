@@ -127,7 +127,7 @@ def dist_cond_fn(x_tau, z_t, x_t, alpha_t,
 # =======================================================
 
 # =======================================================
-# Area-unrestricted DiME
+# Area-unrestricted dime2
 
 def get_DiME_iterative_sampling(use_sampling=False):
     '''
@@ -390,7 +390,7 @@ def get_DiME_iterative_sampling_derivative(use_sampling=False):
     return p_sample_loop
 
 # =======================================================
-# Masked DiME update functions
+# Masked dime2 update functions
 
 @torch.enable_grad()
 def mask_opt_fn(mask, x_tau, x_t, y, classifier,
@@ -636,7 +636,7 @@ def mask_opt_fn3(x_tau, x_cf, y, classifier,
 
 
 # =======================================================
-# Masked DiME
+# Masked dime2
 
 
 def get_masked_DiME_iterative_sampling(use_sampling=False):

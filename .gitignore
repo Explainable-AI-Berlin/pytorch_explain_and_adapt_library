@@ -12,5 +12,5 @@ tests/outputs
 *.pt
 *.pth
 .idea
-DiME/outputs
-ACE/outputs
+dime2/outputs
+ace/outputs

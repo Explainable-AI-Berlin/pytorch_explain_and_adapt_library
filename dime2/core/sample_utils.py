@@ -129,7 +129,7 @@ def dist_cond_fn(x_tau, z_t, x_t, alpha_t, l1_loss, l2_loss, l_perc):
 
 def get_DiME_iterative_sampling(use_sampling=False):
     """
-    Returns DiME's main algorithm to construct counterfactuals.
+    Returns dime2's main algorithm to construct counterfactuals.
     The returned function computes x_t in a recursive way.
     Easy way to set the optional parameters into the sampling
     function such as the use_sampling flag.

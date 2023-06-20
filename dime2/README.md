@@ -8,7 +8,7 @@ Through anaconda, install our environment:
 
 ```bash
 conda env create -f env.yaml
-conda activate dime
+conda activate dime2
 ``` 
 
 ## Data preparation

@@ -223,6 +223,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 x_in=batch["x_list"],
                 target_confidence_goal=target_confidence_goal,
                 target_classes=batch["y_target_list"],
+                source_classes=batch["y_source_list"],
                 classifier=self.downstream_model,
                 pbar=pbar,
                 mode=mode,

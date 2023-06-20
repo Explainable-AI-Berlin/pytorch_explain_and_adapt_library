@@ -22,15 +22,22 @@ from torch.utils import data
 from torchvision import transforms
 from torchvision import datasets
 
-from core import dist_util
-from core.script_util import (
+module_path = os.path.abspath(os.path.join(".."))
+if module_path not in sys.path:
+    sys.path.append(module_path)
+
+from dime2.core.dist_util import (
+    dev,
+    load_state_dict,
+)
+from dime2.core.script_util import (
     model_and_diffusion_defaults,
     create_model_and_diffusion,
     create_classifier,
     args_to_dict,
     add_dict_to_argparser,
 )
-from core.sample_utils import (
+from dime2.core.sample_utils import (
     get_DiME_iterative_sampling,
     clean_class_cond_fn,
     dist_cond_fn,
@@ -43,13 +50,9 @@ from core.sample_utils import (
     Z_T_Saver,
     ChunkedDataset,
 )
-from core.image_datasets import CelebADataset, CelebAMiniVal
+from dime2.core.image_datasets import CelebADataset, CelebAMiniVal
 from core.gaussian_diffusion import _extract_into_tensor
-from core.classifier.densenet import ClassificationModel
-
-module_path = os.path.abspath(os.path.join("../peal"))
-if module_path not in sys.path:
-    sys.path.append(module_path)
+from dime2.core.classifier.densenet import ClassificationModel
 
 import peal
 
@@ -281,7 +284,7 @@ def main(args=None):
     # ========================================
     # Evaluate all feature in case of
     if args.merge_and_eval:
-        merge_and_compute_overall_metrics(args, dist_util.dev())
+        merge_and_compute_overall_metrics(args, dev())
         return  # finish the script
 
     # ========================================
@@ -313,6 +316,9 @@ def main(args=None):
             query_label=args.query_label,
         )
 
+    else:
+        dataset = args.dataset
+
     if len(dataset) - args.batch_size * args.num_batches > 0:
         dataset = SlowSingleLabel(
             query_label=1 - args.target_label if args.target_label != -1 else -1,
@@ -343,9 +349,9 @@ def main(args=None):
         **args_to_dict(args, model_and_diffusion_defaults().keys())
     )
     model.load_state_dict(
-        dist_util.load_state_dict(args.model_path, map_location="cpu")
+        load_state_dict(args.model_path, map_location="cpu")
     )
-    model.to(dist_util.dev())
+    model.to(dev())
     if args.use_fp16:
         model.convert_to_fp16()
     model.eval()
@@ -356,17 +362,20 @@ def main(args=None):
 
     print("Loading Classifier")
 
-    if args.classifier_path[-4:] == ".cpl":
+    if hasattr(args, "classifier"):
+        classifier = args.classifier
+
+    elif args.classifier_path[-4:] == ".cpl":
         module_path = os.path.abspath(os.path.join(".."))
         if module_path not in sys.path:
             sys.path.append(module_path)
-        classifier = torch.load(args.classifier_path, map_location=dist_util.dev()).to(
-            dist_util.dev()
+        classifier = torch.load(args.classifier_path, map_location=dev()).to(
+            dev()
         )
 
     elif args.classifier_path[-4:] == ".pth":
         classifier = ClassificationModel(args.classifier_path, args.query_label).to(
-            dist_util.dev()
+            dev()
         )
 
     classifier.eval()
@@ -377,7 +386,7 @@ def main(args=None):
     if args.l_perc != 0:
         print("Loading Perceptual Loss")
         vggloss = PerceptualLoss(layer=args.l_perc_layer, c=args.l_perc).to(
-            dist_util.dev()
+            dev()
         )
         vggloss.eval()
     else:
@@ -416,17 +425,17 @@ def main(args=None):
     classifier_scales = [float(x) for x in args.classifier_scales.split(",")]
 
     print("Starting Image Generation")
-    pbar = tqdm(total=len(loader) * len(classifier_scales) * (args.start_step ** 2) / 2)
+    pbar = tqdm(total=len(loader) * len(classifier_scales) * (args.start_step**2) / 2)
     for idx, (indexes, img, lab) in enumerate(loader):
         """print(
             f"[Chunk {args.chunk + 1} / {args.num_chunks}] {idx}"
             + f"/ {min(args.num_batches, len(loader))} | Time: {int(time() - start_time)}s"
         )"""
 
-        img = img.to(dist_util.dev())
+        img = img.to(dev())
         I = (img / 2) + 0.5
-        lab = lab.to(dist_util.dev(), dtype=torch.long)
-        t = torch.zeros(img.size(0), device=dist_util.dev(), dtype=torch.long)
+        lab = lab.to(dev(), dtype=torch.long)
+        t = torch.zeros(img.size(0), device=dev(), dtype=torch.long)
 
         # Initial Classification, no noise included
         with torch.no_grad():
@@ -470,7 +479,7 @@ def main(args=None):
                 z_t=noise_img[~transformed, ...],
                 clip_denoised=args.clip_denoised,
                 model_kwargs=model_kwargs,
-                device=dist_util.dev(),
+                device=dev(),
                 class_grad_fn=clean_class_cond_fn,
                 class_grad_kwargs={
                     "y": target[~transformed],
@@ -491,7 +500,11 @@ def main(args=None):
             # evaluate the cf and check whether the model flipped the prediction
             with torch.no_grad():
                 cfsl = classifier(cfs)
-                cfsl = cfsl if isinstance(classifier, ClassificationModel) else cfsl[:, 1] - cfsl[:, 0]
+                cfsl = (
+                    cfsl
+                    if isinstance(classifier, ClassificationModel)
+                    else cfsl[:, 1] - cfsl[:, 0]
+                )
                 cfsp = cfsl > 0
 
             if jdx == 0:
@@ -516,7 +529,11 @@ def main(args=None):
 
         with torch.no_grad():
             logits_cf = classifier(cf)
-            logits_cf = logits_cf if isinstance(classifier, ClassificationModel) else logits_cf[:, 1] - logits_cf[:, 0]
+            logits_cf = (
+                logits_cf
+                if isinstance(classifier, ClassificationModel)
+                else logits_cf[:, 1] - logits_cf[:, 0]
+            )
             pred_cf = (logits_cf > 0).long()
 
             # process images

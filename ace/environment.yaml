@@ -1,4 +1,4 @@
-name: dime
+name: ace
 channels:
     - pytorch
     - anaconda
@@ -16,6 +16,7 @@ dependencies:
     - pandas
     - h5py
     - scipy
+    - git-lfs
     - pip:
         - tqdm
         - blobfile

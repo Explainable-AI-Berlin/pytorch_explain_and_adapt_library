@@ -163,7 +163,7 @@ class CounterfactualKnowledgeDistillation:
             generator=self.generator,
             input_type=self.adaptor_config["data"]["input_type"],
             explainer_config=self.adaptor_config["explainer"],
-            dataset=self.train_dataloader.dataset,
+            dataset=self.val_dataloader.dataset,
         )
         self.logits_to_prediction = lambda logits: logits.argmax(-1)
         self.use_visualization = visualization
@@ -186,7 +186,7 @@ class CounterfactualKnowledgeDistillation:
         self.data_config["data"]["confounder_probability"] = None
         self.data_config["data"]["known_confounder"] = False
         self.data_config["data"]["output_type"] = "singleclass"
-        self.data_config["data"]["output_size"] = 2
+        self.data_config["data"]["output_size"] = self.train_dataset.output_size
         self.data_config["data"]["delimiter"] = ","
         self.data_config["data"]["num_samples"] = self.adaptor_config[
             "max_train_samples"

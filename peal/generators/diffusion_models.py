@@ -1,13 +1,17 @@
 import torch
 import torchvision
 import os
+import types
+import shutil
+import copy
 
 from pathlib import Path
 from torch import nn
 
 from peal.generators.interfaces import EditCapableGenerator
+from peal.data.datasets import Image2ClassDataset
 from peal.utils import load_yaml_config
-from DiME.main import main
+from dime2.main import main
 
 
 class DDPM(EditCapableGenerator):
@@ -20,35 +24,36 @@ class DDPM(EditCapableGenerator):
         self,
         x_in: torch.Tensor,
         target_confidence_goal: float,
+        source_classes: torch.Tensor,
         target_classes: torch.Tensor,
         classifier: nn.Module,
         pbar=None,
         mode="",
     ):
-        Path.mkdir(self.config["output_dir"], parents=True, exist_ok=True)
-        torch.save(classifier, self.config["classifier_path"])
-        x_canonized = self.dataset.project_to_pytorch_default(x_in)
-        data_str = str(x_in.shape[0]) + "\n" + "ImgPath Label"
-        for i in range(x_canonized.shape[0]):
-            torchvision.utils.save_image(
-                x_canonized[i],
-                os.path.join(self.config["data_dir"], "img_align_celeba", f"{i}.png"),
-            )
-            data_str += "\n" + f"{i}.png" + " " + str(target_classes[i].item())
+        shutil.rmtree(self.config["base_path"], ignore_errors=True)
+        self.dataset.serialize_dataset(
+            output_dir=self.config["data_dir"],
+            x_list=x_in,
+            y_list=target_classes,
+            sample_names=list(map(lambda x: str(x) + ".png", range(x_in.shape[0]))),
+        )
 
-        with open(
-            os.path.join(self.config["data_dir"], "list_attr_celeba.txt"), "w"
-        ) as f:
-            f.write(data_str)
-
-        main(args=self.config)
+        args = types.SimpleNamespace(**self.config)
+        args.dataset = Image2ClassDataset(
+            root_dir=self.config["data_dir"],
+            mode=None,
+            config=copy.deepcopy(self.dataset.config),
+            transform=self.dataset.transform,
+        )
+        args.classifier = classifier
+        main(args=args)
         x_counterfactuals = []
         base_path = os.path.join(
-            self.config["output_dir"],
+            self.config["output_path"],
             "Results",
             self.config["exp_name"],
         )
-        for i in range(x_canonized.shape[0]):
+        for i in range(x_in.shape[0]):
             path_correct = os.path.join(base_path, "CC", "CCF", "CF", f"{i}.png")
             path_incorrect = os.path.join(base_path, "IC", "CCF", "CF", f"{i}.png")
             if os.path.exists(path_correct):

@@ -98,7 +98,7 @@ def create_args():
         # backward steps than batch size (e.g have 2 backward steps and batch size of 1 than 1
         # backward step and batch size 2)
         attack_checkpoint_backward_steps=1,
-        # Use DiME shortcut to transfer gradients. We do not recommend it.
+        # Use dime2 shortcut to transfer gradients. We do not recommend it.
         attack_joint_shortcut=False,
         # dist args
         dist_l1=0.0,  # l1 scaling factor
