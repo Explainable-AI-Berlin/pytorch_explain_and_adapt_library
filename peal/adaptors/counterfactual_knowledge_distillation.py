@@ -186,7 +186,7 @@ class CounterfactualKnowledgeDistillation:
         self.data_config["data"]["confounder_probability"] = None
         self.data_config["data"]["known_confounder"] = False
         self.data_config["data"]["output_type"] = "singleclass"
-        self.data_config["data"]["output_size"] = self.train_dataset.output_size
+        self.data_config["data"]["output_size"] = self.train_dataloader.dataset.output_size
         self.data_config["data"]["delimiter"] = ","
         self.data_config["data"]["num_samples"] = self.adaptor_config[
             "max_train_samples"

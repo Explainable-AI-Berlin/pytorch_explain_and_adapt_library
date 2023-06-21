@@ -51,10 +51,7 @@ from dime2.core.sample_utils import (
     ChunkedDataset,
 )
 from dime2.core.image_datasets import CelebADataset, CelebAMiniVal
-from core.gaussian_diffusion import _extract_into_tensor
 from dime2.core.classifier.densenet import ClassificationModel
-
-import peal
 
 import matplotlib
 

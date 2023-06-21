@@ -41,7 +41,7 @@ def request(name, default, is_asking=True):
     if not is_asking:
         return default
 
-    answer = input("Do you want to change value of " + str(name) + "? [y/n]")
+    answer = input("Do you want to change value of " + str(name) + "==" + str(default) + "? [y/n]")
     if answer == "n":
         return default
 

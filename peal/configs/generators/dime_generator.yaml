@@ -21,7 +21,7 @@
 'l_perc_layer' : 18
 'learn_sigma' : True
 'merge_and_eval' : False
-'model_path' : '../ace/ddpm-celeba.pt'
+'model_path' : '../dime2/ddpm-celeba.pt'
 'noise_schedule' : 'linear'
 'num_batches' : 1
 'num_channels' : 128
@@ -30,7 +30,7 @@
 'num_heads' : 4
 'num_heads_upsample' : -1
 'num_res_blocks' : 2
-'oracle_path' : '../ace/oracle.pth'
+'oracle_path' : '../dime2/oracle.pth'
 'output_path' : 'peal_runs/dime2/outputs'
 'predict_xstart' : False
 'query_label' : 31
