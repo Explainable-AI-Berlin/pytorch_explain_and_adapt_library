@@ -7,18 +7,75 @@ import copy
 
 from pathlib import Path
 from torch import nn
+from PIL import Image
+from torchvision.transforms import ToTensor
 
 from peal.generators.interfaces import EditCapableGenerator
 from peal.data.datasets import Image2ClassDataset
-from peal.utils import load_yaml_config
+from peal.utils import load_yaml_config, embed_numberstring
 from dime2.main import main
+
+from ace.guided_diffusion import dist_util, logger
+from ace.guided_diffusion.resample import create_named_schedule_sampler
+from ace.guided_diffusion.script_util import (
+    model_and_diffusion_defaults,
+    create_model_and_diffusion,
+    args_to_dict,
+)
+from ace.guided_diffusion.train_util import TrainLoop
+from peal.data.dataset_factory import get_datasets
+from peal.data.dataloaders import get_dataloader
 
 
 class DDPM(EditCapableGenerator):
-    def __init__(self, config, dataset):
+    def __init__(self, config, dataset, model_dir):
         super().__init__()
         self.config = load_yaml_config(config)
         self.dataset = dataset
+        self.model_dir = model_dir
+
+    def train_model(self, training_config='$PEAL/configs/training/train_ddpm.yaml'):
+        training_config = load_yaml_config(training_config)
+        args = types.SimpleNamespace(**training_config)
+        shutil.rmtree(args.output_path, ignore_errors=True)
+
+        dist_util.setup_dist(args.gpus)
+        logger.configure(dir=args.output_path)
+
+        logger.log("creating model and diffusion...")
+        model, diffusion = create_model_and_diffusion(
+            num_classes=40,
+            multiclass=True,
+            **args_to_dict(args, model_and_diffusion_defaults().keys())
+        )
+        model.to(dist_util.dev())
+        schedule_sampler = create_named_schedule_sampler(args.schedule_sampler, diffusion)
+
+        logger.log("creating data loader...")
+        dataset_config = load_yaml_config("configs/follicles_data.yaml")
+        dataset_train, _, _ = get_datasets(
+            config=dataset_config, base_dir=os.path.join("datasets", "follicles_cut"), return_dict=True
+        )
+        data = iter(get_dataloader(dataset_train, mode='train', batch_size=args.batch_size, training_config={"iterations_per_episode" : 100000}))
+
+        logger.log("training...")
+        TrainLoop(
+            model=model,
+            diffusion=diffusion,
+            data=data,
+            batch_size=args.batch_size,
+            microbatch=args.microbatch,
+            lr=args.lr,
+            ema_rate=args.ema_rate,
+            log_interval=args.log_interval,
+            save_interval=args.save_interval,
+            resume_checkpoint=args.resume_checkpoint,
+            use_fp16=args.use_fp16,
+            fp16_scale_growth=args.fp16_scale_growth,
+            schedule_sampler=schedule_sampler,
+            weight_decay=args.weight_decay,
+            lr_anneal_steps=args.lr_anneal_steps,
+        ).run_loop()
 
     def edit(
         self,
@@ -35,7 +92,7 @@ class DDPM(EditCapableGenerator):
             output_dir=self.config["data_dir"],
             x_list=x_in,
             y_list=target_classes,
-            sample_names=list(map(lambda x: str(x) + ".png", range(x_in.shape[0]))),
+            sample_names=list(map(lambda x: embed_numberstring(str(x)) + ".jpg", range(x_in.shape[0]))),
         )
 
         args = types.SimpleNamespace(**self.config)
@@ -45,6 +102,7 @@ class DDPM(EditCapableGenerator):
             config=copy.deepcopy(self.dataset.config),
             transform=self.dataset.transform,
         )
+        args.model_path = os.path.join(self.model_dir, "model.pt")
         args.classifier = classifier
         main(args=args)
         x_counterfactuals = []
@@ -54,13 +112,21 @@ class DDPM(EditCapableGenerator):
             self.config["exp_name"],
         )
         for i in range(x_in.shape[0]):
-            path_correct = os.path.join(base_path, "CC", "CCF", "CF", f"{i}.png")
-            path_incorrect = os.path.join(base_path, "IC", "CCF", "CF", f"{i}.png")
+            path_correct = os.path.join(base_path, "CC", "CCF", "CF", f"{embed_numberstring(str(i))}.jpg")
+            path_correct2 = os.path.join(base_path, "CC", "ICF", "CF", f"{embed_numberstring(str(i))}.jpg")
+            path_incorrect = os.path.join(base_path, "IC", "CCF", "CF", f"{embed_numberstring(str(i))}.jpg")
+            path_incorrect2 = os.path.join(base_path, "IC", "ICF", "CF", f"{embed_numberstring(str(i))}.jpg")
             if os.path.exists(path_correct):
                 path = path_correct
 
+            elif os.path.exists(path_correct2):
+                path = path_correct2
+
             elif os.path.exists(path_incorrect):
                 path = path_incorrect
+
+            elif os.path.exists(path_incorrect2):
+                path = path_incorrect2
 
             else:
                 print("No counterfactual found for image " + str(i))
@@ -68,14 +134,20 @@ class DDPM(EditCapableGenerator):
 
                 pdb.set_trace()
 
-            x_counterfactuals.append(torchvision.io.read_image(path))
+            #x_counterfactuals.append(torchvision.io.read_image(path))
+            x_counterfactuals.append(ToTensor()(Image.open(path)))
 
         x_counterfactuals = torch.stack(x_counterfactuals)
         x_counterfactuals = self.dataset.project_from_pytorch_default(x_counterfactuals)
+        device = [p for p in classifier.parameters()][0].device
+        preds = torch.nn.Softmax(dim=-1)(classifier(x_counterfactuals.to(device)).detach().cpu())
+        y_target_end_confidence = torch.zeros([x_in.shape[0]])
+        for i in range(x_in.shape[0]):
+            y_target_end_confidence[i] = preds[i, target_classes[i]]
+
+        import pdb; pdb.set_trace()
         return {
             "x_counterfactual_list": list(x_counterfactuals),
             "z_difference_list": list(x_in - x_counterfactuals),
-            "y_target_end_confidence_list": list(
-                classifier(x_counterfactuals)[~target_classes]
-            ),
+            "y_target_end_confidence_list": list(y_target_end_confidence),
         }

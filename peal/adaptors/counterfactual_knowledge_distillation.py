@@ -65,13 +65,21 @@ class CounterfactualKnowledgeDistillation:
             student (nn.Module): The student model that is improved with CFKD
             datasource (Union): The datasource that is used for training
             output_size (int, optional): The output size of the student model. Defaults to None.
-            generator (Union, optional): The generator that is used for CFKD. Defaults to "$PEAL/configs/models/default_generator.yaml".
-            base_dir (Union, optional): The base directory for the run. Defaults to os.path.join("peal_runs", "counterfactual_knowledge_distillation").
+            generator (Union, optional):
+                The generator that is used for CFKD.
+                Defaults to "$PEAL/configs/models/default_generator.yaml".
+            base_dir (Union, optional):
+                The base directory for the run.
+                Defaults to os.path.join("peal_runs", "counterfactual_knowledge_distillation").
             teacher (Union, optional): The teacher that is used for CFKD. Defaults to "human@8000".
-            adaptor_config (Union, optional): The config for the adaptor. Defaults to "$PEAL/configs/adaptors/counterfactual_knowledge_distillation_default.yaml".
+            adaptor_config (Union, optional):
+                The config for the adaptor.
+                Defaults to "$PEAL/configs/adaptors/counterfactual_knowledge_distillation_default.yaml".
             gigabyte_vram (float, optional): The amount of vram in gigabytes. Defaults to None.
-            overwrite (bool, optional): The flag that indicates whether the run should be overwritten. Defaults to False.
-            visualization (callable, optional): The visualization function that is used for the run. Defaults to lambda x: x.
+            overwrite (bool, optional):
+                The flag that indicates whether the run should be overwritten. Defaults to False.
+            visualization (callable, optional):
+                The visualization function that is used for the run. Defaults to lambda x: x.
         """
         # TODO make sure to use seeds everywhere!
         self.base_dir = base_dir
@@ -242,6 +250,7 @@ class CounterfactualKnowledgeDistillation:
 
         x_batch = torch.stack(x_batch)
         y_target_batch = torch.stack(y_target_batch)
+        import pdb; pdb.set_trace()
         return {
             "x_list": x_batch,
             "y_list": y_batch,
