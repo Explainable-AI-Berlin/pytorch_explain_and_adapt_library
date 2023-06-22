@@ -1,4 +1,4 @@
-'attention_resolutions' : ['32', '16', '8']
+'attention_resolutions' : '32,16,8' #['32', '16', '8']
 'batch_size' : 5
 'channel_mult' : ''
 'class_cond' : False
@@ -20,7 +20,7 @@
 'num_heads' : 4
 'num_heads_upsample' : -1
 'num_res_blocks' : 2
-'output_path' : 'peal_runs/follicle_ddpm'
+'output_path' : '.'
 'predict_xstart' : False
 'resblock_updown' : True
 'rescale_learned_sigmas' : False

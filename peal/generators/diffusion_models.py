@@ -34,13 +34,13 @@ class DDPM(EditCapableGenerator):
         self.dataset = dataset
         self.model_dir = model_dir
 
-    def train_model(self, training_config='$PEAL/configs/training/train_ddpm.yaml'):
+    def train_model(self, dataset_train, training_config='$PEAL/configs/training/train_ddpm.yaml'):
         training_config = load_yaml_config(training_config)
         args = types.SimpleNamespace(**training_config)
-        shutil.rmtree(args.output_path, ignore_errors=True)
+        shutil.rmtree(self.model_dir, ignore_errors=True)
 
         dist_util.setup_dist(args.gpus)
-        logger.configure(dir=args.output_path)
+        logger.configure(dir=self.model_dir)
 
         logger.log("creating model and diffusion...")
         model, diffusion = create_model_and_diffusion(
@@ -52,10 +52,6 @@ class DDPM(EditCapableGenerator):
         schedule_sampler = create_named_schedule_sampler(args.schedule_sampler, diffusion)
 
         logger.log("creating data loader...")
-        dataset_config = load_yaml_config("configs/follicles_data.yaml")
-        dataset_train, _, _ = get_datasets(
-            config=dataset_config, base_dir=os.path.join("datasets", "follicles_cut"), return_dict=True
-        )
         data = iter(get_dataloader(dataset_train, mode='train', batch_size=args.batch_size, training_config={"iterations_per_episode" : 100000}))
 
         logger.log("training...")
@@ -75,6 +71,7 @@ class DDPM(EditCapableGenerator):
             schedule_sampler=schedule_sampler,
             weight_decay=args.weight_decay,
             lr_anneal_steps=args.lr_anneal_steps,
+            model_dir=self.model_dir,
         ).run_loop()
 
     def edit(
@@ -145,9 +142,8 @@ class DDPM(EditCapableGenerator):
         for i in range(x_in.shape[0]):
             y_target_end_confidence[i] = preds[i, target_classes[i]]
 
-        import pdb; pdb.set_trace()
-        return {
-            "x_counterfactual_list": list(x_counterfactuals),
-            "z_difference_list": list(x_in - x_counterfactuals),
-            "y_target_end_confidence_list": list(y_target_end_confidence),
-        }
+        return (
+            list(x_counterfactuals),
+            list(x_in - x_counterfactuals),
+            list(y_target_end_confidence),
+        )

@@ -2,6 +2,7 @@ import copy
 import functools
 import os
 import glob
+import copy
 
 import blobfile as bf
 import torch as th
@@ -9,6 +10,7 @@ import torch.distributed as dist
 from torch.nn.parallel.distributed import DistributedDataParallel as DDP
 from torch.optim import AdamW
 from tqdm import tqdm
+from pathlib import Path
 
 from . import dist_util, logger
 from .fp16_util import MixedPrecisionTrainer
@@ -36,6 +38,7 @@ class TrainLoop:
         log_interval,
         save_interval,
         resume_checkpoint,
+        model_dir,
         use_fp16=False,
         fp16_scale_growth=1e-3,
         schedule_sampler=None,
@@ -43,6 +46,7 @@ class TrainLoop:
         lr_anneal_steps=0,
     ):
         self.model = model
+        self.model_dir = model_dir
         self.diffusion = diffusion
         self.data = data
         self.batch_size = batch_size
@@ -174,9 +178,6 @@ class TrainLoop:
             pbar.step = self.step
             batch, cond = next(self.data)
             self.run_step(batch, cond, pbar)
-            if self.step % self.log_interval == 0:
-                # logger.dumpkvs()
-                print("Step", self.step)
             if self.step % self.save_interval == 0:
                 self.save()
                 # Run for a finite amount of time in integration tests.
@@ -261,13 +262,14 @@ class TrainLoop:
                     filename = f"model{(self.step+self.resume_step):06d}.pt"
                 else:
                     filename = f"ema_{rate}_{(self.step+self.resume_step):06d}.pt"
-                with bf.BlobFile(bf.join(get_blob_logdir(), filename), "wb") as f:
+
+                with bf.BlobFile(bf.join(copy.deepcopy(self.model_dir), filename), "wb") as f:
                     th.save(state_dict, f)
 
         # delete old checkpoints
-        if dist.get_rank() == 0:
-            for f in glob.glob(os.path.join(get_blob_logdir(), "*.pt")):
-                os.remove(os.path.join(get_blob_logdir(), f))
+        '''if dist.get_rank() == 0:
+            for f in glob.glob(os.path.join(copy.deepcopy(self.model_dir), "*.pt")):
+                os.remove(os.path.join(copy.deepcopy(self.model_dir), f))'''
 
         save_checkpoint(0, self.mp_trainer.master_params)
         for rate, params in zip(self.ema_rate, self.ema_params):
@@ -275,7 +277,7 @@ class TrainLoop:
 
         if dist.get_rank() == 0:
             with bf.BlobFile(
-                bf.join(get_blob_logdir(), f"opt{(self.step+self.resume_step):06d}.pt"),
+                bf.join(copy.deepcopy(self.model_dir), f"opt{(self.step+self.resume_step):06d}.pt"),
                 "wb",
             ) as f:
                 th.save(self.opt.state_dict(), f)
@@ -298,10 +300,6 @@ def parse_resume_step_from_filename(filename):
         return 0
 
 
-def get_blob_logdir():
-    # You can change this to be a separate path to save checkpoints to
-    # a blobstore or some external drive.
-    return logger.get_dir()
 
 
 def find_resume_checkpoint():
