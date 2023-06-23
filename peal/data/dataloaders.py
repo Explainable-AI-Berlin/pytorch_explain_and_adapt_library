@@ -350,15 +350,15 @@ def create_dataloaders_from_datasource(
     """for dataloader in [train_dataloader, val_dataloader, test_dataloader]:
         if not isinstance(dataloader.dataset, PealDataset):
             dataloader.dataset = wrap_dataset(dataloader.dataset, config["data"])"""
-    if isinstance(val_dataloader, torch.utils.data.dataloader.DataLoader):
-        if (
-            len(
-                val_dataloader.dataset.data[
-                    list(val_dataloader.dataset.data.keys())[-1]
-                ]
-            )
-            < 1
-        ):
-            val_dataloader.dataset.data.popitem()
+    # if isinstance(val_dataloader, torch.utils.data.dataloader.DataLoader):
+    #    if (
+    #        len(
+    #            val_dataloader.dataset.data[
+    #                list(val_dataloader.dataset.data.keys())[-1]
+    #            ]
+    #        )
+    #        < 1
+    #    ):
+    #        val_dataloader.dataset.data.popitem()
 
     return train_dataloader, val_dataloader, test_dataloader
