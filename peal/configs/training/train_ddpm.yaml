@@ -37,3 +37,4 @@
 'use_new_attention_order' : False
 'use_scale_shift_norm' : True
 'weight_decay' : 0.05
+'max_steps' : 1000000
