@@ -34,7 +34,9 @@ class DDPM(EditCapableGenerator):
         self.dataset = dataset
         self.model_dir = model_dir
 
-    def train_model(self, dataset_train, training_config='$PEAL/configs/training/train_ddpm.yaml'):
+    def train_model(
+        self, dataset_train, training_config="$PEAL/configs/training/train_ddpm.yaml"
+    ):
         training_config = load_yaml_config(training_config)
         args = types.SimpleNamespace(**training_config)
         shutil.rmtree(self.model_dir, ignore_errors=True)
@@ -46,13 +48,24 @@ class DDPM(EditCapableGenerator):
         model, diffusion = create_model_and_diffusion(
             num_classes=40,
             multiclass=True,
-            **args_to_dict(args, model_and_diffusion_defaults().keys())
+            **args_to_dict(args, model_and_diffusion_defaults().keys()),
         )
         model.to(dist_util.dev())
-        schedule_sampler = create_named_schedule_sampler(args.schedule_sampler, diffusion)
+        schedule_sampler = create_named_schedule_sampler(
+            args.schedule_sampler, diffusion
+        )
 
         logger.log("creating data loader...")
-        data = iter(get_dataloader(dataset_train, mode='train', batch_size=args.batch_size, training_config={"iterations_per_episode" : 100000}))
+        data = iter(
+            get_dataloader(
+                dataset_train,
+                mode="train",
+                batch_size=args.batch_size,
+                training_config={
+                    "iterations_per_episode": training_config["max_steps"]
+                },
+            )
+        )
 
         logger.log("training...")
         TrainLoop(
@@ -89,7 +102,9 @@ class DDPM(EditCapableGenerator):
             output_dir=self.config["data_dir"],
             x_list=x_in,
             y_list=target_classes,
-            sample_names=list(map(lambda x: embed_numberstring(str(x)) + ".jpg", range(x_in.shape[0]))),
+            sample_names=list(
+                map(lambda x: embed_numberstring(str(x)) + ".jpg", range(x_in.shape[0]))
+            ),
         )
 
         args = types.SimpleNamespace(**self.config)
@@ -109,10 +124,18 @@ class DDPM(EditCapableGenerator):
             self.config["exp_name"],
         )
         for i in range(x_in.shape[0]):
-            path_correct = os.path.join(base_path, "CC", "CCF", "CF", f"{embed_numberstring(str(i))}.jpg")
-            path_correct2 = os.path.join(base_path, "CC", "ICF", "CF", f"{embed_numberstring(str(i))}.jpg")
-            path_incorrect = os.path.join(base_path, "IC", "CCF", "CF", f"{embed_numberstring(str(i))}.jpg")
-            path_incorrect2 = os.path.join(base_path, "IC", "ICF", "CF", f"{embed_numberstring(str(i))}.jpg")
+            path_correct = os.path.join(
+                base_path, "CC", "CCF", "CF", f"{embed_numberstring(str(i))}.jpg"
+            )
+            path_correct2 = os.path.join(
+                base_path, "CC", "ICF", "CF", f"{embed_numberstring(str(i))}.jpg"
+            )
+            path_incorrect = os.path.join(
+                base_path, "IC", "CCF", "CF", f"{embed_numberstring(str(i))}.jpg"
+            )
+            path_incorrect2 = os.path.join(
+                base_path, "IC", "ICF", "CF", f"{embed_numberstring(str(i))}.jpg"
+            )
             if os.path.exists(path_correct):
                 path = path_correct
 
@@ -131,13 +154,15 @@ class DDPM(EditCapableGenerator):
 
                 pdb.set_trace()
 
-            #x_counterfactuals.append(torchvision.io.read_image(path))
+            # x_counterfactuals.append(torchvision.io.read_image(path))
             x_counterfactuals.append(ToTensor()(Image.open(path)))
 
         x_counterfactuals = torch.stack(x_counterfactuals)
         x_counterfactuals = self.dataset.project_from_pytorch_default(x_counterfactuals)
         device = [p for p in classifier.parameters()][0].device
-        preds = torch.nn.Softmax(dim=-1)(classifier(x_counterfactuals.to(device)).detach().cpu())
+        preds = torch.nn.Softmax(dim=-1)(
+            classifier(x_counterfactuals.to(device)).detach().cpu()
+        )
         y_target_end_confidence = torch.zeros([x_in.shape[0]])
         for i in range(x_in.shape[0]):
             y_target_end_confidence[i] = preds[i, target_classes[i]]
