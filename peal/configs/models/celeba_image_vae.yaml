@@ -1,0 +1,10 @@
+#
+'training'          : '$PEAL/configs/training/img_generator.yaml'
+'architecture'      :
+  'input_channels'  : 3
+  'neuron_numbers'  : [7 ]
+'task':
+  'criterions':
+    'likelihood'    : 1.0
+    'reconstruction': 1.0
+  'selection'       : {}
