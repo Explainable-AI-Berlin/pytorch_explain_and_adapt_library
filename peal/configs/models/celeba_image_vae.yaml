@@ -2,8 +2,8 @@
 'architecture'      :
   'block_type'              : 'resnet'
   'dimension_reduction'     : 'mean'
-  'neuron_numbers_encoder': [64, 64, 128, 256, 512, 512]
-  'neuron_numbers_decoder': [512, 512, 256, 128, 64, 64]
+  'neuron_numbers_encoder': [64, 64, 128, 256, 512]
+  'neuron_numbers_decoder': [512, 256, 128, 64, 64]
   'blocks_per_layer': 2
   'use_batchnorm': True
   'dropout': 0.0

@@ -89,6 +89,7 @@ def get_datasets(config, base_dir, task_config=None, return_dict=False):
     elif config["input_type"] == "symbolic" and config["output_type"] in [
         "multiclass",
         "mixed",
+        "singleclass",
     ]:
         dataset = SymbolicDataset
 
