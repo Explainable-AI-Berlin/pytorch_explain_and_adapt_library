@@ -250,7 +250,6 @@ class CounterfactualKnowledgeDistillation:
 
         x_batch = torch.stack(x_batch)
         y_target_batch = torch.stack(y_target_batch)
-        import pdb; pdb.set_trace()
         return {
             "x_list": x_batch,
             "y_list": y_batch,
@@ -409,7 +408,6 @@ class CounterfactualKnowledgeDistillation:
             os.makedirs(
                 os.path.join(self.base_dir, str(finetune_iteration)), exist_ok=True
             )
-            # TODO this does not appear to save anything so far
             with open(
                 validation_values_path,
                 "wb",
@@ -429,6 +427,24 @@ class CounterfactualKnowledgeDistillation:
                         )
 
                 np.savez(f, **tracked_values_file)
+
+            with open(
+                os.path.join(
+                    self.base_dir, str(finetune_iteration), "validation_stats.npz"
+                ),
+                "wb",
+            ) as f:
+                validation_stats_file = {}
+                for key in validation_stats.keys():
+                    if isinstance(validation_stats[key], torch.Tensor):
+                        validation_stats_file[key] = validation_stats[key].numpy()
+
+                    elif isinstance(validation_stats[key], int) or isinstance(
+                        validation_stats[key], float
+                    ):
+                        validation_stats_file[key] = np.array(validation_stats[key])
+
+                np.savez(f, **validation_stats_file)
 
         else:
             # TODO think about this again
@@ -732,7 +748,6 @@ class CounterfactualKnowledgeDistillation:
             x_list=x_list,
             y_list=y_list,
             sample_names=sample_names,
-            config=config["data"],
         )
         return dataset_dir
 

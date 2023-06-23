@@ -4,6 +4,7 @@ import os
 import copy
 import numpy as np
 import matplotlib
+import torchvision
 
 from torchvision.transforms import ToTensor
 from PIL import Image
@@ -20,7 +21,7 @@ matplotlib.use("Agg")
 class SequenceDataset(PealDataset):
     """Sequence dataset."""
 
-    def __init__(self, data_dir, mode, config, transform=ToTensor(), task_config=None):
+    def __init__(self, data_dir, mode, config, transform=ToTensor(), task_config=None, **args,):
         """
         Initialize the dataset.
 
@@ -71,7 +72,7 @@ class SequenceDataset(PealDataset):
 class SymbolicDataset(PealDataset):
     """Symbolic dataset."""
 
-    def __init__(self, data_dir, mode, config, transform=ToTensor(), task_config=None):
+    def __init__(self, data_dir, mode, config, transform=ToTensor(), task_config=None, **args,):
         """
         Initialize the dataset.
 
@@ -180,6 +181,8 @@ class ImageDataset(PealDataset):
         y_target_list,
         y_source_list,
         target_confidence_goal,
+        y_target_start_confidence_list,
+        y_target_end_confidence_list,
         base_path,
         start_idx,
         **args,
@@ -191,78 +194,79 @@ class ImageDataset(PealDataset):
         for path in collage_paths:
             Path(path).mkdir(parents=True, exist_ok=True)
 
-        return x_list, collage_paths
-        """heatmap_red = torch.maximum(
-            torch.tensor(0.0),
-            torch.sum(batch_in, dim=1) - torch.sum(counterfactual, dim=1),
-        )
-        heatmap_blue = torch.maximum(
-            torch.tensor(0.0),
-            torch.sum(counterfactual, dim=1) - torch.sum(batch_in, dim=1),
-        )
-        if counterfactual.shape[1] == 3:
-            heatmap_green = torch.abs(counterfactual[:, 0] - batch_in[:, 0])
-            heatmap_green = heatmap_green + torch.abs(
-                counterfactual[:, 1] - batch_in[:, 1]
+        heatmap_list = []
+        """for i in range(len(x_list)):
+            heatmap_red = torch.maximum(
+                torch.tensor(0.0),
+                torch.sum(x_list[i], dim=1) - torch.sum(x_counterfactual_list[i], dim=1),
             )
-            heatmap_green = heatmap_green + torch.abs(
-                counterfactual[:, 2] - batch_in[:, 2]
+            heatmap_blue = torch.maximum(
+                torch.tensor(0.0),
+                torch.sum(x_counterfactual_list[i], dim=1) - torch.sum(x_counterfactual_list[i], dim=1),
             )
-            heatmap_green = heatmap_green - heatmap_red - heatmap_blue
-            counterfactual_rgb = counterfactual
-
-        else:
-            heatmap_green = torch.zeros_like(heatmap_red)
-            batch_in = torch.tile(batch_in, [1, 3, 1, 1])
-            counterfactual_rgb = torch.tile(torch.clone(counterfactual), [1, 3, 1, 1])
-
-        heatmap = torch.stack([heatmap_red, heatmap_green, heatmap_blue], dim=1)
-        if torch.abs(heatmap.sum() - torch.abs(batch_in - counterfactual).sum()) > 0.1:
-            print("Error: Heatmap does not match counterfactual")
-
-        heatmap_high_contrast = torch.clamp(heatmap / heatmap.max(), 0.0, 1.0)
-        current_collage = torch.cat(
-            [batch_in, counterfactual_rgb, heatmap_high_contrast], -1
-        )
-        current_collage = torchvision.utils.make_grid(
-            current_collage, nrow=self.adaptor_config["batch_size"]
-        )
-        plt.gcf()
-        plt.imshow(current_collage.permute(1, 2, 0))
-        title_string = (
-            str(int(ys[batch_idx][sample_idx]))
-            + " -> "
-            + str(targets[batch_idx][sample_idx].item())
-        )
-        title_string += (
-            ", Target: "
-            + str(
-                round(
-                    float(start_target_confidences[batch_idx][sample_idx]),
-                    2,
+            if x_counterfactual_list[i].shape[1] == 3:
+                heatmap_green = torch.abs(x_counterfactual_list[i][0] - x_counterfactual_list[i][0])
+                heatmap_green = heatmap_green + torch.abs(
+                    x_counterfactual_list[i][1] - x_counterfactual_list[i][1]
                 )
+                heatmap_green = heatmap_green + torch.abs(
+                    x_counterfactual_list[i][2] - x_counterfactual_list[i][2]
+                )
+                heatmap_green = heatmap_green - heatmap_red - heatmap_blue
+                counterfactual_rgb = torch.clone(x_counterfactual_list[i])
+                batch_in = torch.clone(x_counterfactual_list[i])
+
+            else:
+                heatmap_green = torch.zeros_like(heatmap_red)
+                batch_in = torch.tile(x_counterfactual_list[i], [3, 1, 1])
+                counterfactual_rgb = torch.tile(torch.clone(x_counterfactual_list[i]), [3, 1, 1])
+
+            heatmap = torch.stack([heatmap_red, heatmap_green, heatmap_blue], dim=1)
+            if torch.abs(heatmap.sum() - torch.abs(x_counterfactual_list[i] - x_counterfactual_list[i]).sum()) > 0.1:
+                print("Error: Heatmap does not match counterfactual")
+
+            heatmap_high_contrast = torch.clamp(heatmap / heatmap.max(), 0.0, 1.0)
+            current_collage = torch.cat(
+                [batch_in, counterfactual_rgb, heatmap_high_contrast], -1
             )
-            + " -> "
-        )
-        title_string += str(
-            round(float(end_target_confidences[batch_idx][sample_idx]), 2)
-        )
-        plt.title(title_string)
-        collage_path = os.path.join(
-            self.base_dir,
-            str(finetune_iteration),
-            "validation_collages",
-            embed_numberstring(str(sample_idx_iteration)) + ".png",
-        )
-        plt.axis("off")
-        plt.savefig(collage_path)
-        img_np = np.array(Image.open(collage_path))[:, 80:-80]
-        img = Image.fromarray(img_np)
-        img.save(collage_path)
-        return result_img_collage, heatmap_high_contrast"""
+            current_collage = torchvision.utils.make_grid(
+                current_collage, nrow=3
+            )
+            plt.gcf()
+            plt.imshow(current_collage.permute(1, 2, 0))
+            title_string = (
+                str(int(y_source_list[i]))
+                + " -> "
+                + str(int(y_target_list[i]))
+            )
+            title_string += (
+                ", Target: "
+                + str(
+                    round(
+                        float(y_target_start_confidence_list[i]),
+                        2,
+                    )
+                )
+                + " -> "
+            )
+            title_string += str(
+                round(float(y_target_end_confidence_list[i]), 2)
+            )
+            plt.title(title_string)
+            collage_path = os.path.join(
+                base_path,
+                embed_numberstring(str(start_idx + i)),
+                "collage.png",
+            )
+            plt.axis("off")
+            plt.savefig(collage_path)
+
+        return heatmap_list, collage_paths"""
+        return x_list, collage_paths
 
     def serialize_dataset(self, output_dir, x_list, y_list, sample_names=None):
-        for class_name in range(self.output_size):
+        # TODO this does not seem very clean
+        for class_name in range(max(2, self.output_size)):
             Path(os.path.join(output_dir, "imgs", str(class_name))).mkdir(
                 parents=True, exist_ok=True
             )
