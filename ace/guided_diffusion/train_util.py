@@ -7,6 +7,7 @@ import copy
 import blobfile as bf
 import torch as th
 import torch.distributed as dist
+import torchvision.utils
 from torch.nn.parallel.distributed import DistributedDataParallel as DDP
 from torch.optim import AdamW
 from tqdm import tqdm
@@ -179,6 +180,9 @@ class TrainLoop:
             batch, cond = next(self.data)
             self.run_step(batch, cond, pbar)
             if self.step % self.save_interval == 0:
+                # save intermediate images as outputs
+                imgs = self.diffusion.p_sample_loop(self.model, batch.shape)
+                torchvision.utils.save_image(imgs, os.path.join(copy.deepcopy(self.model_dir), f"output{(self.step+self.resume_step):06d}.png"))
                 self.save()
                 # Run for a finite amount of time in integration tests.
                 if os.environ.get("DIFFUSION_TRAINING_TEST", "") and self.step > 0:

@@ -280,6 +280,10 @@ class ModelTrainer:
             with open(os.path.join(self.base_dir, "config.yaml"), "w") as file:
                 yaml.dump(self.config, file)
 
+        else:
+            writer = SummaryWriter(os.path.join(self.base_dir, "logs"))
+            self.logger.writer = writer
+
         pbar = tqdm(
             total=self.config["training"]["max_epochs"]
             * (
