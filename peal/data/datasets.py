@@ -21,7 +21,15 @@ matplotlib.use("Agg")
 class SequenceDataset(PealDataset):
     """Sequence dataset."""
 
-    def __init__(self, data_dir, mode, config, transform=ToTensor(), task_config=None, **args,):
+    def __init__(
+        self,
+        data_dir,
+        mode,
+        config,
+        transform=ToTensor(),
+        task_config=None,
+        **args,
+    ):
         """
         Initialize the dataset.
 
@@ -72,7 +80,15 @@ class SequenceDataset(PealDataset):
 class SymbolicDataset(PealDataset):
     """Symbolic dataset."""
 
-    def __init__(self, data_dir, mode, config, transform=ToTensor(), task_config=None, **args,):
+    def __init__(
+        self,
+        data_dir,
+        mode,
+        config,
+        transform=ToTensor(),
+        task_config=None,
+        **kargs,
+    ):
         """
         Initialize the dataset.
 
@@ -100,6 +116,14 @@ class SymbolicDataset(PealDataset):
 
     def __len__(self):
         return len(self.keys)
+
+    @property
+    def output_size(self):
+        if self.task_config is not None:
+            return len(self.task_config["y_selection"])
+
+        else:
+            return self.config["output_size"]
 
     def __getitem__(self, idx):
         name = self.keys[idx]

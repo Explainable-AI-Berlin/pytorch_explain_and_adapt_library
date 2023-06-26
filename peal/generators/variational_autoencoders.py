@@ -32,7 +32,14 @@ class VAE(InvertibleGenerator):
         self.config = config
         if encoder is None:
             if self.config["data"]["input_type"] == "image":
-                self.encoder = Img2LatentEncoder(self.config)
+                self.encoder = Img2LatentEncoder(
+                    neuron_numbers=config["architecture"]["neuron_numbers_encoder"],
+                    blocks_per_layer=config["architecture"]["blocks_per_layer"],
+                    block_type=config["architecture"]["block_type"],
+                    input_channels=config["data"]["input_size"][0],
+                    use_batchnorm=config["architecture"]["use_batchnorm"],
+                    activation=nn.ReLU,
+                )
 
             elif self.config["data"]["input_type"] == "sequence":
                 self.encoder = Sequence2LatentEncoder(
@@ -57,7 +64,14 @@ class VAE(InvertibleGenerator):
 
         if decoder is None:
             if self.config["data"]["input_type"] == "image":
-                self.decoder = Latent2ImgDecoder(self.config)
+                self.decoder = Latent2ImgDecoder(
+                    neuron_numbers=config["architecture"]["neuron_numbers_decoder"],
+                    blocks_per_layer=config["architecture"]["blocks_per_layer"],
+                    block_type=config["architecture"]["block_type"],
+                    output_size=config["data"]["input_size"][0],
+                    use_batchnorm=config["architecture"]["use_batchnorm"],
+                    activation=nn.ReLU,
+                )
 
             elif self.config["data"]["input_type"] == "sequence":
                 self.decoder = Latent2SequenceDecoder(
