@@ -26,7 +26,7 @@
 'rescale_learned_sigmas' : False
 'rescale_timesteps' : False
 'resume_checkpoint' : ''
-'save_interval' : 10000
+'save_interval' : 1000
 'schedule_sampler' : 'uniform'
 'timestep_respacing' : ''
 'use_celeba_HQ' : False
