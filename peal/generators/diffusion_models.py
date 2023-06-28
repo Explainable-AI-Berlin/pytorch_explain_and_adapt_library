@@ -118,6 +118,7 @@ class DDPM(EditCapableGenerator):
         args.classifier = classifier
         main(args=args)
         x_counterfactuals = []
+        x_list = []
         base_path = os.path.join(
             self.config["output_path"],
             "Results",
@@ -156,6 +157,19 @@ class DDPM(EditCapableGenerator):
 
             # x_counterfactuals.append(torchvision.io.read_image(path))
             x_counterfactuals.append(ToTensor()(Image.open(path)))
+            path_correct = os.path.join(
+                self.config["output_path"], "Original", "Correct", f"{embed_numberstring(str(i))}.jpg"
+            )
+            path_incorrect = os.path.join(
+                self.config["output_path"], "Original", "Incorrect", f"{embed_numberstring(str(i))}.jpg"
+            )
+            if os.path.exists(path_correct):
+                path = path_correct
+
+            elif os.path.exists(path_incorrect):
+                path = path_incorrect
+
+            x_list.append(ToTensor()(Image.open(path)))
 
         x_counterfactuals = torch.stack(x_counterfactuals)
         x_counterfactuals = self.dataset.project_from_pytorch_default(x_counterfactuals)
@@ -171,4 +185,5 @@ class DDPM(EditCapableGenerator):
             list(x_counterfactuals),
             list(x_in - x_counterfactuals),
             list(y_target_end_confidence),
+            list(x_list),
         )

@@ -527,17 +527,17 @@ class CounterfactualKnowledgeDistillation:
             with open(os.path.join(self.base_dir, "platform.txt"), "w") as f:
                 f.write(platform.node())
 
+            test_accuracy = calculate_test_accuracy(
+                self.student, self.test_dataloader, self.device
+            )
+            self.adaptor_config["test_accuracies"] = [test_accuracy]
+
             validation_stats = self.retrieve_validation_stats(finetune_iteration=0)
 
             """if self.output_size == 2 and self.use_visualization:
                 self.visualize_progress(
                     [os.path.join(self.base_dir, "visualization.png")]
                 )"""
-
-            test_accuracy = calculate_test_accuracy(
-                self.student, self.test_dataloader, self.device
-            )
-            self.adaptor_config["test_accuracies"] = [test_accuracy]
 
         else:
             with open(os.path.join(self.base_dir, "platform.txt"), "w") as f:

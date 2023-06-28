@@ -90,6 +90,7 @@ def calculate_validation_statistics(
             remove_below_threshold=False,
             pbar=pbar,
             mode="Validation",
+            start_idx=it * dataloader.batch_size,
         )
         for key in set(results.keys()).intersection(set(tracked_values.keys())):
             tracked_values[key].extend(results[key])

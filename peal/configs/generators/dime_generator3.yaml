@@ -1,0 +1,57 @@
+'attention_resolutions' : '32,16,8'
+'batch_size' : 50
+'channel_mult' : ''
+'chunk' : 0
+'class_cond' : False
+#'../notebooks/peal_runs/celeba_poisened100_Smiling_Blond_Hair_classifier/model.cpl'
+'classifier_path' : 'peal_runs/dime3/classifier.cpl'
+'classifier_scales' : '8,10,15'
+'clip_denoised' : True
+'data_dir' : 'peal_runs/dime3/data'
+'base_path' : 'peal_runs/dime3'
+# 'dataset' : 'CelebAMV'
+'diffusion_steps' : 500
+'dropout' : 0.0
+'exp_name' : 'example_name'
+'gpu' : '0'
+'guided_iterations' : 9999999
+'image_size' : 128
+'l1_loss' : 0.05
+'l2_loss' : 0.0
+'l_perc' : 30.0
+'l_perc_layer' : 18
+'learn_sigma' : True
+'merge_and_eval' : False
+# 'model_path' : '../dime2/ddpm-celeba.pt'
+'noise_schedule' : 'linear'
+'num_batches' : 1
+'num_channels' : 128
+'num_chunks' : 1
+'num_head_channels' : -1
+'num_heads' : 4
+'num_heads_upsample' : -1
+'num_res_blocks' : 2
+# 'oracle_path' : '../dime2/oracle.pth'
+'output_path' : 'peal_runs/dime3/outputs'
+'predict_xstart' : False
+# 'query_label' : 31
+'resblock_updown' : True
+'rescale_learned_sigmas' : False
+'rescale_timesteps' : False
+'sampling_scale' : 1.0
+'save_images' : True
+'save_x_t' : True
+'save_z_t' : True
+'seed' : 4
+'start_step' : 20
+'target_label' : -1
+'timestep_respacing' : '200'
+'use_checkpoint' : False
+'use_ddim' : True
+'use_fp16' : False
+'use_kl' : False
+'use_logits' : True
+'use_new_attention_order' : False
+'use_sampling_on_x_t' : True
+'use_scale_shift_norm' : True
+'use_train' : False

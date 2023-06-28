@@ -68,9 +68,9 @@ class SequenceDataset(PealDataset):
 
         return x, y
 
-    def generate_contrastive_collage(batch_in, counterfactual):
+    def generate_contrastive_collage(x_in, counterfactual):
         # TODO
-        return torch.zeros([batch_in.shape[0], 3, 64, 64]), torch.zeros_like(batch_in)
+        return torch.zeros([x_in.shape[0], 3, 64, 64]), torch.zeros_like(x_in)
 
     def serialize_dataset(output_dir, x_list, y_list, sample_names=None):
         # TODO implement this!
@@ -204,6 +204,7 @@ class ImageDataset(PealDataset):
         x_counterfactual_list,
         y_target_list,
         y_source_list,
+        y_list,
         target_confidence_goal,
         y_target_start_confidence_list,
         y_target_end_confidence_list,
@@ -211,47 +212,42 @@ class ImageDataset(PealDataset):
         start_idx,
         **args,
     ):
-        collage_paths = [
-            os.path.join(base_path, embed_numberstring(str(start_idx + i)))
-            for i in range(len(x_list))
-        ]
-        for path in collage_paths:
-            Path(path).mkdir(parents=True, exist_ok=True)
-
+        Path(base_path).mkdir(parents=True, exist_ok=True)
+        collage_paths = []
         heatmap_list = []
-        """for i in range(len(x_list)):
+        for i in range(len(x_list)):
             heatmap_red = torch.maximum(
                 torch.tensor(0.0),
-                torch.sum(x_list[i], dim=1) - torch.sum(x_counterfactual_list[i], dim=1),
+                torch.sum(x_list[i], dim=0) - torch.sum(x_counterfactual_list[i], dim=0),
             )
             heatmap_blue = torch.maximum(
                 torch.tensor(0.0),
-                torch.sum(x_counterfactual_list[i], dim=1) - torch.sum(x_counterfactual_list[i], dim=1),
+                torch.sum(x_counterfactual_list[i], dim=0) - torch.sum(x_list[i], dim=0),
             )
-            if x_counterfactual_list[i].shape[1] == 3:
-                heatmap_green = torch.abs(x_counterfactual_list[i][0] - x_counterfactual_list[i][0])
+            if x_counterfactual_list[i].shape[0] == 3:
+                heatmap_green = torch.abs(x_list[i][0] - x_counterfactual_list[i][0])
                 heatmap_green = heatmap_green + torch.abs(
-                    x_counterfactual_list[i][1] - x_counterfactual_list[i][1]
+                    x_list[i][1] - x_counterfactual_list[i][1]
                 )
                 heatmap_green = heatmap_green + torch.abs(
-                    x_counterfactual_list[i][2] - x_counterfactual_list[i][2]
+                    x_list[i][2] - x_counterfactual_list[i][2]
                 )
                 heatmap_green = heatmap_green - heatmap_red - heatmap_blue
+                x_in = torch.clone(x_list[i])
                 counterfactual_rgb = torch.clone(x_counterfactual_list[i])
-                batch_in = torch.clone(x_counterfactual_list[i])
 
             else:
                 heatmap_green = torch.zeros_like(heatmap_red)
-                batch_in = torch.tile(x_counterfactual_list[i], [3, 1, 1])
+                x_in = torch.tile(x_list[i], [3, 1, 1])
                 counterfactual_rgb = torch.tile(torch.clone(x_counterfactual_list[i]), [3, 1, 1])
 
-            heatmap = torch.stack([heatmap_red, heatmap_green, heatmap_blue], dim=1)
-            if torch.abs(heatmap.sum() - torch.abs(x_counterfactual_list[i] - x_counterfactual_list[i]).sum()) > 0.1:
-                print("Error: Heatmap does not match counterfactual")
+            heatmap = torch.stack([heatmap_red, heatmap_green, heatmap_blue], dim=0)
+            if torch.abs(heatmap.sum() - torch.abs(x_list[i] - x_counterfactual_list[i]).sum()) > 0.1:
+                print("Error: Heatmap does not add up to absolute counterfactual difference.")
 
             heatmap_high_contrast = torch.clamp(heatmap / heatmap.max(), 0.0, 1.0)
             current_collage = torch.cat(
-                [batch_in, counterfactual_rgb, heatmap_high_contrast], -1
+                [x_in, counterfactual_rgb, heatmap_high_contrast], -1
             )
             current_collage = torchvision.utils.make_grid(
                 current_collage, nrow=3
@@ -259,6 +255,7 @@ class ImageDataset(PealDataset):
             plt.gcf()
             plt.imshow(current_collage.permute(1, 2, 0))
             title_string = (
+                str(int(y_list[i])) + " -> " +
                 str(int(y_source_list[i]))
                 + " -> "
                 + str(int(y_target_list[i]))
@@ -279,14 +276,14 @@ class ImageDataset(PealDataset):
             plt.title(title_string)
             collage_path = os.path.join(
                 base_path,
-                embed_numberstring(str(start_idx + i)),
-                "collage.png",
+                embed_numberstring(str(start_idx + i)) + "_collage.png",
             )
             plt.axis("off")
             plt.savefig(collage_path)
+            collage_paths.append(collage_path)
+            heatmap_list.append(heatmap)
 
-        return heatmap_list, collage_paths"""
-        return x_list, collage_paths
+        return heatmap_list, collage_paths
 
     def serialize_dataset(self, output_dir, x_list, y_list, sample_names=None):
         # TODO this does not seem very clean

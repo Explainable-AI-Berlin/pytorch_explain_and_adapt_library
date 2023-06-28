@@ -219,6 +219,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 batch["x_counterfactual_list"],
                 batch["z_difference_list"],
                 batch["y_target_end_confidence_list"],
+                batch["x_list"]
             ) = self.generator.edit(
                 x_in=batch["x_list"],
                 target_confidence_goal=target_confidence_goal,
