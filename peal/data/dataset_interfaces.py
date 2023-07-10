@@ -1,6 +1,6 @@
 import torch
 
-
+from peal.generators.interfaces import Generator
 class PealDataset(torch.utils.data.Dataset):
     """
     This is the base class for all datasets in PEAL. It is a wrapper around
@@ -66,3 +66,12 @@ class PealDataset(torch.utils.data.Dataset):
             torch.tensor: The data sample in the processed format
         """
         return x
+
+    def track_generator_performance(self, generator: Generator):
+        """
+        This function tracks the performance of the generator
+
+        Args:
+            generator (Generator): The generator
+        """
+        return {}
