@@ -97,7 +97,8 @@ def create_model_and_diffusion(
     use_fp16,
     use_new_attention_order,
     num_classes=1000,
-    multiclass=False
+    multiclass=False,
+    **kwargs
 ):
     model = create_model(
         image_size,

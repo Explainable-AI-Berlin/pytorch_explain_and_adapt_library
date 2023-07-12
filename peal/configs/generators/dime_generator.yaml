@@ -43,7 +43,7 @@
 'save_x_t' : True
 'save_z_t' : True
 'seed' : 4
-'start_step' : 60
+'start_step' : 1 #60
 'target_label' : -1
 'timestep_respacing' : '200'
 'use_checkpoint' : False

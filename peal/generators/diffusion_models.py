@@ -14,25 +14,40 @@ from peal.generators.interfaces import EditCapableGenerator
 from peal.data.datasets import Image2ClassDataset
 from peal.utils import load_yaml_config, embed_numberstring
 from dime2.main import main
-
 from ace.guided_diffusion import dist_util, logger
 from ace.guided_diffusion.resample import create_named_schedule_sampler
 from ace.guided_diffusion.script_util import (
-    model_and_diffusion_defaults,
     create_model_and_diffusion,
-    args_to_dict,
 )
 from ace.guided_diffusion.train_util import TrainLoop
 from peal.data.dataset_factory import get_datasets
 from peal.data.dataloaders import get_dataloader
+from dime2.core.dist_util import (
+    load_state_dict,
+)
 
 
-class DDPM(EditCapableGenerator):
-    def __init__(self, config, dataset, model_dir):
+class DimeDDPMAdaptor(EditCapableGenerator):
+    def __init__(self, config, dataset, model_dir, device):
         super().__init__()
         self.config = load_yaml_config(config)
         self.dataset = dataset
+        #self.config["image_size"] = self.dataset.config["input_size"][-1]
+        # TODO why???
+        self.config["image_size"] = 256
         self.model_dir = model_dir
+        self.model, self.diffusion = create_model_and_diffusion(
+           **self.config
+        )
+        self.model.to(device)
+        self.model_path = os.path.join(self.model_dir, "model.pt")
+        if os.path.exists(self.model_path):
+            self.model.load_state_dict(
+                load_state_dict(self.model_path, map_location=device)
+            )
+
+    def sample_x(self, batch_size=1):
+        return self.diffusion.p_sample_loop(self.model, [batch_size] + self.dataset.config["input_size"])
 
     def train_model(
         self, dataset_train, training_config="$PEAL/configs/training/train_ddpm.yaml"
@@ -44,15 +59,8 @@ class DDPM(EditCapableGenerator):
         dist_util.setup_dist(args.gpus)
         logger.configure(dir=self.model_dir)
 
-        logger.log("creating model and diffusion...")
-        model, diffusion = create_model_and_diffusion(
-            num_classes=40,
-            multiclass=True,
-            **args_to_dict(args, model_and_diffusion_defaults().keys()),
-        )
-        model.to(dist_util.dev())
         schedule_sampler = create_named_schedule_sampler(
-            args.schedule_sampler, diffusion
+            args.schedule_sampler, self.diffusion
         )
 
         logger.log("creating data loader...")
@@ -69,8 +77,8 @@ class DDPM(EditCapableGenerator):
 
         logger.log("training...")
         TrainLoop(
-            model=model,
-            diffusion=diffusion,
+            model=self.model,
+            diffusion=self.diffusion,
             data=data,
             batch_size=args.batch_size,
             microbatch=args.microbatch,
@@ -116,6 +124,8 @@ class DDPM(EditCapableGenerator):
         )
         args.model_path = os.path.join(self.model_dir, "model.pt")
         args.classifier = classifier
+        args.diffusion = self.diffusion
+        args.model = self.model
         main(args=args)
         x_counterfactuals = []
         x_list = []

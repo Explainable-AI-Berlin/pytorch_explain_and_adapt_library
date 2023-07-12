@@ -3,6 +3,7 @@ import torch
 import copy
 import yaml
 import shutil
+import torchvision
 import numpy as np
 import platform
 import sys
@@ -24,6 +25,7 @@ from peal.explainers.counterfactual_explainer import CounterfactualExplainer
 from peal.data.dataset_interfaces import PealDataset
 from peal.visualization.model_comparison import create_comparison
 from peal.teachers.segmentation_mask_teacher import SegmentationMaskTeacher
+from peal.data.datasets import ImageDataset
 from peal.teachers.teacher_factory import get_teacher
 from peal.teachers.teacher_interface import TeacherInterface
 from peal.generators.interfaces import InvertibleGenerator
@@ -194,7 +196,9 @@ class CounterfactualKnowledgeDistillation:
         self.data_config["data"]["confounder_probability"] = None
         self.data_config["data"]["known_confounder"] = False
         self.data_config["data"]["output_type"] = "singleclass"
-        self.data_config["data"]["output_size"] = self.train_dataloader.dataset.output_size
+        self.data_config["data"][
+            "output_size"
+        ] = self.train_dataloader.dataset.output_size
         self.data_config["data"]["delimiter"] = ","
         self.data_config["data"]["num_samples"] = self.adaptor_config[
             "max_train_samples"
@@ -521,6 +525,24 @@ class CounterfactualKnowledgeDistillation:
             print("Create base_dir in: " + str(self.base_dir))
             shutil.rmtree(self.base_dir, ignore_errors=True)
             Path(self.base_dir).mkdir(parents=True, exist_ok=True)
+            if isinstance(self.val_dataloader.dataset, ImageDataset):
+                generator_sample = self.generator.sample_x(
+                    batch_size=self.adaptor_config["batch_size"]
+                )
+                torchvision.utils.save_image(
+                    generator_sample,
+                    os.path.join(self.base_dir, "generator_sample.png"),
+                    normalize=True,
+                )
+
+            generator_performance = (
+                self.val_dataloader.dataset.track_generator_performance(
+                    self.generator, self.adaptor_config["batch_size"]
+                )
+            )
+            print("Generator performance: " + str(generator_performance))
+            self.adaptor_config["generator_performance"] = generator_performance
+
             with open(os.path.join(self.base_dir, "config.yaml"), "w") as file:
                 yaml.dump(self.adaptor_config, file)
 

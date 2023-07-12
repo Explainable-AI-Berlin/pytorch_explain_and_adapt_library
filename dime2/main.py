@@ -342,12 +342,18 @@ def main(args=None):
     # load models
 
     print("Loading Model and diffusion model")
-    model, diffusion = create_model_and_diffusion(
-        **args_to_dict(args, model_and_diffusion_defaults().keys())
-    )
-    model.load_state_dict(
-        load_state_dict(args.model_path, map_location="cpu")
-    )
+    if not hasattr(args, "model"):
+        model, diffusion = create_model_and_diffusion(
+            **args_to_dict(args, model_and_diffusion_defaults().keys())
+        )
+        model.load_state_dict(
+            load_state_dict(args.model_path, map_location="cpu")
+        )
+
+    else:
+        model = args.model
+        diffusion = args.diffusion
+
     model.to(dev())
     if args.use_fp16:
         model.convert_to_fp16()
