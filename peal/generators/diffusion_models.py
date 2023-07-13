@@ -13,7 +13,8 @@ from torchvision.transforms import ToTensor
 from peal.generators.interfaces import EditCapableGenerator
 from peal.data.datasets import Image2ClassDataset
 from peal.utils import load_yaml_config, embed_numberstring
-from dime2.main import main
+from dime2.main import main as dime_main
+from ace.main import main as ace_main
 from ace.guided_diffusion import dist_util, logger
 from ace.guided_diffusion.resample import create_named_schedule_sampler
 from ace.guided_diffusion.script_util import (
@@ -32,9 +33,9 @@ class DimeDDPMAdaptor(EditCapableGenerator):
         super().__init__()
         self.config = load_yaml_config(config)
         self.dataset = dataset
-        #self.config["image_size"] = self.dataset.config["input_size"][-1]
-        # TODO why???
-        self.config["image_size"] = 256
+        if not "image_size" in self.config.keys():
+            self.config["image_size"] = self.dataset.config["input_size"][-1]
+
         self.model_dir = model_dir
         self.model, self.diffusion = create_model_and_diffusion(
            **self.config
@@ -126,7 +127,12 @@ class DimeDDPMAdaptor(EditCapableGenerator):
         args.classifier = classifier
         args.diffusion = self.diffusion
         args.model = self.model
-        main(args=args)
+        if self.config["method"] == "ace":
+            ace_main(args=args)
+
+        elif self.config["method"] == "dime":
+            dime_main(args=args)
+
         x_counterfactuals = []
         x_list = []
         base_path = os.path.join(

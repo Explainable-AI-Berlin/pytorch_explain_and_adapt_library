@@ -337,7 +337,7 @@ class ImageDataset(PealDataset):
 
         generated_images = generated_images[:10]
         self.fid.update(torch.tensor(255 * generated_images, dtype=torch.uint8).cpu(), real=False)
-        fid_score = self.fid.compute()
+        fid_score = float(self.fid.compute())
         return {'fid': fid_score}
 
 

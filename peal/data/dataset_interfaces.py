@@ -67,7 +67,7 @@ class PealDataset(torch.utils.data.Dataset):
         """
         return x
 
-    def track_generator_performance(self, generator: Generator):
+    def track_generator_performance(self, generator: Generator, batch_size=1):
         """
         This function tracks the performance of the generator
 

@@ -117,9 +117,9 @@ class CounterfactualKnowledgeDistillation:
             self.adaptor_config, datasource, output_size
         )
 
-        set_adaptive_batch_size(
+        '''set_adaptive_batch_size(
             self.adaptor_config, gigabyte_vram, self.adaptor_config["max_train_samples"]
-        )
+        )'''
 
         #
         self.enable_hints = bool(teacher == "SegmentationMask")

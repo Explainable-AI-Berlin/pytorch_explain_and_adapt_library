@@ -43,7 +43,7 @@
 'save_x_t' : True
 'save_z_t' : True
 'seed' : 4
-'start_step' : 15 #60
+'start_step' : 2 #60
 'target_label' : -1
 'timestep_respacing' : '200'
 'use_checkpoint' : False
@@ -55,4 +55,4 @@
 'use_sampling_on_x_t' : True
 'use_scale_shift_norm' : True
 'use_train' : False
-'method' : 'dime'
+'method' : 'ace'

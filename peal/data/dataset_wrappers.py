@@ -1,6 +1,7 @@
 import torch
 
 from peal.data.dataset_interfaces import PealDataset
+from peal.generators.interfaces import Generator
 
 
 class GlowDatasetWrapper(PealDataset):
@@ -25,6 +26,9 @@ class GlowDatasetWrapper(PealDataset):
         This function maps processed image back to human visible image
         """
         return x + 0.5
+
+    def track_generator_performance(self, generator: Generator, batch_size=1):
+        return self.base_dataset.track_generator_performance(generator, batch_size)
 
 
 class VAEDatasetWrapper(PealDataset):

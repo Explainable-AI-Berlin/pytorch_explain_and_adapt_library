@@ -15,6 +15,7 @@ from peal.utils import orthogonal_initialization, move_to_device, load_yaml_conf
 from peal.training.loggers import Logger
 from peal.training.criterions import get_criterions
 from peal.data.dataloaders import create_dataloaders_from_datasource
+from peal.generators.interfaces import Generator
 
 
 def calculate_test_accuracy(model, test_dataloader, device):
@@ -300,6 +301,19 @@ class ModelTrainer:
             #
             self.model.train()
             train_loss, train_accuracy = self.run_epoch(self.train_dataloader, pbar=pbar)
+            if isinstance(self.model, Generator):
+                train_generator_performance = (
+                    self.train_dataloader.dataset.track_generator_performance(
+                        self.model, self.train_dataloader.batch_size
+                    )
+                )
+                print(train_generator_performance)
+                for key in train_generator_performance.keys():
+                    self.logger.writer.add_scalar(
+                        "epoch_train_" + key,
+                        train_generator_performance[key],
+                        self.config["training"]["epoch"],
+                    )
             #
             self.model.eval()
             val_accuracy = 0.0
@@ -313,6 +327,19 @@ class ModelTrainer:
             self.logger.writer.add_scalar(
                 "val_accuracy", val_accuracy, self.config["training"]["epoch"]
             )
+            if isinstance(self.model, Generator):
+                val_generator_performance = (
+                    self.val_dataloaders[0].dataset.track_generator_performance(
+                        self.model, self.val_dataloaders[0].batch_size
+                    )
+                )
+                print(val_generator_performance)
+                for key in val_generator_performance.keys():
+                    self.logger.writer.add_scalar(
+                        "epoch_val_" + key,
+                        val_generator_performance[key],
+                        self.config["training"]["epoch"],
+                    )
             #
             torch.save(
                 self.model.state_dict(),
