@@ -114,7 +114,6 @@ def get_datasets(config, base_dir, task_config=None, return_dict=False):
         os.path.join(get_project_resource_dir(), "data", "custom_datasets"),
     )
     dataset_class_dict = {dataset_class.__name__: dataset_class for dataset_class in dataset_class_list}
-    import pdb; pdb.set_trace()
     if config["dataset_class"] in dataset_class_dict.keys():
         dataset = dataset_class_dict[config["dataset_class"]]
 
