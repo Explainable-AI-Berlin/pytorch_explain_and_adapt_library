@@ -1,9 +1,13 @@
 import torch
+import inspect
+import pkgutil
+import importlib
+import os
 
 from torchvision import transforms
 from torchvision.transforms import ToTensor
 
-from peal.utils import load_yaml_config
+from peal.utils import load_yaml_config, get_project_resource_dir
 from peal.data.transformations import (
     CircularCut,
     Padding,
@@ -18,6 +22,34 @@ from peal.data.datasets import (
     Image2ClassDataset,
     SymbolicDataset,
 )
+from peal.data.dataset_interfaces import PealDataset
+
+
+def find_subclasses(base_class, directory):
+    subclasses = []
+
+    def check_module(module_name):
+        try:
+            module = importlib.import_module(module_name)
+            for name, obj in inspect.getmembers(module):
+                if inspect.isclass(obj) and issubclass(obj, base_class):
+                    subclasses.append(obj)
+        except Exception:
+            pass
+
+    for dirpath, dirnames, filenames in os.walk(directory):
+        for filename in filenames:
+            if filename.endswith(".py"):
+                module_name = os.path.splitext(os.path.join(dirpath, filename))[
+                    0
+                ].replace("/", ".")
+                check_module(module_name)
+
+    for importer, package_name, _ in pkgutil.iter_modules():
+        if package_name.startswith(directory):
+            check_module(package_name)
+
+    return subclasses
 
 
 def get_datasets(config, base_dir, task_config=None, return_dict=False):
@@ -77,7 +109,16 @@ def get_datasets(config, base_dir, task_config=None, return_dict=False):
     transform_train = transforms.Compose(transform_list_train)
     transform_test = transforms.Compose(transform_list_test)
 
-    if config["input_type"] == "image" and config["output_type"] == "singleclass":
+    dataset_class_list = find_subclasses(
+        PealDataset,
+        os.path.join(get_project_resource_dir(), "data", "custom_datasets"),
+    )
+    dataset_class_dict = {dataset_class.__name__: dataset_class for dataset_class in dataset_class_list}
+    import pdb; pdb.set_trace()
+    if config["dataset_class"] in dataset_class_dict.keys():
+        dataset = dataset_class_dict[config["dataset_class"]]
+
+    elif config["input_type"] == "image" and config["output_type"] == "singleclass":
         dataset = Image2ClassDataset
 
     elif config["input_type"] == "image" and config["output_type"] in [
