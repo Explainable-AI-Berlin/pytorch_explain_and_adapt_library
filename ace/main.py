@@ -15,6 +15,7 @@ from os import path as osp
 from multiprocessing import Pool
 
 import torch
+import sys
 
 from torch.utils import data
 from torch.nn import functional as F
@@ -22,9 +23,13 @@ from torch.nn import functional as F
 from torchvision import transforms
 from torchvision import datasets
 
+module_path = os.path.abspath(os.path.join(".."))
+if module_path not in sys.path:
+    sys.path.append(module_path)
+
 # Diffusion Model imports
-from guided_diffusion import dist_util
-from guided_diffusion.script_util import (
+from ace.guided_diffusion import dist_util
+from ace.guided_diffusion.script_util import (
     model_and_diffusion_defaults,
     diffusion_defaults,
     create_model_and_diffusion,
@@ -33,7 +38,7 @@ from guided_diffusion.script_util import (
     args_to_dict,
     add_dict_to_argparser,
 )
-from guided_diffusion.sample_utils import (
+from ace.guided_diffusion.sample_utils import (
     get_DiME_iterative_sampling,
     clean_class_cond_fn,
     dist_cond_fn,
@@ -42,20 +47,25 @@ from guided_diffusion.sample_utils import (
     load_from_DDP_model,
     ChunkedDataset,
 )
-from guided_diffusion.gaussian_diffusion import _extract_into_tensor
-from guided_diffusion.image_datasets import (
+from ace.guided_diffusion.gaussian_diffusion import _extract_into_tensor
+from ace.guided_diffusion.image_datasets import (
     get_dataset,
     BINARYDATASET,
     MULTICLASSDATASETS,
 )
+from dime2.core.dist_util import (
+    load_state_dict,
+)
 
 # core imports
-from core.utils import print_dict, merge_all_chunks, generate_mask
-from core.metrics import accuracy, get_prediction
-from core.attacks_and_models import JointClassifierDDPM, get_attack
+from ace.core.utils import print_dict, merge_all_chunks, generate_mask
+from ace.core.metrics import accuracy, get_prediction
+from ace.core.attacks_and_models import JointClassifierDDPM, get_attack
 
 # model imports
-from models import get_classifier
+from ace.models import get_classifier
+
+from peal.data.dataset_interfaces import PealDataset
 
 import matplotlib
 
@@ -151,12 +161,17 @@ def filter_fn(
     target,
     inpaint,
     dilation,
+    ispeal=False,
 ):
     indices = list(range(steps))[::-1]
 
     # Generate pre-explanation
     with torch.enable_grad():
-        pe = attack.perturb(x, target)
+        if ispeal:
+            pe = attack.perturb(x, torch.nn.functional.one_hot(torch.tensor(target, dtype=torch.long), num_classes=2))
+
+        else:
+            pe = attack.perturb(x, target)
 
     # generates masks
     mask, dil_mask = generate_mask(x, pe, dilation)
@@ -203,8 +218,9 @@ def filter_fn(
 # =======================================================
 
 
-def main():
-    args = create_args()
+def main(args=None):
+    if args is None:
+        args = create_args()
 
     if args.merge_chunks:
         merge_all_chunks(args.chunks, args.output_path, args.exp_name)
@@ -229,13 +245,18 @@ def main():
     # ========================================
     # Load Dataset
     # ========================================
+    if isinstance(args.dataset, PealDataset):
+        dataset = args.dataset
 
-    dataset = get_dataset(args)
+    else:
+        dataset = get_dataset(args)
 
     target = -1
     if args.label_target != -1:
         target = (
-            1 - args.label_target if args.dataset in BINARYDATASET else args.label_query
+            1 - args.label_target
+            if args.dataset in BINARYDATASET or isinstance(args.dataset, PealDataset)
+            else args.label_query
         )
 
     dataset = SlowSingleLabel(target, dataset, args.num_samples)
@@ -258,19 +279,36 @@ def main():
 
     print("Loading Model and diffusion model")
     # respaced diffusion has the respaced strategy
-    model, respaced_diffusion = create_model_and_diffusion(
-        **args_to_dict(args, model_and_diffusion_defaults().keys())
-    )
-    model.load_state_dict(
-        dist_util.load_state_dict(args.model_path, map_location="cpu")
-    )
+    if not hasattr(args, "model"):
+        model, respaced_diffusion = create_model_and_diffusion(
+            **args_to_dict(args, model_and_diffusion_defaults().keys())
+        )
+        model.load_state_dict(load_state_dict(args.model_path, map_location="cpu"))
+
+    else:
+        model = args.model
+        respaced_diffusion = args.diffusion
+
     model.to(dist_util.dev())
     if args.use_fp16:
         model.convert_to_fp16()
     model.eval()
 
     print("Loading Classifier")
-    classifier = get_classifier(args)
+    if hasattr(args, "classifier"):
+        classifier = args.classifier
+
+    elif args.classifier_path[-4:] == ".cpl":
+        module_path = os.path.abspath(os.path.join(".."))
+        if module_path not in sys.path:
+            sys.path.append(module_path)
+        classifier = torch.load(args.classifier_path, map_location=dist_util.dev()).to(
+            dist_util.dev()
+        )
+
+    elif args.classifier_path[-4:] == ".pth":
+        classifier = get_classifier(args)
+
     classifier.to(dist_util.dev()).eval()
 
     if args.attack_joint and not (
@@ -290,6 +328,7 @@ def main():
     # ========================================
 
     def get_dist_fn():
+        any_loss = False
         if args.dist_l2 != 0.0:
             l2_loss = (
                 lambda x, x_adv: args.dist_l2
@@ -326,7 +365,8 @@ def main():
         "eps": args.attack_epsilon / 255,
         "nb_iter": args.attack_iterations,
         "dist_schedule": args.dist_schedule,
-        "binary": args.dataset in BINARYDATASET,
+        "binary": args.dataset in BINARYDATASET
+        or isinstance(args.dataset, PealDataset),
         "step": args.attack_step / 255,
     }
 
@@ -395,22 +435,34 @@ def main():
         img = img.to(dist_util.dev())
         lab = lab.to(
             dist_util.dev(),
-            dtype=torch.float if args.dataset in BINARYDATASET else torch.long,
+            dtype=torch.float
+            if args.dataset in BINARYDATASET or isinstance(args.dataset, PealDataset)
+            else torch.long,
         )
 
         # Initial Classification, no noise included
-        c_log, c_pred = get_prediction(classifier, img, args.dataset in BINARYDATASET)
+        c_log, c_pred = get_prediction(
+            classifier,
+            img,
+            args.dataset in BINARYDATASET or isinstance(args.dataset, PealDataset),
+            ispeal=isinstance(args.dataset, PealDataset),
+        )
 
         # construct target
         target = None
         if args.label_target != -1:
             target = torch.ones_like(lab) * args.label_target
             target[lab != c_pred] = lab[lab != c_pred]
-        elif args.dataset in BINARYDATASET:
+        elif args.dataset in BINARYDATASET or isinstance(args.dataset, PealDataset):
             target = 1 - c_pred
             target[lab != c_pred] = lab[lab != c_pred]
 
-        acc1, acc5 = accuracy(c_log, lab, binary=args.dataset in BINARYDATASET)
+        acc1, acc5 = accuracy(
+            c_log,
+            lab,
+            binary=args.dataset in BINARYDATASET
+            or isinstance(args.dataset, PealDataset),
+        )
         stats["clean acc"] += acc1.sum().item()
         stats["clean acc5"] += acc5.sum().item()
         stats["n"] += lab.size(0)
@@ -429,6 +481,7 @@ def main():
             target=target,
             inpaint=args.sampling_inpaint,
             dilation=args.sampling_dilation,
+            ispeal=isinstance(args.dataset, PealDataset),
         )
         noise = (noise * 255).to(dtype=torch.uint8).detach().cpu()
         pe_mask = (pe_mask * 255).to(dtype=torch.uint8).detach().cpu()
@@ -442,13 +495,22 @@ def main():
                 ["pre-explanation", "explanation"], [pe, ce], [pe_mask, ce_mask]
             ):
                 data_log, data_pred = get_prediction(
-                    classifier, data_img, binary=args.dataset in BINARYDATASET
+                    classifier,
+                    data_img,
+                    binary=args.dataset in BINARYDATASET
+                    or isinstance(args.dataset, PealDataset),
                 )
                 cf, cf5 = accuracy(
-                    data_log, target, binary=args.dataset in BINARYDATASET
+                    data_log,
+                    target,
+                    binary=args.dataset in BINARYDATASET
+                    or isinstance(args.dataset, PealDataset),
                 )
                 un, un5 = accuracy(
-                    data_log, c_pred, binary=args.dataset in BINARYDATASET
+                    data_log,
+                    c_pred,
+                    binary=args.dataset in BINARYDATASET
+                    or isinstance(args.dataset, PealDataset),
                 )
                 stats[data_type]["cf"] += cf.sum().item()
                 stats[data_type]["cf5"] += cf5.sum().item()

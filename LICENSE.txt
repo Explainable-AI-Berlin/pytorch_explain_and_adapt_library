@@ -1,0 +1,40 @@
+CFKD LIBRARY NON-COMMERCIAL USE LICENSE
+
+Version 1.0, [Date]
+
+IMPORTANT: READ CAREFULLY BEFORE USING THE CFKD LIBRARY.
+
+This Non-Commercial Use License ("License") is a legal agreement between you (either an individual or an entity) and [Your Name] ("Licensor") for the use of the cfkd library ("cfkd").
+
+By using cfkd, you agree to be bound by the terms and conditions of this License. If you do not agree to the terms and conditions of this License, you must not use cfkd.
+
+1. License Grant:
+   Subject to the terms and conditions of this License, Licensor grants you a non-exclusive, non-transferable, revocable license to use cfkd solely for non-commercial purposes.
+
+2. Restrictions:
+   You may not:
+   a) Use cfkd for any commercial purpose, including but not limited to selling, licensing, or distributing cfkd or any derivative works based on cfkd.
+   b) Modify, adapt, translate, reverse engineer, decompile, disassemble, or create derivative works based on cfkd.
+   c) Remove, alter, or obscure any proprietary notices, labels, or trademarks on cfkd.
+
+3. Intellectual Property:
+   All title, ownership rights, and intellectual property rights in cfkd shall remain with Licensor. cfkd is protected by copyright and other intellectual property laws.
+
+4. No Warranty:
+   cfkd is provided "as is" without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, and non-infringement. Licensor does not warrant that cfkd will be error-free or meet your specific requirements.
+
+5. Limitation of Liability:
+   In no event shall Licensor be liable for any damages, including but not limited to direct, indirect, incidental, special, or consequential damages arising out of or in connection with the use or performance of cfkd.
+
+6. Termination:
+   This License is effective until terminated. Licensor may terminate this License at any time if you fail to comply with any term of this License. Upon termination, you must cease all use of cfkd and destroy all copies of cfkd in your possession or control.
+
+7. Governing Law:
+   This License shall be governed by and construed in accordance with the laws of [Your Jurisdiction]. Any legal action or proceeding arising out of or in connection with this License shall be brought solely in the courts of [Your Jurisdiction].
+
+8. Entire Agreement:
+   This License constitutes the entire agreement between you and Licensor concerning the subject matter hereof and supersedes all prior or contemporaneous oral or written communications, representations, or agreements.
+
+By using cfkd, you acknowledge that you have read and understood this License and agree to be bound by its terms and conditions.
+
+For inquiries regarding commercial licensing or any other use beyond the scope of this License, please contact [Your Contact Information].

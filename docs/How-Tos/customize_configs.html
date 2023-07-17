@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>cfkd - Configuring with YAML and Pydantic</title>
+</head>
+<body>
+  <h1>cfkd - Configuring with YAML and Pydantic</h1>
+
+  <h2>Introduction</h2>
+  <p>In cfkd, you can use YAML configuration files in combination with Pydantic to define and customize the behavior of your application or library. Pydantic allows you to define configuration schemas, validate input, and provide default values for the configuration options.</p>
+
+  <h2>Configuring with YAML and Pydantic</h2>
+  <p>To configure cfkd using YAML and Pydantic, follow these steps:</p>
+
+  <ol>
+    <li>Create a YAML configuration file, for example, `config.yml`, that defines the various configuration options for cfkd. Here's an example:</li>
+  </ol>
+
+  <pre><code># config.yml
+
+# General configuration
+name: "cfkd Application"
+version: 1.0
+
+# Dataset configuration
+dataset:
+  path: "data/dataset.csv"
+  delimiter: ","
+  shuffle: true
+
+# Model configuration
+model:
+  architecture: "resnet50"
+  num_classes: 10
+  learning_rate: 0.001</code></pre>
+
+  <ol start="2">
+    <li>Create a Pydantic model that corresponds to the structure of your YAML configuration file. The Pydantic model will handle the validation, type conversion, and default values. Here's an example:</li>
+  </ol>
+
+  <pre><code>from pydantic import BaseModel
+
+class AppConfig(BaseModel):
+    name: str
+    version: float
+
+class DatasetConfig(BaseModel):
+    path: str
+    delimiter: str = ","
+    shuffle: bool = False
+
+class ModelConfig(BaseModel):
+    architecture: str
+    num_classes: int
+    learning_rate: float
+
+class CFKDConfig(BaseModel):
+    app: AppConfig
+    dataset: DatasetConfig
+    model: ModelConfig</code></pre>
+
+  <ol start="3">
+    <li>Load and parse the YAML configuration file using Pydantic. Here's an example:</li>
+  </ol>
+
+  <pre><code>import yaml
+
+# Load and parse the YAML configuration file
+with open('config.yml') as f:
+    config_data = yaml.safe_load(f)
+
+# Create an instance of the CFKDConfig model
+config = CFKDConfig(**config_data)</code></pre>
+
+  <h2>Accessing Configuration Options</h2>
+  <p>Once the configuration file is parsed and validated, you can access the configuration options as attributes of the `config` object. Here's an example:</p>
+
+  <pre><code>print(config.app.name)
+print(config.dataset.path)
+print(config.model.learning_rate)</code></pre>
+
+  <p>In the above example, the configuration options `name`, `path`, and `learning_rate` are accessed using dot notation.</p>
+
+  <h2>Conclusion</h2>
+  <p>Using YAML configuration files in conjunction with Pydantic provides a convenient and structured way to configure and customize the behavior of cfkd. With Pydantic's validation and default value handling, you can ensure that your configuration options are properly defined and consistent.</p>
+
+  <p>For more information and advanced usage of configuring with YAML and Pydantic, refer to the official cfkd documentation.</p>
+
+  <h2>Support</h2>
+  <p>If you have any questions or need assistance with configuring cfkd using YAML and Pydantic, feel free to reach out to our support team at support@cfkd-library.com.</p>
+</body>
+</html>

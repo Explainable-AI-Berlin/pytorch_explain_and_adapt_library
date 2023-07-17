@@ -22,8 +22,11 @@ def accuracy(logits, label, topk=(1, 5), binary=False):
 
 
 @torch.no_grad()
-def get_prediction(classifier, img, binary):
+def get_prediction(classifier, img, binary, ispeal=False):
     log = classifier(img)
+    if ispeal:
+        log = log[:, 1] - log[:, 0]
+
     if binary:
         pred = (log > 0).float()
     else:

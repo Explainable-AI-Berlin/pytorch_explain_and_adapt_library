@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>cfkd - Custom Dataset Implementation</title>
+</head>
+<body>
+  <h1>cfkd - Custom Dataset Implementation</h1>
+
+  <h2>Introduction</h2>
+  <p>In cfkd, you have the ability to create custom datasets to handle your specific data sources and formats. Custom datasets allow you to encapsulate your data and provide a consistent interface for accessing and manipulating it.</p>
+
+  <h2>Implementing a Custom Dataset</h2>
+  <p>To implement a custom dataset in cfkd, follow these steps:</p>
+
+  <ol>
+    <li>Create a Python class that inherits from the base `cfkd.Dataset` class.</li>
+    <li>In your custom dataset class, implement the following methods:
+      <ul>
+        <li>`__init__(self, ...)` - Initialize your dataset, load data, and set up any necessary variables.</li>
+        <li>`__len__(self)` - Return the total number of samples in your dataset.</li>
+        <li>`__getitem__(self, index)` - Return a specific sample from the dataset based on the given index.</li>
+      </ul>
+    </li>
+    <li>You can also implement additional methods, such as `__repr__()` for a human-readable representation of the dataset or any other methods specific to your needs.</li>
+  </ol>
+
+  <h2>Example</h2>
+  <p>Here's an example implementation of a custom dataset class that represents a collection of images:</p>
+
+  <pre><code>import cfkd
+
+class ImageDataset(cfkd.Dataset):
+    def __init__(self, image_files, transform=None):
+        self.image_files = image_files
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.image_files)
+
+    def __getitem__(self, index):
+        image_path = self.image_files[index]
+        image = load_image(image_path)  # Custom function to load image
+        if self.transform:
+            image = self.transform(image)
+        return image
+
+# Usage example
+image_files = ['image1.jpg', 'image2.jpg', 'image3.jpg']
+dataset = ImageDataset(image_files)
+for image in dataset:
+    # Process each image
+    process_image(image)</code></pre>
+
+  <p>In the above example, the `ImageDataset` class represents a dataset of images. The class inherits from `cfkd.Dataset` and implements the required methods `__init__`, `__len__`, and `__getitem__`. The dataset is then used in a loop to process each image in the dataset.</p>
+
+  <h2>Conclusion</h2>
+  <p>Implementing custom datasets in cfkd provides a flexible and modular way to handle different data sources and formats. With custom datasets, you can encapsulate your data and easily integrate it into your machine learning workflows.</p>
+
+  <p>For more information and advanced usage of custom datasets, refer to the official cfkd documentation.</p>
+
+  <h2>Support</h2>
+  <p>If you have any questions or need assistance with implementing custom datasets in cfkd, feel free to reach out to our support team at support@cfkd-library.com.</p>
+</body>
+</html>
