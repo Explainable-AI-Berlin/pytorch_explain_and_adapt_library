@@ -1,3 +1,4 @@
+'type'                    : 'img2latent'
 'block_type'              : 'resnet'
 'dimension_reduction'     : 'mean'
 'activation'              : 'ReLU'

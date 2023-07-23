@@ -1,4 +1,4 @@
-'dataset_class'           : 'wave_circle'
+'dataset_class'           : 'WaveCircle'
 'num_samples'                        : 2000
 'split'                              : [0.8, 0.9]
 'input_type'                         : 'symbolic'

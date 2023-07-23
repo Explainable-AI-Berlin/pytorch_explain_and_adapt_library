@@ -31,18 +31,21 @@ def find_subclasses(base_class, directory):
     def check_module(module_name):
         try:
             module = importlib.import_module(module_name)
+            name_obj_list = [(name, obj) for name, obj in inspect.getmembers(module)]
             for name, obj in inspect.getmembers(module):
                 if inspect.isclass(obj) and issubclass(obj, base_class):
                     subclasses.append(obj)
+
         except Exception:
             pass
 
+    project_base_dir = get_project_resource_dir()
     for dirpath, dirnames, filenames in os.walk(directory):
         for filename in filenames:
             if filename.endswith(".py"):
-                module_name = os.path.splitext(os.path.join(dirpath, filename))[
-                    0
-                ].replace("/", ".")
+                module_path = os.path.relpath(os.path.join(dirpath, filename), project_base_dir)
+                module_path = os.path.join('peal', module_path)
+                module_name = module_path.replace("/", ".")[:-3]
                 check_module(module_name)
 
     for importer, package_name, _ in pkgutil.iter_modules():
