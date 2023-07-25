@@ -17,16 +17,16 @@ from pydantic import BaseModel
 def set_adaptive_batch_size(config, gigabyte_vram, samples_per_iteration):
     if "base_batch_size" in config.keys():
         multiplier = float(
-            np.prod(config["assumed_input_size"])
-            / np.prod(config["data"]["input_size"])
+            np.prod(config.assumed_input_size)
+            / np.prod(config.data.input_size)
         )
         if not gigabyte_vram is None and "gigabyte_vram" in config.keys():
-            multiplier = multiplier * (gigabyte_vram / config["gigabyte_vram"])
+            multiplier = multiplier * (gigabyte_vram / config.gigabyte_vram)
 
-        batch_size_adapted = max(1, int(config["base_batch_size"] * multiplier))
-        if config["batch_size"] == -1:
-            config["batch_size"] = batch_size_adapted
-            config["num_batches"] = int(samples_per_iteration / batch_size_adapted) + 1
+        batch_size_adapted = max(1, int(config.base_batch_size * multiplier))
+        if config.batch_size == -1:
+            config.batch_size = batch_size_adapted
+            config.num_batches = int(samples_per_iteration / batch_size_adapted) + 1
 
 
 def embed_numberstring(number_str, num_digits=7):

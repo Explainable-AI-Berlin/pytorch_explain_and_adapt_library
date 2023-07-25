@@ -82,14 +82,14 @@ class ModelTrainer:
 
         #
         if optimizer is None:
-            if self.config["training"]["optimizer"] == "sgd":
+            if self.config.training.optimizer == "sgd":
                 self.optimizer = torch.optim.SGD(
-                    model.parameters(), lr=self.config["training"]["learning_rate"]
+                    model.parameters(), lr=self.config.training.learning_rate
                 )
 
-            elif self.config["training"]["optimizer"] == "adam":
+            elif self.config.training.optimizer == "adam":
                 self.optimizer = torch.optim.Adam(
-                    model.parameters(), lr=self.config["training"]["learning_rate"]
+                    model.parameters(), lr=self.config.training.learning_rate
                 )
 
             else:
@@ -103,7 +103,7 @@ class ModelTrainer:
         if criterions is None:
             criterions = get_criterions(config)
             self.criterions = {}
-            for criterion_key in self.config["task"]["criterions"]:
+            for criterion_key in self.config.task.criterions:
                 if inspect.isclass(
                     criterions[criterion_key]
                 ):  # and issubclass(criterions[criterion_key], nn.Module):
@@ -152,8 +152,8 @@ class ModelTrainer:
             pred = self.model(move_to_device(X, self.device))
             loss = torch.tensor(0.0).to(self.device)
             loss_logs = {}
-            for criterion in self.config["task"]["criterions"].keys():
-                criterion_loss = self.config["task"]["criterions"][
+            for criterion in self.config.task.criterions.keys():
+                criterion_loss = self.config.task.criterions[
                     criterion
                 ] * self.criterions[criterion](self.model, pred, y.to(self.device))
                 if criterion in ["l1", "l2", "orthogonality"]:
@@ -164,7 +164,7 @@ class ModelTrainer:
 
             loss_logs["loss"] = loss.detach().item()
 
-            if self.config["training"]["verbosity"] >= 1:
+            if self.config.training.verbosity >= 1:
                 self.logger.log_step(mode, pred, y, loss_logs)
 
             # Backpropagation
@@ -200,7 +200,7 @@ class ModelTrainer:
         print("Training Config: " + str(self.config))
         if (
             not continue_training
-            and "orthogonality" in self.config["task"]["criterions"].keys()
+            and "orthogonality" in self.config.task.criterions.keys()
         ):
             orthogonal_initialization(self.model)
 
@@ -286,7 +286,7 @@ class ModelTrainer:
             self.logger.writer = writer
 
         pbar = tqdm(
-            total=self.config["training"]["max_epochs"]
+            total=self.config.training.max_epochs
             * (
                 len(self.train_dataloader)
                 + int(np.sum(list(map(lambda dl: len(dl), self.val_dataloaders))))
@@ -295,9 +295,9 @@ class ModelTrainer:
         pbar.stored_values = {}
         val_accuracy_max = 0.0
         train_accuracy_max = 0.0
-        self.config["training"]["epoch"] = 0
-        while self.config["training"]["epoch"] < self.config["training"]["max_epochs"]:
-            pbar.stored_values["Epoch"] = self.config["training"]["epoch"]
+        self.config.training.epoch = 0
+        while self.config.training.epoch < self.config.training.max_epochs:
+            pbar.stored_values["Epoch"] = self.config.training.epoch
             #
             self.model.train()
             train_loss, train_accuracy = self.run_epoch(self.train_dataloader, pbar=pbar)
@@ -312,7 +312,7 @@ class ModelTrainer:
                     self.logger.writer.add_scalar(
                         "epoch_train_" + key,
                         train_generator_performance[key],
-                        self.config["training"]["epoch"],
+                        self.config.training.epoch,
                     )
             #
             self.model.eval()
@@ -325,7 +325,7 @@ class ModelTrainer:
                     val_accuracy += self.val_dataloader_weights[idx] * val_accuracy
 
             self.logger.writer.add_scalar(
-                "val_accuracy", val_accuracy, self.config["training"]["epoch"]
+                "val_accuracy", val_accuracy, self.config.training.epoch
             )
             if isinstance(self.model, Generator):
                 val_generator_performance = (
@@ -338,7 +338,7 @@ class ModelTrainer:
                     self.logger.writer.add_scalar(
                         "epoch_val_" + key,
                         val_generator_performance[key],
-                        self.config["training"]["epoch"],
+                        self.config.training.epoch,
                     )
             #
             torch.save(
@@ -346,7 +346,7 @@ class ModelTrainer:
                 os.path.join(
                     self.base_dir,
                     "checkpoints",
-                    str(self.config["training"]["epoch"]) + ".cpl",
+                    str(self.config.training.epoch) + ".cpl",
                 ),
             )
 
@@ -374,7 +374,7 @@ class ModelTrainer:
                         os.path.join(
                             self.base_dir,
                             "checkpoints",
-                            str(self.config["training"]["epoch"] - 1) + ".cpl",
+                            str(self.config.training.epoch - 1) + ".cpl",
                         ),
                         map_location=torch.device(self.device),
                     )
@@ -386,4 +386,4 @@ class ModelTrainer:
             with open(os.path.join(self.base_dir, "config.yaml"), "w") as file:
                 yaml.dump(self.config, file)
 
-            self.config["training"]["epoch"] += 1
+            self.config.training.epoch += 1

@@ -19,7 +19,7 @@ def parse_json(data_dir, config, mode, set_negative_to_zero=True):
     with open(data_dir, "r") as f:
         raw_data = json.load(f)
 
-    if config["known_confounder"]:
+    if config.known_confounder:
 
         def extract_instances_tensor_confounder(idx, line):
             key = str(idx)
@@ -90,8 +90,8 @@ def parse_csv(
 
     if len(config.get("confounding_factors", [])) == 2:
         def extract_instances_tensor_confounder(idx, line):
-            selection_idx1 = attributes.index(config["confounding_factors"][0])
-            selection_idx2 = attributes.index(config["confounding_factors"][1])
+            selection_idx1 = attributes.index(config.confounding_factors[0])
+            selection_idx2 = attributes.index(config.confounding_factors[1])
             key, instances_tensor = extract_instances_tensor(idx, line)
             attribute = int(instances_tensor[selection_idx1])
             confounder = int(instances_tensor[selection_idx2])
@@ -116,17 +116,17 @@ def parse_csv(
 
         keys = list(data.keys())
         if mode == "train":
-            keys_out = keys[: int(len(keys) * config["split"][0])]
+            keys_out = keys[: int(len(keys) * config.split[0])]
 
         elif mode == "val":
             keys_out = keys[
-                int(len(keys) * config["split"][0]) : int(
-                    len(keys) * config["split"][1]
+                int(len(keys) * config.split[0]) : int(
+                    len(keys) * config.split[1]
                 )
             ]
 
         elif mode == "test":
-            keys_out = keys[int(len(keys) * config["split"][1]) :]
+            keys_out = keys[int(len(keys) * config.split[1]) :]
 
         else:
             keys_out = keys
@@ -157,16 +157,16 @@ def process_confounder_data_controlled(
     n_attribute_confounding = np.array([[0, 0], [0, 0]])
     max_attribute_confounding = np.array([[0, 0], [0, 0]])
     max_attribute_confounding[0][0] = int(
-        config["num_samples"] * config["confounder_probability"] * 0.5
+        config.num_samples * config.confounder_probability * 0.5
     )
     max_attribute_confounding[1][0] = int(
-        config["num_samples"] * round(1 - config["confounder_probability"], 2) * 0.5
+        config.num_samples * round(1 - config.confounder_probability, 2) * 0.5
     )
     max_attribute_confounding[0][1] = int(
-        config["num_samples"] * round(1 - config["confounder_probability"], 2) * 0.5
+        config.num_samples * round(1 - config.confounder_probability, 2) * 0.5
     )
     max_attribute_confounding[1][1] = int(
-        config["num_samples"] * config["confounder_probability"] * 0.5
+        config.num_samples * config.confounder_probability * 0.5
     )
     keys = [[[], []], [[], []]]
 
@@ -202,47 +202,47 @@ def process_confounder_data_controlled(
         np.sum(n_attribute_confounding == max_attribute_confounding) == 4
     ), "something went wrong with filling up the attributes"
     assert (
-        np.sum(n_attribute_confounding) == config["num_samples"]
+        np.sum(n_attribute_confounding) == config.num_samples
     ), "wrong number of samples!"
     assert (
         len(keys[0][0]) + len(keys[0][1]) + len(keys[1][0]) + len(keys[1][1])
-        == config["num_samples"]
+        == config.num_samples
     ), "wrong number of keys!"
     if mode == "train":
-        keys_out = keys[0][0][: int(len(keys[0][0]) * config["split"][0])]
-        keys_out += keys[0][1][: int(len(keys[0][1]) * config["split"][0])]
-        keys_out += keys[1][0][: int(len(keys[1][0]) * config["split"][0])]
-        keys_out += keys[1][1][: int(len(keys[1][1]) * config["split"][0])]
+        keys_out = keys[0][0][: int(len(keys[0][0]) * config.split[0])]
+        keys_out += keys[0][1][: int(len(keys[0][1]) * config.split[0])]
+        keys_out += keys[1][0][: int(len(keys[1][0]) * config.split[0])]
+        keys_out += keys[1][1][: int(len(keys[1][1]) * config.split[0])]
         random.shuffle(keys_out)
 
     elif mode == "val":
         keys_out = keys[0][0][
-            int(len(keys[0][0]) * config["split"][0]) : int(
-                len(keys[0][0]) * config["split"][1]
+            int(len(keys[0][0]) * config.split[0]) : int(
+                len(keys[0][0]) * config.split[1]
             )
         ]
         keys_out += keys[0][1][
-            int(len(keys[0][1]) * config["split"][0]) : int(
-                len(keys[0][1]) * config["split"][1]
+            int(len(keys[0][1]) * config.split[0]) : int(
+                len(keys[0][1]) * config.split[1]
             )
         ]
         keys_out += keys[1][0][
-            int(len(keys[1][0]) * config["split"][0]) : int(
-                len(keys[1][0]) * config["split"][1]
+            int(len(keys[1][0]) * config.split[0]) : int(
+                len(keys[1][0]) * config.split[1]
             )
         ]
         keys_out += keys[1][1][
-            int(len(keys[1][1]) * config["split"][0]) : int(
-                len(keys[1][1]) * config["split"][1]
+            int(len(keys[1][1]) * config.split[0]) : int(
+                len(keys[1][1]) * config.split[1]
             )
         ]
         random.shuffle(keys_out)
 
     elif mode == "test":
-        keys_out = keys[0][0][int(len(keys[0][0]) * config["split"][1]) :]
-        keys_out += keys[0][1][int(len(keys[0][1]) * config["split"][1]) :]
-        keys_out += keys[1][0][int(len(keys[1][0]) * config["split"][1]) :]
-        keys_out += keys[1][1][int(len(keys[1][1]) * config["split"][1]) :]
+        keys_out = keys[0][0][int(len(keys[0][0]) * config.split[1]) :]
+        keys_out += keys[0][1][int(len(keys[0][1]) * config.split[1]) :]
+        keys_out += keys[1][0][int(len(keys[1][0]) * config.split[1]) :]
+        keys_out += keys[1][1][int(len(keys[1][1]) * config.split[1]) :]
         random.shuffle(keys_out)
 
     else:

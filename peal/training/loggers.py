@@ -32,15 +32,15 @@ class Logger:
         self.writer = writer
         self.val_dataloader = val_dataloader
 
-        if "output_size" in self.config["task"].keys():
-            self.output_size = self.config["task"]["output_size"]
+        if "output_size" in self.config.task.keys():
+            self.output_size = self.config.task.output_size
 
         else:
-            self.output_size = self.config["data"]["output_size"]
+            self.output_size = self.config.data.output_size
 
         self.device = "cuda" if next(self.model.parameters()).is_cuda else "cpu"
         #
-        if "ce" in config["task"]["criterions"].keys():
+        if "ce" in config.task.criterions.keys():
             #
             # self.test_X, self.test_y = create_class_ordered_batch(val_dataloader.dataset, config)
             self.test_X, self.test_y = next(iter(val_dataloader))
@@ -55,7 +55,7 @@ class Logger:
         # temporary variables
         self.losses = []
         #
-        if self.config["data"]["output_type"] in ["singleclass", "multiclass"]:
+        if self.config.data.output_type in ["singleclass", "multiclass"]:
             self.predictions = []
             self.targets = []
             self.predicted_classes = []
@@ -67,22 +67,22 @@ class Logger:
             self.writer.add_scalar(
                 mode + "_" + criterion,
                 loss_logs[criterion],
-                self.config["training"]["global_train_step"],
+                self.config.training.global_train_step,
             )
 
         self.losses.append(loss_logs["loss"])
 
         if len(
-            set(["ce", "bce"]).intersection(self.config["task"]["criterions"].keys())
+            set(["ce", "bce"]).intersection(self.config.task.criterions.keys())
         ) >= 1 and not isinstance(self.model, InvertibleGenerator):
             #
             self.targets.append(y.detach())
             self.predictions.append(pred.detach())
             #
-            if "ce" in self.config["task"]["criterions"].keys():
+            if "ce" in self.config.task.criterions.keys():
                 class_prediction = pred.detach().argmax(-1)
 
-            elif "bce" in self.config["task"]["criterions"].keys():
+            elif "bce" in self.config.task.criterions.keys():
                 class_prediction = nn.Sigmoid()(pred) >= 0.5
 
             self.correct.append(
@@ -91,10 +91,10 @@ class Logger:
             self.predicted_classes.append(class_prediction.detach().to(torch.float32))
 
         #
-        if not "global_" + mode + "_step" in self.config["training"].keys():
-            self.config["training"]["global_" + mode + "_step"] = 0
+        if not "global_" + mode + "_step" in self.config.training.keys():
+            self.config.training["global_" + mode + "_step"] = 0
 
-        self.config["training"]["global_" + mode + "_step"] += 1
+        self.config.training["global_" + mode + "_step"] += 1
 
     def log_epoch(self, mode, pbar=None):
         """ """
@@ -103,12 +103,12 @@ class Logger:
         self.writer.add_scalar(
             "epoch_" + mode + "_loss_accumulated",
             loss_accumulated.item(),
-            self.config["training"]["epoch"],
+            self.config.training.epoch,
         )
         if not pbar is None:
             pbar.stored_values[mode + "_loss_accumulated"] = loss_accumulated.item()
 
-        if "ce" in self.config["task"]["criterions"].keys() and not isinstance(
+        if "ce" in self.config.task.criterions.keys() and not isinstance(
             self.model, InvertibleGenerator
         ):
             try:
@@ -122,7 +122,7 @@ class Logger:
                 torch.cat(self.predicted_classes).to(torch.int64), self.output_size
             ).to(torch.float32)
 
-        if "bce" in self.config["task"]["criterions"].keys() and not isinstance(
+        if "bce" in self.config.task.criterions.keys() and not isinstance(
             self.model, InvertibleGenerator
         ):
             targets_one_hot = torch.cat(self.targets)
@@ -134,32 +134,32 @@ class Logger:
             self.writer.add_histogram(
                 "epoch_" + mode + "_correct_per_class",
                 correct_per_class,
-                self.config["training"]["epoch"],
+                self.config.training.epoch,
             )
 
         if len(
-            set(["ce", "bce"]).intersection(self.config["task"]["criterions"].keys())
+            set(["ce", "bce"]).intersection(self.config.task.criterions.keys())
         ) >= 1 and not isinstance(self.model, InvertibleGenerator):
             accuracy = torch.cat(self.correct).mean().item()
             self.writer.add_scalar(
                 "epoch_" + mode + "_accuracy",
                 accuracy,
-                self.config["training"]["epoch"],
+                self.config.training.epoch,
             )
             self.writer.add_histogram(
                 "epoch_" + mode + "_predicted_classes",
                 predictions_one_hot.mean(0),
-                self.config["training"]["epoch"],
+                self.config.training.epoch,
             )
             self.writer.add_histogram(
                 "epoch_" + mode + "_targets",
                 targets_one_hot.mean(0),
-                self.config["training"]["epoch"],
+                self.config.training.epoch,
             )
             self.writer.add_histogram(
                 mode + "_classes_difference",
                 predictions_one_hot.mean(0).cpu() - targets_one_hot.mean(0).cpu(),
-                self.config["training"]["epoch"],
+                self.config.training.epoch,
             )
             if not pbar is None:
                 pbar.stored_values[mode + "_accuracy"] = accuracy
@@ -183,7 +183,7 @@ class Logger:
 
         if (
             isinstance(self.model, InvertibleGenerator)
-            and self.config["data"]["input_type"] == "image"
+            and self.config.data.input_type == "image"
         ):
             reconstructed_images = self.model.decode(
                 self.model.encode(self.test_X.to(self.device))
@@ -196,10 +196,10 @@ class Logger:
                 os.path.join(
                     self.base_dir,
                     "outputs",
-                    "reconstruction_" + str(self.config["training"]["epoch"]) + ".png",
+                    "reconstruction_" + str(self.config.training.epoch) + ".png",
                 ),
                 normalize=True,
-                nrow=self.config["training"]["val_batch_size"],
+                nrow=self.config.training.val_batch_size,
                 range=(-0.5, 0.5),
             )
             if hasattr(self.val_dataloader.dataset, "project_to_pytorch_default"):
@@ -219,9 +219,9 @@ class Logger:
                 "reconstructions",
                 torchvision.utils.make_grid(
                     reconstruction_collage,
-                    nrow=self.config["training"]["val_batch_size"],
+                    nrow=self.config.training.val_batch_size,
                 ),
-                self.config["training"]["epoch"],
+                self.config.training.epoch,
             )
 
             #
@@ -231,10 +231,10 @@ class Logger:
                 os.path.join(
                     self.base_dir,
                     "outputs",
-                    "samples_" + str(self.config["training"]["epoch"]) + ".png",
+                    "samples_" + str(self.config.training.epoch) + ".png",
                 ),
                 normalize=True,
-                nrow=int(math.sqrt(self.config["training"]["val_batch_size"])),
+                nrow=int(math.sqrt(self.config.training.val_batch_size)),
                 range=(-0.5, 0.5),
             )
             if hasattr(self.val_dataloader.dataset, "project_to_pytorch_default"):
@@ -252,9 +252,9 @@ class Logger:
                 "samples",
                 torchvision.utils.make_grid(
                     sample_images,
-                    nrow=int(math.sqrt(self.config["training"]["val_batch_size"])),
+                    nrow=int(math.sqrt(self.config.training.val_batch_size)),
                 ),
-                self.config["training"]["epoch"],
+                self.config.training.epoch,
             )
 
         self.losses = []

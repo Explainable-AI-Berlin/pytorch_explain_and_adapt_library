@@ -14,38 +14,38 @@ def integrate_data_config_into_adaptor_config(
 ):
     if not output_size is None:
         output_size = output_size
-        adaptor_config["data"]["output_size"] = output_size
+        adaptor_config.data.output_size = output_size
 
     else:
-        assert adaptor_config["data"]["output_size"] != "None"
+        assert adaptor_config.data.output_size != "None"
 
     def integrate_task_into_adaptor_config(dataset, adaptor_config):
         if hasattr(dataset, "task_config") and not dataset.task_config is None:
-            adaptor_config["task"] = dataset.task_config
+            adaptor_config.task = dataset.task_config
 
         elif isinstance(dataset, Image2MixedDataset):
-            adaptor_config["task"]["selection"] = [
-                dataset.config["confounding_factors"][0]
+            adaptor_config.task.selection = [
+                dataset.config.confounding_factors[0]
             ]
-            adaptor_config["task"]["output_size"] = 2
-            dataset.task_config = adaptor_config["task"]
+            adaptor_config.task.output_size = 2
+            dataset.task_config = adaptor_config.task
 
     if isinstance(datasource[0], torch.utils.data.Dataset):
         integrate_task_into_adaptor_config(datasource[0], adaptor_config)
         X, y = datasource[0].__getitem__(0)
         if hasattr(datasource[0], "config"):
-            adaptor_config["data"] = datasource[0].config
+            adaptor_config.data = datasource[0].config
 
         else:
-            adaptor_config["data"]["input_size"] = list(X.shape)
+            adaptor_config.data.input_size = list(X.shape)
 
     elif isinstance(datasource[0], torch.utils.data.DataLoader):
         integrate_task_into_adaptor_config(datasource[0].dataset, adaptor_config)
         X, y = datasource[0].dataset.__getitem__(0)
-        adaptor_config["data"]["input_size"] = list(X.shape)
+        adaptor_config.data.input_size = list(X.shape)
 
     else:
-        assert adaptor_config["data"]["input_size"] != "None"
+        assert adaptor_config.data.input_size != "None"
 
     return output_size
 
@@ -243,7 +243,7 @@ def visualize_progress(paths):
         score_reference_idx=1,
         generator=generator,
         device=device,
-        explainer_config=adaptor_config["explainer"],
+        explainer_config=adaptor_config.explainer,
     )
     test_dataloader.dataset.task_config = task_config_buffer
     for path in paths:

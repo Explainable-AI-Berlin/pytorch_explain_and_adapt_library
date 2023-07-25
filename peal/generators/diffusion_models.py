@@ -34,7 +34,7 @@ class DimeDDPMAdaptor(EditCapableGenerator):
         self.config = load_yaml_config(config)
         self.dataset = dataset
         if not "image_size" in self.config.keys():
-            self.config["image_size"] = self.dataset.config["input_size"][-1]
+            self.config.image_size = self.dataset.config.input_size[-1]
 
         self.model_dir = model_dir
         self.model, self.diffusion = create_model_and_diffusion(
@@ -48,7 +48,7 @@ class DimeDDPMAdaptor(EditCapableGenerator):
             )
 
     def sample_x(self, batch_size=1):
-        return self.diffusion.p_sample_loop(self.model, [batch_size] + self.dataset.config["input_size"])
+        return self.diffusion.p_sample_loop(self.model, [batch_size] + self.dataset.config.input_size)
 
     def train_model(
         self, dataset_train, training_config="$PEAL/configs/training/train_ddpm.yaml"
@@ -71,7 +71,7 @@ class DimeDDPMAdaptor(EditCapableGenerator):
                 mode="train",
                 batch_size=args.batch_size,
                 training_config={
-                    "iterations_per_episode": training_config["max_steps"]
+                    "iterations_per_episode": training_config.max_steps
                 },
             )
         )
@@ -106,9 +106,9 @@ class DimeDDPMAdaptor(EditCapableGenerator):
         pbar=None,
         mode="",
     ):
-        shutil.rmtree(self.config["base_path"], ignore_errors=True)
+        shutil.rmtree(self.config.base_path, ignore_errors=True)
         self.dataset.serialize_dataset(
-            output_dir=self.config["data_dir"],
+            output_dir=self.config.data_dir,
             x_list=x_in,
             y_list=target_classes,
             sample_names=list(
@@ -118,7 +118,7 @@ class DimeDDPMAdaptor(EditCapableGenerator):
 
         args = types.SimpleNamespace(**self.config)
         args.dataset = Image2ClassDataset(
-            root_dir=self.config["data_dir"],
+            root_dir=self.config.data_dir,
             mode=None,
             config=copy.deepcopy(self.dataset.config),
             transform=self.dataset.transform,
@@ -127,18 +127,18 @@ class DimeDDPMAdaptor(EditCapableGenerator):
         args.classifier = classifier
         args.diffusion = self.diffusion
         args.model = self.model
-        if self.config["method"] == "ace":
+        if self.config.method == "ace":
             ace_main(args=args)
 
-        elif self.config["method"] == "dime":
+        elif self.config.method == "dime":
             dime_main(args=args)
 
         x_counterfactuals = []
         x_list = []
         base_path = os.path.join(
-            self.config["output_path"],
+            self.config.output_path,
             "Results",
-            self.config["exp_name"],
+            self.config.exp_name,
         )
         for i in range(x_in.shape[0]):
             path_correct = os.path.join(
@@ -174,10 +174,10 @@ class DimeDDPMAdaptor(EditCapableGenerator):
             # x_counterfactuals.append(torchvision.io.read_image(path))
             x_counterfactuals.append(ToTensor()(Image.open(path)))
             path_correct = os.path.join(
-                self.config["output_path"], "Original", "Correct", f"{embed_numberstring(str(i))}.jpg"
+                self.config.output_path, "Original", "Correct", f"{embed_numberstring(str(i))}.jpg"
             )
             path_incorrect = os.path.join(
-                self.config["output_path"], "Original", "Incorrect", f"{embed_numberstring(str(i))}.jpg"
+                self.config.output_path, "Original", "Incorrect", f"{embed_numberstring(str(i))}.jpg"
             )
             if os.path.exists(path_correct):
                 path = path_correct

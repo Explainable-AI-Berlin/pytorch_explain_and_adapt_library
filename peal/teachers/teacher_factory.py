@@ -44,7 +44,7 @@ def get_teacher(
         teacher = Human2ModelTeacher(port)
 
     elif teacher == "SegmentationMask":
-        teacher = SegmentationMaskTeacher(adaptor_config["attribution_threshold"])
+        teacher = SegmentationMaskTeacher(adaptor_config.attribution_threshold)
 
     elif teacher[:7] == "virelay":
         teacher = VirelayTeacher(num_classes=output_size, port=int(teacher[-4:]))

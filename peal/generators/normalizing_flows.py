@@ -346,23 +346,23 @@ class Glow(InvertibleGenerator):
         self.config = config
 
         if (
-            isinstance(self.config["architecture"]["n_block"], str)
-            and self.config["architecture"]["n_block"] == "auto"
+            isinstance(self.config.architecture.n_block, str)
+            and self.config.architecture.n_block == "auto"
         ):
-            self.n_block = int(math.log(self.config["data"]["input_size"][1], 2)) - 2
+            self.n_block = int(math.log(self.config.data.input_size[1], 2)) - 2
 
         else:
-            self.n_block = self.config["architecture"]["n_block"]
+            self.n_block = self.config.architecture.n_block
 
         self.blocks = nn.ModuleList()
-        n_channel = self.config["data"]["input_size"][0]
+        n_channel = self.config.data.input_size[0]
         for i in range(self.n_block - 1):
             self.blocks.append(
                 Block(
                     n_channel,
-                    self.config["architecture"]["n_flow"],
-                    affine=self.config["architecture"]["affine"],
-                    conv_lu=self.config["architecture"]["conv_lu"],
+                    self.config.architecture.n_flow,
+                    affine=self.config.architecture.affine,
+                    conv_lu=self.config.architecture.conv_lu,
                 )
             )
             n_channel *= 2
@@ -370,9 +370,9 @@ class Glow(InvertibleGenerator):
         self.blocks.append(
             Block(
                 n_channel,
-                self.config["architecture"]["n_flow"],
+                self.config.architecture.n_flow,
                 split=False,
-                affine=self.config["architecture"]["affine"],
+                affine=self.config.architecture.affine,
             )
         )
 
@@ -414,7 +414,7 @@ class Glow(InvertibleGenerator):
 
     def sample_z(self, n="auto"):
         if isinstance(n, str) and n == "auto":
-            n_sample = self.config["training"]["val_batch_size"]
+            n_sample = self.config.training.val_batch_size
 
         else:
             n_sample = n
@@ -422,7 +422,7 @@ class Glow(InvertibleGenerator):
         z_sample = []
         z_shapes = self.calc_z_shapes()
         for z in z_shapes:
-            z_new = torch.randn(n_sample, *z) * self.config["architecture"]["temp"]
+            z_new = torch.randn(n_sample, *z) * self.config.architecture.temp
             z_sample.append(z_new.to(next(self.parameters()).device))
 
         return z_sample
@@ -438,15 +438,15 @@ class Glow(InvertibleGenerator):
 
         log_p_sum = torch.sum(torch.stack(log_probs, dim=0), dim=0)
 
-        n_pixel = np.prod(self.config["data"]["input_size"])
-        log_p = log_p_sum - self.config["architecture"]["n_bits"] * n_pixel
+        n_pixel = np.prod(self.config.data.input_size)
+        log_p = log_p_sum - self.config.architecture.n_bits * n_pixel
         return -torch.clone(log_p / (math.log(2) * n_pixel)).detach()
 
     def calc_z_shapes(self):
         z_shapes = []
 
-        n_channel = copy.deepcopy(self.config["data"]["input_size"][0])
-        input_size = copy.deepcopy(self.config["data"]["input_size"][1])
+        n_channel = copy.deepcopy(self.config.data.input_size[0])
+        input_size = copy.deepcopy(self.config.data.input_size[1])
 
         for i in range(self.n_block - 1):
             input_size //= 2

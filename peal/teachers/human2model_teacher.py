@@ -52,7 +52,7 @@ class Human2ModelTeacher(TeacherInterface):
         self.data.collage_paths = []
         self.data.feedback = []
 
-        app.config['UPLOAD_FOLDER'] = 'static'
+        app.config.UPLOAD_FOLDER = 'static'
 
         @app.route("/", methods=['GET', 'POST'])
         def index():

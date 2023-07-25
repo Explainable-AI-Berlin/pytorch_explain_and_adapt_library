@@ -123,7 +123,7 @@ class DataIterator:
         Returns:
             _type_: _description_
         """
-        if self._index < self.dataloader.train_config["iterations_per_episode"]:
+        if self._index < self.dataloader.train_config.iterations_per_episode:
             self._index += 1
             return self.dataloader.sample()
 
@@ -235,11 +235,11 @@ def get_dataloader(
 
 
 def create_class_ordered_batch(dataset, config):
-    if "output_size" in config["task"].keys():
-        output_size = config["task"]["output_size"]
+    if "output_size" in config.task.keys():
+        output_size = config.task.output_size
 
     else:
-        output_size = config["data"]["output_size"]
+        output_size = config.data.output_size
 
     datastack = DataStack(dataset, output_size)
 
@@ -261,23 +261,23 @@ def create_dataloaders_from_datasource(
     datasource, config, enable_hints=False, gigabyte_vram=None
 ):
     """ """
-    if "base_batch_size" in config["training"].keys():
+    if "base_batch_size" in config.training.keys():
         multiplier = float(
-            np.prod(config["training"]["assumed_input_size"])
-            / np.prod(config["data"]["input_size"])
+            np.prod(config.training.assumed_input_size)
+            / np.prod(config.data.input_size)
         )
-        if not gigabyte_vram is None and "gigabyte_vram" in config["training"].keys():
+        if not gigabyte_vram is None and "gigabyte_vram" in config.training.keys():
             multiplier = multiplier * (
-                gigabyte_vram / config["training"]["gigabyte_vram"]
+                gigabyte_vram / config.training.gigabyte_vram
             )
 
-        batch_size_adapted = int(config["training"]["base_batch_size"] * multiplier)
-        if config["training"]["train_batch_size"] == -1:
-            config["training"]["train_batch_size"] = batch_size_adapted
-        if config["training"]["val_batch_size"] == -1:
-            config["training"]["val_batch_size"] = batch_size_adapted
-        if config["training"]["test_batch_size"] == -1:
-            config["training"]["test_batch_size"] = batch_size_adapted
+        batch_size_adapted = int(config.training.base_batch_size * multiplier)
+        if config.training.train_batch_size == -1:
+            config.training.train_batch_size = batch_size_adapted
+        if config.training.val_batch_size == -1:
+            config.training.val_batch_size = batch_size_adapted
+        if config.training.test_batch_size == -1:
+            config.training.test_batch_size = batch_size_adapted
 
     if (isinstance(datasource, tuple) or isinstance(datasource, list)) and isinstance(
         datasource[0], DataLoader
@@ -294,7 +294,7 @@ def create_dataloaders_from_datasource(
     else:
         if isinstance(datasource, str):
             dataset_train, dataset_val, dataset_test = get_datasets(
-                config=config["data"], base_dir=datasource
+                config=config.data, base_dir=datasource
             )
 
         elif isinstance(datasource[0], torch.utils.data.Dataset):
@@ -305,15 +305,15 @@ def create_dataloaders_from_datasource(
             else:
                 dataset_train, dataset_val, dataset_test = datasource
 
-        if "n_bits" in config["architecture"].keys():
+        if "n_bits" in config.architecture.keys():
             dataset_train = GlowDatasetWrapper(
-                dataset_train, config["architecture"]["n_bits"]
+                dataset_train, config.architecture.n_bits
             )
             dataset_val = GlowDatasetWrapper(
-                dataset_val, config["architecture"]["n_bits"]
+                dataset_val, config.architecture.n_bits
             )
             dataset_test = GlowDatasetWrapper(
-                dataset_test, config["architecture"]["n_bits"]
+                dataset_test, config.architecture.n_bits
             )
 
         elif enable_hints:
@@ -321,34 +321,34 @@ def create_dataloaders_from_datasource(
 
         train_dataloader = get_dataloader(
             dataset=dataset_train,
-            training_config=config["training"],
+            training_config=config.training,
             mode="train",
-            task_config=config["task"],
+            task_config=config.task,
         )
         val_dataloader = get_dataloader(
             dataset=dataset_val,
-            training_config=config["training"],
+            training_config=config.training,
             mode="val",
-            task_config=config["task"],
+            task_config=config.task,
         )
         test_dataloader = get_dataloader(
             dataset=dataset_test,
-            training_config=config["training"],
+            training_config=config.training,
             mode="test",
-            task_config=config["task"],
+            task_config=config.task,
         )
 
     # TODO this seems quite hacky and could cause problems when combining multiclass dataset with SegmentationMask teacher
     if (
         "config" in train_dataloader.dataset.__dict__.keys()
-        and train_dataloader.dataset.config["output_type"] != "multiclass"
+        and train_dataloader.dataset.config.output_type != "multiclass"
     ):
         # TODO sanity check or warning
-        config["data"] = train_dataloader.dataset.config
+        config.data = train_dataloader.dataset.config
 
     # TODO deal with other datasets
     """for dataloader in [train_dataloader, val_dataloader, test_dataloader]:
         if not isinstance(dataloader.dataset, PealDataset):
-            dataloader.dataset = wrap_dataset(dataloader.dataset, config["data"])"""
+            dataloader.dataset = wrap_dataset(dataloader.dataset, config.data)"""
 
     return train_dataloader, val_dataloader, test_dataloader

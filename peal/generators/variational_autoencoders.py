@@ -31,30 +31,30 @@ class VAE(InvertibleGenerator):
         super().__init__()
         self.config = config
         if encoder is None:
-            if self.config["data"]["input_type"] == "image":
+            if self.config.data.input_type == "image":
                 self.encoder = Img2LatentEncoder(
-                    neuron_numbers=config["architecture"]["neuron_numbers_encoder"],
-                    blocks_per_layer=config["architecture"]["blocks_per_layer"],
-                    block_type=config["architecture"]["block_type"],
-                    input_channels=config["data"]["input_size"][0],
-                    use_batchnorm=config["architecture"]["use_batchnorm"],
+                    neuron_numbers=config.architecture.neuron_numbers_encoder,
+                    blocks_per_layer=config.architecture.blocks_per_layer,
+                    block_type=config.architecture.block_type,
+                    input_channels=config.data.input_size[0],
+                    use_batchnorm=config.architecture.use_batchnorm,
                     activation=nn.ReLU,
                 )
 
-            elif self.config["data"]["input_type"] == "sequence":
+            elif self.config.data.input_type == "sequence":
                 self.encoder = Sequence2LatentEncoder(
-                    num_blocks=config["architecture"]["num_blocks"],
-                    embedding_dim=config["architecture"]["neuron_numbers_encoder"][-1],
-                    num_heads=config["architecture"]["num_heads"],
-                    input_channels=config["data"]["input_size"][-1] + 2,
+                    num_blocks=config.architecture.num_blocks,
+                    embedding_dim=config.architecture.neuron_numbers_encoder[-1],
+                    num_heads=config.architecture.num_heads,
+                    input_channels=config.data.input_size[-1] + 2,
                     activation=nn.ReLU,
                 )
 
-            elif self.config["data"]["input_type"] == "symbolic":
+            elif self.config.data.input_type == "symbolic":
                 self.encoder = Vector2LatentEncoder(
-                    input_channels=self.config["data"]["input_size"][0],
+                    input_channels=self.config.data.input_size[0],
                     activation=nn.ReLU,
-                    neuron_numbers=self.config["architecture"][
+                    neuron_numbers=self.config.architecture[
                         "neuron_numbers_encoder"
                     ],
                 )
@@ -63,35 +63,35 @@ class VAE(InvertibleGenerator):
             self.encoder = encoder
 
         if decoder is None:
-            if self.config["data"]["input_type"] == "image":
+            if self.config.data.input_type == "image":
                 self.decoder = Latent2ImgDecoder(
-                    neuron_numbers=config["architecture"]["neuron_numbers_decoder"],
-                    blocks_per_layer=config["architecture"]["blocks_per_layer"],
-                    block_type=config["architecture"]["block_type"],
-                    output_size=config["data"]["input_size"][0],
-                    use_batchnorm=config["architecture"]["use_batchnorm"],
+                    neuron_numbers=config.architecture.neuron_numbers_decoder,
+                    blocks_per_layer=config.architecture.blocks_per_layer,
+                    block_type=config.architecture.block_type,
+                    output_size=config.data.input_size[0],
+                    use_batchnorm=config.architecture.use_batchnorm,
                     activation=nn.ReLU,
                 )
 
-            elif self.config["data"]["input_type"] == "sequence":
+            elif self.config.data.input_type == "sequence":
                 self.decoder = Latent2SequenceDecoder(
-                    num_blocks=config["architecture"]["num_blocks"],
-                    embedding_dim=config["architecture"]["neuron_numbers_encoder"][-1],
-                    num_heads=config["architecture"]["num_heads"],
-                    input_channels=config["data"]["input_size"][-1] + 2,
+                    num_blocks=config.architecture.num_blocks,
+                    embedding_dim=config.architecture.neuron_numbers_encoder[-1],
+                    num_heads=config.architecture.num_heads,
+                    input_channels=config.data.input_size[-1] + 2,
                     activation=nn.ReLU,
-                    max_length=self.config["data"]["input_size"][0],
+                    max_length=self.config.data.input_size[0],
                     embedding=list(self.encoder.children())[0],
                 )
 
-            elif self.config["data"]["input_type"] == "symbolic":
+            elif self.config.data.input_type == "symbolic":
                 self.decoder = Latent2VectorDecoder(
-                    output_size=self.config["data"]["input_size"][0],
-                    num_hidden_in=self.config["architecture"]["neuron_numbers_encoder"][
+                    output_size=self.config.data.input_size[0],
+                    num_hidden_in=self.config.architecture.neuron_numbers_encoder[
                         -1
                     ],
                     activation=nn.ReLU,
-                    neuron_numbers=self.config["architecture"][
+                    neuron_numbers=self.config.architecture[
                         "neuron_numbers_decoder"
                     ],
                 )
@@ -103,13 +103,13 @@ class VAE(InvertibleGenerator):
         self.register_buffer(
             "mean",
             torch.zeros(
-                self.config["architecture"]["neuron_numbers_encoder"][-1],
+                self.config.architecture.neuron_numbers_encoder[-1],
             ),
         )
         self.register_buffer(
             "var",
             torch.ones(
-                self.config["architecture"]["neuron_numbers_encoder"][-1],
+                self.config.architecture.neuron_numbers_encoder[-1],
             ),
         )
 

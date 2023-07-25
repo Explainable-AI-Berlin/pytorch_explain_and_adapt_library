@@ -72,16 +72,16 @@ class CounterfactualExplainer(ExplainerInterface):
             v = nn.Parameter(torch.clone(v_original.detach().cpu()), requires_grad=True)
             v = [v]
 
-        if self.explainer_config["optimizer"] == "Adam":
-            optimizer = torch.optim.Adam(v, lr=self.explainer_config["learning_rate"])
+        if self.explainer_config.optimizer == "Adam":
+            optimizer = torch.optim.Adam(v, lr=self.explainer_config.learning_rate)
 
-        elif self.explainer_config["optimizer"] == "SGD":
-            optimizer = torch.optim.SGD(v, lr=self.explainer_config["learning_rate"])
+        elif self.explainer_config.optimizer == "SGD":
+            optimizer = torch.optim.SGD(v, lr=self.explainer_config.learning_rate)
 
         target_confidences = [0.0 for i in range(len(target_classes))]
 
-        for i in range(self.explainer_config["gradient_steps"]):
-            if self.explainer_config["use_masking"]:
+        for i in range(self.explainer_config.gradient_steps):
+            if self.explainer_config.use_masking:
                 mask = (
                     torch.tensor(target_confidences).to(self.device)
                     < target_confidence_goal
@@ -98,7 +98,7 @@ class CounterfactualExplainer(ExplainerInterface):
 
             logits = self.downstream_model(
                 img
-                + self.explainer_config["img_noise_injection"] * torch.randn_like(img)
+                + self.explainer_config.img_noise_injection * torch.randn_like(img)
             )
             loss = self.loss(logits, target_classes.to(self.device))
             l1_losses = []
@@ -115,7 +115,7 @@ class CounterfactualExplainer(ExplainerInterface):
             loss += self.explainer_config["l1_regularization"] * torch.mean(
                 torch.stack(l1_losses)
             )
-            loss += self.explainer_config["log_prob_regularization"] * torch.mean(
+            loss += self.explainer_config.log_prob_regularization * torch.mean(
                 self.generator.log_prob_z(latent_code)
             )
 
@@ -128,7 +128,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 pbar.set_description(
                     f"Creating {mode} Counterfactuals:"
                     + f"it: {i}"
-                    + f"/{self.explainer_config['gradient_steps']}"
+                    + f"/{self.explainer_config.gradient_steps}"
                     + f", loss: {loss.detach().item():.2E}"
                     + f", target_confidence: {target_confidences[0]:.2E}"
                     + f", visual_difference: {torch.mean(torch.abs(x_in - img.detach().cpu())).item():.2E}"
@@ -143,13 +143,13 @@ class CounterfactualExplainer(ExplainerInterface):
 
             loss.backward()
 
-            if self.explainer_config["use_masking"]:
+            if self.explainer_config.use_masking:
                 for sample_idx in range(len(target_confidences)):
                     if target_confidences[sample_idx] >= target_confidence_goal:
                         for variable_idx, v_elem in enumerate(v):
-                            if self.explainer_config["optimizer"] == "Adam":
+                            if self.explainer_config.optimizer == "Adam":
                                 optimizer = torch.optim.Adam(
-                                    v, lr=self.explainer_config["learning_rate"]
+                                    v, lr=self.explainer_config.learning_rate
                                 )
 
                             v_elem.grad[sample_idx].data.zero_()
@@ -196,7 +196,7 @@ class CounterfactualExplainer(ExplainerInterface):
             dict: The batch with the counterfactuals added.
         """
         if y_target_goal_confidence_in is None:
-            target_confidence_goal = self.explainer_config["y_target_goal_confidence"]
+            target_confidence_goal = self.explainer_config.y_target_goal_confidence
 
         else:
             target_confidence_goal = y_target_goal_confidence_in

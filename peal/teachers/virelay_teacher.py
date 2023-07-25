@@ -703,12 +703,12 @@ class VirelayTeacher(TeacherInterface):
                 base_dir=base_dir,
                 attribution_database_file_path=os.path.join(base_dir, 'attribution_database.hdf5'),
                 analysis_file_path=os.path.join(base_dir, 'analysis.hdf5'),
-                variant=self.teacher_config['meta_analysis_variant'],
+                variant=self.teacher_config.meta_analysis_variant,
                 class_indices=range(self.num_classes),
                 label_map_file_path=None,
-                number_of_eigenvalues=self.teacher_config['number_of_eigenvalues'],
-                number_of_clusters_list=self.teacher_config['number_of_clusters_list'],
-                number_of_neighbors=self.teacher_config['number_of_neighbors'],
+                number_of_eigenvalues=self.teacher_config.number_of_eigenvalues,
+                number_of_clusters_list=self.teacher_config.number_of_clusters_list,
+                number_of_neighbors=self.teacher_config.number_of_neighbors,
             )
 
         if not os.path.exists(os.path.join(base_dir, 'analysis.yaml')):
@@ -719,8 +719,8 @@ class VirelayTeacher(TeacherInterface):
                 label_map_file_path=None,
                 project_name='analysis',
                 dataset_name='dataset',
-                dataset_down_sampling_method=self.teacher_config['dataset_down_sampling_method'],
-                dataset_up_sampling_method=self.teacher_config['dataset_up_sampling_method'],
+                dataset_down_sampling_method=self.teacher_config.dataset_down_sampling_method,
+                dataset_up_sampling_method=self.teacher_config.dataset_up_sampling_method,
                 model_name='model',
                 attribution_name='attribution',
                 analysis_name='analysis',

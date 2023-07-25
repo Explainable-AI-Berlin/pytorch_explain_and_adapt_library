@@ -34,7 +34,7 @@ def get_generator(
     """
     if not (isinstance(generator, InvertibleGenerator) or isinstance(generator, EditCapableGenerator)):
         generator_config = load_yaml_config(generator)
-        generator_config["data"] = data_config
+        generator_config.data = data_config
         generator = Glow(generator_config).to(device)
         generator_trainer = ModelTrainer(
             config=generator_config,

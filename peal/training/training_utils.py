@@ -54,7 +54,7 @@ def calculate_validation_statistics(
             min(max_validation_samples, len(dataloader.dataset)) / dataloader.batch_size
             + 0.9999
         )
-        * explainer.explainer_config["gradient_steps"],
+        * explainer.explainer_config.gradient_steps,
     )
     pbar.stored_values = {}
     for it, (x, y) in enumerate(dataloader):

@@ -53,12 +53,12 @@ def l2_criterion(model, pred, y):
 #
 def mixed_bce_mse_criterion(model, y_pred, y_target):
     loss_discrete = torch.nn.BCEWithLogitsLoss()(
-        y_pred[: config["data"]["output_split"]],
-        y_target[: config["data"]["output_split"]],
+        y_pred[: config.data.output_split],
+        y_target[: config.data.output_split],
     )
     loss_continuous = torch.nn.MSELoss()(
-        y_pred[config["data"]["output_split"] :],
-        y_target[config["data"]["output_split"] :],
+        y_pred[config.data.output_split :],
+        y_target[config.data.output_split :],
     )
     return loss_discrete + loss_continuous
 
@@ -72,7 +72,7 @@ class LogDiscriminantJacobianCriterion(nn.Module):
         self.device = device
 
     def forward(self, model, y_pred, y_target):
-        n_pixel = np.prod(self.config["data"]["input_size"])
+        n_pixel = np.prod(self.config.data.input_size)
         # return torch.mean(torch.norm(y_pred[2])) / (math.log(2) * n_pixel)
         loss = y_pred[2]
         return -torch.mean(loss / (math.log(2) * n_pixel))
@@ -87,7 +87,7 @@ class LogProbCriterion(nn.Module):
         self.device = device
 
     def forward(self, model, y_pred, y_target):
-        n_pixel = np.prod(self.config["data"]["input_size"])
+        n_pixel = np.prod(self.config.data.input_size)
         loss = y_pred[1]
         return -torch.mean(loss / (math.log(2) * n_pixel))
 
@@ -101,9 +101,9 @@ class ConstantCriterion(nn.Module):
         self.device = device
 
     def forward(self, model, y_pred, y_target):
-        n_pixel = np.prod(self.config["data"]["input_size"])
+        n_pixel = np.prod(self.config.data.input_size)
         # just for sake that loss does not get negative
-        loss = -self.config["architecture"]["n_bits"] * n_pixel
+        loss = -self.config.architecture.n_bits * n_pixel
         return -torch.tensor(loss / (math.log(2) * n_pixel)).to(self.device)
 
 
@@ -150,17 +150,17 @@ class AdversarialCriterion(nn.Module):
             "pad_type": "zero",
         }
         self.discriminator = MsImageDis(
-            input_dim=self.config["data"]["input_size"][0], params=params, device=device
+            input_dim=self.config.data.input_size[0], params=params, device=device
         ).to(self.device)
 
-        if self.config["training"]["optimizer"] == "sgd":
+        if self.config.training.optimizer == "sgd":
             self.dis_optimizer = torch.optim.SGD(
-                self.discriminator.parameters(), lr=config["training"]["learning_rate"]
+                self.discriminator.parameters(), lr=config.training.learning_rate
             )
 
-        elif self.config["training"]["optimizer"] == "adam":
+        elif self.config.training.optimizer == "adam":
             self.dis_optimizer = torch.optim.Adam(
-                self.discriminator.parameters(), lr=config["training"]["learning_rate"]
+                self.discriminator.parameters(), lr=config.training.learning_rate
             )
 
     def forward(self, model, y_pred, y_target):
@@ -174,7 +174,7 @@ class AdversarialCriterion(nn.Module):
             self.writer.add_scalar(
                 "train_adversarial_dis",
                 dis_loss.detach().cpu().item(),
-                self.config["training"]["global_train_step"],
+                self.config.training.global_train_step,
             )
             dis_loss.backward()
             self.dis_optimizer.step()
@@ -214,7 +214,7 @@ available_criterions = {
 def get_criterions(config):
     #
     criterions = {}
-    for criterion in config["task"]["criterions"].keys():
+    for criterion in config.task.criterions.keys():
         criterions[criterion] = available_criterions[criterion]
 
     return criterions

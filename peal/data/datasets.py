@@ -60,9 +60,9 @@ class SequenceDataset(PealDataset):
         x = torch.cat(
             [
                 x,
-                self.config["input_size"][1]
+                self.config.input_size[1]
                 * torch.ones(
-                    [self.config["input_size"][0] - x.shape[0]], dtype=torch.int64
+                    [self.config.input_size[0] - x.shape[0]], dtype=torch.int64
                 ),
             ]
         )
@@ -111,7 +111,7 @@ class SymbolicDataset(PealDataset):
             data_dir=data_dir,
             config=config,
             mode=mode,
-            set_negative_to_zero=config["set_negative_to_zero"]
+            set_negative_to_zero=config.set_negative_to_zero
             if "set_negative_to_zero" in config.keys()
             else False,
         )
@@ -122,10 +122,10 @@ class SymbolicDataset(PealDataset):
     @property
     def output_size(self):
         if self.task_config is not None:
-            return len(self.task_config["y_selection"])
+            return len(self.task_config.y_selection)
 
         else:
-            return self.config["output_size"]
+            return self.config.output_size
 
     def __getitem__(self, idx):
         name = self.keys[idx]
@@ -135,10 +135,10 @@ class SymbolicDataset(PealDataset):
         if (
             not self.task_config is None
             and "x_selection" in self.task_config.keys()
-            and not len(self.task_config["x_selection"]) == 0
+            and not len(self.task_config.x_selection) == 0
         ):
-            x = torch.zeros([len(self.task_config["x_selection"])], dtype=torch.float32)
-            for idx, selection in enumerate(self.task_config["x_selection"]):
+            x = torch.zeros([len(self.task_config.x_selection)], dtype=torch.float32)
+            for idx, selection in enumerate(self.task_config.x_selection):
                 x[idx] = data[self.attributes.index(selection)]
 
         else:
@@ -147,10 +147,10 @@ class SymbolicDataset(PealDataset):
         if (
             not self.task_config is None
             and "y_selection" in self.task_config.keys()
-            and not len(self.task_config["y_selection"]) == 0
+            and not len(self.task_config.y_selection) == 0
         ):
-            y = torch.zeros([len(self.task_config["y_selection"])])
-            for idx, selection in enumerate(self.task_config["y_selection"]):
+            y = torch.zeros([len(self.task_config.y_selection)])
+            for idx, selection in enumerate(self.task_config.y_selection):
                 y[idx] = data[self.attributes.index(selection)]
 
             if y.shape[0] == 1:
@@ -188,8 +188,8 @@ class SymbolicDataset(PealDataset):
         x = torch.stack(x_list, dim=0)
         y = torch.stack([torch.tensor([y]) for y in y_list], dim=0)
         data = torch.cat([x, y], dim=1)
-        features = copy.deepcopy(self.task_config["x_selection"])  # change
-        targets = copy.deepcopy(self.task_config["y_selection"])  # change
+        features = copy.deepcopy(self.task_config.x_selection)  # change
+        targets = copy.deepcopy(self.task_config.y_selection)  # change
         np.savetxt(
             output_dir + ".csv",
             data.numpy(),
@@ -375,7 +375,7 @@ class Image2MixedDataset(ImageDataset):
         self.hints_enabled = False
         data_dir = os.path.join(root_dir, "data.csv")
         self.attributes, self.data, self.keys = parse_csv(
-            data_dir, config, mode, key_type="name", delimiter=config["delimiter"]
+            data_dir, config, mode, key_type="name", delimiter=config.delimiter
         )
         self.return_dict = return_dict
 
@@ -385,7 +385,7 @@ class Image2MixedDataset(ImageDataset):
             return len(self.attributes)
 
         else:
-            return len(self.task_config["selection"])
+            return len(self.task_config.selection)
 
     def __len__(self):
         return len(self.keys)
@@ -406,17 +406,17 @@ class Image2MixedDataset(ImageDataset):
 
         targets = self.data[name]
 
-        if not self.task_config is None and not len(self.task_config["selection"]) == 0:
-            target = torch.zeros([len(self.task_config["selection"])])
-            for idx, selection in enumerate(self.task_config["selection"]):
+        if not self.task_config is None and not len(self.task_config.selection) == 0:
+            target = torch.zeros([len(self.task_config.selection)])
+            for idx, selection in enumerate(self.task_config.selection):
                 target[idx] = targets[self.attributes.index(selection)]
 
         else:
             target = torch.tensor(
-                targets[: self.config["output_size"]], dtype=torch.float32
+                targets[: self.config.output_size], dtype=torch.float32
             )
 
-        if not self.task_config is None and "ce" in self.task_config["criterions"]:
+        if not self.task_config is None and "ce" in self.task_config.criterions:
             assert (
                 target.shape[0] == 1
             ), "output shape inacceptable for singleclass classification"
@@ -469,7 +469,7 @@ class Image2ClassDataset(ImageDataset):
         """
         self.config = config
         self.root_dir = os.path.join(root_dir, "imgs")
-        if "has_hints" in self.config.keys() and self.config["has_hints"]:
+        if "has_hints" in self.config.keys() and self.config.has_hints:
             self.mask_dir = os.path.join(root_dir, "masks")
             self.all_urls = []
             self.urls_with_hints = []
@@ -492,19 +492,19 @@ class Image2ClassDataset(ImageDataset):
         random.shuffle(self.urls)
 
         if mode == "train":
-            self.urls = self.urls[: int(config["split"][0] * len(self.urls))]
+            self.urls = self.urls[: int(config.split[0] * len(self.urls))]
 
         elif mode == "val":
             self.urls = self.urls[
-                int(config["split"][0] * len(self.urls)) : int(
-                    config["split"][1] * len(self.urls)
+                int(config.split[0] * len(self.urls)) : int(
+                    config.split[1] * len(self.urls)
                 )
             ]
 
         elif mode == "test":
-            self.urls = self.urls[int(config["split"][1] * len(self.urls)) :]
+            self.urls = self.urls[int(config.split[1] * len(self.urls)) :]
 
-        if "has_hints" in self.config.keys() and self.config["has_hints"]:
+        if "has_hints" in self.config.keys() and self.config.has_hints:
             self.all_urls = copy.deepcopy(self.urls)
             for target_str, file in self.all_urls:
                 if os.path.exists(os.path.join(self.mask_dir, file)):
@@ -523,7 +523,7 @@ class Image2ClassDataset(ImageDataset):
 
     @property
     def output_size(self):
-        return len(self.config["output_size"])
+        return len(self.config.output_size)
 
     def __len__(self):
         return len(self.urls)
@@ -535,8 +535,8 @@ class Image2ClassDataset(ImageDataset):
         state = torch.get_rng_state()
         img = self.transform(img)
 
-        if img.shape[0] == 1 and self.config["input_size"][0] != 1:
-            img = torch.tile(img, [self.config["input_size"][0], 1, 1])
+        if img.shape[0] == 1 and self.config.input_size[0] != 1:
+            img = torch.tile(img, [self.config.input_size[0], 1, 1])
 
         # target = torch.zeros([len(self.idx_to_name)], dtype=torch.float32)
         # target[self.idx_to_name.index(target_str)] = 1.0
