@@ -1,64 +1,119 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>cfkd - Custom Dataset Implementation</title>
+    <title>PealDataset Class Documentation</title>
 </head>
 <body>
-  <h1>cfkd - Custom Dataset Implementation</h1>
+    <h1>PealDataset Class</h1>
+    <p>
+        This is the base class for all datasets in PEAL. It is a wrapper around
+        <code>torch.utils.data.Dataset (nn.Module)</code>, which serves as the parent class for all datasets in PEAL.
+    </p>
 
-  <h2>Introduction</h2>
-  <p>In cfkd, you have the ability to create custom datasets to handle your specific data sources and formats. Custom datasets allow you to encapsulate your data and provide a consistent interface for accessing and manipulating it.</p>
+    <h2>Methods</h2>
 
-  <h2>Implementing a Custom Dataset</h2>
-  <p>To implement a custom dataset in cfkd, follow these steps:</p>
+    <h3><code>generate_contrastive_collage</code></h3>
+    <p>
+        <code>generate_contrastive_collage(self, x, x_counterfactual, target_confidence_goal, y_target, y_source, base_path, start_idx)</code><br>
+        This function generates a collage of the input and the counterfactual.
+    </p>
+    <p><strong>Parameters:</strong></p>
+    <ul>
+        <li><code>x</code> (torch.tensor): The input batch.</li>
+        <li><code>x_counterfactual</code> (torch.tensor): The counterfactual batch.</li>
+        <li><code>target_confidence_goal</code>: The target confidence goal.</li>
+        <li><code>y_target</code>: The target label.</li>
+        <li><code>y_source</code>: The source label.</li>
+        <li><code>base_path</code>: The base path.</li>
+        <li><code>start_idx</code>: The starting index.</li>
+    </ul>
+    <p><strong>Returns:</strong></p>
+    <ul>
+        <li><code>torch.tensor</code>: The collage.</li>
+    </ul>
 
-  <ol>
-    <li>Create a Python class that inherits from the base `peal.data.dataset_interfaces.PealDataset` class.</li>
-    <li>In your custom dataset class, implement the following methods:
-      <ul>
-        <li>`__init__(self, ...)` - Initialize your dataset, load data, and set up any necessary variables.</li>
-        <li>`__len__(self)` - Return the total number of samples in your dataset.</li>
-        <li>`__getitem__(self, index)` - Return a specific sample from the dataset based on the given index.</li>
-      </ul>
-    </li>
-    <li>You can also implement additional methods, such as `__repr__()` for a human-readable representation of the dataset or any other methods specific to your needs.</li>
-  </ol>
+    <h3><code>serialize_dataset</code></h3>
+    <p>
+        <code>serialize_dataset(self, output_dir, x_list, y_list, sample_names=None)</code><br>
+        This function serializes the dataset to a given directory.
+    </p>
+    <p><strong>Parameters:</strong></p>
+    <ul>
+        <li><code>output_dir</code> (Path): The output directory.</li>
+        <li><code>x_list</code> (list): The list of inputs.</li>
+        <li><code>y_list</code> (list): The list of labels.</li>
+        <li><code>sample_names</code> (list, optional): The list of sample names. Defaults to None.</li>
+    </ul>
 
-  <h2>Example</h2>
-  <p>Here's an example implementation of a custom dataset class that represents a collection of images:</p>
+    <h3><code>project_to_pytorch_default</code></h3>
+    <p>
+        <code>project_to_pytorch_default(self, x)</code><br>
+        This function maps processed data sample back to PyTorch default format.
+    </p>
+    <p><strong>Parameters:</strong></p>
+    <ul>
+        <li><code>x</code> (torch.tensor): The data sample in the processed format.</li>
+    </ul>
+    <p><strong>Returns:</strong></p>
+    <ul>
+        <li><code>torch.tensor</code>: The data sample in the PyTorch default format.</li>
+    </ul>
 
-  <pre><code>import cfkd
+    <h3><code>project_from_pytorch_default</code></h3>
+    <p>
+        <code>project_from_pytorch_default(self, x)</code><br>
+        This function maps PyTorch default image to the processed format.
+    </p>
+    <p><strong>Parameters:</strong></p>
+    <ul>
+        <li><code>x</code> (torch.tensor): The data sample in the PyTorch default format.</li>
+    </ul>
+    <p><strong>Returns:</strong></p>
+    <ul>
+        <li><code>torch.tensor</code>: The data sample in the processed format.</li>
+    </ul>
 
-class ImageDataset(cfkd.Dataset):
-    def __init__(self, image_files, transform=None):
-        self.image_files = image_files
-        self.transform = transform
+    <h3><code>track_generator_performance</code></h3>
+    <p>
+        <code>track_generator_performance(self, generator: Generator, batch_size=1)</code><br>
+        This function tracks the performance of the generator.
+    </p>
+    <p><strong>Parameters:</strong></p>
+    <ul>
+        <li><code>generator</code> (Generator): The generator.</li>
+        <li><code>batch_size</code> (int, optional): The batch size. Defaults to 1.</li>
+    </ul>
+    <p><strong>Returns:</strong></p>
+    <ul>
+        <li><code>{}</code>: An empty dictionary.</li>
+    </ul>
 
-    def __len__(self):
-        return len(self.image_files)
+    <h2>Example Usage</h2>
 
-    def __getitem__(self, index):
-        image_path = self.image_files[index]
-        image = load_image(image_path)  # Custom function to load image
-        if self.transform:
-            image = self.transform(image)
-        return image
+    <h3>Creating an Image2ClassDataset</h3>
+    <p>First, import the required modules:</p>
+    <pre><code>import os
+import random
+import copy
+import torch
+from torchvision.transforms import ToTensor
+from PIL import Image</code></pre>
 
-# Usage example
-image_files = ['image1.jpg', 'image2.jpg', 'image3.jpg']
-dataset = ImageDataset(image_files)
-for image in dataset:
-    # Process each image
-    process_image(image)</code></pre>
+    <p>Next, define the configuration parameters for the dataset:</p>
+    <pre><code>config = {
+    "input_size": (64, 64),
+    "output_size": ["class_1", "class_2", "class_3"],
+    "split": [0.8, 0.9],
+    "has_hints": True  # Set this to False if there are no hints/masks available
+}</code></pre>
 
-  <p>In the above example, the `ImageDataset` class represents a dataset of images. The class inherits from `cfkd.Dataset` and implements the required methods `__init__`, `__len__`, and `__getitem__`. The dataset is then used in a loop to process each image in the dataset.</p>
+    <p>Instantiate the Image2ClassDataset:</p>
+    <pre><code>root_dir = "/path/to/dataset"
+mode = "train"
+transform = ToTensor()
+task_config = None
+return_dict = False
 
-  <h2>Conclusion</h2>
-  <p>Implementing custom datasets in cfkd provides a flexible and modular way to handle different data sources and formats. With custom datasets, you can encapsulate your data and easily integrate it into your machine learning workflows.</p>
-
-  <p>For more information and advanced usage of custom datasets, refer to the official cfkd documentation.</p>
-
-  <h2>Support</h2>
-  <p>If you have any questions or need assistance with implementing custom datasets in cfkd, feel free to reach out to our support team at support@cfkd-library.com.</p>
+dataset = Image2ClassDataset(root_dir, mode, config, transform, task_config, return_dict)</code></pre>
 </body>
 </html>

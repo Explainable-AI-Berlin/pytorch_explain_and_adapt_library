@@ -1,55 +1,88 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>cfkd - Custom Generator Implementation</title>
+    <title>Custom Generators in PyTorch</title>
 </head>
 <body>
-  <h1>cfkd - Custom Generator Implementation</h1>
+    <h1>Custom Generators in PyTorch</h1>
+    <h2>InvertibleGenerator</h2>
+    <p>
+        The InvertibleGenerator class is responsible for encoding and decoding data samples to/from latent vectors.
+    </p>
+    <pre>
+import torch
+from torch import nn
 
-  <h2>Introduction</h2>
-  <p>In cfkd, you have the flexibility to implement custom generators for various purposes. Custom generators allow you to create specialized iterable objects that can be used in loops or other iterable operations.</p>
+class InvertibleGenerator(Generator):
+    def encode(self, x):
+        # Implementation of encoding data samples to latent vectors
+        pass
 
-  <h2>Implementing a Custom Generator</h2>
-  <p>To implement a custom generator in cfkd, follow these steps:</p>
+    def decode(self, z):
+        # Implementation of decoding latent vectors to data samples
+        pass
 
-  <ol>
-    <li>Create a Python class and define it as an iterator by implementing the `__iter__` and `__next__` methods.</li>
-    <li>In the `__iter__` method, return the instance of the class itself to make it iterable.</li>
-    <li>In the `__next__` method, define the logic for generating and returning the next value in the iteration. Raise the `StopIteration` exception when there are no more values to generate.</li>
-  </ol>
+    def sample_z(self, batch_size=1):
+        # Implementation of sampling latent vectors from the prior
+        pass
 
-  <h2>Example</h2>
-  <p>Here's an example implementation of a custom generator that generates a sequence of even numbers:</p>
+    def log_prob_z(self, z):
+        # Implementation of computing the log probability of latent vectors
+        pass
 
-  <pre><code>class EvenNumberGenerator:
-    def __init__(self, limit):
-        self.limit = limit
-        self.current = 0
+    def sample_x(self, batch_size=1):
+        z = self.sample_z(batch_size)
+        return self.decode(z)
 
-    def __iter__(self):
-        return self
+    def log_prob_x(self, x):
+        z = self.encode(x)
+        return self.log_prob_z(z)
+    </pre>
+    <p>Example:</p>
+    <pre>
+# Create an instance of the InvertibleGenerator
+generator = InvertibleGenerator()
 
-    def __next__(self):
-        if self.current >= self.limit:
-            raise StopIteration
-        else:
-            even_number = self.current
-            self.current += 2
-            return even_number
+# Sample a batch of latent vectors and decode them to data samples
+batch_size = 5
+generated_data = generator.sample_x(batch_size)
+print(generated_data)
+    </pre>
 
-# Usage example
-even_numbers = EvenNumberGenerator(10)
-for number in even_numbers:
-    print(number)</code></pre>
+    <h2>EditCapableGenerator</h2>
+    <p>
+        The EditCapableGenerator class is responsible for editing input data samples to match a target confidence goal and target classes according to a classifier.
+    </p>
+    <pre>
+class EditCapableGenerator(Generator):
+    def edit(
+        self,
+        x_in: torch.Tensor,
+        target_confidence_goal: float,
+        target_classes: torch.Tensor,
+        classifier: nn.Module,
+    ):
+        # Implementation of editing the input data to match target confidence goal and target classes
+        pass
+    </pre>
+    <p>Example:</p>
+    <pre>
+# Create an instance of the EditCapableGenerator
+generator = EditCapableGenerator()
 
-  <p>In the above example, the `EvenNumberGenerator` class generates even numbers up to a given limit. The generator is used in a loop to print each even number until the limit is reached.</p>
+# Assuming you have a trained classifier, create an instance of the classifier
+classifier = YourClassifier()
 
-  <h2>Conclusion</h2>
-  <p>Implementing custom generators in cfkd provides a powerful way to create iterable objects tailored to your specific needs. With custom generators, you can efficiently generate and process data in a flexible and controlled manner.</p>
+# Example input data
+input_data = torch.tensor([1.0, 2.0, 3.0])
 
-  <p>For more information and advanced usage of custom generators, refer to the official cfkd documentation.</p>
+# Target confidence goal and target classes
+target_confidence_goal = 0.8
+target_classes = torch.tensor([0, 1])
 
-  <h2>Support</h2>
-  <p>If you have any questions or need assistance with implementing custom generators in cfkd, feel free to reach out to our support team at support@cfkd-library.com.</p>
+# Edit the input data to match the target confidence goal and classes
+edited_data = generator.edit(input_data, target_confidence_goal, target_classes, classifier)
+print(edited_data)
+    </pre>
 </body>
 </html>

@@ -12,11 +12,11 @@ class TrainingConfig(BaseModel):
     '''
     Logs how many steps the model was trained with already.
     '''
-    global_train_step : PositiveInt = 0
+    global_train_step : int = 0
     '''
     Logs how many steps the model was validated for.
     '''
-    global_validation_step : PositiveInt = 0
+    global_validation_step : int = 0
     '''
     The current epoch of the model training.
     '''

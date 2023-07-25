@@ -12,9 +12,25 @@ class Generator(nn.Module):
 
 class InvertibleGenerator(Generator):
     def encode(self, x):
+        '''
+        This function encodes a batch of data samples to latent vectors
+        Args:
+            x: A batch of data samples
+
+        Returns:
+            A batch of latent vectors
+        '''
         pass
 
     def decode(self, z):
+        '''
+        This function decodes a batch of latent vectors to data samples
+        Args:
+            z: A batch of latent vectors
+
+        Returns:
+            A batch of data samples
+        '''
         pass
 
     def sample_z(self, batch_size=1):
@@ -24,6 +40,14 @@ class InvertibleGenerator(Generator):
         pass
 
     def log_prob_z(self, z):
+        '''
+        This function computes the log probability of a batch of latent vectors
+        Args:
+            z: A batch of latent vectors
+
+        Returns:
+            The log probability of the batch of latent vectors
+        '''
         pass
 
     def sample_x(self, batch_size=1):
@@ -34,6 +58,14 @@ class InvertibleGenerator(Generator):
         return self.decode(z)
 
     def log_prob_x(self, x):
+        '''
+        This function computes the log probability of a batch of data samples
+        Args:
+            x: A batch of data samples
+
+        Returns:
+            The log probability of the batch of data samples
+        '''
         z = self.encode(x)
         return self.log_prob_z(z)
 
@@ -46,4 +78,15 @@ class EditCapableGenerator(Generator):
         target_classes: torch.Tensor,
         classifier: nn.Module,
     ):
+        '''
+        This function edits the input to match the target confidence goal and target classes
+        Args:
+            x_in: The input
+            target_confidence_goal: The target confidence goal
+            target_classes: The target classes
+            classifier: The classifier according to which the confidence is measured
+
+        Returns:
+            torch.Tensor: The edited input
+        '''
         pass

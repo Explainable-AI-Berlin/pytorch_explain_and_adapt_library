@@ -1,8 +1,9 @@
-'type'                    : 'img2latent'
-'block_type'              : 'resnet'
-'dimension_reduction'     : 'mean'
+'layers' : [
+  ['vgg', 64, 2, True],
+  ['resnet', 64, 2, True],
+  ['resnet', 128, 2, True],
+  ['resnet', 256, 2, True],
+  ['resnet', 512, 2, True],
+  ['mean'],
+]
 'activation'              : 'ReLU'
-'neuron_numbers'          : [64, 64, 128, 256, 512] # 128, 64, 32, 16, 8
-'blocks_per_layer'        : 2
-'use_batchnorm'           : True
-'dropout'                 : 0.0

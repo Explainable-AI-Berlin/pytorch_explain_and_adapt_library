@@ -38,11 +38,10 @@ class TaskConfig(BaseModel):
     '''
     kwargs : dict = {}
 
-class ModelConfig(BaseModel):
+class ModelConfig:
     '''
-    The config of the data used for training the model.
+    The config template for a model.
     '''
-    data : DataConfig
     '''
     The config of the architecture of the model.
     '''
@@ -56,7 +55,18 @@ class ModelConfig(BaseModel):
     '''
     task : TaskConfig
     '''
+    The config of the data used for training the model.
+    '''
+    data : DataConfig = None
+    '''
     A dict containing all variables that could not be given with the current config structure
     '''
     kwargs : dict = {}
+
+    def __init__(self, architecture: ArchitectureConfig, training: TrainingConfig, task: TaskConfig, data: DataConfig = None, **kwargs):
+        self.architecture = architecture
+        self.training = training
+        self.task = task
+        self.data = data
+        self.kwargs = kwargs
 

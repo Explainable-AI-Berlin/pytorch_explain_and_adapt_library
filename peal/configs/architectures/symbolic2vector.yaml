@@ -1,3 +1,5 @@
+'layers' : [
+  ['fc', 512, 0.25],
+  ['fc', 512, 0.5]
+]
 'activation'              : 'ReLU'
-'neuron_numbers_encoder'  : [512]
-'neuron_numbers_decoder'  : [512]

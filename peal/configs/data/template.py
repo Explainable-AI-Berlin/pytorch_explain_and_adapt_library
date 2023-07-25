@@ -28,7 +28,7 @@ class DataConfig(BaseModel):
     For continuous: [NumVariables]
     For mixed: [NumBinaryClasses + NumVariables]
     '''
-    output_size: list[int]
+    output_size: PositiveInt
     '''
     The number of samples in the dataset.
     Sometimes important when executing specific experiments.

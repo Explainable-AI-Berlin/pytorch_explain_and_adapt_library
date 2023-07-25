@@ -11,6 +11,7 @@ import socket
 import shutil
 
 from pkg_resources import resource_filename
+from pydantic import BaseModel
 
 
 def set_adaptive_batch_size(config, gigabyte_vram, samples_per_iteration):
@@ -41,7 +42,9 @@ def request(name, default, is_asking=True):
     if not is_asking:
         return default
 
-    answer = input("Do you want to change value of " + str(name) + "==" + str(default) + "? [y/n]")
+    answer = input(
+        "Do you want to change value of " + str(name) + "==" + str(default) + "? [y/n]"
+    )
     if answer == "n":
         return default
 
@@ -64,8 +67,7 @@ def get_project_resource_dir():
     )
 
 
-def load_yaml_config(config_path):
-
+def _load_yaml_config(config_path):
     def open_config(config_path):
         with open(config_path, "r") as stream:
             try:
@@ -83,33 +85,34 @@ def load_yaml_config(config_path):
         if split_path[0] == "$PEAL":
             config_path = os.path.join(get_project_resource_dir(), *split_path[1:])
 
-        #with open(config_path, "r") as stream:
-        #    try:
-        #        config = yaml.safe_load(stream)
-        #
-        #    except yaml.YAMLError as exc:
-        #        print(exc)
-        #        raise
-
         try:
             config = open_config(config_path)
         except Exception as e:
             error, _, _ = sys.exc_info()
-            if error.__name__ == 'OSError' or error.__name__ == 'FileNotFoundError':
-                config_path = os.path.abspath(os.path.join('..', *split_path))
-                config_path = config_path.replace('$PEAL', 'peal')
+            if error.__name__ == "OSError" or error.__name__ == "FileNotFoundError":
+                config_path = os.path.abspath(os.path.join("..", *split_path))
+                config_path = config_path.replace("$PEAL", "peal")
                 config = open_config(config_path)
             else:
                 raise e
 
         for key in config.keys():
             if isinstance(config[key], str) and config[key][-5:] == ".yaml":
-                config[key] = load_yaml_config(os.path.join(*config[key].split("/")))
+                config[key] = _load_yaml_config(os.path.join(*config[key].split("/")))
 
         return config
 
     else:
         raise Exception(config_path + " has no valid ending!")
+
+
+def load_yaml_config(config_path, config_model=None):
+    config_data = _load_yaml_config(config_path)
+    if config_model is None:
+        return config_data
+
+    else:
+        return config_model(**config_data)
 
 
 def move_to_device(X, device):
