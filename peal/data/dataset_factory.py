@@ -85,7 +85,7 @@ def get_datasets(config, base_dir, task_config=None, return_dict=False):
 
     #
     if config.input_type == "image":
-        if "crop_size" in config.keys():
+        if not config.crop_size is None:
             transform_list_train.append(Padding(config.crop_size[1:]))
             transform_list_test.append(Padding(config.crop_size[1:]))
 
@@ -98,7 +98,7 @@ def get_datasets(config, base_dir, task_config=None, return_dict=False):
             transform_list_train.append(transforms.RandomVerticalFlip(p=0.5))
 
         #
-        if "crop_size" in config.keys():
+        if not config.crop_size is None:
             transform_list_train.append(transforms.RandomCrop(config.crop_size[1:]))
             transform_list_test.append(transforms.CenterCrop(config.crop_size[1:]))
 

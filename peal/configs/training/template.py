@@ -30,6 +30,10 @@ class TrainingConfig(BaseModel):
     '''
     kwargs : dict = {}
     '''
+    The optimizer used for training the model.
+    '''
+    optimizer : str = 'Adam'
+    '''
     The reference vram of the gpu when using adaptive batch_size.
     '''
     gigabyte_vram : float = None

@@ -227,7 +227,7 @@ def get_dataloader(
     if (
         mode == "train"
         and not training_config is None
-        and "iterations_per_episode" in training_config.keys()
+        and not training_config.iterations_per_episode is None
     ):
         dataloader = DataloaderMixer(training_config, dataloader)
 

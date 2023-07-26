@@ -20,7 +20,7 @@ class DataConfig(BaseModel):
     For sequences: [MaxLength, NumTokens]
     For symbolic: [NumVariables]
     '''
-    input_size: list[int]
+    input_size: list[PositiveInt]
     '''
     The output size of the model.
     For singleclass: [NumClasses]
@@ -28,7 +28,7 @@ class DataConfig(BaseModel):
     For continuous: [NumVariables]
     For mixed: [NumBinaryClasses + NumVariables]
     '''
-    output_size: PositiveInt
+    output_size: list[PositiveInt]
     '''
     The number of samples in the dataset.
     Sometimes important when executing specific experiments.

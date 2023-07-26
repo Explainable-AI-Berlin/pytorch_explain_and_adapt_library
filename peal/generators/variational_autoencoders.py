@@ -125,10 +125,5 @@ class VAE(InvertibleGenerator):
         """
 
         z = self.encode(x)
-        if isinstance(self.decoder, Latent2SequenceDecoder):
-            x_hat = self.decode([z[0] + torch.randn_like(z[0]), x])
-
-        else:
-            x_hat = self.decode([z[0] + torch.randn_like(z[0])])
-
+        x_hat = self.decode([z[i] + torch.randn_like(z[i]) for i in range(len(z))])
         return x_hat, z

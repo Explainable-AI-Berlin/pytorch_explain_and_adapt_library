@@ -132,7 +132,7 @@ class SymbolicDataset(PealDataset):
 
         if (
             not self.task_config is None
-            and "x_selection" in self.task_config.keys()
+            and not self.task_config.x_selection is None
             and not len(self.task_config.x_selection) == 0
         ):
             x = torch.zeros([len(self.task_config.x_selection)], dtype=torch.float32)
@@ -144,7 +144,7 @@ class SymbolicDataset(PealDataset):
 
         if (
             not self.task_config is None
-            and "y_selection" in self.task_config.keys()
+            and not self.task_config.y_selection is None
             and not len(self.task_config.y_selection) == 0
         ):
             y = torch.zeros([len(self.task_config.y_selection)])

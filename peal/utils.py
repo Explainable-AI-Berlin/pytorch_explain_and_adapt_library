@@ -15,12 +15,12 @@ from pydantic import BaseModel
 
 
 def set_adaptive_batch_size(config, gigabyte_vram, samples_per_iteration):
-    if "base_batch_size" in config.keys():
+    if not config.base_batch_size is None:
         multiplier = float(
             np.prod(config.assumed_input_size)
             / np.prod(config.data.input_size)
         )
-        if not gigabyte_vram is None and "gigabyte_vram" in config.keys():
+        if not gigabyte_vram is None and not config.gigabyte_vram is None:
             multiplier = multiplier * (gigabyte_vram / config.gigabyte_vram)
 
         batch_size_adapted = max(1, int(config.base_batch_size * multiplier))

@@ -5,8 +5,8 @@
 'input_size'                         : [11]
 'label_noise'                        : 0.0
 'seed'                               : 0
-'output_type'                        : 'multiclass'
-'output_size'                        : 2
+'output_type'                        : 'singleclass'
+'output_size'                        : [2]
 'confounder_probability'             : 0.5
 'confounding_factors'                : ['Target', 'Confounder']
 'known_confounder'                   : True

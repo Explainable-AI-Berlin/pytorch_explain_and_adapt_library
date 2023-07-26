@@ -32,7 +32,7 @@ class Logger:
         self.writer = writer
         self.val_dataloader = val_dataloader
 
-        if "output_size" in self.config.task.keys():
+        if self.config.task.output_size is None:
             self.output_size = self.config.task.output_size
 
         else:
@@ -91,10 +91,15 @@ class Logger:
             self.predicted_classes.append(class_prediction.detach().to(torch.float32))
 
         #
-        if not "global_" + mode + "_step" in self.config.training.keys():
-            self.config.training["global_" + mode + "_step"] = 0
-
-        self.config.training["global_" + mode + "_step"] += 1
+        if hasattr(
+            self.config.training,
+            "global_" + mode + "_step",
+        ):
+            setattr(
+                self.config.training,
+                "global_" + mode + "_step",
+                getattr(self.config.training, "global_" + mode + "_step") + 1,
+            )
 
     def log_epoch(self, mode, pbar=None):
         """ """
@@ -116,7 +121,9 @@ class Logger:
                     torch.cat(self.targets).to(torch.int64), self.output_size
                 ).to(torch.float32)
             except Exception:
-                import pdb; pdb.set_trace()
+                import pdb
+
+                pdb.set_trace()
 
             predictions_one_hot = torch.nn.functional.one_hot(
                 torch.cat(self.predicted_classes).to(torch.int64), self.output_size

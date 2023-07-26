@@ -164,8 +164,7 @@ class ModelTrainer:
 
             loss_logs["loss"] = loss.detach().item()
 
-            if self.config.training.verbosity >= 1:
-                self.logger.log_step(mode, pred, y, loss_logs)
+            self.logger.log_step(mode, pred, y, loss_logs)
 
             # Backpropagation
             loss.backward()
