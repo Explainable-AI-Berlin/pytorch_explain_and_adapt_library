@@ -213,7 +213,7 @@ def get_dataloader(
     if batch_size is None:
         dataloader = DataLoader(
             dataset,
-            batch_size=training_config[mode + "_batch_size"],
+            batch_size=getattr(training_config, mode + "_batch_size"),
             num_workers=1,
         )
 
@@ -260,25 +260,10 @@ def create_class_ordered_batch(dataset, config):
 def create_dataloaders_from_datasource(
     datasource, config, enable_hints=False, gigabyte_vram=None
 ):
-    """ """
-    if "base_batch_size" in config.training.keys():
-        multiplier = float(
-            np.prod(config.training.assumed_input_size)
-            / np.prod(config.data.input_size)
-        )
-        if not gigabyte_vram is None and "gigabyte_vram" in config.training.keys():
-            multiplier = multiplier * (
-                gigabyte_vram / config.training.gigabyte_vram
-            )
-
-        batch_size_adapted = int(config.training.base_batch_size * multiplier)
-        if config.training.train_batch_size == -1:
-            config.training.train_batch_size = batch_size_adapted
-        if config.training.val_batch_size == -1:
-            config.training.val_batch_size = batch_size_adapted
-        if config.training.test_batch_size == -1:
-            config.training.test_batch_size = batch_size_adapted
-
+    """
+    This function creates the dataloaders from a given datasource.
+    """
+    # TODO could use set adaptive batch size here
     if (isinstance(datasource, tuple) or isinstance(datasource, list)) and isinstance(
         datasource[0], DataLoader
     ):
@@ -305,6 +290,8 @@ def create_dataloaders_from_datasource(
             else:
                 dataset_train, dataset_val, dataset_test = datasource
 
+        '''
+        # TODO reintegrate normalizing flows
         if "n_bits" in config.architecture.keys():
             dataset_train = GlowDatasetWrapper(
                 dataset_train, config.architecture.n_bits
@@ -315,9 +302,11 @@ def create_dataloaders_from_datasource(
             dataset_test = GlowDatasetWrapper(
                 dataset_test, config.architecture.n_bits
             )
-
+        
+        # TODO reintegrate hints
         elif enable_hints:
             dataset_train.enable_hints()
+        '''
 
         train_dataloader = get_dataloader(
             dataset=dataset_train,

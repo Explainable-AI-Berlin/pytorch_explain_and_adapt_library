@@ -175,17 +175,17 @@ class ArchitectureConfig:
             layer[0] contains the type of layer used:
             Options: ['fc', 'vgg','resnet','transformer']
             """
-            if layers[0] == "resnet":
-                self.layers.append(ResnetConfig(*layers[1:]))
+            if layer[0] == "resnet":
+                self.layers.append(ResnetConfig(*layer[1:]))
 
-            elif layers[0] == "fc":
-                self.layers.append(FCConfig(*layers[1:]))
+            elif layer[0] == "fc":
+                self.layers.append(FCConfig(*layer[1:]))
 
-            elif layers[0] == "vgg":
-                self.layers.append(VGGConfig(*layers[1:]))
+            elif layer[0] == "vgg":
+                self.layers.append(VGGConfig(*layer[1:]))
 
-            elif layers[0] == "transformer":
-                self.layers.append(TransformerConfig(*layers[1:]))
+            elif layer[0] == "transformer":
+                self.layers.append(TransformerConfig(*layer[1:]))
 
             else:
-                self.layers.append(layers[0])
+                self.layers.append(layer[0])

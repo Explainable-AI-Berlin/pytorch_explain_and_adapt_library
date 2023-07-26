@@ -38,7 +38,7 @@ class DataConfig(BaseModel):
     The name of the dataset.
     Only necessary to tell dataset factory which customized dataset class to use
     '''
-    name: str = None
+    dataset_class: str = None
     '''
     The split between train, validation and test set.
     '''
@@ -86,3 +86,7 @@ class DataConfig(BaseModel):
     Necessary to mimic real dataset behauviour and avoid trivial non-robust solutions.
     '''
     label_noise: float = None
+    '''
+    Whether to set negative values to zero.
+    '''
+    set_negative_to_zero: bool = False

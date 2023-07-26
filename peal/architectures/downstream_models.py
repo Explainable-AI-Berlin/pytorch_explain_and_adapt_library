@@ -58,7 +58,7 @@ class SequentialModel(torch.nn.Sequential):
         self,
         architecture_config: ArchitectureConfig,
         input_channels: PositiveInt,
-        output_channels: PositiveInt,
+        output_channels: PositiveInt = None,
     ):
         """
         This function initializes the sequential model.
@@ -107,6 +107,15 @@ class SequentialModel(torch.nn.Sequential):
                 layers.append(Mean())
                 tensor_dim = 0
 
-        last_layer_config = FCConfig(output_channels, tensor_dim=tensor_dim)
-        layers.append(FCBlock(last_layer_config, num_neurons_previous, activation))
+            else:
+                import pdb; pdb.set_trace()
+                raise ValueError("Unknown layer config: {}".format(layer_config))
+
+        if not output_channels is None:
+            last_layer_config = FCConfig(output_channels, tensor_dim=tensor_dim)
+            layers.append(FCBlock(last_layer_config, num_neurons_previous, activation))
+            num_neurons_previous = output_channels
+
+        self.output_channels = num_neurons_previous
+
         super(SequentialModel, self).__init__(*layers)

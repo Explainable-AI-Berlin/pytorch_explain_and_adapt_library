@@ -111,9 +111,7 @@ class SymbolicDataset(PealDataset):
             data_dir=data_dir,
             config=config,
             mode=mode,
-            set_negative_to_zero=config.set_negative_to_zero
-            if "set_negative_to_zero" in config.keys()
-            else False,
+            set_negative_to_zero=config.set_negative_to_zero,
         )
 
     def __len__(self):

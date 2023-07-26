@@ -1,115 +1,67 @@
 import torch
 
 from torch import nn
+from pydantic import PositiveInt
 
 from peal.generators.interfaces import InvertibleGenerator
-from peal.architectures.model_parts import Img2LatentEncoder
-from peal.architectures.model_parts import Sequence2LatentEncoder
-from peal.architectures.model_parts import Vector2LatentEncoder
-from peal.architectures.model_parts import Latent2ImgDecoder
-from peal.architectures.model_parts import Latent2SequenceDecoder
-from peal.architectures.model_parts import Latent2VectorDecoder
+from peal.architectures.downstream_models import SequentialModel
+from peal.configs.generators.template import VAEConfig
 
 
 class VAE(InvertibleGenerator):
     """
-    Implements a Variational Autoencoder (VAE) as a generator in a standartized way so that it can be used in the PEAL framework.
+    Implements a Variational Autoencoder (VAE) as a generator in a standartized way
+    so that it can be used in the PEAL framework.
 
     Args:
         InvertibleGenerator (nn.Module): The base class for all invertible generators
     """
 
-    def __init__(self, config, encoder=None, decoder=None):
+    def __init__(
+        self,
+        config: VAEConfig,
+        input_channels: PositiveInt,
+        encoder: nn.Module = None,
+        decoder: nn.Module = None,
+    ):
         """
         The constructor of the VAE class.
 
         Args:
-            config (dict): The configuration dictionary of the experiment.
+            config (VAEConfig): The configuration dictionary of the experiment.
+            input_channels (PositiveInt): The number of input channels of the VAE.
             encoder (nn.Module, optional): The encoder of the VAE. Defaults to None.
             decoder (nn.Module, optional): The decoder of the VAE. Defaults to None.
         """
         super().__init__()
         self.config = config
+        self.input_channels = input_channels
         if encoder is None:
-            if self.config.data.input_type == "image":
-                self.encoder = Img2LatentEncoder(
-                    neuron_numbers=config.architecture.neuron_numbers_encoder,
-                    blocks_per_layer=config.architecture.blocks_per_layer,
-                    block_type=config.architecture.block_type,
-                    input_channels=config.data.input_size[0],
-                    use_batchnorm=config.architecture.use_batchnorm,
-                    activation=nn.ReLU,
-                )
-
-            elif self.config.data.input_type == "sequence":
-                self.encoder = Sequence2LatentEncoder(
-                    num_blocks=config.architecture.num_blocks,
-                    embedding_dim=config.architecture.neuron_numbers_encoder[-1],
-                    num_heads=config.architecture.num_heads,
-                    input_channels=config.data.input_size[-1] + 2,
-                    activation=nn.ReLU,
-                )
-
-            elif self.config.data.input_type == "symbolic":
-                self.encoder = Vector2LatentEncoder(
-                    input_channels=self.config.data.input_size[0],
-                    activation=nn.ReLU,
-                    neuron_numbers=self.config.architecture[
-                        "neuron_numbers_encoder"
-                    ],
-                )
+            self.encoder = SequentialModel(self.config.encoder, self.input_channels)
 
         else:
             self.encoder = encoder
 
         if decoder is None:
-            if self.config.data.input_type == "image":
-                self.decoder = Latent2ImgDecoder(
-                    neuron_numbers=config.architecture.neuron_numbers_decoder,
-                    blocks_per_layer=config.architecture.blocks_per_layer,
-                    block_type=config.architecture.block_type,
-                    output_size=config.data.input_size[0],
-                    use_batchnorm=config.architecture.use_batchnorm,
-                    activation=nn.ReLU,
-                )
-
-            elif self.config.data.input_type == "sequence":
-                self.decoder = Latent2SequenceDecoder(
-                    num_blocks=config.architecture.num_blocks,
-                    embedding_dim=config.architecture.neuron_numbers_encoder[-1],
-                    num_heads=config.architecture.num_heads,
-                    input_channels=config.data.input_size[-1] + 2,
-                    activation=nn.ReLU,
-                    max_length=self.config.data.input_size[0],
-                    embedding=list(self.encoder.children())[0],
-                )
-
-            elif self.config.data.input_type == "symbolic":
-                self.decoder = Latent2VectorDecoder(
-                    output_size=self.config.data.input_size[0],
-                    num_hidden_in=self.config.architecture.neuron_numbers_encoder[
-                        -1
-                    ],
-                    activation=nn.ReLU,
-                    neuron_numbers=self.config.architecture[
-                        "neuron_numbers_decoder"
-                    ],
-                )
+            self.decoder = SequentialModel(
+                self.config.decoder, self.encoder.output_channels, self.input_channels
+            )
 
         else:
             self.decoder = decoder
 
         # The prior is a standard normal distribution
+        # TODO this will become a problem with external encoders
         self.register_buffer(
             "mean",
             torch.zeros(
-                self.config.architecture.neuron_numbers_encoder[-1],
+                self.encoder.output_channels,
             ),
         )
         self.register_buffer(
             "var",
             torch.ones(
-                self.config.architecture.neuron_numbers_encoder[-1],
+                self.encoder.output_channels,
             ),
         )
 
