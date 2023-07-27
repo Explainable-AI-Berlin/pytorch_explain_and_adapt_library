@@ -1,5 +1,5 @@
 'batch_size'                           :  1 # [1,-1] what batch_size is used for creating the confounders?
-'num_batches'                          :  -1 # number of batches per iteration that confounders are calculated for
+'num_batches'                          :  null # number of batches per iteration that confounders are calculated for
 'base_batch_size'                      :  10
 'gigabyte_vram'                        :  40
 'max_train_samples'                    :  500 # [10, 500]
@@ -19,10 +19,10 @@
 'replacement_strategy'                 :  'delayed'
 'explainer'                            :  '$PEAL/configs/explainers/counterfactual_default.yaml'
 'training'                             :  '$PEAL/configs/training/finetune_classifier.yaml'
-'data'                                 :  '$PEAL/configs/data/data_default.yaml'
-'architecture'                         :  {}
+#'data'                                 :  '$PEAL/configs/data/data_default.yaml'
 'task':
   'criterions':
     'ce'     : 1.0
     'l1'     : 10000.0
   'output_type'             : 'singleclass'
+  'output_channels'         : 2

@@ -119,8 +119,8 @@ class SymbolicDataset(PealDataset):
 
     @property
     def output_size(self):
-        if self.task_config is not None:
-            return len(self.task_config.y_selection)
+        if self.task_config is not None and self.task_config.y_selection is not None:
+            return self.task_config.output_channels
 
         else:
             return self.config.output_size
@@ -149,7 +149,13 @@ class SymbolicDataset(PealDataset):
         ):
             y = torch.zeros([len(self.task_config.y_selection)])
             for idx, selection in enumerate(self.task_config.y_selection):
-                y[idx] = data[self.attributes.index(selection)]
+                try:
+                    y[idx] = data[self.attributes.index(selection)]
+
+                except:
+                    print(data)
+                    print(self.data)
+                    quit()
 
             if y.shape[0] == 1:
                 y = y[0]
@@ -186,14 +192,32 @@ class SymbolicDataset(PealDataset):
         x = torch.stack(x_list, dim=0)
         y = torch.stack([torch.tensor([y]) for y in y_list], dim=0)
         data = torch.cat([x, y], dim=1)
-        features = copy.deepcopy(self.task_config.x_selection)  # change
-        targets = copy.deepcopy(self.task_config.y_selection)  # change
+        if (
+            not self.task_config is None
+            and not self.task_config.x_selection is None
+            and not len(self.task_config.x_selection) == 0
+        ):
+            features = copy.deepcopy(self.task_config.x_selection)
+
+        else:
+            features = copy.deepcopy(self.attributes[:-1])
+
+        if (
+            not self.task_config is None
+            and not self.task_config.y_selection is None
+            and not len(self.task_config.y_selection) == 0
+        ):
+            targets = copy.deepcopy(self.task_config.y_selection)
+
+        else:
+            targets = copy.deepcopy(self.attributes[-1])
+
         np.savetxt(
             output_dir + ".csv",
             data.numpy(),
             delimiter=",",
-            # header=",".join(self.attributes),
             header=",".join(features + targets),
+            comments="",
         )
 
 
@@ -379,11 +403,11 @@ class Image2MixedDataset(ImageDataset):
 
     @property
     def output_size(self):
-        if self.task_config is None:
-            return len(self.attributes)
+        if self.task_config is not None and self.task_config.y_selection is not None:
+            return self.task_config.output_channels
 
         else:
-            return len(self.task_config.selection)
+            return len(self.attributes)
 
     def __len__(self):
         return len(self.keys)

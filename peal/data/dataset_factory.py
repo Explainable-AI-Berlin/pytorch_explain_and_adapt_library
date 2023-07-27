@@ -23,6 +23,8 @@ from peal.data.datasets import (
     SymbolicDataset,
 )
 from peal.data.dataset_interfaces import PealDataset
+from peal.configs.data.template import DataConfig
+from peal.configs.models.template import TaskConfig
 
 
 def find_subclasses(base_class, directory):
@@ -55,7 +57,7 @@ def find_subclasses(base_class, directory):
     return subclasses
 
 
-def get_datasets(config, base_dir, task_config=None, return_dict=False):
+def get_datasets(config : DataConfig, base_dir : str, task_config : TaskConfig = None, return_dict : bool = False):
     """
     This function is used to get the datasets for training, validation and testing.
 

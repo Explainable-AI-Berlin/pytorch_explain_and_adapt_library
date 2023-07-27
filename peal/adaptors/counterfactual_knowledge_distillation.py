@@ -34,6 +34,8 @@ from peal.adaptors.adaptor_utils import integrate_data_config_into_adaptor_confi
 from peal.training.training_utils import (
     calculate_validation_statistics,
 )
+from peal.configs.adaptors.template import AdaptorConfig
+from peal.configs.models.template import TaskConfig
 
 
 class CounterfactualKnowledgeDistillation:
@@ -54,8 +56,9 @@ class CounterfactualKnowledgeDistillation:
         ),
         teacher: Union[str, TeacherInterface] = "human@8000",
         adaptor_config: Union[
-            dict, str, Path
+            dict, str, Path, AdaptorConfig
         ] = "$PEAL/configs/adaptors/counterfactual_knowledge_distillation_default.yaml",
+        task_config: Union[dict, str, Path, TaskConfig] = None,
         gigabyte_vram: float = None,
         overwrite: bool = False,
         visualization: callable = lambda x: x,
@@ -96,12 +99,12 @@ class CounterfactualKnowledgeDistillation:
         if self.overwrite or not os.path.exists(
             os.path.join(self.base_dir, "config.yaml")
         ):
-            self.adaptor_config = load_yaml_config(adaptor_config)
+            self.adaptor_config = load_yaml_config(adaptor_config, AdaptorConfig)
             self.student = copy.deepcopy(student)
 
         else:
             self.adaptor_config = load_yaml_config(
-                os.path.join(self.base_dir, "config.yaml")
+                os.path.join(self.base_dir, "config.yaml"), AdaptorConfig
             )
             if os.path.exists(os.path.join(self.base_dir, "model.cpl")):
                 self.student = torch.load(
@@ -111,19 +114,25 @@ class CounterfactualKnowledgeDistillation:
             else:
                 self.student = copy.deepcopy(student)
 
+        if not task_config is None:
+            self.adaptor_config.task = load_yaml_config(task_config, TaskConfig)
+
         self.student.eval()
 
-        self.output_size = integrate_data_config_into_adaptor_config(
+        """self.output_size = integrate_data_config_into_adaptor_config(
             self.adaptor_config, datasource, output_size
-        )
+        )"""
 
-        '''set_adaptive_batch_size(
-            self.adaptor_config, gigabyte_vram, self.adaptor_config.max_train_samples
-        )'''
+        """set_adaptive_batch_size(
+            self.adaptor_config, gigabyte_vram, self.adaptor_config.min_train_samples
+        )"""
 
         #
+        """
+        TODO reintegrate this
         self.enable_hints = bool(teacher == "SegmentationMask")
         self.adaptor_config.data.has_hint = self.enable_hints
+        """
         (
             self.train_dataloader,
             self.val_dataloader,
@@ -131,10 +140,11 @@ class CounterfactualKnowledgeDistillation:
         ) = create_dataloaders_from_datasource(
             datasource=datasource,
             config=self.adaptor_config,
-            enable_hints=self.enable_hints,
             gigabyte_vram=gigabyte_vram,
+            # enable_hints=self.enable_hints,
         )
         self.dataloaders_val = [self.val_dataloader, None]
+        self.adaptor_config.data = self.train_dataloader.dataset.config
 
         # in case the used dataloader has a non-default data normalization it is assumed
         # the inverse function of this normalization is attribute of the underlying dataset
@@ -155,6 +165,12 @@ class CounterfactualKnowledgeDistillation:
             base_dir=base_dir,
             gigabyte_vram=gigabyte_vram,
             device=self.device,
+        )
+
+        self.output_size = (
+            self.adaptor_config.task.output_channels
+            if self.adaptor_config.task.output_channels is not None
+            else self.adaptor_config.data.output_size[0]
         )
 
         #
@@ -194,13 +210,14 @@ class CounterfactualKnowledgeDistillation:
         self.data_config.data.split = [1.0, 1.0]
         self.data_config.data.confounding_factors = []
         self.data_config.data.confounder_probability = None
-        self.data_config.data.known_confounder = False
         self.data_config.data.output_type = "singleclass"
         self.data_config.data.output_size = self.train_dataloader.dataset.output_size
         self.data_config.data.delimiter = ","
-        self.data_config.data.num_samples = self.adaptor_config.max_train_samples
+        self.data_config.data.num_samples = self.adaptor_config.min_train_samples
         self.validation_data_config = copy.deepcopy(self.data_config)
-        self.validation_data_config.data.num_samples = self.adaptor_config.max_validation_samples
+        self.validation_data_config.data.num_samples = (
+            self.adaptor_config.max_validation_samples
+        )
         self.validation_data_config.data.split = [1.0, 1.0]
 
     def get_batch(
@@ -284,17 +301,14 @@ class CounterfactualKnowledgeDistillation:
         tracked_values = {key: [] for key in tracked_keys}
 
         continue_collecting = True
-        acceptance_threshold = self.adaptor_config.explainer[
-            "y_target_goal_confidence"
-        ]
+        acceptance_threshold = self.adaptor_config.explainer.y_target_goal_confidence
 
         pbar = tqdm(
             total=int(
-                self.adaptor_config.max_train_samples
-                / self.adaptor_config.batch_size
+                self.adaptor_config.min_train_samples / self.adaptor_config.batch_size
                 + 0.99
             )
-            * self.adaptor_config.explainer["gradient_steps"],
+            * self.adaptor_config.explainer.gradient_steps,
         )
         pbar.stored_values = {}
         pbar.stored_values["n_total"] = 0
@@ -302,7 +316,7 @@ class CounterfactualKnowledgeDistillation:
             num_batches_per_iteration = int(
                 1
                 + (
-                    self.adaptor_config.max_train_samples
+                    self.adaptor_config.min_train_samples
                     - len(list(tracked_values.values())[0])
                 )
                 / self.adaptor_config.batch_size
@@ -324,7 +338,7 @@ class CounterfactualKnowledgeDistillation:
                 pbar.stored_values["n_valid"] = (
                     str(len(list(tracked_values.values())[0]))
                     + "/"
-                    + str(self.adaptor_config.max_train_samples)
+                    + str(self.adaptor_config.min_train_samples)
                 )
                 pbar.stored_values["th"] = acceptance_threshold
                 pbar.stored_values["n_total"] += self.adaptor_config.batch_size
@@ -335,7 +349,7 @@ class CounterfactualKnowledgeDistillation:
 
             if (
                 len(list(tracked_values.values())[0])
-                < self.adaptor_config.max_train_samples
+                < self.adaptor_config.min_train_samples
             ):
                 if (
                     acceptance_threshold == 0.51
@@ -345,7 +359,7 @@ class CounterfactualKnowledgeDistillation:
 
                 elif (
                     len(list(values.values())[0])
-                    < self.adaptor_config.max_train_samples / 2
+                    < self.adaptor_config.min_train_samples / 2
                 ):
                     acceptance_threshold = float(
                         np.maximum(0.51, acceptance_threshold - 0.1)
@@ -399,9 +413,7 @@ class CounterfactualKnowledgeDistillation:
                 logits_to_prediction=self.logits_to_prediction,
                 use_confusion_matrix=self.adaptor_config.use_confusion_matrix,
                 max_validation_samples=self.adaptor_config.max_validation_samples,
-                min_start_target_percentile=self.adaptor_config[
-                    "min_start_target_percentile"
-                ],
+                min_start_target_percentile=self.adaptor_config.min_start_target_percentile,
             )
             os.makedirs(
                 os.path.join(self.base_dir, str(finetune_iteration)), exist_ok=True
@@ -655,10 +667,15 @@ class CounterfactualKnowledgeDistillation:
                 feedback = f.read().split("\n")
 
         # TODO this is not correct for calculating training stats.
-        num_samples = min(
-            self.adaptor_config["max_" + mode + "_samples"],
-            len(self.val_dataloader.dataset),
-        )
+        if mode == "validation":
+            num_samples = min(
+                self.adaptor_config.max_validation_samples,
+                len(self.val_dataloader.dataset),
+            )
+
+        else:
+            num_samples = -1
+
         counterfactual_rate = len(list(tracked_values.values())[0]) / num_samples
         ood_rate = len(list(filter(lambda sample: sample == "ood", feedback))) / len(
             feedback
@@ -814,7 +831,7 @@ class CounterfactualKnowledgeDistillation:
             ), "priorities do not match! " + str(self.dataloader_mixer.priorities)
             self.dataloaders_val[1] = dataloader_val
 
-            if not self.adaptor_config.continuos_learning:
+            if not self.adaptor_config.continuous_learning:
 
                 def weight_reset(m):
                     reset_parameters = getattr(m, "reset_parameters", None)
@@ -875,7 +892,7 @@ class CounterfactualKnowledgeDistillation:
             )
             if (
                 len(list(tracked_values.values())[0])
-                < self.adaptor_config.max_train_samples
+                < self.adaptor_config.min_train_samples
             ):
                 print("No counterfactuals could be found anymore!")
                 open(os.path.join(self.base_dir, "warning.txt"), "w").write(
@@ -941,7 +958,7 @@ class CounterfactualKnowledgeDistillation:
             ):
                 torch.save(self.student, os.path.join(self.base_dir, "model.cpl"))
 
-            if validation_stats["fa_1sided"] > self.adaptor_config["fa_1sided_prime"]:
+            if validation_stats["fa_1sided"] > self.adaptor_config.fa_1sided_prime:
                 self.adaptor_config["fa_1sided_prime"] = validation_stats["fa_1sided"]
                 if self.adaptor_config.replacement_strategy == "direct":
                     torch.save(self.student, os.path.join(self.base_dir, "model.cpl"))

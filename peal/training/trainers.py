@@ -159,7 +159,12 @@ class ModelTrainer:
                 if criterion in ["l1", "l2", "orthogonality"]:
                     criterion_loss *= self.regularization_level
 
-                loss_logs[criterion] = criterion_loss.detach().item()
+                try:
+                    loss_logs[criterion] = criterion_loss.detach().item()
+
+                except Exception:
+                    import pdb; pdb.set_trace()
+
                 loss += criterion_loss
 
             loss_logs["loss"] = loss.detach().item()

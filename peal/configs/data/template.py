@@ -90,3 +90,7 @@ class DataConfig(BaseModel):
     Whether to set negative values to zero.
     '''
     set_negative_to_zero: bool = False
+    '''
+    The delimiter used for the csv file.
+    '''
+    delimiter: str = None

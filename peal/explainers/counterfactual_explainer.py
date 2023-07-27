@@ -8,6 +8,7 @@ from peal.utils import load_yaml_config
 from peal.generators.interfaces import InvertibleGenerator, EditCapableGenerator
 from peal.data.dataset_interfaces import PealDataset
 from peal.explainers.explainer_interface import ExplainerInterface
+from peal.configs.explainers.template import ExplainerConfig
 
 
 class CounterfactualExplainer(ExplainerInterface):
@@ -22,7 +23,7 @@ class CounterfactualExplainer(ExplainerInterface):
         input_type: str,
         dataset: PealDataset,
         explainer_config: Union[
-            dict, str
+            dict, str, ExplainerConfig
         ] = "$PEAL/configs/explainers/counterfactual_default.yaml",
     ):
         """
@@ -38,7 +39,7 @@ class CounterfactualExplainer(ExplainerInterface):
         self.downstream_model = downstream_model
         self.generator = generator
         self.dataset = dataset
-        self.explainer_config = load_yaml_config(explainer_config)
+        self.explainer_config = load_yaml_config(explainer_config, ExplainerConfig)
         self.device = (
             "cuda" if next(self.downstream_model.parameters()).is_cuda else "cpu"
         )
@@ -112,7 +113,7 @@ class CounterfactualExplainer(ExplainerInterface):
                     )
                 )
 
-            loss += self.explainer_config["l1_regularization"] * torch.mean(
+            loss += self.explainer_config.l1_regularization * torch.mean(
                 torch.stack(l1_losses)
             )
             loss += self.explainer_config.log_prob_regularization * torch.mean(

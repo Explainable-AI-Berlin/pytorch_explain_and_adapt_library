@@ -19,7 +19,7 @@ def parse_json(data_dir, config, mode, set_negative_to_zero=True):
     with open(data_dir, "r") as f:
         raw_data = json.load(f)
 
-    if config.known_confounder:
+    if not len(config.confounding_factors) == 0:
 
         def extract_instances_tensor_confounder(idx, line):
             key = str(idx)
@@ -65,6 +65,8 @@ def parse_csv(
         attributes = attributes[1:]
 
     raw_data = raw_data[1:]
+    while "" in raw_data:
+        raw_data.remove("")
 
     def extract_instances_tensor(idx, line):
         instance_attributes = line.split(delimiter)

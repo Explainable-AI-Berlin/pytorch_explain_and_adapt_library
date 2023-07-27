@@ -111,8 +111,11 @@ def load_yaml_config(config_path, config_model=None):
     if config_model is None:
         return config_data
 
-    else:
+    elif isinstance(config_data, dict):
         return config_model(**config_data)
+
+    else:
+        return config_path
 
 
 def move_to_device(X, device):

@@ -32,11 +32,11 @@ class Logger:
         self.writer = writer
         self.val_dataloader = val_dataloader
 
-        if self.config.task.output_size is None:
-            self.output_size = self.config.task.output_size
+        if not self.config.task.output_size is None:
+            self.output_channels = self.config.task.output_channels
 
         else:
-            self.output_size = self.config.data.output_size
+            self.output_channels = self.config.data.output_size[0]
 
         self.device = "cuda" if next(self.model.parameters()).is_cuda else "cpu"
         #
@@ -118,7 +118,7 @@ class Logger:
         ):
             try:
                 targets_one_hot = torch.nn.functional.one_hot(
-                    torch.cat(self.targets).to(torch.int64), self.output_size
+                    torch.cat(self.targets).to(torch.int64), self.output_channels
                 ).to(torch.float32)
             except Exception:
                 import pdb
@@ -126,7 +126,7 @@ class Logger:
                 pdb.set_trace()
 
             predictions_one_hot = torch.nn.functional.one_hot(
-                torch.cat(self.predicted_classes).to(torch.int64), self.output_size
+                torch.cat(self.predicted_classes).to(torch.int64), self.output_channels
             ).to(torch.float32)
 
         if "bce" in self.config.task.criterions.keys() and not isinstance(

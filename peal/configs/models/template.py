@@ -26,7 +26,7 @@ class TaskConfig:
     The output_size that can be at most the output_size of the dataset, but if a subtask is chosen
     the output_size has also be adapted accordingly
     """
-    output_size: PositiveInt = None
+    output_channels: PositiveInt = None
     """
     Gives the option to select a subset of the input variables. Only works for symbolic data.
     """
