@@ -1,4 +1,6 @@
 #
+'model_name'        : 'Smiling_confounding_Blond_Hair_celeba_classifier'
+'data'              : '$PEAL/configs/data/Smiling_confounding_Blond_Hair_celeba.yaml'
 'training'          : '$PEAL/configs/training/img_classifier.yaml'
 'architecture'      : '$PEAL/configs/architectures/resnet18.yaml'
 'task':

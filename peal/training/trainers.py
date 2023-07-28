@@ -16,6 +16,10 @@ from peal.training.loggers import Logger
 from peal.training.criterions import get_criterions
 from peal.data.dataloaders import create_dataloaders_from_datasource
 from peal.generators.interfaces import Generator
+from peal.architectures.downstream_models import SequentialModel
+from peal.generators.variational_autoencoders import VAE
+from peal.configs.architectures.template import ArchitectureConfig
+from peal.configs.generators.template import VAEConfig
 
 
 def calculate_test_accuracy(model, test_dataloader, device):
@@ -43,10 +47,10 @@ class ModelTrainer:
 
     def __init__(
         self,
-        model_name,
-        model,
-        datasource,
         config,
+        model_name=None,
+        model=None,
+        datasource=None,
         optimizer=None,
         base_dir="peal_runs",
         criterions=None,
@@ -63,10 +67,35 @@ class ModelTrainer:
         self.val_dataloader_weights = val_dataloader_weights
 
         #
-        self.model_name = model_name
+        if model_name is None:
+            self.model_name = model_name
 
-        # TODO check whether model is consistent with given config
-        self.model = model
+        else:
+            self.model_name = self.config.model_name
+
+        if model is None:
+            if not len(self.config.task.x_selection) is None:
+                input_channels = len(self.config.task.x_selection)
+
+            else:
+                input_channels = self.config.data.input_size[0]
+
+            if not self.config.task.output_size is None:
+                output_channels = self.config.task.output_size
+
+            else:
+                output_channels = self.config.data.output_size[0]
+
+            if isinstance(self.config.architecture, ArchitectureConfig):
+                self.model = SequentialModel(
+                    self.config.architecture, input_channels, output_channels
+                )
+
+            elif isinstance(self.config.architecture, VAEConfig):
+                self.model = VAE(self.config.architecture, input_channels)
+
+        else:
+            self.model = model
 
         # either the dataloaders have to be given or the path to the dataset
         (
@@ -74,7 +103,7 @@ class ModelTrainer:
             self.val_dataloaders,
             _,
         ) = create_dataloaders_from_datasource(
-            datasource, self.config, gigabyte_vram=gigabyte_vram
+            config=self.config, datasource=datasource, gigabyte_vram=gigabyte_vram
         )
 
         if not isinstance(self.val_dataloaders, list):
@@ -159,12 +188,7 @@ class ModelTrainer:
                 if criterion in ["l1", "l2", "orthogonality"]:
                     criterion_loss *= self.regularization_level
 
-                try:
-                    loss_logs[criterion] = criterion_loss.detach().item()
-
-                except Exception:
-                    import pdb; pdb.set_trace()
-
+                loss_logs[criterion] = criterion_loss.detach().item()
                 loss += criterion_loss
 
             loss_logs["loss"] = loss.detach().item()
@@ -304,7 +328,9 @@ class ModelTrainer:
             pbar.stored_values["Epoch"] = self.config.training.epoch
             #
             self.model.train()
-            train_loss, train_accuracy = self.run_epoch(self.train_dataloader, pbar=pbar)
+            train_loss, train_accuracy = self.run_epoch(
+                self.train_dataloader, pbar=pbar
+            )
             if isinstance(self.model, Generator):
                 train_generator_performance = (
                     self.train_dataloader.dataset.track_generator_performance(
@@ -332,10 +358,10 @@ class ModelTrainer:
                 "val_accuracy", val_accuracy, self.config.training.epoch
             )
             if isinstance(self.model, Generator):
-                val_generator_performance = (
-                    self.val_dataloaders[0].dataset.track_generator_performance(
-                        self.model, self.val_dataloaders[0].batch_size
-                    )
+                val_generator_performance = self.val_dataloaders[
+                    0
+                ].dataset.track_generator_performance(
+                    self.model, self.val_dataloaders[0].batch_size
                 )
                 print(val_generator_performance)
                 for key in val_generator_performance.keys():

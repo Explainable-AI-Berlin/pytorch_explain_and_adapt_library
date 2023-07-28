@@ -30,6 +30,10 @@ class DataConfig(BaseModel):
     '''
     output_size: list[PositiveInt]
     '''
+    The path to the dataset.
+    '''
+    dataset_path: str = None
+    '''
     The number of samples in the dataset.
     Sometimes important when executing specific experiments.
     '''

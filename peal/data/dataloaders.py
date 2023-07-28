@@ -258,12 +258,11 @@ def create_class_ordered_batch(dataset, config):
 
 
 def create_dataloaders_from_datasource(
-    datasource, config, enable_hints=False, gigabyte_vram=None
+    config, datasource=None, enable_hints=False, gigabyte_vram=None
 ):
     """
     This function creates the dataloaders from a given datasource.
     """
-    # TODO could use set adaptive batch size here
     if (isinstance(datasource, tuple) or isinstance(datasource, list)) and isinstance(
         datasource[0], DataLoader
     ):
@@ -277,6 +276,9 @@ def create_dataloaders_from_datasource(
             test_dataloader = datasource[2]
 
     else:
+        if datasource is None:
+            datasource = config.data.dataset_path
+
         if isinstance(datasource, str):
             dataset_train, dataset_val, dataset_test = get_datasets(
                 config=config.data, base_dir=datasource

@@ -81,6 +81,10 @@ class ModelConfig:
     """
     data: DataConfig = None
     """
+    The name of the model.
+    """
+    model_name : str = 'model_run1'
+    """
     A dict containing all variables that could not be given with the current config structure
     """
     kwargs: dict = {}
