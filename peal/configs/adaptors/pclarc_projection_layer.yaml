@@ -1,12 +1,12 @@
-'explainer'                            : '$PEAL/configs/explainers/lrp_default.yaml'
+'explainer'                            : '<PEAL_BASE>/configs/explainers/lrp_default.yaml'
 'projection_type'                      : 'svm' # ['svm', 'simple']
 'projection_location'                  : 'input' # ['input', 'features']
 'attribution_threshold'                :  0.5
 'finetune_iterations'                  :  1
 'correction_strength'                  :  1.0
 'samples_per_iteration'                :  100 #16000
-'data'                                 :  '$PEAL/configs/data/data_default.yaml'
-'training'                             :  '$PEAL/configs/training/finetune_classifier_clarc.yaml'
+'data'                                 :  '<PEAL_BASE>/configs/data/data_default.yaml'
+'training'                             :  '<PEAL_BASE>/configs/training/finetune_classifier_clarc.yaml'
 'architecture'                         :  {}
 'max_validation_samples'               :  0
 'task':

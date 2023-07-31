@@ -17,9 +17,9 @@
 # for celeba we found empirically, that the test accuracies are highest when using the model that was trained on the data with the best feedback accuracy
 # instead of using the model achieving the best feedback accuracy
 'replacement_strategy'                 :  'delayed'
-'explainer'                            :  '$PEAL/configs/explainers/counterfactual_default.yaml'
-'training'                             :  '$PEAL/configs/training/finetune_classifier.yaml'
-#'data'                                 :  '$PEAL/configs/data/data_default.yaml'
+'explainer'                            :  '<PEAL_BASE>/configs/explainers/counterfactual_default.yaml'
+'training'                             :  '<PEAL_BASE>/configs/training/finetune_classifier.yaml'
+#'data'                                 :  '<PEAL_BASE>/configs/data/data_default.yaml'
 'task':
   'criterions':
     'ce'     : 1.0

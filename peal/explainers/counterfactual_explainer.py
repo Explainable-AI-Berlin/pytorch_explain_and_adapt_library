@@ -24,7 +24,7 @@ class CounterfactualExplainer(ExplainerInterface):
         dataset: PealDataset,
         explainer_config: Union[
             dict, str, ExplainerConfig
-        ] = "$PEAL/configs/explainers/counterfactual_default.yaml",
+        ] = "<PEAL_BASE>/configs/explainers/counterfactual_default.yaml",
     ):
         """
         This class implements the counterfactual explanation method

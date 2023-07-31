@@ -32,7 +32,7 @@ class Logger:
         self.writer = writer
         self.val_dataloader = val_dataloader
 
-        if not self.config.task.output_size is None:
+        if not self.config.task.output_channels is None:
             self.output_channels = self.config.task.output_channels
 
         else:

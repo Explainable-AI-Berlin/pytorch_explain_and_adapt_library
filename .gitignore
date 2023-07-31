@@ -6,7 +6,11 @@ notebooks/peal_runs
 notebooks/*.png
 notebooks/static
 notebooks/templates
-tests/outputs
+datasets
+peal_runs
+static
+templates
+outputs
 *.fuse_hidden*
 .vscode
 *.pt

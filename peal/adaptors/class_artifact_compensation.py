@@ -142,7 +142,7 @@ class ClassArtifactCompensation:
         output_size,
         base_dir,
         teacher="virelay@8000",
-        adaptor_config="$PEAL/configs/adaptors/pclarc_projection_layer.yaml",
+        adaptor_config="<PEAL_BASE>/configs/adaptors/pclarc_projection_layer.yaml",
         gigabyte_vram=None,
         overwrite=False,
     ):

@@ -1,6 +1,6 @@
 #
-'training'          : '$PEAL/configs/training/symbolic_classifier.yaml'
-'architecture'      : '$PEAL/configs/architectures/symbolic2vector.yaml'
+'training'          : '<PEAL_BASE>/configs/training/symbolic_classifier.yaml'
+'architecture'      : '<PEAL_BASE>/configs/architectures/symbolic2vector.yaml'
 'task':
   'criterions':
     'ce'     : 1.0

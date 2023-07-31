@@ -51,7 +51,7 @@ class DimeDDPMAdaptor(EditCapableGenerator):
         return self.diffusion.p_sample_loop(self.model, [batch_size] + self.dataset.config.input_size)
 
     def train_model(
-        self, dataset_train, training_config="$PEAL/configs/training/train_ddpm.yaml"
+        self, dataset_train, training_config="<PEAL_BASE>/configs/training/train_ddpm.yaml"
     ):
         training_config = load_yaml_config(training_config)
         args = types.SimpleNamespace(**training_config)

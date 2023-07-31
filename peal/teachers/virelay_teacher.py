@@ -669,7 +669,7 @@ class VirelayTeacher(TeacherInterface):
         self,
         num_classes,
         port = 2000,
-        teacher_config='$PEAL/configs/teachers/virelay_teacher.yaml'
+        teacher_config='<PEAL_BASE>/configs/teachers/virelay_teacher.yaml'
     ):
         self.num_classes = num_classes
         self.port = port

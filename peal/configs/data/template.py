@@ -98,3 +98,7 @@ class DataConfig(BaseModel):
     The delimiter used for the csv file.
     '''
     delimiter: str = None
+    """
+    The name of the class.
+    """
+    __name__ : str = 'peal.DataConfig'

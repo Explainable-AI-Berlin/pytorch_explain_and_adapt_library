@@ -6,6 +6,7 @@ import shutil
 import inspect
 import platform
 import numpy as np
+import sys
 
 from pathlib import Path
 from torch.utils.tensorboard import SummaryWriter
@@ -64,6 +65,7 @@ class ModelTrainer:
         """ """
         #
         self.config = load_yaml_config(config)
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.val_dataloader_weights = val_dataloader_weights
 
         #
@@ -74,14 +76,14 @@ class ModelTrainer:
             self.model_name = self.config.model_name
 
         if model is None:
-            if not len(self.config.task.x_selection) is None:
+            if not self.config.task.x_selection is None:
                 input_channels = len(self.config.task.x_selection)
 
             else:
                 input_channels = self.config.data.input_size[0]
 
-            if not self.config.task.output_size is None:
-                output_channels = self.config.task.output_size
+            if not self.config.task.output_channels is None:
+                output_channels = self.config.task.output_channels
 
             else:
                 output_channels = self.config.data.output_size[0]
@@ -96,6 +98,8 @@ class ModelTrainer:
 
         else:
             self.model = model
+
+        self.model.to(self.device)
 
         # either the dataloaders have to be given or the path to the dataset
         (
@@ -113,12 +117,12 @@ class ModelTrainer:
         if optimizer is None:
             if self.config.training.optimizer == "sgd":
                 self.optimizer = torch.optim.SGD(
-                    model.parameters(), lr=self.config.training.learning_rate
+                    self.model.parameters(), lr=self.config.training.learning_rate
                 )
 
             elif self.config.training.optimizer == "adam":
                 self.optimizer = torch.optim.Adam(
-                    model.parameters(), lr=self.config.training.learning_rate
+                    self.model.parameters(), lr=self.config.training.learning_rate
                 )
 
             else:
@@ -127,8 +131,10 @@ class ModelTrainer:
         else:
             self.optimizer = optimizer
 
-        self.base_dir = os.path.join(base_dir, model_name)
-        self.device = "cuda" if next(self.model.parameters()).is_cuda else "cpu"
+        if not model_name is None:
+            self.config.model_name = model_name
+
+        self.base_dir = os.path.join(base_dir, self.config.model_name)
         if criterions is None:
             criterions = get_criterions(config)
             self.criterions = {}
@@ -205,7 +211,9 @@ class ModelTrainer:
                 + str(batch_idx)
                 + ", loss: "
                 + str(loss.detach().item())
-                + ", ".join(
+            )
+            pbar.write(
+                ", ".join(
                     [
                         key + ": " + str(pbar.stored_values[key])
                         for key in pbar.stored_values

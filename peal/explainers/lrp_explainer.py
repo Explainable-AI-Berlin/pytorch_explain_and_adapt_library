@@ -42,7 +42,7 @@ class LRPExplainer:
             self,
             downstream_model,
             num_classes,
-            explainer_config = '$PEAL/configs/explainers/lrp_default.yaml',
+            explainer_config = '<PEAL_BASE>/configs/explainers/lrp_default.yaml',
     ):
         self.downstream_model = downstream_model
         self.num_classes = num_classes

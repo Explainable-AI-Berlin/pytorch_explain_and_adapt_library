@@ -9,9 +9,9 @@
 'mixing_ratio'                         :  0.8 # determines what sampling ratio is used from original training dataset and from counterfactual dataset
 'min_start_target_percentile'          :  0.2 # determines how close to the decision boundary to start - is a percentile to ensure indepence of specific classifier attributes
 'attribution_threshold'                :  5.0 # only used when SegmentationMask feedback is used - determines how much more average change should be done inside each masked pixel than outside
-'explainer'                            :  '$PEAL/configs/explainers/counterfactual_default.yaml'
-'training'                             :  '$PEAL/configs/training/finetune_classifier_test_run.yaml'
-'data'                                 :  '$PEAL/configs/data/data_default.yaml'
+'explainer'                            :  '<PEAL_BASE>/configs/explainers/counterfactual_default.yaml'
+'training'                             :  '<PEAL_BASE>/configs/training/finetune_classifier_test_run.yaml'
+'data'                                 :  '<PEAL_BASE>/configs/data/data_default.yaml'
 'architecture'                         :  {}
 'task':
   'criterions':

@@ -128,7 +128,7 @@ class SymbolicDataset(PealDataset):
     def __getitem__(self, idx):
         name = self.keys[idx]
 
-        data = torch.tensor(self.data[name], dtype=torch.float32)
+        data = self.data[name].clone().detach().to(torch.float32)
 
         if (
             not self.task_config is None

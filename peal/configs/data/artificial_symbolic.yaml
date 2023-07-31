@@ -1,3 +1,4 @@
+'dataset_path'                       : 'notebooks/datasets/artificial_symbolic/2000_10_000_0.csv'
 'num_samples'                        : 2000
 'split'                              : [0.8, 0.9]
 'input_type'                         : 'symbolic'
@@ -5,7 +6,7 @@
 'label_noise'                        : 0.0
 'seed'                               : 0
 'output_type'                        : 'multiclass'
-'output_size'                        : 2
+'output_size'                        : [1]
 'confounder_probability'             : 0.5
 'confounding_factors'                : ['Target', 'Confounder']
 'known_confounder'                   : True

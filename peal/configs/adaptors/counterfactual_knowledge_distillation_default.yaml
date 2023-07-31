@@ -15,8 +15,8 @@
 'replace_model'                        :  True
 'fa_1sided_prime'                      :  0.0
 'replacement_strategy'                 :  'direct'
-'explainer'                            :  '$PEAL/configs/explainers/counterfactual_default.yaml'
-'training'                             :  '$PEAL/configs/training/finetune_classifier.yaml'
+'explainer'                            :  '<PEAL_BASE>/configs/explainers/counterfactual_default.yaml'
+'training'                             :  '<PEAL_BASE>/configs/training/finetune_classifier.yaml'
 'task':
   'criterions':
     'ce'     : 1.0

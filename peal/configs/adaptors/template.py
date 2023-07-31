@@ -107,6 +107,10 @@ class AdaptorConfig:
     A dict containing all variables that could not be given with the current config structure
     """
     kwargs: dict = {}
+    """
+    The name of the class.
+    """
+    __name__ : str = 'peal.AdaptorConfig'
 
     def __init__(
         self,

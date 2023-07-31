@@ -50,14 +50,14 @@ class CounterfactualKnowledgeDistillation:
         output_size: int = None,
         generator: Union[
             InvertibleGenerator, Path, str
-        ] = "$PEAL/configs/models/default_generator.yaml",
+        ] = "<PEAL_BASE>/configs/models/default_generator.yaml",
         base_dir: Union[str, Path] = os.path.join(
             "peal_runs", "counterfactual_knowledge_distillation"
         ),
         teacher: Union[str, TeacherInterface] = "human@8000",
         adaptor_config: Union[
             dict, str, Path, AdaptorConfig
-        ] = "$PEAL/configs/adaptors/counterfactual_knowledge_distillation_default.yaml",
+        ] = "<PEAL_BASE>/configs/adaptors/counterfactual_knowledge_distillation_default.yaml",
         task_config: Union[dict, str, Path, TaskConfig] = None,
         gigabyte_vram: float = None,
         overwrite: bool = False,
@@ -72,14 +72,14 @@ class CounterfactualKnowledgeDistillation:
             output_size (int, optional): The output size of the student model. Defaults to None.
             generator (Union, optional):
                 The generator that is used for CFKD.
-                Defaults to "$PEAL/configs/models/default_generator.yaml".
+                Defaults to "<PEAL_BASE>/configs/models/default_generator.yaml".
             base_dir (Union, optional):
                 The base directory for the run.
                 Defaults to os.path.join("peal_runs", "counterfactual_knowledge_distillation").
             teacher (Union, optional): The teacher that is used for CFKD. Defaults to "human@8000".
             adaptor_config (Union, optional):
                 The config for the adaptor.
-                Defaults to "$PEAL/configs/adaptors/counterfactual_knowledge_distillation_default.yaml".
+                Defaults to "<PEAL_BASE>/configs/adaptors/counterfactual_knowledge_distillation_default.yaml".
             gigabyte_vram (float, optional): The amount of vram in gigabytes. Defaults to None.
             overwrite (bool, optional):
                 The flag that indicates whether the run should be overwritten. Defaults to False.

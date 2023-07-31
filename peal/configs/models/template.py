@@ -23,8 +23,8 @@ class TaskConfig:
     """
     output_type: str = None
     """
-    The output_size that can be at most the output_size of the dataset, but if a subtask is chosen
-    the output_size has also be adapted accordingly
+    The output_channels that can be at most the output_channels of the dataset, but if a subtask is chosen
+    the output_channels has also be adapted accordingly
     """
     output_channels: PositiveInt = None
     """
@@ -41,19 +41,23 @@ class TaskConfig:
     A dict containing all variables that could not be given with the current config structure
     """
     kwargs: dict = {}
+    """
+    The name of the class.
+    """
+    __name__ : str = 'peal.TaskConfig'
 
     def __init__(
         self,
         criterions: dict,
         output_type: str = None,
-        output_size: PositiveInt = None,
+        output_channels: PositiveInt = None,
         x_selection: list[str] = None,
         y_selection: list[str] = None,
         **kwargs
     ):
         self.criterions = criterions
         self.output_type = output_type
-        self.output_size = output_size
+        self.output_channels = output_channels
         self.x_selection = x_selection
         self.y_selection = y_selection
         self.kwargs = kwargs
@@ -88,6 +92,10 @@ class ModelConfig:
     A dict containing all variables that could not be given with the current config structure
     """
     kwargs: dict = {}
+    """
+    The name of the class.
+    """
+    __name__ : str = 'peal.ModelConfig'
 
     def __init__(
         self,
@@ -121,6 +129,6 @@ class ModelConfig:
             self.data = None
 
         else:
-            DataConfig(**data)
+            self.data = DataConfig(**data)
 
         self.kwargs = kwargs

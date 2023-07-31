@@ -14,6 +14,10 @@ class VAEConfig:
     The config of the decoder.
     """
     decoder: ArchitectureConfig = None
+    """
+    The name of the class.
+    """
+    __name__ : str = 'peal.VAEConfig'
     def __init__(self, encoder : Union[dict, ArchitectureConfig] = None, decoder : Union[dict, ArchitectureConfig] = None):
         """
         The constructor of the VAEConfig class.
