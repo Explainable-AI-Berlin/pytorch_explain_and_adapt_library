@@ -32,7 +32,10 @@ def get_generator(
     Returns:
         InvertibleGenerator: The generator.
     """
-    if not (isinstance(generator, InvertibleGenerator) or isinstance(generator, EditCapableGenerator)):
+    if isinstance(generator, str) and generator[-4:] == '.cpl':
+        generator = torch.load(generator, map_location=device)
+
+    elif not (isinstance(generator, InvertibleGenerator) or isinstance(generator, EditCapableGenerator)):
         generator_config = load_yaml_config(generator)
         generator_config.data = data_config
         generator = Glow(generator_config).to(device)

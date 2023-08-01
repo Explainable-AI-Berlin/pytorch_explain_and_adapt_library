@@ -8,8 +8,8 @@ torch.multiprocessing.set_sharing_strategy("file_system")
 
 from peal.data.dataset_wrappers import GlowDatasetWrapper
 from peal.data.dataset_factory import get_datasets
-from peal.data.dataset_wrappers import wrap_dataset
-from peal.data.dataset_interfaces import PealDataset
+from peal.data.dataset_wrappers import VAEDatasetWrapper
+from peal.configs.generators.template import VAEConfig
 
 
 class DataStack:
@@ -258,7 +258,11 @@ def create_class_ordered_batch(dataset, config):
 
 
 def create_dataloaders_from_datasource(
-    config, datasource=None, enable_hints=False, gigabyte_vram=None
+    config,
+    datasource=None,
+    enable_hints=False,
+    gigabyte_vram=None,
+    test_config=None,
 ):
     """
     This function creates the dataloaders from a given datasource.
@@ -281,7 +285,9 @@ def create_dataloaders_from_datasource(
 
         if isinstance(datasource, str):
             dataset_train, dataset_val, dataset_test = get_datasets(
-                config=config.data, base_dir=datasource
+                config=config.data,
+                base_dir=datasource,
+                test_config=test_config,
             )
 
         elif isinstance(datasource[0], torch.utils.data.Dataset):
@@ -292,7 +298,16 @@ def create_dataloaders_from_datasource(
             else:
                 dataset_train, dataset_val, dataset_test = datasource
 
-        '''
+        else:
+            print("datasource is not a valid input!")
+            quit()
+
+        if hasattr(config, "architecture") and isinstance(config.architecture, VAEConfig):
+            dataset_train = VAEDatasetWrapper(dataset_train)
+            dataset_val = VAEDatasetWrapper(dataset_val)
+            dataset_test = VAEDatasetWrapper(dataset_test)
+
+        """
         # TODO reintegrate normalizing flows
         if "n_bits" in config.architecture.keys():
             dataset_train = GlowDatasetWrapper(
@@ -308,7 +323,7 @@ def create_dataloaders_from_datasource(
         # TODO reintegrate hints
         elif enable_hints:
             dataset_train.enable_hints()
-        '''
+        """
 
         train_dataloader = get_dataloader(
             dataset=dataset_train,

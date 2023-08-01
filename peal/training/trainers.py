@@ -69,7 +69,7 @@ class ModelTrainer:
         self.val_dataloader_weights = val_dataloader_weights
 
         #
-        if model_name is None:
+        if model_name is not None:
             self.model_name = model_name
 
         else:
@@ -134,14 +134,15 @@ class ModelTrainer:
         if not model_name is None:
             self.config.model_name = model_name
 
-        self.base_dir = os.path.join(base_dir, self.config.model_name)
+        self.base_dir = os.path.join(base_dir, self.model_name)
         if criterions is None:
             criterions = get_criterions(config)
             self.criterions = {}
             for criterion_key in self.config.task.criterions:
                 if inspect.isclass(
                     criterions[criterion_key]
-                ):  # and issubclass(criterions[criterion_key], nn.Module):
+                ):
+                    # and issubclass(criterions[criterion_key], nn.Module):
                     self.criterions[criterion_key] = criterions[criterion_key](
                         self.config, None, self.device
                     )
@@ -313,7 +314,7 @@ class ModelTrainer:
                 except Exception:
                     break
 
-            # TODO log the current config file
+            self.config.is_loaded = True
             with open(os.path.join(self.base_dir, "config.yaml"), "w") as file:
                 yaml.dump(self.config, file)
 

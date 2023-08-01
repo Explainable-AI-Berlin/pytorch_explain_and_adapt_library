@@ -45,8 +45,10 @@ def find_subclasses(base_class, directory):
     for dirpath, dirnames, filenames in os.walk(directory):
         for filename in filenames:
             if filename.endswith(".py"):
-                module_path = os.path.relpath(os.path.join(dirpath, filename), project_base_dir)
-                module_path = os.path.join('peal', module_path)
+                module_path = os.path.relpath(
+                    os.path.join(dirpath, filename), project_base_dir
+                )
+                module_path = os.path.join("peal", module_path)
                 module_name = module_path.replace("/", ".")[:-3]
                 check_module(module_name)
 
@@ -57,7 +59,13 @@ def find_subclasses(base_class, directory):
     return subclasses
 
 
-def get_datasets(config : DataConfig, base_dir : str, task_config : TaskConfig = None, return_dict : bool = False):
+def get_datasets(
+    config: DataConfig,
+    base_dir: str,
+    task_config: TaskConfig = None,
+    return_dict: bool = False,
+    test_config: DataConfig = None,
+):
     """
     This function is used to get the datasets for training, validation and testing.
 
@@ -73,52 +81,73 @@ def get_datasets(config : DataConfig, base_dir : str, task_config : TaskConfig =
     """
     config = load_yaml_config(config)
 
+    if test_config is None:
+        test_config = config
+
     #
     transform_list_train = []
+    transform_list_validation = []
     transform_list_test = []
     #
     if config.input_type == "image" and "circular_cut" in config.invariances:
         transform_list_train.append(CircularCut())
+        transform_list_validation.append(CircularCut())
+
+    if test_config.input_type == "image" and "circular_cut" in test_config.invariances:
         transform_list_test.append(CircularCut())
 
     #
     transform_list_train.append(ToTensor())
+    transform_list_validation.append(ToTensor())
     transform_list_test.append(ToTensor())
 
     #
     if config.input_type == "image":
         if not config.crop_size is None:
             transform_list_train.append(Padding(config.crop_size[1:]))
-            transform_list_test.append(Padding(config.crop_size[1:]))
+            transform_list_validation.append(Padding(config.crop_size[1:]))
+
+        if not test_config.crop_size is None:
+            transform_list_test.append(Padding(test_config.crop_size[1:]))
 
         #
         if "rotation" in config.invariances:
             transform_list_train.append(RandomRotation())
+
         if "hflipping" in config.invariances:
             transform_list_train.append(transforms.RandomHorizontalFlip(p=0.5))
+
         if "vflipping" in config.invariances:
             transform_list_train.append(transforms.RandomVerticalFlip(p=0.5))
 
         #
         if not config.crop_size is None:
             transform_list_train.append(transforms.RandomCrop(config.crop_size[1:]))
-            transform_list_test.append(transforms.CenterCrop(config.crop_size[1:]))
+            transform_list_validation.append(transforms.CenterCrop(config.crop_size[1:]))
+
+        if not test_config.crop_size is None:
+            transform_list_test.append(transforms.CenterCrop(test_config.crop_size[1:]))
 
         transform_list_train.append(transforms.Resize(config.input_size[1:]))
-        transform_list_test.append(transforms.Resize(config.input_size[1:]))
+        transform_list_validation.append(transforms.Resize(config.input_size[1:]))
+        transform_list_test.append(transforms.Resize(test_config.input_size[1:]))
 
         transform_list_train.append(SetChannels(config.input_size[0]))
-        transform_list_test.append(SetChannels(config.input_size[0]))
+        transform_list_validation.append(SetChannels(config.input_size[0]))
+        transform_list_test.append(SetChannels(test_config.input_size[0]))
 
     #
     transform_train = transforms.Compose(transform_list_train)
+    transform_validation = transforms.Compose(transform_list_validation)
     transform_test = transforms.Compose(transform_list_test)
 
     dataset_class_list = find_subclasses(
         PealDataset,
         os.path.join(get_project_resource_dir(), "data", "custom_datasets"),
     )
-    dataset_class_dict = {dataset_class.__name__: dataset_class for dataset_class in dataset_class_list}
+    dataset_class_dict = {
+        dataset_class.__name__: dataset_class for dataset_class in dataset_class_list
+    }
     if config.dataset_class in dataset_class_dict.keys():
         dataset = dataset_class_dict[config.dataset_class]
 
@@ -164,14 +193,13 @@ def get_datasets(config : DataConfig, base_dir : str, task_config : TaskConfig =
         config.normalization.append(list(torch.std(samples, [0, 2, 3]).numpy()))
 
         #
-        normalization = Normalization(
-            config.normalization[0], config.normalization[1]
-        )
+        normalization = Normalization(config.normalization[0], config.normalization[1])
 
     else:
         normalization = IdentityNormalization()
 
     transform_train = transforms.Compose([transform_train, normalization])
+    transform_validation = transforms.Compose([transform_validation, normalization])
     transform_test = transforms.Compose([transform_test, normalization])
 
     train_data = dataset(
@@ -181,7 +209,7 @@ def get_datasets(config : DataConfig, base_dir : str, task_config : TaskConfig =
         base_dir, "val", config, transform_train, return_dict=return_dict
     )
     test_data = dataset(
-        base_dir, "test", config, transform_test, return_dict=return_dict
+        base_dir, "test", test_config, transform_test, return_dict=return_dict
     )
 
     # this is kind of dirty

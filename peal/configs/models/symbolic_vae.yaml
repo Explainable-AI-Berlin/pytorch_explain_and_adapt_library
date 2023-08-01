@@ -1,8 +1,9 @@
 #
+'name'              : 'symbolic_vae'
+'data'              : '<PEAL_BASE>/configs/data/artificial_symbolic.yaml'
 'training'          : '<PEAL_BASE>/configs/training/img_generator.yaml'
 'architecture'      : '<PEAL_BASE>/configs/generators/symbolic_vae.yaml'
 'task':
   'criterions':
     'likelihood'    : 1.0
     'reconstruction': 1.0
-  'selection'       : {}

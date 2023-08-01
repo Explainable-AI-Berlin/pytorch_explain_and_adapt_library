@@ -15,6 +15,7 @@ def get_teacher(
     teacher: Union[TeacherInterface, nn.Module, str],
     output_size: int,
     adaptor_config: Union[dict, str],
+    device: Union[torch.device, str] = torch.device("cpu"),
 ) -> TeacherInterface:
     """
     This function returns a teacher. It can be a teacher that is already.
@@ -23,6 +24,7 @@ def get_teacher(
         teacher (Union[TeacherInterface, nn.Module, str]): This can be a teacher that is already
         output_size (int): The output size.
         adaptor_config (Union[dict, str]): The adaptor config.
+        device (Union[torch.device, str], optional): The device. Defaults to torch.device("cpu").
 
     Returns:
         TeacherInterface: The teacher.
@@ -49,7 +51,10 @@ def get_teacher(
     elif teacher[:7] == "virelay":
         teacher = VirelayTeacher(num_classes=output_size, port=int(teacher[-4:]))
 
+    elif teacher[-4:] == ".cpl":
+        teacher = Model2ModelTeacher(torch.load(teacher, map_location=device))
+
     else:
-        teacher = Model2ModelTeacher(torch.load(os.path.join(teacher, "model.cpl")))
+        raise ValueError(f"Unknown teacher {teacher}")
 
     return teacher

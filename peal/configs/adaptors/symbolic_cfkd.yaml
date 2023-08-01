@@ -1,0 +1,20 @@
+'batch_size'                           :  1
+'min_train_samples'                    :  2
+'finetune_iterations'                  :  3
+'mixing_ratio'                         :  0.5
+'attribution_threshold'                :  0.65
+'max_validation_samples'               :  2
+'explainer'                            :  '<PEAL_BASE>/configs/explainers/counterfactual_default.yaml'
+'training'                             :  '<PEAL_BASE>/configs/training/finetune_classifier.yaml'
+'data'                                 :  '<PEAL_BASE>/configs/data/artificial_symbolic_poisened.yaml'
+'test_data'                            :  '<PEAL_BASE>/configs/data/artificial_symbolic.yaml'
+'student'                              :  'peal_runs/symbolic_classifier_poisened/model.cpl'
+'teacher'                              :  'peal_runs/symbolic_classifier_unpoisened/model.cpl'
+'generator'                            :  'peal_runs/symbolic_vae_unpoisened/model.cpl'
+'base_dir'                             :  'peal_runs/symbolic_classifier_poisened/cfkd_oracle'
+'task':
+  'criterions':
+    'ce'     : 1.0
+    'l1'     : 10000.0
+  'output_type'             : 'singleclass'
+  'output_channels'         : 2

@@ -93,6 +93,10 @@ class ModelConfig:
     """
     kwargs: dict = {}
     """
+    A flag that indicates if the model is loaded from a checkpoint.
+    """
+    is_loaded: bool = False
+    """
     The name of the class.
     """
     __name__ : str = 'peal.ModelConfig'

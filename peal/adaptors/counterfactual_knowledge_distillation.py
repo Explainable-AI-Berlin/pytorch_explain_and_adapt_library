@@ -45,22 +45,17 @@ class CounterfactualKnowledgeDistillation:
 
     def __init__(
         self,
-        student: nn.Module,
-        datasource: Union[list, tuple],
+        student: nn.Module = None,
+        datasource: Union[list, tuple] = None,
         output_size: int = None,
-        generator: Union[
-            InvertibleGenerator, Path, str
-        ] = "<PEAL_BASE>/configs/models/default_generator.yaml",
-        base_dir: Union[str, Path] = os.path.join(
-            "peal_runs", "counterfactual_knowledge_distillation"
-        ),
-        teacher: Union[str, TeacherInterface] = "human@8000",
+        generator: Union[InvertibleGenerator, Path, str] = None,
+        base_dir: Union[str, Path] = None,
+        teacher: Union[str, TeacherInterface] = None,
         adaptor_config: Union[
             dict, str, Path, AdaptorConfig
-        ] = "<PEAL_BASE>/configs/adaptors/counterfactual_knowledge_distillation_default.yaml",
-        task_config: Union[dict, str, Path, TaskConfig] = None,
+        ] = "<PEAL_BASE>/configs/adaptors/symbolic_cfkd.yaml",
         gigabyte_vram: float = None,
-        overwrite: bool = False,
+        overwrite: bool = None,
         visualization: callable = lambda x: x,
     ):
         """
@@ -79,7 +74,7 @@ class CounterfactualKnowledgeDistillation:
             teacher (Union, optional): The teacher that is used for CFKD. Defaults to "human@8000".
             adaptor_config (Union, optional):
                 The config for the adaptor.
-                Defaults to "<PEAL_BASE>/configs/adaptors/counterfactual_knowledge_distillation_default.yaml".
+                Defaults to "<PEAL_BASE>/configs/adaptors/symbolic_cfkd.yaml".
             gigabyte_vram (float, optional): The amount of vram in gigabytes. Defaults to None.
             overwrite (bool, optional):
                 The flag that indicates whether the run should be overwritten. Defaults to False.
@@ -87,36 +82,20 @@ class CounterfactualKnowledgeDistillation:
                 The visualization function that is used for the run. Defaults to lambda x: x.
         """
         # TODO make sure to use seeds everywhere!
-        self.base_dir = base_dir
+        self.adaptor_config = load_yaml_config(adaptor_config, AdaptorConfig)
+        self.base_dir = (
+            base_dir if not base_dir is None else self.adaptor_config.base_dir
+        )
         #
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        if student is None:
+            student = torch.load(self.adaptor_config.student, map_location=self.device)
+
         self.original_student = student
         self.original_student.eval()
-        self.device = (
-            "cuda" if next(self.original_student.parameters()).is_cuda else "cpu"
-        )
-        self.overwrite = overwrite
-        # either copy or load the student
-        if self.overwrite or not os.path.exists(
-            os.path.join(self.base_dir, "config.yaml")
-        ):
-            self.adaptor_config = load_yaml_config(adaptor_config, AdaptorConfig)
-            self.student = copy.deepcopy(student)
-
-        else:
-            self.adaptor_config = load_yaml_config(
-                os.path.join(self.base_dir, "config.yaml"), AdaptorConfig
-            )
-            if os.path.exists(os.path.join(self.base_dir, "model.cpl")):
-                self.student = torch.load(
-                    os.path.join(self.base_dir, "model.cpl"), map_location=self.device
-                )
-
-            else:
-                self.student = copy.deepcopy(student)
-
-        if not task_config is None:
-            self.adaptor_config.task = load_yaml_config(task_config, TaskConfig)
-
+        self.overwrite = overwrite if not overwrite is None else self.adaptor_config.overwrite
+        self.adaptor_config.overwrite = False
+        self.student = copy.deepcopy(student)
         self.student.eval()
 
         """self.output_size = integrate_data_config_into_adaptor_config(
@@ -141,6 +120,7 @@ class CounterfactualKnowledgeDistillation:
             datasource=datasource,
             config=self.adaptor_config,
             gigabyte_vram=gigabyte_vram,
+            test_config=self.adaptor_config.test_data,
             # enable_hints=self.enable_hints,
         )
         self.dataloaders_val = [self.val_dataloader, None]
@@ -158,7 +138,9 @@ class CounterfactualKnowledgeDistillation:
 
         #
         self.generator = get_generator(
-            generator=generator,
+            generator=generator
+            if not generator is None
+            else self.adaptor_config.generator,
             data_config=self.adaptor_config.data,
             train_dataloader=self.train_dataloader,
             dataloaders_val=self.dataloaders_val,
@@ -175,9 +157,10 @@ class CounterfactualKnowledgeDistillation:
 
         #
         self.teacher = get_teacher(
-            teacher=teacher,
+            teacher=teacher if not teacher is None else self.adaptor_config.teacher,
             output_size=self.output_size,
             adaptor_config=self.adaptor_config,
+            device=self.device,
         )
 
         self.dataloader_mixer = DataloaderMixer(
@@ -802,7 +785,8 @@ class CounterfactualKnowledgeDistillation:
             ).mkdir(parents=True, exist_ok=True)
             #
             dataloader, _, _ = create_dataloaders_from_datasource(
-                dataset_path, self.data_config
+                config=self.data_config,
+                datasource=dataset_path,
             )
 
             #
@@ -810,8 +794,8 @@ class CounterfactualKnowledgeDistillation:
                 self.base_dir, str(finetune_iteration), "validation_dataset"
             )
             _, dataloader_val, _ = create_dataloaders_from_datasource(
-                val_dataset_path,
-                self.validation_data_config,  # TODO: why dataset_path???
+                config=self.validation_data_config,
+                datasource=val_dataset_path,
             )
 
             #

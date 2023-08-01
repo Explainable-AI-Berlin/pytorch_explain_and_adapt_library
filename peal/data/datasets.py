@@ -210,7 +210,7 @@ class SymbolicDataset(PealDataset):
             targets = copy.deepcopy(self.task_config.y_selection)
 
         else:
-            targets = copy.deepcopy(self.attributes[-1])
+            targets = copy.deepcopy(self.attributes[-1:])
 
         np.savetxt(
             output_dir + ".csv",
