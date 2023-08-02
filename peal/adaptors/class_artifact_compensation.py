@@ -22,7 +22,7 @@ from zennit.composites import COMPOSITES
 from PIL import Image
 
 from peal.explainers.lrp_explainer import LRPExplainer
-from peal.utils import load_yaml_config, embed_numberstring
+from peal.global_utils import load_yaml_config, embed_numberstring
 from peal.teachers.teacher_interface import TeacherInterface
 from peal.teachers.human2model_teacher import Human2ModelTeacher
 from peal.teachers.heatmap_comparison_teacher import HeatmapComparisonTeacher

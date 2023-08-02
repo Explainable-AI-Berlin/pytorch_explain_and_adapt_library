@@ -26,7 +26,7 @@ from torchvision.transforms import ToTensor
 from itertools import product
 from pathlib import Path
 
-from peal.utils import (
+from peal.global_utils import (
     load_yaml_config,
     is_port_in_use
 )

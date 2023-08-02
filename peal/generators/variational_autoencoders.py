@@ -5,7 +5,7 @@ from pydantic import PositiveInt
 
 from peal.generators.interfaces import InvertibleGenerator
 from peal.architectures.downstream_models import SequentialModel
-from peal.configs.generators.template import VAEConfig
+from peal.configs.generators.generator_template import VAEConfig
 
 
 class VAE(InvertibleGenerator):

@@ -12,7 +12,7 @@ from torchvision.transforms import ToTensor
 
 from peal.generators.interfaces import EditCapableGenerator
 from peal.data.datasets import Image2ClassDataset
-from peal.utils import load_yaml_config, embed_numberstring
+from peal.global_utils import load_yaml_config, embed_numberstring
 from dime2.main import main as dime_main
 from ace.main import main as ace_main
 from ace.guided_diffusion import dist_util, logger

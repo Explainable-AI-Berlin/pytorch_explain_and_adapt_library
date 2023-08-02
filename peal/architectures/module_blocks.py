@@ -7,7 +7,7 @@ from peal.architectures.basic_modules import (
     SelfAttentionLayer,
     Transpose,
 )
-from peal.configs.architectures.template import (
+from peal.configs.architectures.architecture_template import (
     VGGConfig,
     ResnetConfig,
     FCConfig,
@@ -77,12 +77,12 @@ class VGGBlock(nn.Sequential):
         submodules = []
         padding = int(config.receptive_field / 2)
         submodules.append(
-            conv(input_channels, config.output_channels, config.receptive_field, stride, padding)
+            conv(input_channels, config.num_neurons, config.receptive_field, stride, padding)
         )
 
         #
         if config.use_batchnorm:
-            submodules.append(batchnorm(config.output_channels))
+            submodules.append(batchnorm(config.num_neurons))
 
         submodules.append(activation())
 
@@ -118,19 +118,19 @@ class ResnetBlock(nn.Sequential):
         """
         submodules = []
         submodule_1 = []
-        submodule_1.append(conv(input_channels, config.output_channels, 3, stride, 1))
+        submodule_1.append(conv(input_channels, config.num_neurons, 3, stride, 1))
         if config.use_batchnorm:
-            submodule_1.append(batchnorm(config.output_channels))
+            submodule_1.append(batchnorm(config.num_neurons))
 
         submodule_1.append(activation())
-        submodule_1.append(conv(config.output_channels, config.output_channels, 3, 1, 1))
+        submodule_1.append(conv(config.num_neurons, config.num_neurons, 3, 1, 1))
         if config.use_batchnorm:
-            submodule_1.append(batchnorm(config.output_channels))
+            submodule_1.append(batchnorm(config.num_neurons))
 
         submodule_1 = nn.Sequential(*submodule_1)
         if stride > 1:
             pooling = nn.AvgPool2d(2)
-            downsample_conv = conv(input_channels, config.output_channels, 1)
+            downsample_conv = conv(input_channels, config.num_neurons, 1)
             downsample = nn.Sequential(*[pooling, downsample_conv])
             submodule_1 = SkipConnection(submodule_1, downsample)
 

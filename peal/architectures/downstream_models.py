@@ -11,9 +11,9 @@ from peal.architectures.module_blocks import (
     FCBlock,
     ResnetBlock,
     TransformerBlock,
-    VGGBlock,
+    VGGBlock, create_cnn_layer,
 )
-from peal.configs.architectures.template import (
+from peal.configs.architectures.architecture_template import (
     ArchitectureConfig,
     FCConfig,
     VGGConfig,
@@ -81,13 +81,13 @@ class SequentialModel(torch.nn.Sequential):
         for layer_config in architecture_config.layers:
             if isinstance(layer_config, ResnetConfig):
                 layers.append(
-                    ResnetBlock(layer_config, num_neurons_previous, activation)
+                    create_cnn_layer(ResnetBlock, layer_config, num_neurons_previous, activation)
                 )
                 num_neurons_previous = layer_config.num_neurons
                 tensor_dim = layer_config.tensor_dim
 
             elif isinstance(layer_config, VGGConfig):
-                layers.append(VGGBlock(layer_config, num_neurons_previous, activation))
+                layers.append(create_cnn_layer(VGGBlock, layer_config, num_neurons_previous, activation))
                 num_neurons_previous = layer_config.num_neurons
                 tensor_dim = layer_config.tensor_dim
 

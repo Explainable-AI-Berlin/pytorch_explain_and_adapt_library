@@ -14,7 +14,7 @@ from tqdm import tqdm
 from typing import Union
 from torch import nn
 
-from peal.utils import load_yaml_config, set_adaptive_batch_size
+from peal.global_utils import load_yaml_config, set_adaptive_batch_size
 from peal.data.dataloaders import (
     DataStack,
     DataloaderMixer,
@@ -34,8 +34,8 @@ from peal.adaptors.adaptor_utils import integrate_data_config_into_adaptor_confi
 from peal.training.training_utils import (
     calculate_validation_statistics,
 )
-from peal.configs.adaptors.template import AdaptorConfig
-from peal.configs.models.template import TaskConfig
+from peal.configs.adaptors.adaptor_template import AdaptorConfig
+from peal.configs.models.model_template import TaskConfig
 
 
 class CounterfactualKnowledgeDistillation:

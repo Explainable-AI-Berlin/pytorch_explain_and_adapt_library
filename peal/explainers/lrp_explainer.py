@@ -25,7 +25,7 @@ from zennit.torchvision import VGGCanonizer, ResNetCanonizer
 from zennit.image import imgify
 from torchvision.transforms import ToTensor
 
-from peal.utils import (
+from peal.global_utils import (
     load_yaml_config
 )
 

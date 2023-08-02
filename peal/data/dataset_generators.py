@@ -8,7 +8,7 @@ import pandas as pd
 
 from pathlib import Path
 from PIL import Image
-from peal.utils import get_project_resource_dir, embed_numberstring
+from peal.global_utils import get_project_resource_dir, embed_numberstring
 
 
 class ArtificialConfounderTabularDatasetGenerator:

@@ -102,7 +102,7 @@ class Mean(nn.Module):
         nn (_type_): _description_
     '''
 
-    def __init__(self, dims, keepdim=True, input_shape=None):
+    def __init__(self, dims = None, keepdim=False, input_shape=None):
         '''
         _summary_
 
@@ -127,7 +127,13 @@ class Mean(nn.Module):
             _type_: _description_
         '''
         self.input_shape = [-1] + list(x.shape[1:])
-        for dim in self.dims:
+        if self.dims is None:
+            dims = list(range(2, len(x.shape))[::-1])
+
+        else:
+            dims = self.dims
+
+        for dim in dims:
             x = torch.mean(x, dim, keepdim=self.keepdim)
 
         return x

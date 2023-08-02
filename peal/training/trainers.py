@@ -12,15 +12,15 @@ from pathlib import Path
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from peal.utils import orthogonal_initialization, move_to_device, load_yaml_config
+from peal.global_utils import orthogonal_initialization, move_to_device, load_yaml_config
 from peal.training.loggers import Logger
 from peal.training.criterions import get_criterions
 from peal.data.dataloaders import create_dataloaders_from_datasource
 from peal.generators.interfaces import Generator
 from peal.architectures.downstream_models import SequentialModel
 from peal.generators.variational_autoencoders import VAE
-from peal.configs.architectures.template import ArchitectureConfig
-from peal.configs.generators.template import VAEConfig
+from peal.configs.architectures.architecture_template import ArchitectureConfig
+from peal.configs.generators.generator_template import VAEConfig
 
 
 def calculate_test_accuracy(model, test_dataloader, device):

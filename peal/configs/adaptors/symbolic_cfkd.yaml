@@ -2,7 +2,6 @@
 'min_train_samples'                    :  2
 'finetune_iterations'                  :  3
 'mixing_ratio'                         :  0.5
-'attribution_threshold'                :  0.65
 'max_validation_samples'               :  2
 'explainer'                            :  '<PEAL_BASE>/configs/explainers/counterfactual_default.yaml'
 'training'                             :  '<PEAL_BASE>/configs/training/finetune_classifier.yaml'

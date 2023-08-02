@@ -7,7 +7,7 @@ import os
 from torchvision import transforms
 from torchvision.transforms import ToTensor
 
-from peal.utils import load_yaml_config, get_project_resource_dir
+from peal.global_utils import load_yaml_config, get_project_resource_dir
 from peal.data.transformations import (
     CircularCut,
     Padding,
@@ -23,8 +23,8 @@ from peal.data.datasets import (
     SymbolicDataset,
 )
 from peal.data.dataset_interfaces import PealDataset
-from peal.configs.data.template import DataConfig
-from peal.configs.models.template import TaskConfig
+from peal.configs.data.data_template import DataConfig
+from peal.configs.models.model_template import TaskConfig
 
 
 def find_subclasses(base_class, directory):
@@ -182,7 +182,7 @@ def get_datasets(
         )
 
     #
-    if config.input_type == "image" and config.use_normalization:
+    if config.input_type == "image" and not config.normalization is None:
         stats_dataset = dataset(base_dir, "train", config, transform_test)
         samples = []
         for idx in range(stats_dataset.__len__()):

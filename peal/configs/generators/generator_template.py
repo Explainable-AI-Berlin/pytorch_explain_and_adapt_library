@@ -1,6 +1,6 @@
 from typing import Union
 
-from peal.configs.architectures.template import ArchitectureConfig
+from peal.configs.architectures.architecture_template import ArchitectureConfig
 
 class VAEConfig:
     """

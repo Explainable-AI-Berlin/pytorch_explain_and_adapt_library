@@ -1,10 +1,10 @@
 from pydantic import BaseModel, PositiveInt
 from typing import Union
 
-from peal.configs.data.template import DataConfig
-from peal.configs.training.template import TrainingConfig
-from peal.configs.architectures.template import ArchitectureConfig
-from peal.configs.generators.template import VAEConfig
+from peal.configs.data.data_template import DataConfig
+from peal.configs.training.training_template import TrainingConfig
+from peal.configs.architectures.architecture_template import ArchitectureConfig
+from peal.configs.generators.generator_template import VAEConfig
 
 
 class TaskConfig:

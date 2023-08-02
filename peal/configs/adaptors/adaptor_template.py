@@ -1,11 +1,11 @@
 from pydantic import BaseModel, PositiveInt
 from typing import Union
 
-from peal.configs.data.template import DataConfig
-from peal.configs.training.template import TrainingConfig
-from peal.configs.architectures.template import ArchitectureConfig
-from peal.configs.models.template import TaskConfig
-from peal.configs.explainers.template import ExplainerConfig
+from peal.configs.data.data_template import DataConfig
+from peal.configs.training.training_template import TrainingConfig
+from peal.configs.architectures.architecture_template import ArchitectureConfig
+from peal.configs.models.model_template import TaskConfig
+from peal.configs.explainers.explainer_template import ExplainerConfig
 
 
 class AdaptorConfig:

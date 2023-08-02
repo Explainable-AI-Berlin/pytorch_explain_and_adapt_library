@@ -1,0 +1,20 @@
+'encoder':
+  'layers' : [
+    ['vgg', 64, 2, True],
+    ['resnet', 64, 2, True],
+    ['resnet', 128, 2, True],
+    ['resnet', 256, 2, True],
+    ['resnet', 512, 2, True],
+    ['mean'],
+  ]
+  'activation'              : 'ReLU'
+'decoder':
+  'layers' : [
+    ['unsqueeze'],
+    ['resnet', 512, 2, True],
+    ['resnet', 256, 2, True],
+    ['resnet', 128, 2, True],
+    ['resnet', 64, 2, True],
+    ['vgg', 64, 2, True],
+  ]
+  'activation'              : 'ReLU'

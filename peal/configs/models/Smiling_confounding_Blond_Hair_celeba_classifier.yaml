@@ -8,5 +8,5 @@
     'ce'     : 1.0
     'l1'     : 10000.0
   'output_type'             : 'singleclass'
-  'output_size'             : 2
-  'selection'               : ['Smiling']
+  'output_channels'         : 2
+  'y_selection'               : ['Smiling']

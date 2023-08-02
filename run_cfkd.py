@@ -1,7 +1,7 @@
 import argparse
 
-from peal.configs.adaptors.template import AdaptorConfig
-from peal.utils import load_yaml_config, add_class_arguments, integrate_arguments
+from peal.configs.adaptors.adaptor_template import AdaptorConfig
+from peal.global_utils import load_yaml_config, add_class_arguments, integrate_arguments
 from peal.adaptors.counterfactual_knowledge_distillation import (
     CounterfactualKnowledgeDistillation,
 )

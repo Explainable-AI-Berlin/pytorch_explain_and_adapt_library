@@ -4,7 +4,7 @@ from typing import Union
 
 from peal.generators.interfaces import InvertibleGenerator, EditCapableGenerator
 from peal.generators.normalizing_flows import Glow
-from peal.utils import load_yaml_config
+from peal.global_utils import load_yaml_config
 from peal.training.trainers import ModelTrainer
 
 

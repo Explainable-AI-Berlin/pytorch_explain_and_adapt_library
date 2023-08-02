@@ -14,7 +14,7 @@ from matplotlib import pyplot as plt
 
 from peal.data.dataset_interfaces import PealDataset
 from peal.data.dataset_utils import parse_json, parse_csv
-from peal.utils import embed_numberstring
+from peal.global_utils import embed_numberstring
 from peal.generators.interfaces import Generator
 
 matplotlib.use("Agg")
@@ -145,7 +145,7 @@ class SymbolicDataset(PealDataset):
         if (
             not self.task_config is None
             and not self.task_config.y_selection is None
-            and not len(self.task_config.y_selection) == 0
+            and not self.task_config.y_selection is None
         ):
             y = torch.zeros([len(self.task_config.y_selection)])
             for idx, selection in enumerate(self.task_config.y_selection):
@@ -205,7 +205,7 @@ class SymbolicDataset(PealDataset):
         if (
             not self.task_config is None
             and not self.task_config.y_selection is None
-            and not len(self.task_config.y_selection) == 0
+            and not self.task_config.y_selection is None
         ):
             targets = copy.deepcopy(self.task_config.y_selection)
 
@@ -428,14 +428,14 @@ class Image2MixedDataset(ImageDataset):
 
         targets = self.data[name]
 
-        if not self.task_config is None and not len(self.task_config.selection) == 0:
-            target = torch.zeros([len(self.task_config.selection)])
-            for idx, selection in enumerate(self.task_config.selection):
+        if not self.task_config is None and not self.task_config.y_selection is None:
+            target = torch.zeros([len(self.task_config.y_selection)])
+            for idx, selection in enumerate(self.task_config.y_selection):
                 target[idx] = targets[self.attributes.index(selection)]
 
         else:
             target = torch.tensor(
-                targets[: self.config.output_size], dtype=torch.float32
+                targets[:self.config.output_size[0]], dtype=torch.float32
             )
 
         if not self.task_config is None and "ce" in self.task_config.criterions:

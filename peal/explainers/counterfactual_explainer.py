@@ -4,11 +4,11 @@ from torch import nn
 from tqdm import tqdm
 from typing import Union
 
-from peal.utils import load_yaml_config
+from peal.global_utils import load_yaml_config
 from peal.generators.interfaces import InvertibleGenerator, EditCapableGenerator
 from peal.data.dataset_interfaces import PealDataset
 from peal.explainers.explainer_interface import ExplainerInterface
-from peal.configs.explainers.template import ExplainerConfig
+from peal.configs.explainers.explainer_template import ExplainerConfig
 
 
 class CounterfactualExplainer(ExplainerInterface):

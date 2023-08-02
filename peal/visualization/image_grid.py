@@ -4,7 +4,7 @@ import torch
 
 from PIL import Image, ImageFont, ImageDraw
 
-from peal.utils import get_project_resource_dir
+from peal.global_utils import get_project_resource_dir
 
 def zip_tensors(tensor_list):
     padding = torch.ones([3, tensor_list[0].shape[2], 5])

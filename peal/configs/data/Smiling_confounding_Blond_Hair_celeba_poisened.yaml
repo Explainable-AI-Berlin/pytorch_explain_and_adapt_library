@@ -1,9 +1,9 @@
 'dataset_class'           : 'celeba'
 'dataset_path'            : 'datasets/celeba'
-'num_samples'             : 14000
+'num_samples'             : 7000
 'input_type'              : 'image'
 'input_size'              : [3, 128, 128]
 'output_type'             : 'multiclass'
 'output_size'             : [41]
-'confounder_probability'  : 0.5
+'confounder_probability'  : 1.0
 'confounding_factors'     : ['Smiling', 'Blond_Hair']
