@@ -13,7 +13,7 @@ from torchvision.transforms import ToTensor
 from peal.generators.interfaces import EditCapableGenerator
 from peal.data.datasets import Image2ClassDataset
 from peal.global_utils import load_yaml_config, embed_numberstring
-from dime2.main import main as dime_main
+#from dime2.main import main as dime_main
 from ace.main import main as ace_main
 from ace.guided_diffusion import dist_util, logger
 from ace.guided_diffusion.resample import create_named_schedule_sampler
@@ -130,8 +130,8 @@ class DimeDDPMAdaptor(EditCapableGenerator):
         if self.config.method == "ace":
             ace_main(args=args)
 
-        elif self.config.method == "dime":
-            dime_main(args=args)
+        '''elif self.config.method == "dime":
+            dime_main(args=args)'''
 
         x_counterfactuals = []
         x_list = []

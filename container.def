@@ -1,8 +1,9 @@
-Bootstrap: docker
-From: python:3.10
+Bootstrap: conda
+From: python:3.9.15
 
 %files
-    $PWD/requirements.txt requirements.txt
+    $PWD/environment.yml environment.yaml
 
 %post
-    pip install --root-user-action=ignore -r requirements.txt
+    conda env create -f environment.yaml
+    conda activate my_conda_env

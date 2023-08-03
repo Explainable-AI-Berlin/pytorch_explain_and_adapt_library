@@ -1,6 +1,6 @@
 python3 train_model.py \
 --model_config "<PEAL_BASE>/configs/models/Smiling_confounding_Blond_Hair_celeba_classifier.yaml" \
---model_name "Smiling_confounding_Blond_Hair_celeba_classifie_unpoisened"
+--model_name "Smiling_confounding_Blond_Hair_celeba_classifier_unpoisened"
 python3 train_model.py \
 --model_config "<PEAL_BASE>/configs/models/Smiling_confounding_Blond_Hair_celeba_classifier.yaml" \
 --model_name "Smiling_confounding_Blond_Hair_celeba_classifier_poisened" \

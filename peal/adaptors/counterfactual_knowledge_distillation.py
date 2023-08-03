@@ -138,7 +138,7 @@ class CounterfactualKnowledgeDistillation:
 
         #
         self.generator = get_generator(
-            generator=generator
+            generator=generator if not generator is None else self.adaptor_config.generator
             if not generator is None
             else self.adaptor_config.generator,
             data_config=self.adaptor_config.data,
