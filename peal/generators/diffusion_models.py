@@ -71,7 +71,7 @@ class DimeDDPMAdaptor(EditCapableGenerator):
                 mode="train",
                 batch_size=args.batch_size,
                 training_config={
-                    "iterations_per_episode": training_config.max_steps
+                    "steps_per_epoch": training_config.max_steps
                 },
             )
         )

@@ -8,7 +8,7 @@
 'classifier_scales' : '8,10,15'
 'clip_denoised' : True
 'data_dir' : 'peal_runs/dime2/data'
-'base_path' : 'peal_runs/dime2'
+'base_path' : 'peal_runs/ddpm_celeba'
 # 'dataset' : 'CelebAMV'
 'diffusion_steps' : 500
 'dropout' : 0.0
@@ -32,7 +32,7 @@
 'num_heads_upsample' : -1
 'num_res_blocks' : 2
 # 'oracle_path' : '../dime2/oracle.pth'
-'output_path' : 'peal_runs/dime2/outputs'
+'output_path' : 'peal_runs/ddpm_celeba/outputs'
 'predict_xstart' : False
 # 'query_label' : 31
 'resblock_updown' : True
@@ -77,3 +77,8 @@
 'chunks' : 1 # Chunking for spliting the CE generation into multiple gpus
 'merge_chunks' : False  # to merge all chunked results
 'cudnn_deterministic' : False  # to make the results deterministic
+# own parameters
+'max_train_steps' : 1000000
+'data' : '<PEAL_BASE>/configs/data/celeba.yaml'
+'current_fid' : 100000000000000.0'
+'best_fid' : 100000000000000.0'

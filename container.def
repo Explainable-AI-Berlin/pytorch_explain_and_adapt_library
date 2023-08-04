@@ -1,9 +1,14 @@
-Bootstrap: conda
-From: python:3.9.15
+Bootstrap: docker
+From: continuumio/miniconda3
 
 %files
-    $PWD/environment.yml environment.yaml
+    $PWD/environment.yaml environment.yaml
+
 
 %post
-    conda env create -f environment.yaml
-    conda activate my_conda_env
+    conda update -n base -c defaults conda -y
+    conda env create -f environment.yml
+
+    # Source environment at runtime
+    echo ". /opt/conda/etc/profile.d/conda.sh" >> $SINGULARITY_ENVIRONMENT
+    echo "conda activate peal" >> $SINGULARITY_ENVIRONMENT

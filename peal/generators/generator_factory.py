@@ -57,7 +57,7 @@ def get_generator(
 
         else:
             # TODO this is super dirty!
-            generator_config_path = '<PEAL_BASE>/configs/generators/ace_generator.yaml'
+            generator_config_path = '<PEAL_BASE>/configs/generators/ace_generator_celeba.yaml'
             generator_out = DimeDDPMAdaptor(generator_config_path, train_dataloader.dataset, generator, device)
 
     else:

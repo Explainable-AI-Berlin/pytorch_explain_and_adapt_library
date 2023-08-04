@@ -15,9 +15,17 @@ from ace.guided_diffusion.script_util import (
 )
 from ace.guided_diffusion.train_util import TrainLoop
 
+from peal.data.dataset_factory import get_datasets
+from peal.data.dataloaders import get_dataloader
+from peal.global_utils import load_yaml_config
+from peal.configs.data.data_template import DataConfig
+
 
 def main():
     args = create_argparser().parse_args()
+
+    if not args.generator_config is None:
+        args = load_yaml_config(args.generator_config)
 
     dist_util.setup_dist(args.gpus)
     logger.configure(dir=args.output_path)
@@ -32,14 +40,23 @@ def main():
     schedule_sampler = create_named_schedule_sampler(args.schedule_sampler, diffusion)
 
     logger.log("creating data loader...")
-    data = load_data_celeba(
-        data_dir=args.data_dir,
-        batch_size=args.batch_size,
-        image_size=args.image_size,
-        class_cond=args.class_cond,
-        use_hdf5=args.use_hdf5,
-        HQ=args.use_celeba_HQ,
-    )
+    if args.data is None:
+        data = load_data_celeba(
+            data_dir=args.data_dir,
+            batch_size=args.batch_size,
+            image_size=args.image_size,
+            class_cond=args.class_cond,
+            use_hdf5=args.use_hdf5,
+            HQ=args.use_celeba_HQ,
+        )
+
+    else:
+        args.data = load_yaml_config(args.data, DataConfig)
+        dataset,_,_ = get_datasets(args.data)
+        args.train_batch_size = args.batch_size
+        args.steps_per_epoch = args.max_train_steps
+        dataloader = get_dataloader(dataset, training_config=args)
+        data = iter(dataloader)
 
     logger.log("training...")
     TrainLoop(
@@ -58,7 +75,7 @@ def main():
         schedule_sampler=schedule_sampler,
         weight_decay=args.weight_decay,
         lr_anneal_steps=args.lr_anneal_steps,
-    ).run_loop()
+    ).run_loop(config=args)
 
 
 def create_argparser():
@@ -80,6 +97,7 @@ def create_argparser():
         gpus='',
         use_hdf5=False,
         use_celeba_HQ=False,
+        generator_config=None,
     )
     defaults.update(model_and_diffusion_defaults())
     parser = argparse.ArgumentParser()

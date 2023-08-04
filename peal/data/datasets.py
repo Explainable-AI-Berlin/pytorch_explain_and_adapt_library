@@ -335,7 +335,7 @@ class ImageDataset(PealDataset):
         with open(os.path.join(output_dir, "data.csv"), "w") as f:
             f.write(data)
 
-    def track_generator_performance(self, generator: Generator, batch_size=1):
+    def track_generator_performance(self, generator: Union[Generator, torch.Tensor], batch_size=1):
         """
         This function tracks the performance of the generator
 
@@ -351,11 +351,15 @@ class ImageDataset(PealDataset):
             real_images = torch.stack(real_images, dim=0)
             self.fid.update(torch.tensor(255 * real_images, dtype=torch.uint8), real=True)
 
-        generated_images = generator.sample_x(batch_size=batch_size)
-        while generated_images.shape[0] < 10:
-            generated_images = torch.cat(
-                [generated_images, generator.sample_x(batch_size=batch_size)], dim=0
-            )
+        if isinstance(generator, torch.Tensor):
+            generated_images = torch.clone(generator)
+
+        elif isinstance(generator, Generator):
+            generated_images = generator.sample_x(batch_size=batch_size)
+            while generated_images.shape[0] < 10:
+                generated_images = torch.cat(
+                    [generated_images, generator.sample_x(batch_size=batch_size)], dim=0
+                )
 
         generated_images = generated_images[:10]
         self.fid.update(torch.tensor(255 * generated_images, dtype=torch.uint8).cpu(), real=False)

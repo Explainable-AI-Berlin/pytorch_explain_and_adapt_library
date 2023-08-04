@@ -58,4 +58,4 @@ class TrainingConfig(BaseModel):
     If it is not set, the DataloaderMixer is not used and the value implicitly becomes
     dataset_size / batch_size
     '''
-    iterations_per_episode : PositiveInt = None
+    steps_per_epoch : PositiveInt = None

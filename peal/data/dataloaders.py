@@ -123,7 +123,7 @@ class DataIterator:
         Returns:
             _type_: _description_
         """
-        if self._index < self.dataloader.train_config.iterations_per_episode:
+        if self._index < self.dataloader.train_config.steps_per_epoch:
             self._index += 1
             return self.dataloader.sample()
 
@@ -204,7 +204,12 @@ class DataloaderMixer(DataLoader):
 
 
 def get_dataloader(
-    dataset, training_config=None, mode="train", task_config=None, batch_size=None
+    dataset,
+    training_config=None,
+    mode="train",
+    task_config=None,
+    batch_size=None,
+    steps_per_epoch=None,
 ):
     assert (
         not training_config is None or not batch_size is None
@@ -226,8 +231,11 @@ def get_dataloader(
 
     if (
         mode == "train"
-        and not training_config is None
-        and not training_config.iterations_per_episode is None
+        and not steps_per_epoch is None
+        or (
+            not training_config is None
+            and not training_config.steps_per_epoch is None
+        )
     ):
         dataloader = DataloaderMixer(training_config, dataloader)
 
@@ -302,7 +310,9 @@ def create_dataloaders_from_datasource(
             print("datasource is not a valid input!")
             quit()
 
-        if hasattr(config, "architecture") and isinstance(config.architecture, VAEConfig):
+        if hasattr(config, "architecture") and isinstance(
+            config.architecture, VAEConfig
+        ):
             dataset_train = VAEDatasetWrapper(dataset_train)
             dataset_val = VAEDatasetWrapper(dataset_val)
             dataset_test = VAEDatasetWrapper(dataset_test)

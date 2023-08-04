@@ -10,5 +10,5 @@
 'global_train_step'       : 0
 'global_validation_step'  : 0
 'epoch'                   : -1
-'iterations_per_episode'  : 1000
+'steps_per_epoch'  : 1000
 'verbosity'               : 1

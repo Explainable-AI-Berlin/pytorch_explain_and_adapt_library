@@ -3,6 +3,7 @@ import functools
 import os
 import glob
 import copy
+import shutil
 
 import blobfile as bf
 import torch as th
@@ -12,6 +13,7 @@ from torch.nn.parallel.distributed import DistributedDataParallel as DDP
 from torch.optim import AdamW
 from tqdm import tqdm
 from pathlib import Path
+from torch.utils.tensorboard import SummaryWriter
 
 from . import dist_util, logger
 from .fp16_util import MixedPrecisionTrainer
@@ -168,10 +170,21 @@ class TrainLoop:
             )
             self.opt.load_state_dict(state_dict)
 
-    def run_loop(self):
+    def run_loop(self, config):
         print("Running training loop")
-        pbar = tqdm(total=self.data.dataloader.train_config['iterations_per_episode'] * self.batch_size / self.microbatch)
-        pbar.num_steps = self.data.dataloader.train_config['iterations_per_episode']
+        pbar = tqdm(
+            total=self.data.dataloader.train_config["steps_per_epoch"]
+            * self.batch_size
+            / self.microbatch
+        )
+        pbar.num_steps = self.data.dataloader.train_config["steps_per_epoch"]
+        pbar.config = config
+        shutil.rmtree(self.base_dir, ignore_errors=True)
+        os.makedirs(os.path.join(self.base_dir, "ema"), exist_ok=True)
+        os.makedirs(os.path.join(self.base_dir, "model"), exist_ok=True)
+        os.makedirs(os.path.join(self.base_dir, "optimizer"), exist_ok=True)
+        os.makedirs(os.path.join(self.base_dir, "outputs"), exist_ok=True)
+        pbar.writer = SummaryWriter(os.path.join(self.base_dir, "logs"))
         while (
             not self.lr_anneal_steps
             or self.step + self.resume_step < self.lr_anneal_steps
@@ -182,7 +195,20 @@ class TrainLoop:
             if self.step % self.save_interval == 0:
                 # save intermediate images as outputs
                 imgs = self.diffusion.p_sample_loop(self.model, batch.shape)
-                torchvision.utils.save_image(imgs, os.path.join(copy.deepcopy(self.model_dir), f"output{(self.step+self.resume_step):06d}.png"))
+                torchvision.utils.save_image(
+                    imgs,
+                    os.path.join(
+                        copy.deepcopy(self.model_dir),
+                        os.path.join(
+                            "outputs", f"{(self.step+self.resume_step):06d}.png"
+                        ),
+                    ),
+                )
+                train_generator_performance = (
+                    self.data.dataloader.dataset.track_generator_performance(
+                        self.model, self.data.dataloader.batch_size
+                    )
+                )
                 self.save()
                 # Run for a finite amount of time in integration tests.
                 if os.environ.get("DIFFUSION_TRAINING_TEST", "") and self.step > 0:
@@ -257,23 +283,31 @@ class TrainLoop:
         logger.logkv("step", self.step + self.resume_step)
         logger.logkv("samples", (self.step + self.resume_step + 1) * self.global_batch)
 
-    def save(self):
+    def save(self, pbar = None):
         def save_checkpoint(rate, params):
             state_dict = self.mp_trainer.master_params_to_state_dict(params)
             if dist.get_rank() == 0:
                 print(f"saving model {rate}...")
                 if not rate:
-                    filename = f"model{(self.step+self.resume_step):06d}.pt"
+                    filename = os.path.join(f"model",  f"{(self.step+self.resume_step):06d}.pt")
+                    if not pbar is None and pbar.config.current_fid < pbar.config.best_fid:
+                        pbar.config.best_fid = pbar.config.current_fid
+                        with bf.BlobFile(
+                            bf.join(copy.deepcopy(self.model_dir), f"final.pt"), "wb"
+                        ) as f:
+                            th.save(state_dict, f)
                 else:
-                    filename = f"ema_{rate}_{(self.step+self.resume_step):06d}.pt"
+                    filename = os.path.join(f"ema", f"{rate}_{(self.step+self.resume_step):06d}.pt")
 
-                with bf.BlobFile(bf.join(copy.deepcopy(self.model_dir), filename), "wb") as f:
+                with bf.BlobFile(
+                    bf.join(copy.deepcopy(self.model_dir), filename), "wb"
+                ) as f:
                     th.save(state_dict, f)
 
         # delete old checkpoints
-        '''if dist.get_rank() == 0:
+        """if dist.get_rank() == 0:
             for f in glob.glob(os.path.join(copy.deepcopy(self.model_dir), "*.pt")):
-                os.remove(os.path.join(copy.deepcopy(self.model_dir), f))'''
+                os.remove(os.path.join(copy.deepcopy(self.model_dir), f))"""
 
         save_checkpoint(0, self.mp_trainer.master_params)
         for rate, params in zip(self.ema_rate, self.ema_params):
@@ -281,7 +315,10 @@ class TrainLoop:
 
         if dist.get_rank() == 0:
             with bf.BlobFile(
-                bf.join(copy.deepcopy(self.model_dir), f"opt{(self.step+self.resume_step):06d}.pt"),
+                bf.join(
+                    copy.deepcopy(self.model_dir),
+                    os.path.join(f"opt", f"{(self.step+self.resume_step):06d}.pt"),
+                ),
                 "wb",
             ) as f:
                 th.save(self.opt.state_dict(), f)
@@ -302,8 +339,6 @@ def parse_resume_step_from_filename(filename):
         return int(split1)
     except ValueError:
         return 0
-
-
 
 
 def find_resume_checkpoint():

@@ -1,18 +1,13 @@
 # This whole file contains all the stuff, that is written too bad and had no clear position where it should be located in the project!
-
-import argparse
 import numpy as np
 import sys
-import logging
+import types
 import torch
 import os
 import yaml
 import socket
-import shutil
-import inspect
 import typing
 
-from typing import Union
 from pkg_resources import resource_filename
 
 
@@ -167,7 +162,7 @@ def _load_yaml_config(config_path):
 def load_yaml_config(config_path, config_model=None):
     config_data = _load_yaml_config(config_path)
     if config_model is None:
-        return config_data
+        return types.SimpleNamespace(**config_data)
 
     elif isinstance(config_data, dict):
         return config_model(**config_data)
