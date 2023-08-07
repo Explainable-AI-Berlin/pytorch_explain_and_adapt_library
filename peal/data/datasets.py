@@ -11,6 +11,7 @@ from torchvision.transforms import ToTensor
 from PIL import Image
 from pathlib import Path
 from matplotlib import pyplot as plt
+from typing import Union
 
 from peal.data.dataset_interfaces import PealDataset
 from peal.data.dataset_utils import parse_json, parse_csv
@@ -342,28 +343,35 @@ class ImageDataset(PealDataset):
         Args:
             generator (Generator): The generator
         """
-        if not hasattr(self, "fid"):
-            self.fid = torchmetrics.image.fid.FrechetInceptionDistance(feature=64, reset_real_features=False)
-            real_images = []
-            for i in range(10):
-                real_images.append(self[i][0])
-
-            real_images = torch.stack(real_images, dim=0)
-            self.fid.update(torch.tensor(255 * real_images, dtype=torch.uint8), real=True)
 
         if isinstance(generator, torch.Tensor):
             generated_images = torch.clone(generator)
 
         elif isinstance(generator, Generator):
+            # TODO set device
             generated_images = generator.sample_x(batch_size=batch_size)
-            while generated_images.shape[0] < 10:
+            while generated_images.shape[0] < 20:
                 generated_images = torch.cat(
                     [generated_images, generator.sample_x(batch_size=batch_size)], dim=0
                 )
 
-        generated_images = generated_images[:10]
-        self.fid.update(torch.tensor(255 * generated_images, dtype=torch.uint8).cpu(), real=False)
+        else:
+            raise NotImplementedError("Generator type not supported")
+
+        if not hasattr(self, "fid"):
+            self.fid = torchmetrics.image.fid.FrechetInceptionDistance(feature=192, reset_real_features=False)
+            self.fid.to(generated_images.device)
+            real_images = []
+            for i in range(20):
+                real_images.append(self[i][0])
+
+            real_images = torch.stack(real_images, dim=0).to(generated_images.device)
+            self.fid.update(torch.tensor(255 * real_images, dtype=torch.uint8), real=True)
+
+        generated_images = generated_images[:20]
+        self.fid.update(torch.tensor(255 * generated_images, dtype=torch.uint8), real=False)
         fid_score = float(self.fid.compute())
+
         return {'fid': fid_score}
 
 

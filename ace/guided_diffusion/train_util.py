@@ -173,18 +173,18 @@ class TrainLoop:
     def run_loop(self, config):
         print("Running training loop")
         pbar = tqdm(
-            total=self.data.dataloader.train_config["steps_per_epoch"]
+            total=self.data.dataloader.train_config.steps_per_epoch
             * self.batch_size
             / self.microbatch
         )
-        pbar.num_steps = self.data.dataloader.train_config["steps_per_epoch"]
+        pbar.num_steps = self.data.dataloader.train_config.steps_per_epoch
         pbar.config = config
-        shutil.rmtree(self.base_dir, ignore_errors=True)
-        os.makedirs(os.path.join(self.base_dir, "ema"), exist_ok=True)
-        os.makedirs(os.path.join(self.base_dir, "model"), exist_ok=True)
-        os.makedirs(os.path.join(self.base_dir, "optimizer"), exist_ok=True)
-        os.makedirs(os.path.join(self.base_dir, "outputs"), exist_ok=True)
-        pbar.writer = SummaryWriter(os.path.join(self.base_dir, "logs"))
+        shutil.rmtree(self.model_dir, ignore_errors=True)
+        os.makedirs(os.path.join(self.model_dir, "ema"), exist_ok=True)
+        os.makedirs(os.path.join(self.model_dir, "model"), exist_ok=True)
+        os.makedirs(os.path.join(self.model_dir, "optimizer"), exist_ok=True)
+        os.makedirs(os.path.join(self.model_dir, "outputs"), exist_ok=True)
+        pbar.writer = SummaryWriter(os.path.join(self.model_dir, "logs"))
         while (
             not self.lr_anneal_steps
             or self.step + self.resume_step < self.lr_anneal_steps
@@ -206,7 +206,7 @@ class TrainLoop:
                 )
                 train_generator_performance = (
                     self.data.dataloader.dataset.track_generator_performance(
-                        self.model, self.data.dataloader.batch_size
+                        imgs, self.data.dataloader.batch_size
                     )
                 )
                 self.save()

@@ -1,15 +1,11 @@
 'attention_resolutions' : '32,16,8'
-'batch_size' : 1 #50
+'batch_size' : 20 #50
 'channel_mult' : ''
 'chunk' : 0
 'class_cond' : False
-#'../notebooks/peal_runs/celeba_poisened100_Smiling_Blond_Hair_classifier/model.cpl'
-'classifier_path' : 'peal_runs/dime2/classifier.cpl'
 'classifier_scales' : '8,10,15'
 'clip_denoised' : True
-'data_dir' : 'peal_runs/dime2/data'
 'base_path' : 'peal_runs/ddpm_celeba'
-# 'dataset' : 'CelebAMV'
 'diffusion_steps' : 500
 'dropout' : 0.0
 'exp_name' : 'example_name'
@@ -22,7 +18,6 @@
 'l_perc_layer' : 18
 'learn_sigma' : True
 'merge_and_eval' : False
-# 'model_path' : '../dime2/ddpm-celeba.pt'
 'noise_schedule' : 'linear'
 'num_batches' : 1
 'num_channels' : 128
@@ -32,9 +27,7 @@
 'num_heads_upsample' : -1
 'num_res_blocks' : 2
 # 'oracle_path' : '../dime2/oracle.pth'
-'output_path' : 'peal_runs/ddpm_celeba/outputs'
 'predict_xstart' : False
-# 'query_label' : 31
 'resblock_updown' : True
 'rescale_learned_sigmas' : False
 'rescale_timesteps' : False
@@ -82,3 +75,16 @@
 'data' : '<PEAL_BASE>/configs/data/celeba.yaml'
 'current_fid' : 100000000000000.0'
 'best_fid' : 100000000000000.0'
+# from argparsing
+'gpus' : ''
+'schedule_sampler' : "uniform"
+'microbatch' : -1
+'ema_rate' : "0.9999"
+'lr' : 0.0001
+'weight_decay' : 0.0
+'lr_anneal_steps' : 0
+'log_interval' : 10
+'save_interval' : 10000
+'resume_checkpoint' : ""
+'fp16_scale_growth' : 1e-3
+'use_hdf5' : False

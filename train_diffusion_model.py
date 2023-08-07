@@ -3,6 +3,7 @@ Train a diffusion model on images.
 """
 
 import argparse
+import os
 
 from ace.guided_diffusion import dist_util, logger
 from ace.guided_diffusion.image_datasets import load_data_celeba
@@ -28,7 +29,7 @@ def main():
         args = load_yaml_config(args.generator_config)
 
     dist_util.setup_dist(args.gpus)
-    logger.configure(dir=args.output_path)
+    logger.configure(dir=os.path.join(args.base_path, 'output'))
 
     logger.log("creating model and diffusion...")
     model, diffusion = create_model_and_diffusion(
@@ -53,6 +54,7 @@ def main():
     else:
         args.data = load_yaml_config(args.data, DataConfig)
         dataset,_,_ = get_datasets(args.data)
+        dataset.return_dict = True
         args.train_batch_size = args.batch_size
         args.steps_per_epoch = args.max_train_steps
         dataloader = get_dataloader(dataset, training_config=args)
@@ -75,6 +77,7 @@ def main():
         schedule_sampler=schedule_sampler,
         weight_decay=args.weight_decay,
         lr_anneal_steps=args.lr_anneal_steps,
+        model_dir=args.base_path,
     ).run_loop(config=args)
 
 

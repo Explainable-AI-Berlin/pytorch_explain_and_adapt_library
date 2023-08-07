@@ -161,7 +161,7 @@ def _load_yaml_config(config_path):
 
 def load_yaml_config(config_path, config_model=None):
     config_data = _load_yaml_config(config_path)
-    if config_model is None:
+    if config_model is None and isinstance(config_data, dict):
         return types.SimpleNamespace(**config_data)
 
     elif isinstance(config_data, dict):

@@ -61,7 +61,7 @@ def find_subclasses(base_class, directory):
 
 def get_datasets(
     config: DataConfig,
-    base_dir: str,
+    base_dir: str = None,
     task_config: TaskConfig = None,
     return_dict: bool = False,
     test_config: DataConfig = None,
@@ -80,6 +80,9 @@ def get_datasets(
         _type_: _description_
     """
     config = load_yaml_config(config)
+
+    if base_dir is None:
+        base_dir = config.dataset_path
 
     if test_config is None:
         test_config = config
