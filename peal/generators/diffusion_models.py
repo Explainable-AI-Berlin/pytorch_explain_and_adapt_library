@@ -33,12 +33,12 @@ class DimeDDPMAdaptor(EditCapableGenerator):
         super().__init__()
         self.config = load_yaml_config(config)
         self.dataset = dataset
-        if not "image_size" in self.config.keys():
+        if not self.config.image_size is None:
             self.config.image_size = self.dataset.config.input_size[-1]
 
         self.model_dir = model_dir
         self.model, self.diffusion = create_model_and_diffusion(
-           **self.config
+           **self.config.__dict__
         )
         self.model.to(device)
         self.model_path = os.path.join(self.model_dir, "model.pt")

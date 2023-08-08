@@ -4,6 +4,7 @@ import os
 import glob
 import copy
 import shutil
+import yaml
 
 import blobfile as bf
 import torch as th
@@ -209,7 +210,14 @@ class TrainLoop:
                         imgs, self.data.dataloader.batch_size
                     )
                 )
+                pbar.config.current_fid = train_generator_performance["fid"]
+                pbar.writer.add_scalar(
+                    "fid", train_generator_performance["fid"], self.step + self.resume_step
+                )
                 self.save()
+                with open(os.path.join(self.model_dir, "config.yaml"), "w") as file:
+                    yaml.dump(pbar.config, file)
+
                 # Run for a finite amount of time in integration tests.
                 if os.environ.get("DIFFUSION_TRAINING_TEST", "") and self.step > 0:
                     return
@@ -266,6 +274,7 @@ class TrainLoop:
             #     self.diffusion, t, {k: v * weights for k, v in losses.items()}
             # )
             self.mp_trainer.backward(loss)
+            pbar.writer.add_scalar("loss", loss.detach().item(), self.step + self.resume_step)
 
     def _update_ema(self):
         for rate, params in zip(self.ema_rate, self.ema_params):

@@ -7,8 +7,9 @@ From: continuumio/miniconda3
 
 %post
     conda update -n base -c defaults conda -y
-    conda env create -f environment.yml
+    conda env create -f environment.yaml -n peal
 
     # Source environment at runtime
     echo ". /opt/conda/etc/profile.d/conda.sh" >> $SINGULARITY_ENVIRONMENT
     echo "conda activate peal" >> $SINGULARITY_ENVIRONMENT
+
