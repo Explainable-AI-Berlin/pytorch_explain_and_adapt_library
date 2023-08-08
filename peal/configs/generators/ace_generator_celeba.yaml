@@ -75,6 +75,7 @@
 'data' : '<PEAL_BASE>/configs/data/celeba.yaml'
 'current_fid' : 100000000000000.0'
 'best_fid' : 100000000000000.0'
+'generator_type' : 'ddpm'
 # from argparsing
 'gpus' : ''
 'schedule_sampler' : "uniform"

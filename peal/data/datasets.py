@@ -503,7 +503,7 @@ class Image2ClassDataset(ImageDataset):
         """
         self.config = config
         self.root_dir = os.path.join(root_dir, "imgs")
-        if "has_hints" in self.config.keys() and self.config.has_hints:
+        if self.config.has_hints:
             self.mask_dir = os.path.join(root_dir, "masks")
             self.all_urls = []
             self.urls_with_hints = []
@@ -538,7 +538,7 @@ class Image2ClassDataset(ImageDataset):
         elif mode == "test":
             self.urls = self.urls[int(config.split[1] * len(self.urls)) :]
 
-        if "has_hints" in self.config.keys() and self.config.has_hints:
+        if self.config.has_hints:
             self.all_urls = copy.deepcopy(self.urls)
             for target_str, file in self.all_urls:
                 if os.path.exists(os.path.join(self.mask_dir, file)):

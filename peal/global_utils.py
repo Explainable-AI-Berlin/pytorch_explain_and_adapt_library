@@ -171,6 +171,33 @@ def load_yaml_config(config_path, config_model=None):
         return config_path
 
 
+def save_yaml_config(config, config_path):
+    '''
+    This function saves a config to a yaml file.
+    Args:
+        config: The config to save.
+        config_path: The path to save the config to.
+    '''
+    def process_object(obj):
+        if hasattr(obj, "__dict__"):
+            return process_object(obj.__dict__)
+
+        elif hasattr(obj, "state"):
+            return process_object(obj.state)
+
+        elif isinstance(obj, (list, tuple)):
+            return [process_object(item) for item in obj]
+
+        elif isinstance(obj, dict):
+            return {key: process_object(value) for key, value in obj.items()}
+
+        return obj
+
+    processed_data = process_object(config)
+    with open(config_path, "w") as outfile:
+        yaml.dump(processed_data, outfile, default_flow_style=False)
+
+
 def move_to_device(X, device):
     if isinstance(X, list):
         return [torch.clone(x).to(device) for x in X]

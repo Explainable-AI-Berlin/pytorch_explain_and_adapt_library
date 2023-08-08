@@ -29,14 +29,22 @@ from dime2.core.dist_util import (
 
 
 class DimeDDPMAdaptor(EditCapableGenerator):
-    def __init__(self, config, dataset, model_dir, device):
+    def __init__(self, config, dataset = None, model_dir = None, device = 'cpu'):
         super().__init__()
         self.config = load_yaml_config(config)
-        self.dataset = dataset
+        self.dataset = dataset if not dataset is None else get_datasets(self.config.data)[0]
         if not self.config.image_size is None:
             self.config.image_size = self.dataset.config.input_size[-1]
 
-        self.model_dir = model_dir
+        if not model_dir is None:
+            self.model_dir = model_dir
+
+        else:
+            self.model_dir = self.config.base_path
+
+        self.data_dir = os.path.join(self.model_dir, "data")
+        self.counterfactual_path = os.path.join(self.model_dir, "counterfactuals")
+
         self.model, self.diffusion = create_model_and_diffusion(
            **self.config.__dict__
         )
@@ -106,9 +114,9 @@ class DimeDDPMAdaptor(EditCapableGenerator):
         pbar=None,
         mode="",
     ):
-        shutil.rmtree(self.config.base_path, ignore_errors=True)
+        shutil.rmtree(self.data_dir, ignore_errors=True)
         self.dataset.serialize_dataset(
-            output_dir=self.config.data_dir,
+            output_dir=self.data_dir,
             x_list=x_in,
             y_list=target_classes,
             sample_names=list(
@@ -116,9 +124,9 @@ class DimeDDPMAdaptor(EditCapableGenerator):
             ),
         )
 
-        args = types.SimpleNamespace(**self.config)
+        args = copy.deepcopy(self.config)
         args.dataset = Image2ClassDataset(
-            root_dir=self.config.data_dir,
+            root_dir=self.data_dir,
             mode=None,
             config=copy.deepcopy(self.dataset.config),
             transform=self.dataset.transform,
@@ -127,6 +135,7 @@ class DimeDDPMAdaptor(EditCapableGenerator):
         args.classifier = classifier
         args.diffusion = self.diffusion
         args.model = self.model
+        args.output_path = self.counterfactual_path
         if self.config.method == "ace":
             ace_main(args=args)
 
@@ -136,7 +145,7 @@ class DimeDDPMAdaptor(EditCapableGenerator):
         x_counterfactuals = []
         x_list = []
         base_path = os.path.join(
-            self.config.output_path,
+            self.counterfactual_path,
             "Results",
             self.config.exp_name,
         )
@@ -174,10 +183,10 @@ class DimeDDPMAdaptor(EditCapableGenerator):
             # x_counterfactuals.append(torchvision.io.read_image(path))
             x_counterfactuals.append(ToTensor()(Image.open(path)))
             path_correct = os.path.join(
-                self.config.output_path, "Original", "Correct", f"{embed_numberstring(str(i))}.jpg"
+                self.counterfactual_path, "Original", "Correct", f"{embed_numberstring(str(i))}.jpg"
             )
             path_incorrect = os.path.join(
-                self.config.output_path, "Original", "Incorrect", f"{embed_numberstring(str(i))}.jpg"
+                self.counterfactual_path, "Original", "Incorrect", f"{embed_numberstring(str(i))}.jpg"
             )
             if os.path.exists(path_correct):
                 path = path_correct

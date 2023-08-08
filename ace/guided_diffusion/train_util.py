@@ -22,6 +22,8 @@ from .nn import update_ema
 from .resample import LossAwareSampler, UniformSampler
 from .sample_utils import load_from_DDP_model
 
+from peal.global_utils import save_yaml_config
+
 # For ImageNet experiments, this was a good default value.
 # We found that the lg_loss_scale quickly climbed to
 # 20-21 within the first ~1K steps of training.
@@ -215,8 +217,7 @@ class TrainLoop:
                     "fid", train_generator_performance["fid"], self.step + self.resume_step
                 )
                 self.save()
-                with open(os.path.join(self.model_dir, "config.yaml"), "w") as file:
-                    yaml.dump(pbar.config, file)
+                save_yaml_config(pbar.config, os.path.join(self.model_dir, "config.yaml"))
 
                 # Run for a finite amount of time in integration tests.
                 if os.environ.get("DIFFUSION_TRAINING_TEST", "") and self.step > 0:

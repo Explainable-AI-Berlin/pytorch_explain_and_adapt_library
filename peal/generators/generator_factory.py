@@ -1,4 +1,5 @@
 import torch
+import os
 
 from typing import Union
 
@@ -33,12 +34,21 @@ def get_generator(
     Returns:
         InvertibleGenerator: The generator.
     """
-    if isinstance(generator, str) and generator[-4:] == '.cpl':
+    if isinstance(generator, str) and generator[-4:] == ".cpl":
         generator_out = torch.load(generator, map_location=device)
 
-    elif not (isinstance(generator, InvertibleGenerator) or isinstance(generator, EditCapableGenerator)):
-        if isinstance(generator, str) and generator[-5:] == '.yaml':
-            generator_config = load_yaml_config(generator)
+    elif not (
+        isinstance(generator, InvertibleGenerator)
+        or isinstance(generator, EditCapableGenerator)
+    ):
+        generator_config = load_yaml_config(generator)
+        if generator_config.generator_type == "ddpm":
+            generator_out = DimeDDPMAdaptor(
+                config=generator_config, dataset=train_dataloader.dataset, device=device
+            )
+
+        elif generator_config.generator_type == "glow":
+            # TODO this should be moved into the glow class
             generator_config.data = data_config
             generator_out = Glow(generator_config).to(device)
             generator_trainer = ModelTrainer(
@@ -54,11 +64,6 @@ def get_generator(
             )
             print("Train generator model!")
             generator_trainer.fit()
-
-        else:
-            # TODO this is super dirty!
-            generator_config_path = '<PEAL_BASE>/configs/generators/ace_generator_celeba.yaml'
-            generator_out = DimeDDPMAdaptor(generator_config_path, train_dataloader.dataset, generator, device)
 
     else:
         generator_out = generator

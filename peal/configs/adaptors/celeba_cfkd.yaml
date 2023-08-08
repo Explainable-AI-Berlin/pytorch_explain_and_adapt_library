@@ -10,7 +10,7 @@
 'test_data'                            :  '<PEAL_BASE>/configs/data/Smiling_confounding_Blond_Hair_celeba.yaml'
 'student'                              :  'peal_runs/Smiling_confounding_Blond_Hair_celeba_classifier_poisened/model.cpl'
 'teacher'                              :  'peal_runs/Smiling_confounding_Blond_Hair_celeba_classifier_unpoisened/model.cpl'
-'generator'                            :  'peal_runs/ddpm_celeba'
+'generator'                            :  'peal_runs/ddpm_celeba/config.yaml'
 'base_dir'                             :  'peal_runs/celeba_classifier_poisened/cfkd_oracle'
 'task':
   'criterions':
