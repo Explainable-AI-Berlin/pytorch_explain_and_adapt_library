@@ -42,6 +42,7 @@ def get_generator(
         or isinstance(generator, EditCapableGenerator)
     ):
         generator_config = load_yaml_config(generator)
+        generator_config.batch_size = train_dataloader.batch_size
         if generator_config.generator_type == "ddpm":
             generator_out = DimeDDPMAdaptor(
                 config=generator_config, dataset=train_dataloader.dataset, device=device

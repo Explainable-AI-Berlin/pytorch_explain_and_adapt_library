@@ -12,7 +12,7 @@ from pathlib import Path
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from peal.global_utils import orthogonal_initialization, move_to_device, load_yaml_config
+from peal.global_utils import orthogonal_initialization, move_to_device, load_yaml_config, save_yaml_config
 from peal.training.loggers import Logger
 from peal.training.criterions import get_criterions
 from peal.data.dataloaders import create_dataloaders_from_datasource
@@ -315,8 +315,7 @@ class ModelTrainer:
                     break
 
             self.config.is_loaded = True
-            with open(os.path.join(self.base_dir, "config.yaml"), "w") as file:
-                yaml.dump(self.config, file)
+            save_yaml_config(self.config, os.path.join(self.base_dir, "config.yaml"))
 
         else:
             writer = SummaryWriter(os.path.join(self.base_dir, "logs"))
@@ -422,7 +421,6 @@ class ModelTrainer:
                 else:
                     train_accuracy_max = train_accuracy
 
-            with open(os.path.join(self.base_dir, "config.yaml"), "w") as file:
-                yaml.dump(self.config, file)
+            save_yaml_config(self.config, os.path.join(self.base_dir, "config.yaml"))
 
             self.config.training.epoch += 1

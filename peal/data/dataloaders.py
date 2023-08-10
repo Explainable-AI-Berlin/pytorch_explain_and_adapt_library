@@ -229,13 +229,9 @@ def get_dataloader(
             num_workers=1,
         )
 
-    if (
-        mode == "train"
-        and not steps_per_epoch is None
-        or (
-            not training_config is None
-            and not training_config.steps_per_epoch is None
-        )
+    if mode == "train" and (
+        not steps_per_epoch is None
+        or (not training_config is None and not training_config.steps_per_epoch is None)
     ):
         dataloader = DataloaderMixer(training_config, dataloader)
 

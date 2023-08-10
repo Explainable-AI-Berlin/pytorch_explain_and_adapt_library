@@ -14,7 +14,7 @@ from tqdm import tqdm
 from typing import Union
 from torch import nn
 
-from peal.global_utils import load_yaml_config, set_adaptive_batch_size
+from peal.global_utils import load_yaml_config, set_adaptive_batch_size, save_yaml_config
 from peal.data.dataloaders import (
     DataStack,
     DataloaderMixer,
@@ -112,6 +112,9 @@ class CounterfactualKnowledgeDistillation:
         self.enable_hints = bool(teacher == "SegmentationMask")
         self.adaptor_config.data.has_hint = self.enable_hints
         """
+        # kind of dirty, but also very confusing if not done this way since validation batches are fed directly
+        # into the explainer and thereby potentially causing VRAM overflows otherwise
+        self.adaptor_config.training.val_batch_size = self.adaptor_config.batch_size
         (
             self.train_dataloader,
             self.val_dataloader,
@@ -530,8 +533,7 @@ class CounterfactualKnowledgeDistillation:
             print("Generator performance: " + str(generator_performance))
             self.adaptor_config.generator_performance = generator_performance
 
-            with open(os.path.join(self.base_dir, "config.yaml"), "w") as file:
-                yaml.dump(self.adaptor_config, file)
+            save_yaml_config(self.adaptor_config, os.path.join(self.base_dir, "config.yaml"))
 
             with open(os.path.join(self.base_dir, "platform.txt"), "w") as f:
                 f.write(platform.node())
@@ -797,12 +799,17 @@ class CounterfactualKnowledgeDistillation:
             )
 
             #
-            priority = (
-                (1 / (1 - self.adaptor_config.mixing_ratio))
-                * self.adaptor_config.mixing_ratio
-                * len(self.dataloader_mixer)
-                / len(dataloader.dataset)
-            )
+            if not self.adaptor_config.mixing_ratio is None:
+                priority = (
+                    (1 / (1 - self.adaptor_config.mixing_ratio))
+                    * self.adaptor_config.mixing_ratio
+                    * len(self.dataloader_mixer)
+                    / len(dataloader.dataset)
+                )
+
+            else:
+                priority = 1
+
             self.dataloader_mixer.append(dataloader, priority=priority)
             assert (
                 abs(
@@ -953,7 +960,6 @@ class CounterfactualKnowledgeDistillation:
             self.adaptor_config.current_iteration = (
                 self.adaptor_config.current_iteration + 1
             )
-            with open(os.path.join(self.base_dir, "config.yaml"), "w") as file:
-                yaml.dump(self.adaptor_config, file)
+            save_yaml_config(self.adaptor_config, os.path.join(self.base_dir, "config.yaml"))
 
         return self.student

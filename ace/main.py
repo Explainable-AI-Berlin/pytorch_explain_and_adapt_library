@@ -168,7 +168,12 @@ def filter_fn(
     # Generate pre-explanation
     with torch.enable_grad():
         if ispeal:
-            pe = attack.perturb(x, torch.nn.functional.one_hot(torch.tensor(target, dtype=torch.long), num_classes=2))
+            pe = attack.perturb(
+                x,
+                torch.nn.functional.one_hot(
+                    target.to(torch.long), num_classes=2
+                ).float(),
+            )
 
         else:
             pe = attack.perturb(x, target)
@@ -229,7 +234,6 @@ def main(args=None):
     respaced_steps = int(args.sampling_time_fraction * int(args.timestep_respacing))
     normal_steps = int(args.sampling_time_fraction * int(args.diffusion_steps))
 
-    print(args)
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
     os.makedirs(osp.join(args.output_path, "Results"), exist_ok=True)
 
@@ -547,7 +551,7 @@ def main(args=None):
                         target=target if target is not None else lab,
                         label=lab,
                         pred=c_pred,
-                        pred_cf=data_pred,
+                        pred_cf=data_pred.argmax(dim=-1),
                         l_inf=linf,
                         l_1=l1,
                         indexes=indexes.numpy(),

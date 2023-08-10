@@ -49,7 +49,7 @@ class DimeDDPMAdaptor(EditCapableGenerator):
            **self.config.__dict__
         )
         self.model.to(device)
-        self.model_path = os.path.join(self.model_dir, "model.pt")
+        self.model_path = os.path.join(self.model_dir, "final.pt")
         if os.path.exists(self.model_path):
             self.model.load_state_dict(
                 load_state_dict(self.model_path, map_location=device)
@@ -131,11 +131,12 @@ class DimeDDPMAdaptor(EditCapableGenerator):
             config=copy.deepcopy(self.dataset.config),
             transform=self.dataset.transform,
         )
-        args.model_path = os.path.join(self.model_dir, "model.pt")
+        args.model_path = os.path.join(self.model_dir, "final.pt")
         args.classifier = classifier
         args.diffusion = self.diffusion
         args.model = self.model
         args.output_path = self.counterfactual_path
+        args.batch_size = x_in.shape[0]
         if self.config.method == "ace":
             ace_main(args=args)
 
@@ -148,19 +149,20 @@ class DimeDDPMAdaptor(EditCapableGenerator):
             self.counterfactual_path,
             "Results",
             self.config.exp_name,
+            "explanation",
         )
         for i in range(x_in.shape[0]):
             path_correct = os.path.join(
-                base_path, "CC", "CCF", "CF", f"{embed_numberstring(str(i))}.jpg"
+                base_path, "CC", "CCF", "CF", f"{embed_numberstring(str(i))}.png"
             )
             path_correct2 = os.path.join(
-                base_path, "CC", "ICF", "CF", f"{embed_numberstring(str(i))}.jpg"
+                base_path, "CC", "ICF", "CF", f"{embed_numberstring(str(i))}.png"
             )
             path_incorrect = os.path.join(
-                base_path, "IC", "CCF", "CF", f"{embed_numberstring(str(i))}.jpg"
+                base_path, "IC", "CCF", "CF", f"{embed_numberstring(str(i))}.png"
             )
             path_incorrect2 = os.path.join(
-                base_path, "IC", "ICF", "CF", f"{embed_numberstring(str(i))}.jpg"
+                base_path, "IC", "ICF", "CF", f"{embed_numberstring(str(i))}.png"
             )
             if os.path.exists(path_correct):
                 path = path_correct
