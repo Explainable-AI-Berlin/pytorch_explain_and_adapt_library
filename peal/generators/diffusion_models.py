@@ -165,16 +165,16 @@ class DimeDDPMAdaptor(EditCapableGenerator):
                 base_path, "IC", "ICF", "CF", f"{embed_numberstring(str(i))}.png"
             )
             if os.path.exists(path_correct):
-                path = path_correct
+                path_counterfactual = path_correct
 
             elif os.path.exists(path_correct2):
-                path = path_correct2
+                path_counterfactual = path_correct2
 
             elif os.path.exists(path_incorrect):
-                path = path_incorrect
+                path_counterfactual = path_incorrect
 
             elif os.path.exists(path_incorrect2):
-                path = path_incorrect2
+                path_counterfactual = path_incorrect2
 
             else:
                 print("No counterfactual found for image " + str(i))
@@ -183,20 +183,26 @@ class DimeDDPMAdaptor(EditCapableGenerator):
                 pdb.set_trace()
 
             # x_counterfactuals.append(torchvision.io.read_image(path))
-            x_counterfactuals.append(ToTensor()(Image.open(path)))
+            x_counterfactuals.append(ToTensor()(Image.open(path_counterfactual)))
             path_correct = os.path.join(
-                self.counterfactual_path, "Original", "Correct", f"{embed_numberstring(str(i))}.jpg"
+                self.counterfactual_path, "Original", "Correct", f"{embed_numberstring(str(i))}.png"
             )
             path_incorrect = os.path.join(
-                self.counterfactual_path, "Original", "Incorrect", f"{embed_numberstring(str(i))}.jpg"
+                self.counterfactual_path, "Original", "Incorrect", f"{embed_numberstring(str(i))}.png"
             )
             if os.path.exists(path_correct):
-                path = path_correct
+                path_original = path_correct
 
             elif os.path.exists(path_incorrect):
-                path = path_incorrect
+                path_original = path_incorrect
 
-            x_list.append(ToTensor()(Image.open(path)))
+            else:
+                print("No original image found " + str(i))
+                import pdb
+
+                pdb.set_trace()
+
+            x_list.append(ToTensor()(Image.open(path_original)))
 
         x_counterfactuals = torch.stack(x_counterfactuals)
         x_counterfactuals = self.dataset.project_from_pytorch_default(x_counterfactuals)

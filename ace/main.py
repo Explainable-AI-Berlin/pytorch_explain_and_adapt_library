@@ -1,4 +1,6 @@
 import os
+import shutil
+
 import yaml
 import copy
 import math
@@ -235,6 +237,7 @@ def main(args=None):
     normal_steps = int(args.sampling_time_fraction * int(args.diffusion_steps))
 
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
+    shutil.rmtree(args.output_path, ignore_errors=True)
     os.makedirs(osp.join(args.output_path, "Results"), exist_ok=True)
 
     # ========================================

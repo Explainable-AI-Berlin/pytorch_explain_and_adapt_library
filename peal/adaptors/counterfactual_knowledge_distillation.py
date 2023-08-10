@@ -14,7 +14,7 @@ from tqdm import tqdm
 from typing import Union
 from torch import nn
 
-from peal.global_utils import load_yaml_config, set_adaptive_batch_size, save_yaml_config
+from peal.global_utils import load_yaml_config, set_adaptive_batch_size, save_yaml_config, log_images_to_writer
 from peal.data.dataloaders import (
     DataStack,
     DataloaderMixer,
@@ -860,6 +860,9 @@ class CounterfactualKnowledgeDistillation:
         print("Adaptor Config: " + str(self.adaptor_config))
         validation_stats, test_accuracy = self.initialize_run()
         writer = SummaryWriter(os.path.join(self.base_dir, "logs"))
+        log_images_to_writer(self.train_dataloader, writer, "train")
+        log_images_to_writer(self.val_dataloader, writer, "validation")
+        log_images_to_writer(self.test_dataloader, writer, "test")
 
         for key in validation_stats.keys():
             if isinstance(validation_stats[key], float):

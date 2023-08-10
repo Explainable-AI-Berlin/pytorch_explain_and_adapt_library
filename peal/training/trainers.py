@@ -12,7 +12,7 @@ from pathlib import Path
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from peal.global_utils import orthogonal_initialization, move_to_device, load_yaml_config, save_yaml_config
+from peal.global_utils import orthogonal_initialization, move_to_device, load_yaml_config, save_yaml_config, log_images_to_writer
 from peal.training.loggers import Logger
 from peal.training.criterions import get_criterions
 from peal.data.dataloaders import create_dataloaders_from_datasource
@@ -252,67 +252,8 @@ class ModelTrainer:
                 platform.node()
             )
 
-            train_iterator = iter(self.train_dataloader)
-            val_iterator = iter(self.val_dataloaders[0])
-            for i in range(3):
-                try:
-                    sample_train_imgs, sample_train_y = next(train_iterator)
-                    if hasattr(
-                        self.train_dataloader.dataset, "project_to_pytorch_default"
-                    ):
-                        sample_train_imgs = (
-                            self.train_dataloader.dataset.project_to_pytorch_default(
-                                sample_train_imgs
-                            )
-                        )
-
-                    else:
-                        print(
-                            "Warning! If your dataloader uses another normalization than the PyTorch default [0,1] range data might be visualized incorrect!"
-                            + "In that case add function project_to_pytorch_default() to your underlying dataset to correct visualization!"
-                        )
-
-                    sample_batch_label_str = "sample_train_batch" + str(i) + "_"
-                    if len(sample_train_y.shape) == 1:
-                        sample_batch_label_str += "_" + str(
-                            list(map(lambda x: int(x), list(sample_train_y)))
-                        )
-
-                    self.logger.writer.add_image(
-                        sample_batch_label_str,
-                        torchvision.utils.make_grid(
-                            sample_train_imgs, sample_train_imgs.shape[0]
-                        ),
-                    )
-                    sample_val_imgs, sample_val_y = next(val_iterator)
-                    if hasattr(
-                        self.val_dataloaders[0].dataset, "project_to_pytorch_default"
-                    ):
-                        sample_val_imgs = self.val_dataloaders[
-                            0
-                        ].dataset.project_to_pytorch_default(sample_val_imgs)
-
-                    else:
-                        print(
-                            "Warning! If your dataloader uses another normalization than the PyTorch default [0,1] range data might be visualized incorrect!"
-                            + "In that case add function project_to_pytorch_default() to your underlying dataset to correct visualization!"
-                        )
-
-                    sample_batch_label_str = "sample_val_batch" + str(i) + "_"
-                    if len(sample_val_y.shape) == 1:
-                        sample_batch_label_str += "_" + str(
-                            list(map(lambda x: int(x), list(sample_train_y)))
-                        )
-
-                    self.logger.writer.add_image(
-                        sample_batch_label_str,
-                        torchvision.utils.make_grid(
-                            sample_val_imgs, sample_train_imgs.shape[0]
-                        ),
-                    )
-
-                except Exception:
-                    break
+            log_images_to_writer(self.train_dataloader, self.logger.writer, "train")
+            log_images_to_writer(self.val_dataloaders[0], self.logger.writer, "validation")
 
             self.config.is_loaded = True
             save_yaml_config(self.config, os.path.join(self.base_dir, "config.yaml"))

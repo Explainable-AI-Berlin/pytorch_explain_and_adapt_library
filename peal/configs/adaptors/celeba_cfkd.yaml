@@ -1,7 +1,7 @@
 'batch_size'                           :  1
-'min_train_samples'                    :  2
+'min_train_samples'                    :  50
 'finetune_iterations'                  :  3
-'max_validation_samples'               :  2
+'max_validation_samples'               :  1
 'replace_model'                        :  True
 'replacement_strategy'                 :  'delayed'
 'explainer'                            :  '<PEAL_BASE>/configs/explainers/counterfactual_default.yaml'
