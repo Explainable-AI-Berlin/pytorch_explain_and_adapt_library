@@ -85,6 +85,13 @@ def get_datasets(
         base_dir = config.dataset_path
 
     if test_config is None:
+        print('test config was None!!!')
+        print('test config was None!!!')
+        print('test config was None!!!')
+        print('test config was None!!!')
+        print('test config was None!!!')
+        print('test config was None!!!')
+        print('test config was None!!!')
         test_config = config
 
     #
@@ -209,7 +216,7 @@ def get_datasets(
         base_dir, "train", config, transform_train, return_dict=return_dict
     )
     val_data = dataset(
-        base_dir, "val", config, transform_train, return_dict=return_dict
+        base_dir, "val", config, transform_validation, return_dict=return_dict
     )
     test_data = dataset(
         base_dir, "test", test_config, transform_test, return_dict=return_dict
