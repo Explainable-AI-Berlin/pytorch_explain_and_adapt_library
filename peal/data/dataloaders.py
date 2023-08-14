@@ -94,6 +94,10 @@ class DataStack:
         for idx in range(self.num_classes):
             self.data.append([])
 
+        # TODO if no mixer is used here this will not work
+        if isinstance(self.datasource, DataloaderMixer):
+            self.datasource.reset()
+
         self.fill_stack()
 
 

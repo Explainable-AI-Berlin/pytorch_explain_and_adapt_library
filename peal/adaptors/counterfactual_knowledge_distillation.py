@@ -270,7 +270,6 @@ class CounterfactualKnowledgeDistillation:
         for dataloader in self.datastack.datasource.dataloaders:
             dataloader.dataset.enable_hints()"""
 
-        self.datastack.datasource.reset()
         self.datastack.reset()
 
         collage_base_path = os.path.join(
@@ -515,6 +514,11 @@ class CounterfactualKnowledgeDistillation:
             print("Create base_dir in: " + str(self.base_dir))
             shutil.rmtree(self.base_dir, ignore_errors=True)
             Path(self.base_dir).mkdir(parents=True, exist_ok=True)
+            writer = SummaryWriter(os.path.join(self.base_dir, "logs"))
+            log_images_to_writer(self.train_dataloader, writer, "train")
+            log_images_to_writer(self.val_dataloader, writer, "validation")
+            log_images_to_writer(self.test_dataloader, writer, "test")
+
             if isinstance(self.val_dataloader.dataset, ImageDataset):
                 generator_sample = self.generator.sample_x(
                     batch_size=self.adaptor_config.batch_size
@@ -541,9 +545,18 @@ class CounterfactualKnowledgeDistillation:
             test_accuracy = calculate_test_accuracy(
                 self.student, self.test_dataloader, self.device
             )
+            writer.add_scalar(
+                "test_accuracy", test_accuracy, self.adaptor_config.current_iteration
+            )
             self.adaptor_config.test_accuracies = [test_accuracy]
 
             validation_stats = self.retrieve_validation_stats(finetune_iteration=0)
+
+            for key in validation_stats.keys():
+                if isinstance(validation_stats[key], float):
+                    writer.add_scalar(
+                        key, validation_stats[key], self.adaptor_config.current_iteration
+                    )
 
             """if self.output_size == 2 and self.use_visualization:
                 self.visualize_progress(
@@ -554,12 +567,13 @@ class CounterfactualKnowledgeDistillation:
             with open(os.path.join(self.base_dir, "platform.txt"), "w") as f:
                 f.write(platform.node())
 
+            writer = SummaryWriter(os.path.join(self.base_dir, "logs"))
             validation_stats = self.retrieve_validation_stats(finetune_iteration=0)
 
             # test_accuracy = self.adaptor_config.test_accuracies[-1]
             test_accuracy = -1.0
 
-        return validation_stats, test_accuracy
+        return validation_stats, writer
 
     def retrieve_counterfactual_list(self, validation_stats, finetune_iteration):
         tracked_values_path = os.path.join(
@@ -858,21 +872,7 @@ class CounterfactualKnowledgeDistillation:
         Run the counterfactual knowledge distillation
         """
         print("Adaptor Config: " + str(self.adaptor_config))
-        validation_stats, test_accuracy = self.initialize_run()
-        writer = SummaryWriter(os.path.join(self.base_dir, "logs"))
-        log_images_to_writer(self.train_dataloader, writer, "train")
-        log_images_to_writer(self.val_dataloader, writer, "validation")
-        log_images_to_writer(self.test_dataloader, writer, "test")
-
-        for key in validation_stats.keys():
-            if isinstance(validation_stats[key], float):
-                writer.add_scalar(
-                    key, validation_stats[key], self.adaptor_config.current_iteration
-                )
-
-        writer.add_scalar(
-            "test_accuracy", test_accuracy, self.adaptor_config.current_iteration
-        )
+        validation_stats, writer = self.initialize_run()
 
         # iterate over the finetune iterations
         for finetune_iteration in range(

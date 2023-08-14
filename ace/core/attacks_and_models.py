@@ -335,7 +335,7 @@ class ClassifierDiffusionShortcut(ClassifierDiffusionCheckpointGradients):
                     noise = torch.randn_like(x) if self.stochastic else torch.zeros_like(x)
                     x = self.diffusion.q_sample(x, t, noise=noise)    
 
-                if self.fix_noise:
+                if hasattr(self, "fix_noise") and self.fix_noise:
                     noise = self.noise[idx + 1, ...].unsqueeze(dim=0)
                 elif self.stochastic:
                     noise = torch.randn_like(x)

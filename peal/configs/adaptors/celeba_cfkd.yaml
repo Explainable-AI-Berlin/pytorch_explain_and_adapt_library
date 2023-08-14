@@ -1,14 +1,14 @@
-'batch_size'                           :  3
+'batch_size'                           :  1
 'min_train_samples'                    :  50
 'finetune_iterations'                  :  3
 'max_validation_samples'               :  1
 'replace_model'                        :  True
 'replacement_strategy'                 :  'delayed'
 'explainer'                            :  '<PEAL_BASE>/configs/explainers/counterfactual_default.yaml'
-'training'                             :  '<PEAL_BASE>/configs/training/finetune_classifier.yaml'
+'training'                             :  '<PEAL_BASE>/configs/training/img_classifier.yaml'
 'data'                                 :  '<PEAL_BASE>/configs/data/Smiling_confounding_Blond_Hair_celeba_poisened.yaml'
 'test_data'                            :  '<PEAL_BASE>/configs/data/Smiling_confounding_Blond_Hair_celeba.yaml'
-'student'                              :  'peal_runs/Smiling_confounding_Blond_Hair_celeba_classifier_unpoisened/model.cpl'
+'student'                              :  'peal_runs/Smiling_confounding_Blond_Hair_celeba_classifier_poisened/model.cpl'
 'teacher'                              :  'peal_runs/Smiling_confounding_Blond_Hair_celeba_classifier_unpoisened/model.cpl'
 'generator'                            :  'peal_runs/ddpm_celeba/config.yaml'
 'base_dir'                             :  'peal_runs/Smiling_confounding_Blond_Hair_celeba_classifier_poisened/cfkd_oracle'

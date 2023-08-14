@@ -85,13 +85,6 @@ def get_datasets(
         base_dir = config.dataset_path
 
     if test_config is None:
-        print('test config was None!!!')
-        print('test config was None!!!')
-        print('test config was None!!!')
-        print('test config was None!!!')
-        print('test config was None!!!')
-        print('test config was None!!!')
-        print('test config was None!!!')
         test_config = config
 
     #

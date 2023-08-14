@@ -213,7 +213,7 @@ class AdaptorConfig:
                 self.test_data = test_data
 
             else:
-                self.test_data = DataConfig(**data)
+                self.test_data = DataConfig(**test_data)
 
         if isinstance(explainer, ExplainerConfig):
             self.explainer = explainer
