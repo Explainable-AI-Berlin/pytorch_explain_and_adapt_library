@@ -3,5 +3,5 @@
 'input_type'              : 'image'
 'input_size'              : [3, 128, 128]
 'output_type'             : 'multiclass'
-'output_size'             : [41]
+'output_size'             : [40]
 'downsize'                : 'Resize'

@@ -115,6 +115,7 @@ class DimeDDPMAdaptor(EditCapableGenerator):
         mode="",
     ):
         shutil.rmtree(self.data_dir, ignore_errors=True)
+        shutil.rmtree(self.counterfactual_path, ignore_errors=True)
         self.dataset.serialize_dataset(
             output_dir=self.data_dir,
             x_list=x_in,

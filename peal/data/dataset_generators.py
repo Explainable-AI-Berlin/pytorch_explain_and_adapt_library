@@ -23,7 +23,7 @@ class ArtificialConfounderTabularDatasetGenerator:
     def __init__(
         self,
         dataset_name,
-        base_dataset_dir="datasets",
+        dataset_origin_path="datasets",
         num_samples=1000,
         input_size=10,
         label_noise=0.0,
@@ -34,15 +34,15 @@ class ArtificialConfounderTabularDatasetGenerator:
 
         Args:
                 dataset_name (str): The name of the dataset.
-                base_dataset_dir (Path): The path to the directory where the datasets are stored.
+                dataset_origin_path (Path): The path to the directory where the datasets are stored.
                 num_samples (int, optional): The number of samples in the dataset. Defaults to 1000.
                 input_size (int, optional): The number of features in the dataset. Defaults to 10.
                 label_noise (float, optional): The probability that the label is flipped. Defaults to 0.0.
                 seed (int, optional): The seed for the random number generator. Defaults to 0.
         """
-        self.base_dataset_dir = base_dataset_dir
+        self.dataset_origin_path = dataset_origin_path
         self.dataset_name = dataset_name
-        self.dataset_dir = os.path.join(self.base_dataset_dir, self.dataset_name)
+        self.dataset_dir = os.path.join(self.dataset_origin_path, self.dataset_name)
         self.num_samples = num_samples
         self.input_size = input_size - 1
         self.label_noise = label_noise
@@ -114,7 +114,7 @@ class ArtificialConfounderSequenceDatasetGenerator:
     def __init__(
         self,
         dataset_name,
-        base_dataset_dir="datasets",
+        dataset_origin_path="datasets",
         num_samples=1000,
         input_size=[10, 10],
         label_noise=0.01,
@@ -125,15 +125,15 @@ class ArtificialConfounderSequenceDatasetGenerator:
 
         Args:
                 dataset_name (str): The name of the dataset.
-                base_dataset_dir (Path): The path to the directory where the datasets are stored.
+                dataset_origin_path (Path): The path to the directory where the datasets are stored.
                 num_samples (int, optional): The number of samples in the dataset. Defaults to 1000.
                 input_size (list, optional): The size of the input sequence. Defaults to [10, 10].
                 label_noise (float, optional): The probability that the label is flipped. Defaults to 0.01.
                 seed (int, optional): The seed for the random number generator. Defaults to 0.
         """
-        self.base_dataset_dir = base_dataset_dir
+        self.dataset_origin_path = dataset_origin_path
         self.dataset_name = dataset_name
-        self.dataset_dir = os.path.join(self.base_dataset_dir, self.dataset_name)
+        self.dataset_dir = os.path.join(self.dataset_origin_path, self.dataset_name)
         self.num_samples = num_samples
         self.input_size = input_size
         self.label_noise = label_noise
@@ -265,26 +265,28 @@ class ConfounderDatasetGenerator:
 
     def __init__(
         self,
-        base_dataset_dir,
+        dataset_origin_path,
         dataset_name=None,
         label_dir=None,
         delimiter=",",
         confounding="intensity",
-        num_samples=40000,
+        num_samples=None,
+        attribute=None,
+        **kwargs,
     ):
         """ """
-        self.base_dataset_dir = base_dataset_dir
+        self.dataset_origin_path = dataset_origin_path
         self.confounding = confounding
         if dataset_name is None:
             self.dataset_name = (
-                os.path.split(base_dataset_dir)[-1] + "_" + self.confounding
+                os.path.split(dataset_origin_path)[-1] + "_" + self.confounding
             )
 
         else:
             self.dataset_name = dataset_name
 
         if label_dir is None:
-            self.label_dir = os.path.join(base_dataset_dir, "data.csv")
+            self.label_dir = os.path.join(dataset_origin_path, "data.csv")
 
         else:
             self.label_dir = label_dir
@@ -292,6 +294,7 @@ class ConfounderDatasetGenerator:
         self.delimiter = delimiter
         self.dataset_dir = os.path.join("datasets", self.dataset_name)
         self.num_samples = num_samples
+        self.attribute = attribute
 
     def generate_dataset(self):
         """ """
@@ -303,7 +306,9 @@ class ConfounderDatasetGenerator:
 
         raw_data = open(self.label_dir, "r").read().split("\n")
         attributes = raw_data[1].split(self.delimiter)
-        attributes.remove("")
+        while "" in attributes:
+            attributes.remove("")
+
         attributes.append("Confounder")
         attributes.append("ConfounderStrength")
         data = []
@@ -318,8 +323,7 @@ class ConfounderDatasetGenerator:
             instance_names.append(instance_attributes[0])
             data.append(instance_attributes_int)
 
-        num_has_confounder = 0
-        lines_out = ["ImgPath," + ",".join(attributes)]
+        lines_out = [",".join(attributes)]
 
         if self.confounding == "copyrighttag":
             resource_dir = get_project_resource_dir()
@@ -364,7 +368,10 @@ class ConfounderDatasetGenerator:
             )
 
         attribute_vs_no_attribute_idxs = np.zeros([2], dtype=np.int32)
-        for sample_idx in range(self.num_samples):
+        num_samples = (
+            self.num_samples if not self.num_samples is None else len(instance_names)
+        )
+        for sample_idx in range(num_samples):
             if sample_idx % 100 == 0:
                 print(sample_idx)
                 open(os.path.join(self.dataset_dir, "data.csv"), "w").write(
@@ -374,16 +381,17 @@ class ConfounderDatasetGenerator:
             has_attribute = int(sample_idx % 4 == 0 or sample_idx % 4 == 1)
             has_confounder = bool(sample_idx % 2 == 0)
 
-            while (
-                not data[attribute_vs_no_attribute_idxs[has_attribute]][
-                    attributes.index("Blond_Hair")
-                ]
-                == has_attribute
-            ):
-                attribute_vs_no_attribute_idxs[has_attribute] += 1
+            if not self.attribute is None:
+                while (
+                    not data[attribute_vs_no_attribute_idxs[has_attribute]][
+                        attributes.index(self.attribute)
+                    ]
+                    == has_attribute
+                ):
+                    attribute_vs_no_attribute_idxs[has_attribute] += 1
 
             name = instance_names[attribute_vs_no_attribute_idxs[has_attribute]]
-            img = Image.open(os.path.join(self.base_dataset_dir, name))
+            img = Image.open(os.path.join(self.dataset_origin_path, "imgs", name))
             sample = data[attribute_vs_no_attribute_idxs[has_attribute]]
 
             if sample_idx < 0.9 * self.num_samples:
@@ -451,13 +459,13 @@ class StainingConfounderGenerator:
     def __init__(
         self,
         raw_data_dir,
-        base_dataset_dir="datasets",
+        dataset_origin_path="datasets",
         dataset_name="cancer_tissue_no_norm",
         delimiter=",",
         num_samples=40000,
     ):
         """ """
-        self.base_dataset_dir = base_dataset_dir
+        self.dataset_origin_path = dataset_origin_path
         self.dataset_name = dataset_name
         self.delimiter = delimiter
         self.dataset_dir = os.path.join("datasets", self.dataset_name)
@@ -624,7 +632,7 @@ class CircleDatasetGenerator:
     def __init__(
         self,
         dataset_name,
-        base_dataset_dir="datasets",
+        dataset_origin_path="datasets",
         num_samples=1024,
         radius=1,
         noise_scale=0.0,
@@ -636,7 +644,7 @@ class CircleDatasetGenerator:
 
         Args:
             dataset_name (str): Name of the dataset
-            base_dataset_dir (Path): path to the directory where the dataset is stored
+            dataset_origin_path (Path): path to the directory where the dataset is stored
             num_samples (int, optional): Number of samples to generate. Default is 1024.
             noise_scale (float, optional): The value with which to scale the variance (set to 1 initially) of the noise. Default is 0.0 (no noise).
             seed (int, optional): Seed for the random number generator. Defaults is 0.
@@ -644,8 +652,8 @@ class CircleDatasetGenerator:
 
         self.data = None
         self.dataset_name = dataset_name
-        self.base_dataset_dir = base_dataset_dir
-        self.dataset_dir = os.path.join(self.base_dataset_dir, self.dataset_name)
+        self.dataset_origin_path = dataset_origin_path
+        self.dataset_dir = os.path.join(self.dataset_origin_path, self.dataset_name)
         self.num_samples = num_samples
         self.radius = radius
         self.noise_scale = noise_scale

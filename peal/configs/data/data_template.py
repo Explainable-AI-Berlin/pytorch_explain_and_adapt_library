@@ -105,6 +105,14 @@ class DataConfig(BaseModel):
     """
     crop_size: int = None
     """
+    The type of confounder present in the dataset.
+    """
+    confounding: str = None
+    """
+    The path of the original dataset.
+    """
+    dataset_origin_path: str = None
+    """
     The name of the class.
     """
     __name__: str = "peal.DataConfig"

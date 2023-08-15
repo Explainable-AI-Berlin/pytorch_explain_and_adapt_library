@@ -1,11 +1,11 @@
 'attention_resolutions' : '32,16,8'
-'batch_size' : 10 #50
+'batch_size' : 1 #10 #50
 'channel_mult' : ''
 'chunk' : 0
 'class_cond' : False
 'classifier_scales' : '8,10,15'
 'clip_denoised' : True
-'base_path' : 'peal_runs/ddpm_celeba'
+'base_path' : 'peal_runs/ddpm_CopyrightTag_celeba_new'
 'diffusion_steps' : 500
 'dropout' : 0.0
 'exp_name' : 'example_name'
@@ -72,7 +72,7 @@
 'cudnn_deterministic' : False  # to make the results deterministic
 # own parameters
 'max_train_steps' : 1000000
-'data' : '<PEAL_BASE>/configs/data/celeba.yaml'
+'data' : '<PEAL_BASE>/configs/data/CopyrightTag_celeba.yaml'
 'current_fid' : 100000000000000.0'
 'best_fid' : 100000000000000.0'
 'generator_type' : 'ddpm'

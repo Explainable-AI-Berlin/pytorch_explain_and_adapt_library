@@ -14,7 +14,12 @@ from tqdm import tqdm
 from typing import Union
 from torch import nn
 
-from peal.global_utils import load_yaml_config, set_adaptive_batch_size, save_yaml_config, log_images_to_writer
+from peal.global_utils import (
+    load_yaml_config,
+    set_adaptive_batch_size,
+    save_yaml_config,
+    log_images_to_writer,
+)
 from peal.data.dataloaders import (
     DataStack,
     DataloaderMixer,
@@ -93,7 +98,9 @@ class CounterfactualKnowledgeDistillation:
 
         self.original_student = student
         self.original_student.eval()
-        self.overwrite = overwrite if not overwrite is None else self.adaptor_config.overwrite
+        self.overwrite = (
+            overwrite if not overwrite is None else self.adaptor_config.overwrite
+        )
         self.adaptor_config.overwrite = False
         self.student = copy.deepcopy(student)
         self.student.eval()
@@ -115,6 +122,10 @@ class CounterfactualKnowledgeDistillation:
         # kind of dirty, but also very confusing if not done this way since validation batches are fed directly
         # into the explainer and thereby potentially causing VRAM overflows otherwise
         self.adaptor_config.training.val_batch_size = self.adaptor_config.batch_size
+        # TODO this does not sound like the best solution
+        self.adaptor_config.training.steps_per_epoch = (
+            10 * self.adaptor_config.min_train_samples / self.adaptor_config.batch_size
+        )
         (
             self.train_dataloader,
             self.val_dataloader,
@@ -141,7 +152,9 @@ class CounterfactualKnowledgeDistillation:
 
         #
         self.generator = get_generator(
-            generator=generator if not generator is None else self.adaptor_config.generator,
+            generator=generator
+            if not generator is None
+            else self.adaptor_config.generator,
             data_config=self.adaptor_config.data,
             train_dataloader=self.train_dataloader,
             dataloaders_val=self.dataloaders_val,
@@ -537,7 +550,9 @@ class CounterfactualKnowledgeDistillation:
             print("Generator performance: " + str(generator_performance))
             self.adaptor_config.generator_performance = generator_performance
 
-            save_yaml_config(self.adaptor_config, os.path.join(self.base_dir, "config.yaml"))
+            save_yaml_config(
+                self.adaptor_config, os.path.join(self.base_dir, "config.yaml")
+            )
 
             with open(os.path.join(self.base_dir, "platform.txt"), "w") as f:
                 f.write(platform.node())
@@ -555,7 +570,9 @@ class CounterfactualKnowledgeDistillation:
             for key in validation_stats.keys():
                 if isinstance(validation_stats[key], float):
                     writer.add_scalar(
-                        key, validation_stats[key], self.adaptor_config.current_iteration
+                        key,
+                        validation_stats[key],
+                        self.adaptor_config.current_iteration,
                     )
 
             """if self.output_size == 2 and self.use_visualization:
@@ -963,6 +980,8 @@ class CounterfactualKnowledgeDistillation:
             self.adaptor_config.current_iteration = (
                 self.adaptor_config.current_iteration + 1
             )
-            save_yaml_config(self.adaptor_config, os.path.join(self.base_dir, "config.yaml"))
+            save_yaml_config(
+                self.adaptor_config, os.path.join(self.base_dir, "config.yaml")
+            )
 
         return self.student

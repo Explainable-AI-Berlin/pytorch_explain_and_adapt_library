@@ -305,6 +305,7 @@ class ImageDataset(PealDataset):
             )
             plt.axis("off")
             plt.savefig(collage_path)
+            print("Saved collage to " + collage_path)
             collage_paths.append(collage_path)
             heatmap_list.append(heatmap)
 
@@ -408,8 +409,14 @@ class Image2MixedDataset(ImageDataset):
         self.task_config = task_config
         self.hints_enabled = False
         data_dir = os.path.join(root_dir, "data.csv")
+        if not config.delimiter is None:
+            delimiter = config.delimiter
+
+        else:
+            delimiter = ","
+
         self.attributes, self.data, self.keys = parse_csv(
-            data_dir, config, mode, key_type="name", delimiter=config.delimiter
+            data_dir, config, mode, key_type="name", delimiter=delimiter
         )
         self.return_dict = return_dict
 

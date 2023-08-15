@@ -275,6 +275,11 @@ class ModelTrainer:
         self.config.training.epoch = 0
         while self.config.training.epoch < self.config.training.max_epochs:
             pbar.stored_values["Epoch"] = self.config.training.epoch
+            self.logger.writer.add_scalar(
+                "regularization_level",
+                self.regularization_level,
+                self.config.training.epoch,
+            )
             #
             self.model.train()
             train_loss, train_accuracy = self.run_epoch(
