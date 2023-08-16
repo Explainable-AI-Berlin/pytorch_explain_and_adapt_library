@@ -1,5 +1,5 @@
 'attention_resolutions' : '32,16,8'
-'batch_size' : 1 #10 #50
+'batch_size' : 50
 'channel_mult' : ''
 'chunk' : 0
 'class_cond' : False
