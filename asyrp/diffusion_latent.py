@@ -7,7 +7,6 @@ from models.improved_ddpm.nn import normalization
 from tqdm import tqdm
 import os
 import numpy as np
-import cv2
 from PIL import Image
 import torch
 from torch import nn
