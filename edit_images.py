@@ -7,7 +7,7 @@ import os
 import torch
 import numpy as np
 
-from diffusion_latent import Asyrp
+from asyrp.diffusion_latent import Asyrp
 
 def parse_args_and_config():
     parser = argparse.ArgumentParser(description=globals()['__doc__'])
@@ -228,7 +228,7 @@ def parse_args_and_config():
     args = parser.parse_args()
 
     # parse config file
-    with open(os.path.join('configs', args.config), 'r') as f:
+    with open(os.path.join('asyrp', 'configs', args.config), 'r') as f:
         config = yaml.safe_load(f)
     new_config = dict2namespace(config)
 

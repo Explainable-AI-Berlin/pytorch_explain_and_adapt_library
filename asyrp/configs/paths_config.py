@@ -1,6 +1,6 @@
 DATASET_PATHS = {
 	'FFHQ': '/hdd1/datasets/celeba_hq/',
-	'CelebA_HQ': '/hdd1/datasets/celeba_hq/',
+	'CelebA_HQ': '../datasets/celeba/imgs',
 	'AFHQ': '/hdd1/datasets/afhq/',
 	'LSUN':  '/hdd1/datasets/lsun/',
     'IMAGENET': '/hdd1/datasets/imagenet/',
