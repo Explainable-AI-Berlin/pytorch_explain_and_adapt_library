@@ -43,6 +43,7 @@ dependencies:
       - certifi==2023.7.22
       - charset-normalizer==3.2.0
       - click==8.1.6
+      - clip-by-openai==1.1
       - cmake==3.27.0
       - contextlib2==21.6.0
       - corelay==0.2.1
@@ -164,10 +165,9 @@ dependencies:
       - termcolor==2.3.0
       - threadpoolctl==3.2.0
       - tifffile==2023.7.18
-      - torch==2.0.1
+      - torch==1.7.1
       - torch-fidelity==0.3.0
-      - torchmetrics==1.0.3
-      - torchvision==0.15.2
+      - torchvision==0.10.0
       - tqdm==4.64.0
       - traitlets==5.9.0
       - triton==2.0.0

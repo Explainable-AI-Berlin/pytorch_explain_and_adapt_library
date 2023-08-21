@@ -209,7 +209,7 @@ def parse_args_and_config():
     parser.add_argument('--clr_loss_w', type=int, default=3, help='Weights of CLIP loss')
     parser.add_argument('--l1_loss_w', type=float, default=0, help='Weights of L1 loss')
     parser.add_argument('--id_loss_w', type=float, default=0, help='Weights of ID loss')
-    parser.add_argument('--clip_model_name', type=str, default='ViT-B/16', help='ViT-B/16, ViT-B/32, RN50x16 etc')
+    parser.add_argument('--clip_model_name', type=str, default='ViT-B/32', help='ViT-B/16, ViT-B/32, RN50x16 etc')
     parser.add_argument('--lr_clip_finetune', type=float, default=2e-6, help='Initial learning rate for finetuning')
     parser.add_argument('--lr_latent_clr', type=float, default=2e-6, help='Initial learning rate for latent clr')
     parser.add_argument('--lr_clip_lat_opt', type=float, default=2e-2, help='Initial learning rate for latent optim')

@@ -679,7 +679,7 @@ class Asyrp(object):
         tvu.save_image(
             grid,
             os.path.join(folder_dir, f"{file_name}_ngen{self.args.n_train_step}.png"),
-            normalization=True,
+            normalize=True # TODO normalization=True,
         )
 
         time_e = time.time()

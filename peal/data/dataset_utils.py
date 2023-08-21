@@ -68,6 +68,7 @@ def parse_csv(
     while "" in raw_data:
         raw_data.remove("")
 
+
     def extract_instances_tensor(idx, line):
         instance_attributes = line.split(delimiter)
 

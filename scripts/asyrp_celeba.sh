@@ -1,4 +1,4 @@
-apptainer run --nv python_container.sif python edit_images.py  \
+apptainer run --nv asyrp_container.sif python edit_images.py  \
 --lpips \
 --edit_attr test         \
 --n_train_img 100        \
@@ -8,7 +8,7 @@ apptainer run --nv python_container.sif python edit_images.py  \
 --custom_train_dataset_dir "datasets/celeba/imgs"    \
 --custom_test_dataset_dir "datasets/celeba/imgs"  \
 --model_path peal_runs/ddpm_celebahq/final.pt
-apptainer run --nv python_container.sif python edit_images.py  \
+apptainer run --nv asyrp_container.sif python edit_images.py  \
 --run_train          \
 --edit_attr test     \
 --do_train 1         \
@@ -20,11 +20,13 @@ apptainer run --nv python_container.sif python edit_images.py  \
 --n_train_step 50    \
 --n_test_step 50     \
 --just_precompute \
+--config custom.yml         \
 --exp peal_runs/asyrp_test         \
+--sh_file_name "scripts/asyrp_precompute.sh"   \
 --custom_train_dataset_dir "datasets/celeba/imgs"    \
 --custom_test_dataset_dir "datasets/celeba/imgs"  \
 --model_path peal_runs/ddpm_celebahq/final.pt
-python main.py  \
+apptainer run --nv asyrp_container.sif python edit_images.py  \
 --run_train                    \
 --do_train 1                   \
 --do_test 1                    \
@@ -46,8 +48,36 @@ python main.py  \
 --add_noise_from_xt            \
 --lpips_addnoise_th 1.2        \
 --lpips_edit_th 0.33           \
---edit_attr $guid              \
---sh_file_name $sh_file_name   \
+--config custom.yml         \
+--edit_attr "smiling"              \
+--sh_file_name "asyrp/script_copies/train.sh"   \
+--exp peal_runs/asyrp_test_implicit         \
+--custom_train_dataset_dir "datasets/celeba/imgs"    \
+--custom_test_dataset_dir "datasets/celeba/imgs"  \
+--model_path peal_runs/ddpm_celebahq/final.pt
+apptainer run --nv asyrp_container.sif python edit_images.py  \
+--run_test                    \
+--do_train 1                  \
+--do_test 1                   \
+--n_train_img 100             \
+--n_test_img 32               \
+--n_iter 5                    \
+--bs_train 1                  \
+--t_0 999                     \
+--n_inv_step 50               \
+--n_train_step 50             \
+--n_test_step 50      \
+--get_h_num 1                 \
+--train_delta_block           \
+--add_noise_from_xt           \
+--lpips_addnoise_th 1.2       \
+--lpips_edit_th 0.33          \
+--save_x0                     \
+--use_x0_tensor               \
+--hs_coeff_delta_h 1.0        \
+--config custom.yml         \
+--edit_attr "smiling"              \
+--sh_file_name "asyrp/script_copies/inference.sh"   \
 --exp peal_runs/asyrp_test_implicit         \
 --custom_train_dataset_dir "datasets/celeba/imgs"    \
 --custom_test_dataset_dir "datasets/celeba/imgs"  \
