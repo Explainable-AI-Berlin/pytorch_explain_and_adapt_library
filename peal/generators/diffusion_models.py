@@ -13,8 +13,8 @@ from torchvision.transforms import ToTensor
 from peal.generators.interfaces import EditCapableGenerator
 from peal.data.datasets import Image2ClassDataset
 from peal.global_utils import load_yaml_config, embed_numberstring
-#from dime2.main import main as dime_main
-from ace.main import main as ace_main
+from run_dime import main as dime_main
+from run_ace import main as ace_main
 from ace.guided_diffusion import dist_util, logger
 from ace.guided_diffusion.resample import create_named_schedule_sampler
 from ace.guided_diffusion.script_util import (
@@ -140,9 +140,11 @@ class DimeDDPMAdaptor(EditCapableGenerator):
         args.batch_size = x_in.shape[0]
         if self.config.method == "ace":
             ace_main(args=args)
+            ending = '.png'
 
-        '''elif self.config.method == "dime":
-            dime_main(args=args)'''
+        elif self.config.method == "dime":
+            dime_main(args=args)
+            ending = '.jpg'
 
         x_counterfactuals = []
         x_list = []
@@ -150,20 +152,22 @@ class DimeDDPMAdaptor(EditCapableGenerator):
             self.counterfactual_path,
             "Results",
             self.config.exp_name,
-            "explanation",
         )
+        if self.config.method == "ace":
+            base_path = os.path.join(base_path, "explanation")
+
         for i in range(x_in.shape[0]):
             path_correct = os.path.join(
-                base_path, "CC", "CCF", "CF", f"{embed_numberstring(str(i))}.png"
+                base_path, "CC", "CCF", "CF", f"{embed_numberstring(str(i))}" + ending
             )
             path_correct2 = os.path.join(
-                base_path, "CC", "ICF", "CF", f"{embed_numberstring(str(i))}.png"
+                base_path, "CC", "ICF", "CF", f"{embed_numberstring(str(i))}" + ending
             )
             path_incorrect = os.path.join(
-                base_path, "IC", "CCF", "CF", f"{embed_numberstring(str(i))}.png"
+                base_path, "IC", "CCF", "CF", f"{embed_numberstring(str(i))}" + ending
             )
             path_incorrect2 = os.path.join(
-                base_path, "IC", "ICF", "CF", f"{embed_numberstring(str(i))}.png"
+                base_path, "IC", "ICF", "CF", f"{embed_numberstring(str(i))}" + ending
             )
             if os.path.exists(path_correct):
                 path_counterfactual = path_correct
@@ -186,10 +190,10 @@ class DimeDDPMAdaptor(EditCapableGenerator):
             # x_counterfactuals.append(torchvision.io.read_image(path))
             x_counterfactuals.append(ToTensor()(Image.open(path_counterfactual)))
             path_correct = os.path.join(
-                self.counterfactual_path, "Original", "Correct", f"{embed_numberstring(str(i))}.png"
+                self.counterfactual_path, "Original", "Correct", f"{embed_numberstring(str(i))}" + ending
             )
             path_incorrect = os.path.join(
-                self.counterfactual_path, "Original", "Incorrect", f"{embed_numberstring(str(i))}.png"
+                self.counterfactual_path, "Original", "Incorrect", f"{embed_numberstring(str(i))}" + ending
             )
             if os.path.exists(path_correct):
                 path_original = path_correct

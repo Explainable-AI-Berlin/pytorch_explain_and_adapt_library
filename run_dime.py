@@ -5,22 +5,15 @@ import math
 import random
 import argparse
 import shutil
-import itertools
 import numpy as np
 import os.path as osp
-import matplotlib.pyplot as plt
 
-from PIL import Image
 from time import time
 from tqdm import tqdm
 from os import path as osp
-from multiprocessing import Pool
 
 import torch
 from torch.utils import data
-
-from torchvision import transforms
-from torchvision import datasets
 
 module_path = os.path.abspath(os.path.join(".."))
 if module_path not in sys.path:
@@ -43,8 +36,6 @@ from dime2.core.sample_utils import (
     dist_cond_fn,
     ImageSaver,
     SlowSingleLabel,
-    Normalizer,
-    load_from_DDP_model,
     PerceptualLoss,
     X_T_Saver,
     Z_T_Saver,
@@ -52,6 +43,8 @@ from dime2.core.sample_utils import (
 )
 from dime2.core.image_datasets import CelebADataset, CelebAMiniVal
 from dime2.core.classifier.densenet import ClassificationModel
+
+from peal.architectures.downstream_models import SequentialModel
 
 import matplotlib
 
@@ -273,7 +266,6 @@ def main(args=None):
     if args is None:
         args = create_args()
 
-    print(args)
     shutil.rmtree(args.output_path, ignore_errors=True)
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
     os.makedirs(osp.join(args.output_path, "Results", args.exp_name), exist_ok=True)
@@ -443,7 +435,7 @@ def main(args=None):
         # Initial Classification, no noise included
         with torch.no_grad():
             logits = classifier(img)
-            if args.classifier_path[-4:] == ".cpl":
+            if isinstance(classifier, SequentialModel):
                 logits = logits[:, 1] - logits[:, 0]
 
             pred = (logits > 0).long()

@@ -26,7 +26,7 @@ apptainer run --nv asyrp_container.sif python edit_images.py  \
 --config custom.yml         \
 --edit_attr "smiling"              \
 --sh_file_name "/home/sidney/workspace/peal/scripts/asyrp_train.sh"   \
---exp peal_runs/asyrp_test_implicit         \
+--exp peal_runs/asyrp/implicit_function       \
 --custom_train_dataset_dir "datasets/celeba/imgs"    \
 --custom_test_dataset_dir "datasets/celeba/imgs"  \
 --model_path peal_runs/ddpm_celebahq/final.pt

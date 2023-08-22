@@ -43,7 +43,7 @@ dependencies:
       - certifi==2023.7.22
       - charset-normalizer==3.2.0
       - click==8.1.6
-      - clip-by-openai==1.1
+      - git+https://github.com/openai/CLIP.git
       - cmake==3.27.0
       - contextlib2==21.6.0
       - corelay==0.2.1
