@@ -68,6 +68,7 @@ from ace.core.attacks_and_models import JointClassifierDDPM, get_attack
 from ace.models import get_classifier
 
 from peal.data.dataset_interfaces import PealDataset
+from peal.architectures.downstream_models import SequentialModel
 
 import matplotlib
 
@@ -452,7 +453,7 @@ def main(args=None):
             classifier,
             img,
             args.dataset in BINARYDATASET or isinstance(args.dataset, PealDataset),
-            ispeal=isinstance(args.dataset, PealDataset),
+            ispeal=isinstance(classifier, SequentialModel),
         )
 
         # construct target
@@ -488,7 +489,7 @@ def main(args=None):
             target=target,
             inpaint=args.sampling_inpaint,
             dilation=args.sampling_dilation,
-            ispeal=isinstance(args.dataset, PealDataset),
+            ispeal=isinstance(classifier, SequentialModel),
         )
         noise = (noise * 255).to(dtype=torch.uint8).detach().cpu()
         pe_mask = (pe_mask * 255).to(dtype=torch.uint8).detach().cpu()
@@ -506,6 +507,7 @@ def main(args=None):
                     data_img,
                     binary=args.dataset in BINARYDATASET
                     or isinstance(args.dataset, PealDataset),
+                    ispeal=isinstance(classifier, SequentialModel),
                 )
                 cf, cf5 = accuracy(
                     data_log,
@@ -554,7 +556,7 @@ def main(args=None):
                         target=target if target is not None else lab,
                         label=lab,
                         pred=c_pred,
-                        pred_cf=data_pred.argmax(dim=-1),
+                        pred_cf=data_pred,
                         l_inf=linf,
                         l_1=l1,
                         indexes=indexes.numpy(),
