@@ -1,6 +1,7 @@
 import torch
 
 from torch import nn
+from typing import Tuple
 
 
 class Generator(nn.Module):
@@ -77,7 +78,7 @@ class EditCapableGenerator(Generator):
         target_confidence_goal: float,
         target_classes: torch.Tensor,
         classifier: nn.Module,
-    ):
+    ) -> Tuple[list[torch.Tensor], list[torch.Tensor], list[torch.Tensor], list[torch.Tensor]]:
         '''
         This function edits the input to match the target confidence goal and target classes
         Args:
