@@ -5,3 +5,4 @@
 'output_type'             : 'multiclass'
 'output_size'             : [40]
 'downsize'                : 'Resize'
+'delimiter'               : ' '

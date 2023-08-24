@@ -87,6 +87,9 @@ class EditCapableGenerator(Generator):
             classifier: The classifier according to which the confidence is measured
 
         Returns:
-            torch.Tensor: The edited input
+            list[torch.Tensor]: List of the counterfactuals
+            list[torch.Tensor]: List of the differences in latent codes. In the simplest case just x_in - x_counterfactual
+            list[torch.Tensor]: List of the achieved target confidences of the counterfactuals
+            list[torch.Tensor]: List of x_in. This is necessary since the counterfactuals might be in a different order
         '''
         pass

@@ -3,10 +3,10 @@ import os
 
 from typing import Union
 
-from peal.generators.interfaces import InvertibleGenerator, EditCapableGenerator
+from peal.generators.interfaces import InvertibleGenerator, EditCapableGenerator, Generator
 from peal.generators.normalizing_flows import Glow
 from peal.generators.diffusion_models import DimeDDPMAdaptor
-from peal.global_utils import load_yaml_config
+from peal.global_utils import load_yaml_config, find_subclasses, get_project_resource_dir
 from peal.training.trainers import ModelTrainer
 
 
@@ -43,7 +43,21 @@ def get_generator(
     ):
         generator_config = load_yaml_config(generator)
         generator_config.batch_size = train_dataloader.batch_size
-        if generator_config.generator_type == "ddpm":
+        generator_class_list = find_subclasses(
+            Generator,
+            os.path.join(get_project_resource_dir(), "generators", "custom_generators"),
+        )
+        generator_class_dict = {
+            generator_class.__name__: generator_class for generator_class in generator_class_list
+        }
+        if generator_config.generator_type in generator_class_dict.keys():
+            generator_out = generator_class_dict[generator_config.generator_type](
+                config=generator_config,
+                dataset=train_dataloader.dataset,
+                device=device,
+            )
+
+        elif generator_config.generator_type == "ddpm":
             generator_out = DimeDDPMAdaptor(
                 config=generator_config, dataset=train_dataloader.dataset, device=device
             )

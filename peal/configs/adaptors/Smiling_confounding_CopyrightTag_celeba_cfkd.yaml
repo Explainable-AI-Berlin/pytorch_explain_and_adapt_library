@@ -9,8 +9,8 @@
 'test_data'                            :  '<PEAL_BASE>/configs/data/Smiling_confounding_CopyrightTag_celeba.yaml'
 'student'                              :  'peal_runs/Smiling_confounding_CopyrightTag_celeba_classifier_unpoisened/model.cpl'
 'teacher'                              :  'peal_runs/Smiling_confounding_CopyrightTag_celeba_classifier_unpoisened/model.cpl'
-#'generator'                            :  'peal_runs/ddpm_CopyrightTag_celeba_new/config.yaml'
-'generator'                            :  'peal_runs/celeba_ddpm_downloaded/config.yaml'
+'generator'                            :  'peal_runs/ddpm_CopyrightTag_celeba_new/config.yaml'
+#'generator'                            :  'peal_runs/celeba_ddpm_downloaded/config.yaml'
 'base_dir'                             :  'peal_runs/Smiling_confounding_CopyrightTag_celeba_classifier_poisened/cfkd_ace_oracle'
 'task':
   'criterions':
