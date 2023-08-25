@@ -1,4 +1,5 @@
 import torch
+import copy
 
 
 def accuracy(logits, label, topk=(1, 5), binary=False):
@@ -9,6 +10,7 @@ def accuracy(logits, label, topk=(1, 5), binary=False):
     if binary:
         res = [((logits > 0).float() == label)]
         res += [torch.ones_like(res[0])] * (len(topk) - 1)
+
     else:
         maxk = max(topk)
         _, pred_k = torch.topk(logits, maxk, dim=1)
@@ -18,17 +20,19 @@ def accuracy(logits, label, topk=(1, 5), binary=False):
         for k in topk:
             res.append(correct_k[:, :k].sum(dim=1))
 
+        if len(topk) == 1:
+            res.append(copy.deepcopy(res[0]))
+
     return res
 
 
 @torch.no_grad()
-def get_prediction(classifier, img, binary, ispeal=False):
+def get_prediction(classifier, img, binary):
     log = classifier(img)
-    if ispeal:
-        log = log[:, 1] - log[:, 0]
 
     if binary:
         pred = (log > 0).float()
+
     else:
         pred = log.argmax(dim=1)
 

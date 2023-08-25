@@ -149,7 +149,6 @@ def create_args():
 # =======================================================
 # =======================================================
 
-
 @torch.no_grad()
 def filter_fn(
     diffusion,
@@ -170,16 +169,14 @@ def filter_fn(
 
     # Generate pre-explanation
     with torch.enable_grad():
-        if ispeal:
-            pe = attack.perturb(
-                x,
-                torch.nn.functional.one_hot(
-                    target.to(torch.long), num_classes=2
-                ).float(),
-            )
+        '''pe = attack.perturb(
+            x,
+            torch.nn.functional.one_hot(
+                target.to(torch.long), num_classes=2
+            ).float(),
+        )'''
 
-        else:
-            pe = attack.perturb(x, target)
+        pe = attack.perturb(x, target)
 
     # generates masks
     mask, dil_mask = generate_mask(x, pe, dilation)
@@ -250,6 +247,23 @@ def main(args=None):
     random.seed(args.seed)
     np.random.seed(args.seed)
 
+    print("Loading Classifier")
+    if hasattr(args, "classifier"):
+        classifier = args.classifier
+
+    elif args.classifier_path[-4:] == ".cpl":
+        module_path = os.path.abspath(os.path.join(".."))
+        if module_path not in sys.path:
+            sys.path.append(module_path)
+        classifier = torch.load(args.classifier_path, map_location=dist_util.dev()).to(
+            dist_util.dev()
+        )
+
+    elif args.classifier_path[-4:] == ".pth":
+        classifier = get_classifier(args)
+
+    classifier.to(dist_util.dev()).eval()
+
     # ========================================
     # Load Dataset
     # ========================================
@@ -263,7 +277,7 @@ def main(args=None):
     if args.label_target != -1:
         target = (
             1 - args.label_target
-            if args.dataset in BINARYDATASET or isinstance(args.dataset, PealDataset)
+            if args.dataset in BINARYDATASET and not isinstance(classifier, SequentialModel)
             else args.label_query
         )
 
@@ -301,23 +315,6 @@ def main(args=None):
     if args.use_fp16:
         model.convert_to_fp16()
     model.eval()
-
-    print("Loading Classifier")
-    if hasattr(args, "classifier"):
-        classifier = args.classifier
-
-    elif args.classifier_path[-4:] == ".cpl":
-        module_path = os.path.abspath(os.path.join(".."))
-        if module_path not in sys.path:
-            sys.path.append(module_path)
-        classifier = torch.load(args.classifier_path, map_location=dist_util.dev()).to(
-            dist_util.dev()
-        )
-
-    elif args.classifier_path[-4:] == ".pth":
-        classifier = get_classifier(args)
-
-    classifier.to(dist_util.dev()).eval()
 
     if args.attack_joint and not (
         args.attack_joint_checkpoint or args.attack_joint_shortcut
@@ -374,7 +371,7 @@ def main(args=None):
         "nb_iter": args.attack_iterations,
         "dist_schedule": args.dist_schedule,
         "binary": args.dataset in BINARYDATASET
-        or isinstance(args.dataset, PealDataset),
+        and not isinstance(classifier, SequentialModel),
         "step": args.attack_step / 255,
     }
 
@@ -452,8 +449,7 @@ def main(args=None):
         c_log, c_pred = get_prediction(
             classifier,
             img,
-            args.dataset in BINARYDATASET or isinstance(args.dataset, PealDataset),
-            ispeal=isinstance(classifier, SequentialModel),
+            args.dataset in BINARYDATASET and not isinstance(classifier, SequentialModel),
         )
 
         # construct target
@@ -461,15 +457,20 @@ def main(args=None):
         if args.label_target != -1:
             target = torch.ones_like(lab) * args.label_target
             target[lab != c_pred] = lab[lab != c_pred]
-        elif args.dataset in BINARYDATASET or isinstance(args.dataset, PealDataset):
+
+        elif args.dataset in BINARYDATASET and not isinstance(classifier, SequentialModel):
             target = 1 - c_pred
             target[lab != c_pred] = lab[lab != c_pred]
+
+        elif isinstance(classifier, SequentialModel):
+            target = 1 - c_pred
 
         acc1, acc5 = accuracy(
             c_log,
             lab,
+            topk=[1] if isinstance(classifier, SequentialModel) else (1, 5),
             binary=args.dataset in BINARYDATASET
-            or isinstance(args.dataset, PealDataset),
+            and not isinstance(classifier, SequentialModel),
         )
         stats["clean acc"] += acc1.sum().item()
         stats["clean acc5"] += acc5.sum().item()
@@ -505,21 +506,21 @@ def main(args=None):
                 data_log, data_pred = get_prediction(
                     classifier,
                     data_img,
-                    binary=args.dataset in BINARYDATASET
-                    or isinstance(args.dataset, PealDataset),
-                    ispeal=isinstance(classifier, SequentialModel),
+                    binary=args.dataset in BINARYDATASET and not isinstance(classifier, SequentialModel),
                 )
                 cf, cf5 = accuracy(
                     data_log,
                     target,
+                    topk=[1] if isinstance(classifier, SequentialModel) else (1, 5),
                     binary=args.dataset in BINARYDATASET
-                    or isinstance(args.dataset, PealDataset),
+                    and not isinstance(classifier, SequentialModel),
                 )
                 un, un5 = accuracy(
                     data_log,
                     c_pred,
+                    topk=[1] if isinstance(classifier, SequentialModel) else (1, 5),
                     binary=args.dataset in BINARYDATASET
-                    or isinstance(args.dataset, PealDataset),
+                    and not isinstance(classifier, SequentialModel),
                 )
                 stats[data_type]["cf"] += cf.sum().item()
                 stats[data_type]["cf5"] += cf5.sum().item()

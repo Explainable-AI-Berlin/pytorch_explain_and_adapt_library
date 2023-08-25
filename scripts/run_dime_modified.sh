@@ -3,13 +3,14 @@ MODEL_FLAGS="--attention_resolutions 32,16,8 --class_cond False --diffusion_step
 --use_scale_shift_norm True"
 SAMPLE_FLAGS="--batch_size 50 --timestep_respacing 200"
 DATAPATH=datasets/celeba_dime
-#MODELPATH=peal_runs/dime_test/model.pt
-MODELPATH=peal_runs/ddpm_CopyrightTag_celeba_new/final.pt
-CLASSIFIERPATH=peal_runs/ace_test/classifier.pth
+MODELPATH=peal_runs/dime_test/model.pt
+#MODELPATH=peal_runs/ddpm_CopyrightTag_celeba_new/final.pt
+#CLASSIFIERPATH=peal_runs/dime_test/classifier.pth
 #CLASSIFIERPATH=peal_runs/Smiling_confounding_CopyrightTag_celeba_classifier_unpoisened/model.cpl
+CLASSIFIERPATH=peal_runs/Smiling_confounding_Blond_Hair_celeba_classifier_unpoisened/model.cpl
 ORACLEPATH=peal_runs/dime_test/oracle.pth
-#OUTPUT_PATH=peal_runs/dime_test/outputs_own_classifier
-OUTPUT_PATH=peal_runs/dime_test/outputs_own_generator
+OUTPUT_PATH=peal_runs/dime_test/outputs_own_classifier
+#OUTPUT_PATH=peal_runs/dime_test/outputs_own_generator
 EXPNAME=experiment1
 
 # parameters of the sampling

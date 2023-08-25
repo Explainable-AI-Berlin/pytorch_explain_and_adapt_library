@@ -22,5 +22,5 @@ python3 train_model.py \
 #--model_name "celeba_glow_unpoisened"
 python train_diffusion_model.py \
 --generator_config "peal/configs/generators/ace_generator_celeba.yaml"
-python3 run_cfkd.py \
+apptainer run --nv python_container.sif python3 run_cfkd.py \
 --adaptor_config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_Blond_Hair_celeba_cfkd.yaml"

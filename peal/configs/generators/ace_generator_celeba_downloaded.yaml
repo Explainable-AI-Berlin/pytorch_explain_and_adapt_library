@@ -1,12 +1,20 @@
+# important parameters for creating counterfactuals:
+'dist_l1' : 0.0 #0.0001 #0.0  # l1 scaling factor
+'dist_l2' : 0.01 #1.0  # l2 scaling factor schedule for the distance loss. We did not used any for our results
+'sampling_inpaint' : 0.15  # Inpainting threshold
+'sampling_time_fraction' : 0.3 # 0.1
+'timestep_respacing' : '50'
+'base_path' : 'peal_runs/celeba_ddpm_downloaded'
+'data' : '<PEAL_BASE>/configs/data/celeba.yaml'
+# Other parameters - careful might not have any effect since they are ported from DiME!!!
+'start_step' : 60
 'attention_resolutions' : '32,16,8'
-'start_step' : 15 #60
 'batch_size' : 10 #50
 'channel_mult' : ''
 'chunk' : 0
 'class_cond' : False
 'classifier_scales' : '8,10,15'
 'clip_denoised' : True
-'base_path' : 'peal_runs/ddpm_ace_celeba'
 'diffusion_steps' : 500
 'dropout' : 0.0
 'exp_name' : 'example_name'
@@ -38,7 +46,6 @@
 'save_z_t' : True
 'seed' : 4
 'target_label' : -1
-'timestep_respacing' : '200'
 'use_checkpoint' : False
 'use_ddim' : False
 'use_fp16' : False
@@ -51,19 +58,15 @@
 'method' : 'ace'
 'num_samples' : 500000000000  # useful to sample few examples
 'attack_method' : "PGD"  # Attack method (currently 'PGD', 'C&W', 'GD' and 'None' supported)
-'attack_iterations' : 50  # Attack iterations updates
+'attack_iterations' : 100 # 50  # Attack iterations updates
 'attack_epsilon' : 255  # L inf epsilon bound (will be devided by 255)
 'attack_step' : 1.0  # Attack update step (will be devided by 255)
 'attack_joint' : True  # Set to false to generate adversarial attacks generation!
 'attack_joint_checkpoint' : False
 'attack_checkpoint_backward_steps' : 1 # Use dime2 shortcut to transfer gradients. We do not recommend it.
 'attack_joint_shortcut' : False
-'dist_l1' : 0.0  # l1 scaling factor
-'dist_l2' : 1.0  # l2 scaling factor schedule for the distance loss. We did not used any for our results
 'dist_schedule' : "none" # filtering args fraction of noise steps (e.g. 0.1 for 1000 smpling steps would be 100 out of 1000)
-'sampling_time_fraction' : 0.1
 'sampling_stochastic' : True  # Set to False to remove the noise when sampling
-'sampling_inpaint' : 0.15  # Inpainting threshold
 'sampling_dilation' : 15  # Dilation size for the mask generation
 'label_query' : -1  # Query label to target
 'label_target' : -1  # Target label, useful for MultiClass datasets
@@ -72,7 +75,6 @@
 'cudnn_deterministic' : False  # to make the results deterministic
 # own parameters
 'max_train_steps' : 1000000
-'data' : '<PEAL_BASE>/configs/data/celeba.yaml'
 'current_fid' : 100000000000000.0'
 'best_fid' : 100000000000000.0'
 'generator_type' : 'AceDDPMAdaptor'

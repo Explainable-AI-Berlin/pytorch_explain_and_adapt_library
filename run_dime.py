@@ -33,6 +33,7 @@ from dime2.core.script_util import (
 from dime2.core.sample_utils import (
     get_DiME_iterative_sampling,
     clean_class_cond_fn,
+    clean_multiclass_cond_fn,
     dist_cond_fn,
     ImageSaver,
     SlowSingleLabel,
@@ -475,7 +476,7 @@ def main(args=None):
                 clip_denoised=args.clip_denoised,
                 model_kwargs=model_kwargs,
                 device=dev(),
-                class_grad_fn=clean_class_cond_fn,
+                class_grad_fn=clean_multiclass_cond_fn if isinstance(classifier, SequentialModel) else clean_class_cond_fn,
                 class_grad_kwargs={
                     "y": target[~transformed],
                     "classifier": classifier,
