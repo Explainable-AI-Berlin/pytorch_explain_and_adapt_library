@@ -11,10 +11,8 @@
 'student'                              :  'peal_runs/Smiling_confounding_Blond_Hair_celeba_classifier_unpoisened/model.cpl'
 'teacher'                              :  'peal_runs/Smiling_confounding_Blond_Hair_celeba_classifier_unpoisened/model.cpl'
 #'generator'                            :  'peal_runs/celeba_ddpm_downloaded/config.yaml'
-'generator'                            :  '<PEAL_BASE>/configs/generators/ace_generator_celeba.yaml'
-#'generator'                            :  '<PEAL_BASE>/configs/generators/ace_generator_celeba_downloaded.yaml'
-'base_dir'                             :  'peal_runs/Smiling_confounding_Blond_Hair_celeba_classifier_poisened/cfkd_ace_oracle'
-#'base_dir'                             :  'peal_runs/Smiling_confounding_Blond_Hair_celeba_classifier_poisened/cfkd_ace_oracle_downloaded'
+'generator'                            :  '<PEAL_BASE>/configs/generators/ace_generator_celeba_downloaded.yaml'
+'base_dir'                             :  'peal_runs/Smiling_confounding_Blond_Hair_celeba_classifier_poisened/cfkd_ace_oracle_downloaded'
 'task':
   'criterions':
     'ce'     : 1.0

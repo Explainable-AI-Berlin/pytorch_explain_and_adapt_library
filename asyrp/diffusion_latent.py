@@ -1671,28 +1671,28 @@ class Asyrp(object):
 
         with open(
             os.path.join(
-                "utils", f"{(self.args.config).split('.')[0]}_LPIPS_distance_x.tsv"
+                self.args.exp, f"{(self.args.config).split('.')[0]}_LPIPS_distance_x.tsv"
             ),
             "w",
         ) as f:
             f.write(result_x_tsv)
         with open(
             os.path.join(
-                "utils", f"{(self.args.config).split('.')[0]}_LPIPS_distance_x_std.tsv"
+                self.args.exp, f"{(self.args.config).split('.')[0]}_LPIPS_distance_x_std.tsv"
             ),
             "w",
         ) as f:
             f.write(result_x_std_tsv)
         with open(
             os.path.join(
-                "utils", f"{(self.args.config).split('.')[0]}_LPIPS_distance_x0_t.tsv"
+                self.args.exp, f"{(self.args.config).split('.')[0]}_LPIPS_distance_x0_t.tsv"
             ),
             "w",
         ) as f:
             f.write(result_x0_tsv)
         with open(
             os.path.join(
-                "utils",
+                self.args.exp,
                 f"{(self.args.config).split('.')[0]}_LPIPS_distance_x0_t_std.tsv",
             ),
             "w",
@@ -1736,7 +1736,7 @@ class Asyrp(object):
         if dataset_name == "custom":
             dataset_name = self.args.custom_dataset_name
         LPIPS_file_name = f"{dataset_name}_LPIPS_distance_x0_t.tsv"
-        LPIPS_file_path = os.path.join("utils", LPIPS_file_name)
+        LPIPS_file_path = os.path.join(self.args.exp, LPIPS_file_name)
         if not os.path.exists(LPIPS_file_path):
             if self.args.user_defined_t_edit and self.args.user_defined_t_addnoise:
                 self.t_edit = self.args.user_defined_t_edit
@@ -1787,7 +1787,7 @@ class Asyrp(object):
         else:
             if self.args.add_noise_from_xt:
                 LPIPS_file_name = f"{dataset_name}_LPIPS_distance_x.tsv"
-                LPIPS_file_path = os.path.join("utils", LPIPS_file_name)
+                LPIPS_file_path = os.path.join(self.args.exp, LPIPS_file_name)
                 if not os.path.exists(LPIPS_file_path):
                     print("LPIPS file not found, get LPIPS distance first!")
                     raise ValueError

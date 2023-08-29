@@ -209,7 +209,16 @@ class AceDDPMAdaptor(EditCapableGenerator):
 
             x_list.append(ToTensor()(Image.open(path_original)))
 
-        x_counterfactuals = torch.stack(x_counterfactuals)
+        pairwise_distances = torch.zeros([x_in.shape[0], x_in.shape[0]])
+        for i in range(x_in.shape[0]):
+            for j in range(x_in.shape[0]):
+                pairwise_distances[i, j] = torch.norm(x_in[i] - x_list[j])
+
+        x_counterfactuals_correct_order = []
+        for i in range(x_in.shape[0]):
+            x_counterfactuals_correct_order.append(x_counterfactuals[torch.argmin(pairwise_distances[i])])
+
+        x_counterfactuals = torch.stack(x_counterfactuals_correct_order)
         x_counterfactuals = self.dataset.project_from_pytorch_default(x_counterfactuals)
         device = [p for p in classifier.parameters()][0].device
         preds = torch.nn.Softmax(dim=-1)(
@@ -223,5 +232,5 @@ class AceDDPMAdaptor(EditCapableGenerator):
             list(x_counterfactuals),
             list(x_in - x_counterfactuals),
             list(y_target_end_confidence),
-            list(x_list),
+            list(x_in),
         )

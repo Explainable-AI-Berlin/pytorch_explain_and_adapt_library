@@ -1,0 +1,11 @@
+apptainer run --nv asyrp_container.sif python edit_images.py  \
+--lpips \
+--edit_attr test         \
+--n_train_img 100        \
+--n_inv_step 1000 \
+--config custom.yml         \
+--exp peal_runs/asyrp_test         \
+--custom_train_dataset_dir "datasets/celeba/imgs"    \
+--custom_test_dataset_dir "datasets/celeba/imgs"  \
+--sh_file_name "/home/sidney/workspace/peal/scripts/asyrp_calculate_lpips.sh"   \
+--model_path peal_runs/celebahq_ddpm/final.pt

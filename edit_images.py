@@ -246,10 +246,10 @@ def parse_args_and_config():
     logger.addHandler(handler1)
     logger.setLevel(level)
 
-    os.makedirs('checkpoint', exist_ok=True)
-    os.makedirs('checkpoint_latent', exist_ok=True)
-    os.makedirs('precomputed', exist_ok=True)
-    os.makedirs('runs', exist_ok=True)
+    os.makedirs(os.path.join(args.exp, 'checkpoint'), exist_ok=True)
+    os.makedirs(os.path.join(args.exp, 'checkpoint_latent'), exist_ok=True)
+    os.makedirs(os.path.join(args.exp, 'precomputed'), exist_ok=True)
+    os.makedirs(os.path.join(args.exp, 'runs'), exist_ok=True)
     os.makedirs(args.exp, exist_ok=True)
 
     import shutil

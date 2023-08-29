@@ -17,4 +17,4 @@ apptainer run --nv asyrp_container.sif python edit_images.py  \
 --sh_file_name "/home/sidney/workspace/peal/scripts/asyrp_precompute.sh"   \
 --custom_train_dataset_dir "datasets/celeba/imgs"    \
 --custom_test_dataset_dir "datasets/celeba/imgs"  \
---model_path peal_runs/ddpm_celebahq/final.pt
+--model_path peal_runs/celebahq_ddpm/final.pt
