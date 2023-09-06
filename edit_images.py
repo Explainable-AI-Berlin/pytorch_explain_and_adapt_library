@@ -232,7 +232,8 @@ def parse_args_and_config():
         config = yaml.safe_load(f)
     new_config = dict2namespace(config)
 
-    args.exp = args.exp + f'_LC_{new_config.data.category}_t{args.t_0}_ninv{args.n_inv_step}_ngen{args.n_train_step}'
+    # TODO why is this done?
+    #args.exp = args.exp + f'_LC_{new_config.data.category}_t{args.t_0}_ninv{args.n_inv_step}_ngen{args.n_train_step}'
 
 
     level = getattr(logging, args.verbose.upper(), None)

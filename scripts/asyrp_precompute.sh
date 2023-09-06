@@ -11,9 +11,9 @@ apptainer run --nv asyrp_container.sif python edit_images.py  \
 --n_test_step 50     \
 --just_precompute \
 --config custom.yml         \
+--train_delta_block            \
+--get_h_num 1                  \
 --exp peal_runs/asyrp_test         \
---user_defined_t_edit 500       \
---user_defined_t_addnoise 200   \
 --sh_file_name "/home/sidney/workspace/peal/scripts/asyrp_precompute.sh"   \
 --custom_train_dataset_dir "datasets/celeba/imgs"    \
 --custom_test_dataset_dir "datasets/celeba/imgs"  \
