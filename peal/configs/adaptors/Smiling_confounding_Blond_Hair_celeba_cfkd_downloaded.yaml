@@ -1,20 +1,18 @@
-'batch_size'                           :  2
-'min_train_samples'                    :  10
+'batch_size'                           :  6
+'min_train_samples'                    :  500
 'finetune_iterations'                  :  3
-'max_validation_samples'               :  10
+'max_validation_samples'               :  20
 'mixing_ratio'                         :  0.5
 'replace_model'                        :  True
 'explainer'                            :  '<PEAL_BASE>/configs/explainers/counterfactual_default.yaml'
 'training'                             :  '<PEAL_BASE>/configs/training/img_classifier.yaml'
 'data'                                 :  '<PEAL_BASE>/configs/data/Smiling_confounding_Blond_Hair_celeba_poisened.yaml'
 'test_data'                            :  '<PEAL_BASE>/configs/data/Smiling_confounding_Blond_Hair_celeba.yaml'
-'student'                              :  'peal_runs/Smiling_confounding_Blond_Hair_celeba_classifier_unpoisened/model.cpl'
+'student'                              :  'peal_runs/Smiling_confounding_Blond_Hair_celeba_classifier_poisened/model.cpl'
 'teacher'                              :  'peal_runs/Smiling_confounding_Blond_Hair_celeba_classifier_unpoisened/model.cpl'
 #'generator'                            :  'peal_runs/celeba_ddpm_downloaded/config.yaml'
-'generator'                            :  '<PEAL_BASE>/configs/generators/ace_generator_celeba.yaml'
-#'generator'                            :  '<PEAL_BASE>/configs/generators/ace_generator_celeba_downloaded.yaml'
-'base_dir'                             :  'peal_runs/Smiling_confounding_Blond_Hair_celeba_classifier_poisened/cfkd_ace_oracle'
-#'base_dir'                             :  'peal_runs/Smiling_confounding_Blond_Hair_celeba_classifier_poisened/cfkd_ace_oracle_downloaded'
+'generator'                            :  '<PEAL_BASE>/configs/generators/ace_generator_celeba_downloaded.yaml'
+'base_dir'                             :  'peal_runs/Smiling_confounding_Blond_Hair_celeba_classifier_poisened/cfkd_ace_oracle_downloaded'
 'task':
   'criterions':
     'ce'     : 1.0

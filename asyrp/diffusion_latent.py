@@ -207,9 +207,15 @@ class Asyrp(object):
                 optim_param_list = optim_param_list + [delta_h_dict[key]]
 
         # optim_ft = torch.optim.Adam(optim_get_h_list, weight_decay=0, lr=self.args.lr_latent_clr)
-        optim_ft = torch.optim.SGD(
-            optim_param_list, weight_decay=0, lr=self.args.lr_training
-        )
+        try:
+            optim_ft = torch.optim.SGD(
+                optim_param_list, weight_decay=0, lr=self.args.lr_training
+            )
+
+        except Exception:
+            print('Error in SGD')
+            import pdb; pdb.set_trace()
+
         scheduler_ft = torch.optim.lr_scheduler.StepLR(
             optim_ft, step_size=self.args.scheduler_step_size, gamma=self.args.sch_gamma
         )
@@ -249,10 +255,12 @@ class Asyrp(object):
             self.args.start_iter_when_you_use_pretrained, self.args.n_iter
         ):
             exp_id = os.path.split(self.args.exp)[-1]
-            if self.args.load_from_checkpoint:
+            '''if self.args.load_from_checkpoint:
                 save_name = f"checkpoint/{self.args.load_from_checkpoint}_LC_{self.config.data.category}_t{self.args.t_0}_ninv{self.args.n_inv_step}_ngen{self.args.n_train_step}_{it_out}.pth"
             else:
-                save_name = f"checkpoint/{exp_id}_{it_out}.pth"
+                save_name = f"checkpoint/{exp_id}_{it_out}.pth"'''
+
+            save_name = os.path.join(self.args.exp, f"checkpoint_{it_out}.pth")
 
             # train set
             if self.args.do_train:
@@ -1671,28 +1679,28 @@ class Asyrp(object):
 
         with open(
             os.path.join(
-                "utils", f"{(self.args.config).split('.')[0]}_LPIPS_distance_x.tsv"
+                self.args.exp, f"{(self.args.config).split('.')[0]}_LPIPS_distance_x.tsv"
             ),
             "w",
         ) as f:
             f.write(result_x_tsv)
         with open(
             os.path.join(
-                "utils", f"{(self.args.config).split('.')[0]}_LPIPS_distance_x_std.tsv"
+                self.args.exp, f"{(self.args.config).split('.')[0]}_LPIPS_distance_x_std.tsv"
             ),
             "w",
         ) as f:
             f.write(result_x_std_tsv)
         with open(
             os.path.join(
-                "utils", f"{(self.args.config).split('.')[0]}_LPIPS_distance_x0_t.tsv"
+                self.args.exp, f"{(self.args.config).split('.')[0]}_LPIPS_distance_x0_t.tsv"
             ),
             "w",
         ) as f:
             f.write(result_x0_tsv)
         with open(
             os.path.join(
-                "utils",
+                self.args.exp,
                 f"{(self.args.config).split('.')[0]}_LPIPS_distance_x0_t_std.tsv",
             ),
             "w",
@@ -1733,10 +1741,11 @@ class Asyrp(object):
         LPIPS_th = LPIPS_th * cosine
 
         dataset_name = str(self.args.config).split(".")[0]
-        if dataset_name == "custom":
-            dataset_name = self.args.custom_dataset_name
+        # TODO why???
+        '''if dataset_name == "custom":
+            dataset_name = self.args.custom_dataset_name'''
         LPIPS_file_name = f"{dataset_name}_LPIPS_distance_x0_t.tsv"
-        LPIPS_file_path = os.path.join("utils", LPIPS_file_name)
+        LPIPS_file_path = os.path.join(self.args.exp, LPIPS_file_name)
         if not os.path.exists(LPIPS_file_path):
             if self.args.user_defined_t_edit and self.args.user_defined_t_addnoise:
                 self.t_edit = self.args.user_defined_t_edit
@@ -1749,6 +1758,7 @@ class Asyrp(object):
                 else:
                     return cosine
             else:
+                import pdb; pdb.set_trace()
                 print(
                     f"LPIPS file not found, get LPIPS distance first!  : {LPIPS_file_path}"
                 )
@@ -1780,14 +1790,17 @@ class Asyrp(object):
         self.t_edit = t_edit
         print(f"t_edit: {self.t_edit}")
 
+        t_addnoise = None
+
         # t_boost is from LPIPS(xt, x0)
         if self.args.user_defined_t_addnoise:
             # when you use user_defined_t_addnoise but not user_defined_t_edit
             t_addnoise = self.args.user_defined_t_addnoise
+
         else:
             if self.args.add_noise_from_xt:
                 LPIPS_file_name = f"{dataset_name}_LPIPS_distance_x.tsv"
-                LPIPS_file_path = os.path.join("utils", LPIPS_file_name)
+                LPIPS_file_path = os.path.join(self.args.exp, LPIPS_file_name)
                 if not os.path.exists(LPIPS_file_path):
                     print("LPIPS file not found, get LPIPS distance first!")
                     raise ValueError
@@ -1805,6 +1818,11 @@ class Asyrp(object):
                 if lpips_dict[key] >= LPIPS_addnoise_th:
                     t_addnoise = key
                     break
+
+        if t_addnoise is None:
+            # TODO this seems sketchy!
+            t_addnoise = len(sorted_lpips_dict_key_list) - 1
+
         self.t_addnoise = t_addnoise
         print(f"t_addnoise: {self.t_addnoise}")
 

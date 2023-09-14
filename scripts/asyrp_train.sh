@@ -20,13 +20,10 @@ apptainer run --nv asyrp_container.sif python edit_images.py  \
 --add_noise_from_xt            \
 --lpips_addnoise_th 1.2        \
 --lpips_edit_th 0.33           \
---user_defined_t_edit 500       \
---user_defined_t_addnoise 200   \
---load_random_noise \
 --config custom.yml         \
 --edit_attr "smiling"              \
 --sh_file_name "/home/sidney/workspace/peal/scripts/asyrp_train.sh"   \
---exp peal_runs/asyrp/implicit_function       \
+--exp peal_runs/asyrp_test       \
 --custom_train_dataset_dir "datasets/celeba/imgs"    \
 --custom_test_dataset_dir "datasets/celeba/imgs"  \
---model_path peal_runs/ddpm_celebahq/final.pt
+--model_path peal_runs/celebahq_ddpm/final.pt

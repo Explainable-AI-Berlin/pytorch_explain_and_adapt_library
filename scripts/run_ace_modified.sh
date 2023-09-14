@@ -8,11 +8,12 @@ T=-1
 
 GPU=0
 DATAPATH=datasets/celeba_dime
-MODELPATH=peal_runs/ace_test/model.pt
+#MODELPATH=peal_runs/ace_test/model.pt
+MODELPATH=peal_runs/ddpm_celeba/final.pt
 #MODELPATH=peal_runs/ddpm_CopyrightTag_celeba_new/final.pt
 #CLASSIFIERPATH=peal_runs/ace_test/classifier.pth
-#CLASSIFIERPATH=peal_runs/Smiling_confounding_CopyrightTag_celeba_classifier_unpoisened/model.cpl
 CLASSIFIERPATH=peal_runs/Smiling_confounding_Blond_Hair_celeba_classifier_unpoisened/model.cpl
+#CLASSIFIERPATH=peal_runs/Smiling_confounding_CopyrightTag_celeba_classifier_unpoisened/model.cpl
 #OUTPUT_PATH=peal_runs/ace_test/outputs
 OUTPUT_PATH=peal_runs/ace_test/outputs_own_classifier
 #OUTPUT_PATH=peal_runs/ace_test/outputs_own_generator

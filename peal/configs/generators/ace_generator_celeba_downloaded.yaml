@@ -1,10 +1,12 @@
 # important parameters for creating counterfactuals:
-'dist_l1' : 0.0 #0.0001 #0.0  # l1 scaling factor
-'dist_l2' : 0.01 #1.0  # l2 scaling factor schedule for the distance loss. We did not used any for our results
-'sampling_inpaint' : 0.15  # Inpainting threshold
-'sampling_time_fraction' : 0.3 # 0.1
+'attack_iterations' : 100 #50  # Attack iterations updates
+'sampling_time_fraction' : 0.3 #0.35 # 0.1 #
+'dist_l1' : 0.0 #0.1 #0.0001 #0.0  # l1 scaling factor
+'dist_l2' : 0.001 #1.0 #0.01 #1.0  # l2 scaling factor schedule for the distance loss. We did not used any for our results
+'sampling_inpaint' : 0.05 #0.15  # Inpainting threshold
+#
 'timestep_respacing' : '50'
-'base_path' : 'peal_runs/celeba_ddpm_downloaded'
+'base_path' : 'peal_runs/celeba_ddpm_downloaded' # 'peal_runs/celeba_ddpm' # 'peal_runs/celeba_ddpm_downloaded' #
 'data' : '<PEAL_BASE>/configs/data/celeba.yaml'
 # Other parameters - careful might not have any effect since they are ported from DiME!!!
 'start_step' : 60
@@ -58,7 +60,6 @@
 'method' : 'ace'
 'num_samples' : 500000000000  # useful to sample few examples
 'attack_method' : "PGD"  # Attack method (currently 'PGD', 'C&W', 'GD' and 'None' supported)
-'attack_iterations' : 100 # 50  # Attack iterations updates
 'attack_epsilon' : 255  # L inf epsilon bound (will be devided by 255)
 'attack_step' : 1.0  # Attack update step (will be devided by 255)
 'attack_joint' : True  # Set to false to generate adversarial attacks generation!
