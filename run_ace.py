@@ -149,6 +149,7 @@ def create_args():
 # =======================================================
 # =======================================================
 
+
 @torch.no_grad()
 def filter_fn(
     diffusion,
@@ -169,12 +170,12 @@ def filter_fn(
 
     # Generate pre-explanation
     with torch.enable_grad():
-        '''pe = attack.perturb(
+        """pe = attack.perturb(
             x,
             torch.nn.functional.one_hot(
                 target.to(torch.long), num_classes=2
             ).float(),
-        )'''
+        )"""
 
         pe = attack.perturb(x, target)
 
@@ -277,7 +278,8 @@ def main(args=None):
     if args.label_target != -1:
         target = (
             1 - args.label_target
-            if args.dataset in BINARYDATASET and not isinstance(classifier, SequentialModel)
+            if args.dataset in BINARYDATASET
+            and not isinstance(classifier, SequentialModel)
             else args.label_query
         )
 
@@ -449,7 +451,8 @@ def main(args=None):
         c_log, c_pred = get_prediction(
             classifier,
             img,
-            args.dataset in BINARYDATASET and not isinstance(classifier, SequentialModel),
+            args.dataset in BINARYDATASET
+            and not isinstance(classifier, SequentialModel),
         )
 
         # construct target
@@ -458,7 +461,9 @@ def main(args=None):
             target = torch.ones_like(lab) * args.label_target
             target[lab != c_pred] = lab[lab != c_pred]
 
-        elif args.dataset in BINARYDATASET and not isinstance(classifier, SequentialModel):
+        elif args.dataset in BINARYDATASET and not isinstance(
+            classifier, SequentialModel
+        ):
             target = 1 - c_pred
             target[lab != c_pred] = lab[lab != c_pred]
 
@@ -506,7 +511,8 @@ def main(args=None):
                 data_log, data_pred = get_prediction(
                     classifier,
                     data_img,
-                    binary=args.dataset in BINARYDATASET and not isinstance(classifier, SequentialModel),
+                    binary=args.dataset in BINARYDATASET
+                    and not isinstance(classifier, SequentialModel),
                 )
                 cf, cf5 = accuracy(
                     data_log,

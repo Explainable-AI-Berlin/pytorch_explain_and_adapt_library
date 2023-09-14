@@ -17,15 +17,20 @@ from eval_utils.resnet50_facevgg2_FVA import resnet50, load_state_dict
 
 
 # create dataset to read the counterfactual results images
-class CFDataset():
+class CFDataset:
     mean_bgr = np.array([91.4953, 103.8827, 131.0912])
-    def __init__(self, path, exp_name):
 
+    def __init__(self, path, exp_name):
         self.images = []
         self.path = path
         self.exp_name = exp_name
-        for CL, CF in itertools.product(['CC', 'IC'], ['CCF']):
-            self.images += [(CL, CF, I) for I in os.listdir(osp.join(path, 'Results', self.exp_name, CL, CF, 'CF'))]
+        for CL, CF in itertools.product(["CC", "IC"], ["CCF"]):
+            self.images += [
+                (CL, CF, I)
+                for I in os.listdir(
+                    osp.join(path, "Results", self.exp_name, CL, CF, "CF")
+                )
+            ]
 
     def __len__(self):
         return len(self.images)
@@ -33,8 +38,10 @@ class CFDataset():
     def __getitem__(self, idx):
         CL, CF, I = self.images[idx]
         # get paths
-        cl_path = osp.join(self.path, 'Original', 'Correct' if CL == 'CC' else 'Incorrect', I)
-        cf_path = osp.join(self.path, 'Results', self.exp_name, CL, CF, 'CF', I)
+        cl_path = osp.join(
+            self.path, "Original", "Correct" if CL == "CC" else "Incorrect", I
+        )
+        cf_path = osp.join(self.path, "Results", self.exp_name, CL, CF, "CF", I)
 
         cl = self.load_img(cl_path)
         cf = self.load_img(cf_path)
@@ -56,22 +63,17 @@ class CFDataset():
         return img
 
 
-
 @torch.no_grad()
-def compute_FVA(oracle,
-                path,
-                exp_name,
-                batch_size):
-
+def compute_FVA(oracle, path, exp_name, batch_size):
     dataset = CFDataset(path, exp_name)
 
     cosine_similarity = torch.nn.CosineSimilarity()
 
     FVAS = []
     dists = []
-    loader = data.DataLoader(dataset, batch_size=15,
-                             shuffle=False,
-                             num_workers=4, pin_memory=True)
+    loader = data.DataLoader(
+        dataset, batch_size=15, shuffle=False, num_workers=4, pin_memory=True
+    )
 
     for cl, cf in tqdm(loader):
         cl = cl.to(device, dtype=torch.float)
@@ -86,33 +88,31 @@ def compute_FVA(oracle,
 
 
 def arguments():
-    parser = argparse.ArgumentParser(description='FVA arguments.')
-    parser.add_argument('--gpu', default='0', type=str,
-                        help='GPU id')
-    parser.add_argument('--exp-name', required=True, type=str,
-                        help='Experiment Name')
-    parser.add_argument('--output-path', required=True, type=str,
-                        help='Results Path')
-    parser.add_argument('--weights-path', default='pretrained_models/resnet50_ft_weight.pkl', type=str,
-                        help='ResNet50 VGGFace2 model weights')
-    parser.add_argument('--batch-size', default=15, type=int)
+    parser = argparse.ArgumentParser(description="FVA arguments.")
+    parser.add_argument("--gpu", default="0", type=str, help="GPU id")
+    parser.add_argument("--exp-name", required=True, type=str, help="Experiment Name")
+    parser.add_argument("--output-path", required=True, type=str, help="Results Path")
+    parser.add_argument(
+        "--weights-path",
+        default="pretrained_models/resnet50_ft_weight.pkl",
+        type=str,
+        help="ResNet50 VGGFace2 model weights",
+    )
+    parser.add_argument("--batch-size", default=15, type=int)
 
     return parser.parse_args()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = arguments()
-    device = torch.device('cuda:' + args.gpu)
+    device = torch.device("cuda:" + args.gpu)
     oracle = resnet50(num_classes=8631, include_top=False).to(device)
     load_state_dict(oracle, args.weights_path)
     oracle.eval()
 
-    results = compute_FVA(oracle,
-                          args.output_path,
-                          args.exp_name,
-                          args.batch_size)
+    results = compute_FVA(oracle, args.output_path, args.exp_name, args.batch_size)
 
-    print('FVA', np.mean(results[0]))
-    print('FVA (STD)', np.std(results[0]))
-    print('mean dist', np.mean(results[1]))
-    print('std dist', np.std(results[1]))
+    print("FVA", np.mean(results[0]))
+    print("FVA (STD)", np.std(results[0]))
+    print("mean dist", np.mean(results[1]))
+    print("std dist", np.std(results[1]))

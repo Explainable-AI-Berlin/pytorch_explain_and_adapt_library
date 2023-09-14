@@ -188,11 +188,11 @@ def load_data_celeba(
     data_dir,
     batch_size,
     image_size,
-    partition='train',
+    partition="train",
     class_cond=False,
     deterministic=False,
     random_crop=False,
-    random_flip=True
+    random_flip=True,
 ):
     """
     For a dataset, create a generator over (images, kwargs) pairs.
@@ -251,33 +251,38 @@ class CelebADataset(Dataset):
         query_label=-1,
         normalize=True,
     ):
-        partition_df = pd.read_csv(osp.join(data_dir, 'list_eval_partition.csv'))
+        partition_df = pd.read_csv(osp.join(data_dir, "list_eval_partition.csv"))
         self.data_dir = data_dir
-        data = pd.read_csv(osp.join(data_dir, 'list_attr_celeba.csv'))
+        data = pd.read_csv(osp.join(data_dir, "list_attr_celeba.csv"))
 
-        if partition == 'train':
+        if partition == "train":
             partition = 0
-        elif partition == 'val':
+        elif partition == "val":
             partition = 1
-        elif partition == 'test':
+        elif partition == "test":
             partition = 2
         else:
-            raise ValueError(f'Unkown partition {partition}')
+            raise ValueError(f"Unkown partition {partition}")
 
-        self.data = data[partition_df['partition'] == partition]
+        self.data = data[partition_df["partition"] == partition]
         self.data = self.data[shard::num_shards]
         self.data.reset_index(inplace=True)
         self.data.replace(-1, 0, inplace=True)
 
-        self.transform = transforms.Compose([
-            transforms.Resize(image_size),
-            transforms.RandomHorizontalFlip() if random_flip else lambda x: x,
-            transforms.CenterCrop(image_size),
-            transforms.RandomResizedCrop(image_size, (0.95, 1.0)) if random_crop else lambda x: x,
-            transforms.ToTensor(),
-            transforms.Normalize([0.5, 0.5, 0.5],
-                                 [0.5, 0.5, 0.5]) if normalize else lambda x: x
-        ])
+        self.transform = transforms.Compose(
+            [
+                transforms.Resize(image_size),
+                transforms.RandomHorizontalFlip() if random_flip else lambda x: x,
+                transforms.CenterCrop(image_size),
+                transforms.RandomResizedCrop(image_size, (0.95, 1.0))
+                if random_crop
+                else lambda x: x,
+                transforms.ToTensor(),
+                transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
+                if normalize
+                else lambda x: x,
+            ]
+        )
 
         self.query = query_label
         self.class_cond = class_cond
@@ -291,12 +296,12 @@ class CelebADataset(Dataset):
         if self.query != -1:
             labels = int(labels[self.query])
         else:
-            labels = torch.from_numpy(labels.astype('float32'))
-        img_file = sample['image_id']
+            labels = torch.from_numpy(labels.astype("float32"))
+        img_file = sample["image_id"]
 
-        with open(osp.join(self.data_dir, 'img_align_celeba', img_file), "rb") as f:
+        with open(osp.join(self.data_dir, "img_align_celeba", img_file), "rb") as f:
             img = Image.open(f)
-            img = img.convert('RGB')
+            img = img.convert("RGB")
 
         img = self.transform(img)
 
@@ -304,7 +309,7 @@ class CelebADataset(Dataset):
             return img, labels
 
         if self.class_cond:
-            return img, {'y': labels}
+            return img, {"y": labels}
         else:
             return img, {}
 
@@ -323,18 +328,23 @@ class CelebAMiniVal(CelebADataset):
         query_label=-1,
         normalize=True,
     ):
-        self.data = pd.read_csv('dime2/utils/minival.csv').iloc[:, 1:]
+        self.data = pd.read_csv("dime2/utils/minival.csv").iloc[:, 1:]
         self.data = self.data[shard::num_shards]
         self.image_size = image_size
-        self.transform = transforms.Compose([
-            transforms.Resize(image_size),
-            transforms.RandomHorizontalFlip() if random_flip else lambda x: x,
-            transforms.CenterCrop(image_size),
-            transforms.RandomResizedCrop(image_size, (0.95, 1.0)) if random_crop else lambda x: x,
-            transforms.ToTensor(),
-            transforms.Normalize([0.5, 0.5, 0.5],
-                                 [0.5, 0.5, 0.5]) if normalize else lambda x: x,
-        ])
+        self.transform = transforms.Compose(
+            [
+                transforms.Resize(image_size),
+                transforms.RandomHorizontalFlip() if random_flip else lambda x: x,
+                transforms.CenterCrop(image_size),
+                transforms.RandomResizedCrop(image_size, (0.95, 1.0))
+                if random_crop
+                else lambda x: x,
+                transforms.ToTensor(),
+                transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
+                if normalize
+                else lambda x: x,
+            ]
+        )
         self.data_dir = data_dir
         self.class_cond = class_cond
         self.query = query_label

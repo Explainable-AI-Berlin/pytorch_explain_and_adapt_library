@@ -11,7 +11,8 @@ from peal.architectures.module_blocks import (
     FCBlock,
     ResnetBlock,
     TransformerBlock,
-    VGGBlock, create_cnn_layer,
+    VGGBlock,
+    create_cnn_layer,
 )
 from peal.configs.architectures.architecture_template import (
     ArchitectureConfig,
@@ -52,7 +53,7 @@ def load_model(
 
 
 class SequentialModel(torch.nn.Sequential):
-    """ A sequential model that is defined by a list of layers. """
+    """A sequential model that is defined by a list of layers."""
 
     def __init__(
         self,
@@ -81,13 +82,19 @@ class SequentialModel(torch.nn.Sequential):
         for layer_config in architecture_config.layers:
             if isinstance(layer_config, ResnetConfig):
                 layers.append(
-                    create_cnn_layer(ResnetBlock, layer_config, num_neurons_previous, activation)
+                    create_cnn_layer(
+                        ResnetBlock, layer_config, num_neurons_previous, activation
+                    )
                 )
                 num_neurons_previous = layer_config.num_neurons
                 tensor_dim = layer_config.tensor_dim
 
             elif isinstance(layer_config, VGGConfig):
-                layers.append(create_cnn_layer(VGGBlock, layer_config, num_neurons_previous, activation))
+                layers.append(
+                    create_cnn_layer(
+                        VGGBlock, layer_config, num_neurons_previous, activation
+                    )
+                )
                 num_neurons_previous = layer_config.num_neurons
                 tensor_dim = layer_config.tensor_dim
 
@@ -108,7 +115,9 @@ class SequentialModel(torch.nn.Sequential):
                 tensor_dim = 0
 
             else:
-                import pdb; pdb.set_trace()
+                import pdb
+
+                pdb.set_trace()
                 raise ValueError("Unknown layer config: {}".format(layer_config))
 
         if not output_channels is None:

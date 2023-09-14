@@ -92,7 +92,9 @@ def get_datasets(
         #
         if not config.crop_size is None:
             transform_list_train.append(transforms.RandomCrop(config.crop_size[1:]))
-            transform_list_validation.append(transforms.CenterCrop(config.crop_size[1:]))
+            transform_list_validation.append(
+                transforms.CenterCrop(config.crop_size[1:])
+            )
 
         if not test_config.crop_size is None:
             transform_list_test.append(transforms.CenterCrop(test_config.crop_size[1:]))

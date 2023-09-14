@@ -25,14 +25,18 @@ from guided_diffusion.image_datasets import BINARYDATASET, MULTICLASSDATASETS
 
 
 # create dataset to read the counterfactual results images
-class CFDataset():
+class CFDataset:
     def __init__(self, path, exp_name):
-
         self.images = []
         self.path = path
         self.exp_name = exp_name
-        for CL, CF in itertools.product(['CC'], ['CCF', 'ICF']):
-            self.images += [(CL, CF, I) for I in os.listdir(osp.join(path, 'Results', self.exp_name, CL, CF, 'CF'))]
+        for CL, CF in itertools.product(["CC"], ["CCF", "ICF"]):
+            self.images += [
+                (CL, CF, I)
+                for I in os.listdir(
+                    osp.join(path, "Results", self.exp_name, CL, CF, "CF")
+                )
+            ]
 
     def __len__(self):
         return len(self.images)
@@ -40,8 +44,10 @@ class CFDataset():
     def __getitem__(self, idx):
         CL, CF, I = self.images[idx]
         # get paths
-        cl_path = osp.join(self.path, 'Original', 'Correct' if CL == 'CC' else 'Incorrect', I)
-        cf_path = osp.join(self.path, 'Results', self.exp_name, CL, CF, 'CF', I)
+        cl_path = osp.join(
+            self.path, "Original", "Correct" if CL == "CC" else "Incorrect", I
+        )
+        cf_path = osp.join(self.path, "Results", self.exp_name, CL, CF, "CF", I)
 
         cl = self.load_img(cl_path)
         cf = self.load_img(cf_path)
@@ -61,77 +67,78 @@ class CFDataset():
 
 
 def arguments():
-    parser = argparse.ArgumentParser(description='COUT arguments.')
-    parser.add_argument('--gpu', default='0', type=str,
-                        help='GPU id')
-    parser.add_argument('--exp-name', required=True, type=str,
-                        help='Experiment Name')
-    parser.add_argument('--output-path', required=True, type=str,
-                        help='Results Path')
-    parser.add_argument('--weights-path', required=True, type=str,
-                        help='Classification model weights')
-    parser.add_argument('--dataset', required=True, type=str,
-                        choices=BINARYDATASET + MULTICLASSDATASETS,
-                        help='Dataset to evaluate')
-    parser.add_argument('--batch-size', default=10, type=int,
-                        help='Batch size')
-    parser.add_argument('--query-label', required=True, type=int)
-    parser.add_argument('--target-label', required=True, type=int)
+    parser = argparse.ArgumentParser(description="COUT arguments.")
+    parser.add_argument("--gpu", default="0", type=str, help="GPU id")
+    parser.add_argument("--exp-name", required=True, type=str, help="Experiment Name")
+    parser.add_argument("--output-path", required=True, type=str, help="Results Path")
+    parser.add_argument(
+        "--weights-path", required=True, type=str, help="Classification model weights"
+    )
+    parser.add_argument(
+        "--dataset",
+        required=True,
+        type=str,
+        choices=BINARYDATASET + MULTICLASSDATASETS,
+        help="Dataset to evaluate",
+    )
+    parser.add_argument("--batch-size", default=10, type=int, help="Batch size")
+    parser.add_argument("--query-label", required=True, type=int)
+    parser.add_argument("--target-label", required=True, type=int)
 
     return parser.parse_args()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = arguments()
-    device = torch.device('cuda:' + args.gpu)
+    device = torch.device("cuda:" + args.gpu)
 
     dataset = CFDataset(args.output_path, args.exp_name)
 
-    loader = data.DataLoader(dataset, batch_size=args.batch_size,
-                             shuffle=False,
-                             num_workers=4, pin_memory=True)
+    loader = data.DataLoader(
+        dataset,
+        batch_size=args.batch_size,
+        shuffle=False,
+        num_workers=4,
+        pin_memory=True,
+    )
 
-    print('Loading Classifier')
+    print("Loading Classifier")
 
     ql = args.query_label
-    if args.dataset in ['CelebA', 'CelebAMV']:
+    if args.dataset in ["CelebA", "CelebAMV"]:
         classifier = Normalizer(
-            DiVEDenseNet121(args.weights_path, args.query_label),
-            [0.5] * 3, [0.5] * 3
+            DiVEDenseNet121(args.weights_path, args.query_label), [0.5] * 3, [0.5] * 3
         ).to(device)
 
-    elif args.dataset == 'CelebAHQ':
-        assert args.query_label in [20, 31, 39], 'Query label MUST be 20 (Gender), 31 (Smile), or 39 (Gender) for CelebAHQ'
+    elif args.dataset == "CelebAHQ":
+        assert args.query_label in [
+            20,
+            31,
+            39,
+        ], "Query label MUST be 20 (Gender), 31 (Smile), or 39 (Gender) for CelebAHQ"
         ql = 0
         if args.query_label in [31, 39]:
             ql = 1 if args.query_label == 31 else 2
-        classifier = DecisionDensenetModel(3, pretrained=False,
-                                           query_label=ql)
-        classifier.load_state_dict(torch.load(args.weights_path, map_location='cpu')['model_state_dict'])
-        classifier = Normalizer(
-            classifier,
-            [0.5] * 3, [0.5] * 3
-        ).to(device)
+        classifier = DecisionDensenetModel(3, pretrained=False, query_label=ql)
+        classifier.load_state_dict(
+            torch.load(args.weights_path, map_location="cpu")["model_state_dict"]
+        )
+        classifier = Normalizer(classifier, [0.5] * 3, [0.5] * 3).to(device)
 
-    elif 'BDD' in args.dataset:
-        classifier = DecisionDensenetModel(4, pretrained=False,
-                                           query_label=args.query_label)
-        classifier.load_state_dict(torch.load(args.weights_path, map_location='cpu')['model_state_dict'])
-        classifier = Normalizer(
-            classifier,
-            [0.5] * 3, [0.5] * 3
-        ).to(device)
+    elif "BDD" in args.dataset:
+        classifier = DecisionDensenetModel(
+            4, pretrained=False, query_label=args.query_label
+        )
+        classifier.load_state_dict(
+            torch.load(args.weights_path, map_location="cpu")["model_state_dict"]
+        )
+        classifier = Normalizer(classifier, [0.5] * 3, [0.5] * 3).to(device)
 
     else:
-        classifier = Normalizer(
-            models.resnet50(pretrained=True)
-        ).to(device)
-    
+        classifier = Normalizer(models.resnet50(pretrained=True)).to(device)
+
     classifier.eval()
 
-    results = evaluate(ql,
-                       args.target_label,
-                       classifier,
-                       loader,
-                       device,
-                       args.dataset in BINARYDATASET)
+    results = evaluate(
+        ql, args.target_label, classifier, loader, device, args.dataset in BINARYDATASET
+    )

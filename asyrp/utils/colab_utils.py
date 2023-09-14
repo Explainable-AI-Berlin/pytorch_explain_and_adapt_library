@@ -19,18 +19,18 @@ class GoogleDrive_Dowonloader(object):
         self.drive = GoogleDrive(gauth)
 
     def ensure_file_exists(self, file_id, file_dst):
-      if not os.path.isfile(file_dst):
-        if self.use_pydrive:
-            print(f'Downloading {file_dst} ...')
-            downloaded = self.drive.CreateFile({'id':file_id})
-            downloaded.FetchMetadata(fetch_all=True)
-            downloaded.GetContentFile(file_dst)
-            print('Finished')
+        if not os.path.isfile(file_dst):
+            if self.use_pydrive:
+                print(f"Downloading {file_dst} ...")
+                downloaded = self.drive.CreateFile({"id": file_id})
+                downloaded.FetchMetadata(fetch_all=True)
+                downloaded.GetContentFile(file_dst)
+                print("Finished")
+            else:
+                from gdown import download as drive_download
+
+                drive_download(
+                    f"https://drive.google.com/uc?id={file_id}", file_dst, quiet=False
+                )
         else:
-            from gdown import download as drive_download
-            drive_download(f'https://drive.google.com/uc?id={file_id}', file_dst, quiet=False)
-      else:
-        print(f'{file_dst} exists.')
-
-
-
+            print(f"{file_dst} exists.")

@@ -57,7 +57,7 @@ def add_class_arguments(parser, config_class, base_str=""):
             f"--{base_str}{attr_name}",
             type=attr_type,
             default=None,
-            help=str(attr_type), # TODO + getattr(config_class, attr_name).__doc__,
+            help=str(attr_type),  # TODO + getattr(config_class, attr_name).__doc__,
         )
         # TODO this is not thought to the end...
         if (
@@ -208,12 +208,13 @@ def load_yaml_config(config_path, config_model=None):
 
 
 def save_yaml_config(config, config_path):
-    '''
+    """
     This function saves a config to a yaml file.
     Args:
         config: The config to save.
         config_path: The path to save the config to.
-    '''
+    """
+
     def process_object(obj):
         if hasattr(obj, "__dict__"):
             return process_object(obj.__dict__)
@@ -255,18 +256,14 @@ def orthogonal_initialization(model):
             torch.nn.init.orthogonal_(parameter)
 
 
-def log_images_to_writer(dataloader, writer, tag = "train"):
+def log_images_to_writer(dataloader, writer, tag="train"):
     iterator = iter(dataloader)
     for i in range(3):
         try:
             sample_train_imgs, sample_train_y = next(iterator)
-            if hasattr(
-                dataloader.dataset, "project_to_pytorch_default"
-            ):
-                sample_train_imgs = (
-                   dataloader.dataset.project_to_pytorch_default(
-                        sample_train_imgs
-                    )
+            if hasattr(dataloader.dataset, "project_to_pytorch_default"):
+                sample_train_imgs = dataloader.dataset.project_to_pytorch_default(
+                    sample_train_imgs
                 )
 
             else:

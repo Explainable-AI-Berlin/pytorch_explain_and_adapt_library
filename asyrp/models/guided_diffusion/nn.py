@@ -178,7 +178,6 @@ class CheckpointFunction(th.autograd.Function):
         for output_grad in output_grads:
             output_grad.requires_grad_(origin_output_grad_require)
 
-
         del ctx.input_tensors
         del ctx.input_params
         del output_tensors

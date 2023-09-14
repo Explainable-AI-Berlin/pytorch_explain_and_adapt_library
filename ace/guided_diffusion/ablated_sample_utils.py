@@ -6,11 +6,9 @@
 
 
 @torch.enable_grad()
-def get_naive_class_grad(x, y, classifier,
-                         s, use_logits):
-
+def get_naive_class_grad(x, y, classifier, s, use_logits):
     kwargs = {}
-    
+
     x_in = x.detach().requires_grad_(True)
     logits = classifier(x_in, **kwargs)
 
@@ -30,11 +28,11 @@ def get_naive_class_grad(x, y, classifier,
     return grads
 
 
-def get_naive_clean_fn(use_sampling=False,
-                       sampling_scale=1.):
-    '''
+def get_naive_clean_fn(use_sampling=False, sampling_scale=1.0):
+    """
     Easy way to set the optional parameters into the sampling fn
-    '''
+    """
+
     @torch.no_grad()
     def p_sample_loop(
         diffusion,
@@ -52,7 +50,6 @@ def get_naive_clean_fn(use_sampling=False,
         is_x_t_sampling=False,
         guided_iterations=9999999,
     ):
-
         x_t = img.clone()
         z_t = diffusion.q_sample(img, t) if z_t is None else z_t
 
@@ -61,7 +58,6 @@ def get_naive_clean_fn(use_sampling=False,
         indices = list(range(num_timesteps))[::-1]
 
         for jdx, i in enumerate(indices):
-
             t = torch.tensor([i] * shape[0], device=device)
             x_t_steps.append(x_t.detach())
             z_t_steps.append(z_t.detach())
@@ -76,22 +72,18 @@ def get_naive_clean_fn(use_sampling=False,
             )
 
             # extract sqrtalphacum
-            acp = _extract_into_tensor(diffusion.sqrt_alphas_cumprod,
-                                       t, shape)
+            acp = _extract_into_tensor(diffusion.sqrt_alphas_cumprod, t, shape)
 
             nonzero_mask = (
                 (t != 0).float().view(-1, *([1] * (len(shape) - 1)))
             )  # no noise when t == 0
 
             grads = 0
-            
+
             if (class_grad is not None) and (guided_iterations > jdx):
                 grads = grads + class_grad / acp
 
-            out["mean"] = (
-                out["mean"].float() -
-                out["variance"] * grads
-            )
+            out["mean"] = out["mean"].float() - out["variance"] * grads
 
             if not x_t_sampling:
                 z_t = out["mean"]
@@ -99,8 +91,11 @@ def get_naive_clean_fn(use_sampling=False,
             else:
                 scale = sampling_scale if is_x_t_sampling else 1
                 z_t = (
-                    out["mean"] +
-                    nonzero_mask * torch.exp(0.5 * out["log_variance"]) * torch.randn_like(img) * scale
+                    out["mean"]
+                    + nonzero_mask
+                    * torch.exp(0.5 * out["log_variance"])
+                    * torch.randn_like(img)
+                    * scale
                 )
 
         return z_t, x_t_steps, z_t_steps
@@ -108,11 +103,11 @@ def get_naive_clean_fn(use_sampling=False,
     return p_sample_loop
 
 
-def get_direct_clean(use_sampling=False,
-                     sampling_scale=1.):
-    '''
+def get_direct_clean(use_sampling=False, sampling_scale=1.0):
+    """
     Easy way to set the optional parameters into the sampling fn
-    '''
+    """
+
     @torch.no_grad()
     def p_sample_loop(
         diffusion,
@@ -133,14 +128,12 @@ def get_direct_clean(use_sampling=False,
         is_x_t_sampling=False,
         guided_iterations=9999999,
     ):
-
         z_t = diffusion.q_sample(img, t) if z_t is None else z_t
 
         z_t_steps = []
         indices = list(range(num_timesteps))[::-1]
 
         for jdx, i in enumerate(indices):
-
             t = torch.tensor([i] * shape[0], device=device)
             z_t_steps.append(z_t.detach())
 
@@ -154,31 +147,25 @@ def get_direct_clean(use_sampling=False,
             )
 
             # extract sqrtalphacum
-            acp = _extract_into_tensor(diffusion.sqrt_alphas_cumprod,
-                                       t, shape)
+            acp = _extract_into_tensor(diffusion.sqrt_alphas_cumprod, t, shape)
 
             nonzero_mask = (
                 (t != 0).float().view(-1, *([1] * (len(shape) - 1)))
             )  # no noise when t == 0
 
             grads = 0
-            
+
             if (class_grad_fn is not None) and (guided_iterations > jdx):
-                grads = grads + class_grad_fn(x=z_t,
-                                              t=diffusion._scale_timesteps(t),
-                                              **class_grad_kwargs)
+                grads = grads + class_grad_fn(
+                    x=z_t, t=diffusion._scale_timesteps(t), **class_grad_kwargs
+                )
 
             if (dist_grad_fn is not None) and (guided_iterations > jdx):
-                grads = grads + dist_grad_fn(z_t=z_t,
-                                             x=img,
-                                             x_t=None,
-                                             acp=1,
-                                             **dist_grad_kargs)
+                grads = grads + dist_grad_fn(
+                    z_t=z_t, x=img, x_t=None, acp=1, **dist_grad_kargs
+                )
 
-            out["mean"] = (
-                out["mean"].float() -
-                out["variance"] * grads
-            )
+            out["mean"] = out["mean"].float() - out["variance"] * grads
 
             if not x_t_sampling:
                 z_t = out["mean"]
@@ -186,8 +173,11 @@ def get_direct_clean(use_sampling=False,
             else:
                 scale = sampling_scale if is_x_t_sampling else 1
                 z_t = (
-                    out["mean"] +
-                    nonzero_mask * torch.exp(0.5 * out["log_variance"]) * torch.randn_like(img) * scale
+                    out["mean"]
+                    + nonzero_mask
+                    * torch.exp(0.5 * out["log_variance"])
+                    * torch.randn_like(img)
+                    * scale
                 )
 
         return z_t, None, z_t_steps

@@ -6,12 +6,14 @@ import pickle
 import math
 
 
-__all__ = ['ResNet', 'resnet50']
+__all__ = ["ResNet", "resnet50"]
+
 
 def conv3x3(in_planes, out_planes, stride=1):
     """3x3 convolution with padding"""
-    return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
-                     padding=1, bias=False)
+    return nn.Conv2d(
+        in_planes, out_planes, kernel_size=3, stride=stride, padding=1, bias=False
+    )
 
 
 class BasicBlock(nn.Module):
@@ -51,9 +53,13 @@ class Bottleneck(nn.Module):
 
     def __init__(self, inplanes, planes, stride=1, downsample=None):
         super(Bottleneck, self).__init__()
-        self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, stride=stride, bias=False)
+        self.conv1 = nn.Conv2d(
+            inplanes, planes, kernel_size=1, stride=stride, bias=False
+        )
         self.bn1 = nn.BatchNorm2d(planes)
-        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=1, padding=1, bias=False)
+        self.conv2 = nn.Conv2d(
+            planes, planes, kernel_size=3, stride=1, padding=1, bias=False
+        )
         self.bn2 = nn.BatchNorm2d(planes)
         self.conv3 = nn.Conv2d(planes, planes * 4, kernel_size=1, bias=False)
         self.bn3 = nn.BatchNorm2d(planes * 4)
@@ -85,17 +91,16 @@ class Bottleneck(nn.Module):
 
 
 class ResNet(nn.Module):
-
-    def __init__(self, block, layers, num_classes=1000,
-                 layer=0):
-
+    def __init__(self, block, layers, num_classes=1000, layer=0):
         self.inplanes = 64
         super(ResNet, self).__init__()
         self.layer = layer
-        
-        self.register_buffer('mu', torch.tensor((91.4953, 103.8827, 131.0912)).view(1, -1, 1, 1))  # to normalize the images just like VGGFace2
+
+        self.register_buffer(
+            "mu", torch.tensor((91.4953, 103.8827, 131.0912)).view(1, -1, 1, 1)
+        )  # to normalize the images just like VGGFace2
         self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False)
-        if layer == 0:  # a little brute force stopping 
+        if layer == 0:  # a little brute force stopping
             return
         self.bn1 = nn.BatchNorm2d(64)
         self.relu = nn.ReLU(inplace=True)
@@ -122,8 +127,13 @@ class ResNet(nn.Module):
         downsample = None
         if stride != 1 or self.inplanes != planes * block.expansion:
             downsample = nn.Sequential(
-                nn.Conv2d(self.inplanes, planes * block.expansion,
-                          kernel_size=1, stride=stride, bias=False),
+                nn.Conv2d(
+                    self.inplanes,
+                    planes * block.expansion,
+                    kernel_size=1,
+                    stride=stride,
+                    bias=False,
+                ),
                 nn.BatchNorm2d(planes * block.expansion),
             )
 
@@ -139,8 +149,7 @@ class ResNet(nn.Module):
         x = x[:, [2, 1, 0], :, :]  # RGB -> BGR
         x = (x + 1) * 127.5  # make it to the 255 range
         x = x - self.mu  # remove mean
-        x = F.interpolate(x, size=(224, 224), mode='bilinear',
-                          align_corners=True)
+        x = F.interpolate(x, size=(224, 224), mode="bilinear", align_corners=True)
         x = self.conv1(x)
         if self.layer == 0:
             return x
@@ -163,18 +172,19 @@ class ResNet(nn.Module):
 
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
-        
+
         if self.layer == 5:
             return x
-        
+
         x = self.fc(x)
         return x
 
+
 def resnet50(**kwargs):
-    """Constructs a ResNet-50 model.
-    """
+    """Constructs a ResNet-50 model."""
     model = ResNet(Bottleneck, [3, 4, 6, 3], **kwargs)
     return model
+
 
 def load_state_dict(model, fname):
     """
@@ -184,8 +194,8 @@ def load_state_dict(model, fname):
         model: model
         fname: file name of parameters converted from a Caffe model, assuming the file format is Pickle.
     """
-    with open(fname, 'rb') as f:
-        weights = pickle.load(f, encoding='latin1')
+    with open(fname, "rb") as f:
+        weights = pickle.load(f, encoding="latin1")
 
     own_state = model.state_dict()
     for name, param in weights.items():
@@ -193,7 +203,11 @@ def load_state_dict(model, fname):
             try:
                 own_state[name].copy_(torch.from_numpy(param))
             except Exception:
-                raise RuntimeError('While copying the parameter named {}, whose dimensions in the model are {} and whose '\
-                                   'dimensions in the checkpoint are {}.'.format(name, own_state[name].size(), param.size()))
+                raise RuntimeError(
+                    "While copying the parameter named {}, whose dimensions in the model are {} and whose "
+                    "dimensions in the checkpoint are {}.".format(
+                        name, own_state[name].size(), param.size()
+                    )
+                )
 
     model.load_state_dict(own_state)

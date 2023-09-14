@@ -29,10 +29,12 @@ from dime2.core.dist_util import (
 
 
 class AceDDPMAdaptor(EditCapableGenerator):
-    def __init__(self, config, dataset = None, model_dir = None, device = 'cpu'):
+    def __init__(self, config, dataset=None, model_dir=None, device="cpu"):
         super().__init__()
         self.config = load_yaml_config(config)
-        self.dataset = dataset if not dataset is None else get_datasets(self.config.data)[0]
+        self.dataset = (
+            dataset if not dataset is None else get_datasets(self.config.data)[0]
+        )
         if not self.config.image_size is None:
             self.config.image_size = self.dataset.config.input_size[-1]
 
@@ -45,9 +47,7 @@ class AceDDPMAdaptor(EditCapableGenerator):
         self.data_dir = os.path.join(self.model_dir, "data")
         self.counterfactual_path = os.path.join(self.model_dir, "counterfactuals")
 
-        self.model, self.diffusion = create_model_and_diffusion(
-           **self.config.__dict__
-        )
+        self.model, self.diffusion = create_model_and_diffusion(**self.config.__dict__)
         self.model.to(device)
         self.model_path = os.path.join(self.model_dir, "final.pt")
         if os.path.exists(self.model_path):
@@ -56,10 +56,14 @@ class AceDDPMAdaptor(EditCapableGenerator):
             )
 
     def sample_x(self, batch_size=1):
-        return self.diffusion.p_sample_loop(self.model, [batch_size] + self.dataset.config.input_size)
+        return self.diffusion.p_sample_loop(
+            self.model, [batch_size] + self.dataset.config.input_size
+        )
 
     def train_model(
-        self, dataset_train, training_config="<PEAL_BASE>/configs/training/train_ddpm.yaml"
+        self,
+        dataset_train,
+        training_config="<PEAL_BASE>/configs/training/train_ddpm.yaml",
     ):
         training_config = load_yaml_config(training_config)
         args = types.SimpleNamespace(**training_config)
@@ -78,9 +82,7 @@ class AceDDPMAdaptor(EditCapableGenerator):
                 dataset_train,
                 mode="train",
                 batch_size=args.batch_size,
-                training_config={
-                    "steps_per_epoch": training_config.max_steps
-                },
+                training_config={"steps_per_epoch": training_config.max_steps},
             )
         )
 
@@ -140,11 +142,11 @@ class AceDDPMAdaptor(EditCapableGenerator):
         args.batch_size = x_in.shape[0]
         if self.config.method == "ace":
             ace_main(args=args)
-            ending = '.png'
+            ending = ".png"
 
         elif self.config.method == "dime":
             dime_main(args=args)
-            ending = '.jpg'
+            ending = ".jpg"
 
         x_counterfactuals = []
         x_list = []
@@ -190,10 +192,16 @@ class AceDDPMAdaptor(EditCapableGenerator):
             # x_counterfactuals.append(torchvision.io.read_image(path))
             x_counterfactuals.append(ToTensor()(Image.open(path_counterfactual)))
             path_correct = os.path.join(
-                self.counterfactual_path, "Original", "Correct", f"{embed_numberstring(str(i))}" + ending
+                self.counterfactual_path,
+                "Original",
+                "Correct",
+                f"{embed_numberstring(str(i))}" + ending,
             )
             path_incorrect = os.path.join(
-                self.counterfactual_path, "Original", "Incorrect", f"{embed_numberstring(str(i))}" + ending
+                self.counterfactual_path,
+                "Original",
+                "Incorrect",
+                f"{embed_numberstring(str(i))}" + ending,
             )
             if os.path.exists(path_correct):
                 path_original = path_correct

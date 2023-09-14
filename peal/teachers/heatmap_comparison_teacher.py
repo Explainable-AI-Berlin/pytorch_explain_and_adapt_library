@@ -17,30 +17,50 @@ class HeatmapComparisonTeacher(TeacherInterface):
         for idx, heatmap in enumerate(heatmaps):
             #
             if source_classes[idx] != predictions[idx]:
-                feedback.append('false')
-                
+                feedback.append("false")
+
             else:
-                heatmap_oracle = self.explainer.explain_batch(images[idx].unsqueeze(0), torch.tensor([source_classes[idx]]))[0].squeeze(0)
-                #normalized_heatmap = heatmap.sum(0) / heatmap.sum()
-                #normalized_hints = hints.sum(0) / hints.sum()
+                heatmap_oracle = self.explainer.explain_batch(
+                    images[idx].unsqueeze(0), torch.tensor([source_classes[idx]])
+                )[0].squeeze(0)
+                # normalized_heatmap = heatmap.sum(0) / heatmap.sum()
+                # normalized_hints = hints.sum(0) / hints.sum()
                 # TODO wasserstein distance???
-                #attribution_relative = (heatmap * hints).mean()
-                #masked_pixels_relative = hints[idx].sum() / torch.prod(torch.tensor(list(hints[idx].shape)))
-                #attribution_relative = attribution_relative / masked_pixels_relative
-                img = Image.fromarray(np.array(255 * torch.cat([heatmap, heatmap_oracle], 2).numpy().transpose(1,2,0), dtype= np.uint8))
+                # attribution_relative = (heatmap * hints).mean()
+                # masked_pixels_relative = hints[idx].sum() / torch.prod(torch.tensor(list(hints[idx].shape)))
+                # attribution_relative = attribution_relative / masked_pixels_relative
+                img = Image.fromarray(
+                    np.array(
+                        255
+                        * torch.cat([heatmap, heatmap_oracle], 2)
+                        .numpy()
+                        .transpose(1, 2, 0),
+                        dtype=np.uint8,
+                    )
+                )
                 heatmap = heatmap / heatmap.sum()
                 heatmap_oracle = heatmap_oracle / heatmap_oracle.sum()
-                attribution_relative = torch.nn.CosineSimilarity()(heatmap.sum(0).flatten().unsqueeze(0), heatmap_oracle.sum(0).flatten().unsqueeze(0))
-                img.save('tmp' + str(idx) + '_' + str(int(1000 * attribution_relative)) + '.png')
+                attribution_relative = torch.nn.CosineSimilarity()(
+                    heatmap.sum(0).flatten().unsqueeze(0),
+                    heatmap_oracle.sum(0).flatten().unsqueeze(0),
+                )
+                img.save(
+                    "tmp"
+                    + str(idx)
+                    + "_"
+                    + str(int(1000 * attribution_relative))
+                    + ".png"
+                )
                 # TODO manually inspect some of these similarities
                 if idx == 10:
                     from IPython.core.debugger import set_trace
+
                     set_trace()
                 #
                 if attribution_relative > self.attribution_threshold:
-                    feedback.append('true')
+                    feedback.append("true")
 
                 else:
-                    feedback.append('false')
+                    feedback.append("false")
 
         return feedback

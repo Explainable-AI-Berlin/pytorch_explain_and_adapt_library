@@ -15,16 +15,19 @@ import torch.distributed as dist
 # The GPU for a given rank is (rank % GPUS_PER_NODE).
 
 
-def setup_dist(devices=''):
+def setup_dist(devices=""):
     """
     Setup a distributed process group.
     """
     if dist.is_initialized():
         return
-    if devices != '':
+    if devices != "":
         # set only one of the devices ready
-        device = devices.split(',')[MPI.COMM_WORLD.Get_rank()]
-        print(f'RANK/GPU ({MPI.COMM_WORLD.Get_rank()}/{device}) with a world size:', MPI.COMM_WORLD.size)
+        device = devices.split(",")[MPI.COMM_WORLD.Get_rank()]
+        print(
+            f"RANK/GPU ({MPI.COMM_WORLD.Get_rank()}/{device}) with a world size:",
+            MPI.COMM_WORLD.size,
+        )
         os.environ["CUDA_VISIBLE_DEVICES"] = device
     # else:
 
@@ -57,7 +60,7 @@ def load_state_dict(path, **kwargs):
     """
     Load a PyTorch file without redundant fetches across MPI ranks.
     """
-    chunk_size = 2 ** 30  # MPI has a relatively small size limit
+    chunk_size = 2**30  # MPI has a relatively small size limit
     if MPI.COMM_WORLD.Get_rank() == 0:
         with bf.BlobFile(path, "rb") as f:
             data = f.read()

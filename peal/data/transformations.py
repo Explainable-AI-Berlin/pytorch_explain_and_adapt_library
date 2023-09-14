@@ -3,7 +3,8 @@ import torchvision
 import pygame
 import random
 import math
-#import imgaug.augmenters as iaa
+
+# import imgaug.augmenters as iaa
 import torchvision.transforms as transforms
 import numpy as np
 
@@ -62,11 +63,11 @@ class RandomRotation(object):
 
     def __call__(self, sample):
         # TODO: fix this
-        '''theta = random.randint(self.min_rotation, self.max_rotation)
+        """theta = random.randint(self.min_rotation, self.max_rotation)
         rotation = iaa.Rotate(theta)
         sample = rotation.augment_image(sample.numpy().transpose([1, 2, 0]))
         self.last_theta = theta / 180 * math.pi
-        return torch.tensor(sample.transpose([2, 0, 1]))'''
+        return torch.tensor(sample.transpose([2, 0, 1]))"""
         return sample
 
 

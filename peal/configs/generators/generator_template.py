@@ -2,10 +2,12 @@ from typing import Union
 
 from peal.configs.architectures.architecture_template import ArchitectureConfig
 
+
 class VAEConfig:
     """
     This class defines the config of a VAE.
     """
+
     """
     The config of the encoder.
     """
@@ -17,8 +19,13 @@ class VAEConfig:
     """
     The name of the class.
     """
-    __name__ : str = 'peal.VAEConfig'
-    def __init__(self, encoder : Union[dict, ArchitectureConfig] = None, decoder : Union[dict, ArchitectureConfig] = None):
+    __name__: str = "peal.VAEConfig"
+
+    def __init__(
+        self,
+        encoder: Union[dict, ArchitectureConfig] = None,
+        decoder: Union[dict, ArchitectureConfig] = None,
+    ):
         """
         The constructor of the VAEConfig class.
         """

@@ -968,7 +968,8 @@ class CounterfactualKnowledgeDistillation:
                 torch.save(self.student, os.path.join(self.base_dir, "model.cpl"))
 
             if validation_stats["fa_1sided"] > self.adaptor_config.fa_1sided_prime:
-                self.adaptor_config["fa_1sided_prime"] = validation_stats["fa_1sided"]
+                # self.adaptor_config["fa_1sided_prime"] = validation_stats["fa_1sided"]
+                self.adaptor_config.fa_1sided_prime = validation_stats["fa_1sided"]
                 if self.adaptor_config.replacement_strategy == "direct":
                     torch.save(self.student, os.path.join(self.base_dir, "model.cpl"))
 
