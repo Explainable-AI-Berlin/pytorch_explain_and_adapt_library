@@ -1,6 +1,6 @@
-'train_batch_size'        : 10
-'val_batch_size'          : 10
-'test_batch_size'         : 10
-'max_epochs'              : 12
+'train_batch_size'        : 100
+'val_batch_size'          : 50
+'test_batch_size'         : 50
+'max_epochs'              : 6
 'learning_rate'           : 0.00001
 'optimizer'               : 'adam'

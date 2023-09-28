@@ -1,6 +1,6 @@
 'radius'                             : 1
 'noise_scale'                        : 0.0
-'num_samples'                        : 500
+'num_samples'                        : 1088
 'split'                              : [0.8, 0.9]
 'input_type'                         : 'symbolic'
 'input_size'                         : [2]
@@ -12,4 +12,6 @@
 'confounding_factors'                : ['Target', 'Confounder']
 'known_confounder'                   : True
 'set_negative_to_zero'               : False
+'dataset_class'                     : 'CircleDataset'
+
 
