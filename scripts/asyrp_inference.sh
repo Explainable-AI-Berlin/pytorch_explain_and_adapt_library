@@ -1,0 +1,27 @@
+apptainer run --nv asyrp_container.sif python edit_images.py  \
+--run_test                    \
+--do_train 1                  \
+--do_test 1                   \
+--n_train_img 100             \
+--n_test_img 32               \
+--n_iter 5                    \
+--bs_train 1                  \
+--t_0 999                     \
+--n_inv_step 50               \
+--n_train_step 50             \
+--n_test_step 50      \
+--get_h_num 1                 \
+--train_delta_block           \
+--add_noise_from_xt           \
+--lpips_addnoise_th 1.2       \
+--lpips_edit_th 0.33          \
+--save_x0                     \
+--use_x0_tensor               \
+--hs_coeff_delta_h 1.0        \
+--config custom.yml         \
+--edit_attr "smiling"              \
+--sh_file_name "/home/sidney/workspace/peal/scripts/asyrp_inference.sh"   \
+--exp peal_runs/asyrp_test        \
+--custom_train_dataset_dir "datasets/celeba/imgs"    \
+--custom_test_dataset_dir "datasets/celeba/imgs"  \
+--model_path peal_runs/celebahq_ddpm/final.pt

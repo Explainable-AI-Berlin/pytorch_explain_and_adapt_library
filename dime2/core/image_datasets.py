@@ -323,7 +323,7 @@ class CelebAMiniVal(CelebADataset):
         query_label=-1,
         normalize=True,
     ):
-        self.data = pd.read_csv('utils/minival.csv').iloc[:, 1:]
+        self.data = pd.read_csv('dime2/utils/minival.csv').iloc[:, 1:]
         self.data = self.data[shard::num_shards]
         self.image_size = image_size
         self.transform = transforms.Compose([

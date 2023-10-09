@@ -1,0 +1,20 @@
+apptainer run --nv asyrp_container.sif python edit_images.py  \
+--run_train          \
+--edit_attr test     \
+--do_train 1         \
+--do_test 1          \
+--n_train_img 100    \
+--n_test_img 32      \
+--bs_train 1         \
+--n_inv_step 50      \
+--n_train_step 50    \
+--n_test_step 50     \
+--just_precompute \
+--config custom.yml         \
+--train_delta_block            \
+--get_h_num 1                  \
+--exp peal_runs/asyrp_test         \
+--sh_file_name "/home/sidney/workspace/peal/scripts/asyrp_precompute.sh"   \
+--custom_train_dataset_dir "datasets/celeba/imgs"    \
+--custom_test_dataset_dir "datasets/celeba/imgs"  \
+--model_path peal_runs/celebahq_ddpm/final.pt

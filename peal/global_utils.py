@@ -8,8 +8,43 @@ import yaml
 import socket
 import typing
 import torchvision
+import inspect
+import pkgutil
+import importlib
 
 from pkg_resources import resource_filename
+
+
+def find_subclasses(base_class, directory):
+    subclasses = []
+
+    def check_module(module_name):
+        try:
+            module = importlib.import_module(module_name)
+            name_obj_list = [(name, obj) for name, obj in inspect.getmembers(module)]
+            for name, obj in inspect.getmembers(module):
+                if inspect.isclass(obj) and issubclass(obj, base_class):
+                    subclasses.append(obj)
+
+        except Exception:
+            pass
+
+    project_base_dir = get_project_resource_dir()
+    for dirpath, dirnames, filenames in os.walk(directory):
+        for filename in filenames:
+            if filename.endswith(".py"):
+                module_path = os.path.relpath(
+                    os.path.join(dirpath, filename), project_base_dir
+                )
+                module_path = os.path.join("peal", module_path)
+                module_name = module_path.replace("/", ".")[:-3]
+                check_module(module_name)
+
+    for importer, package_name, _ in pkgutil.iter_modules():
+        if package_name.startswith(directory):
+            check_module(package_name)
+
+    return subclasses
 
 
 def add_class_arguments(parser, config_class, base_str=""):

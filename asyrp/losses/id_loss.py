@@ -1,7 +1,7 @@
 import torch
 from torch import nn
-from configs.paths_config import MODEL_PATHS
-from models.insight_face.model_irse import Backbone, MobileFaceNet
+from asyrp.configs.paths_config import MODEL_PATHS
+from asyrp.models.insight_face.model_irse import Backbone, MobileFaceNet
 
 
 class IDLoss(nn.Module):

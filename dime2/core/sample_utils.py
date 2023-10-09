@@ -21,7 +21,7 @@ module_path = os.path.abspath(os.path.join("../../peal"))
 if module_path not in sys.path:
     sys.path.append(module_path)
 
-from peal.architectures.downstream_models import Img2VectorModel
+from peal.architectures.downstream_models import SequentialModel
 
 
 # =======================================================
@@ -57,8 +57,6 @@ def clean_class_cond_fn(x_t, y, classifier, s, use_logits):
 
     x_in = x_t.detach().requires_grad_(True)
     logits = classifier(x_in)
-    if isinstance(classifier, Img2VectorModel):
-        logits = logits[:, 1] - logits[:, 0]
 
     y = y.to(logits.device).float()
     # Select the target logits,

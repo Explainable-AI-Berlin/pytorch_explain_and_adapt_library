@@ -9,7 +9,7 @@ This is the codebase for the CVPR 2023 paper [Adversarial Counterfactual Visual 
 Through anaconda, install our environment:
 
 ```bash
-conda env create -f environment.yaml
+conda env create -f asyrp_environment.yaml
 conda activate ace
 ``` 
 
