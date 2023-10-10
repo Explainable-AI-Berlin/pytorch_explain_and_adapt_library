@@ -11,7 +11,7 @@
 'student'                              :  'peal_runs/artificial_circle_poisened_classifier/model.cpl'
 'teacher'                              :  'peal_runs/artificial_circle_unpoisened_classifier/model.cpl'
 'generator'                            :  'peal_runs/artificial_circle_vae_generator/config.yaml'
-'base_dir'                             :  'peal_runs/artificial_circle_poisened_classifier/cfkd_ddpm_oracle_steps_20_grad_1'
+'base_dir'                             :  'peal_runs/artificial_circle_poisened_classifier/cfkd_vae_oracle_steps_5_iter_60'
 'task':
   'criterions':
     'ce'     : 1.0

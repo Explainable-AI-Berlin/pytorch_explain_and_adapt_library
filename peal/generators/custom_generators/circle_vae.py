@@ -158,9 +158,9 @@ class CircleVAEAdaptor(EditCapableGenerator):
 
         epsilon = torch.randn_like(z, requires_grad=True)
         epsilon.data *= 0.01
-        optimizer = torch.optim.Adam([epsilon], lr=self.config['lr_counterfactual'], weight_decay=0)
+        optimizer = torch.optim.Adam([epsilon], lr=self.config.lr_counterfactual, weight_decay=0)
 
-        for it in range(self.config['num_iterations']):
+        for it in range(self.config.num_iterations):
             optimizer.zero_grad()
 
             z_perturbed = z + epsilon  # no grads required for latents
@@ -205,14 +205,14 @@ class CircleVAEAdaptor(EditCapableGenerator):
         """
 
         list_counterfactuals = torch.zeros_like(x_in)
-        y_target_end_confidence = torch.zeros_like(x_in)
+        y_target_end_confidence = torch.zeros([x_in.shape[0]])
         counterfactuals = x_in
-        for i in range(x_in):
-            while True:
-                _, counterfactual = self.DIVE(x_in[i:i + 1], target_classes[i:i + 1], self.model, classifier)
-                current_confidence = classifier(counterfactual).softmax(dim=-1)[0][target_classes[i].item()].item()
-                if current_confidence > target_confidence_goal:
-                    break
+        for i in range(len(x_in)):
+            #while True:
+            _, counterfactual = self.DIVE(x_in[i:i + 1], target_classes[i:i + 1], self.model, classifier)
+            current_confidence = classifier(counterfactual).softmax(dim=-1)[0][target_classes[i].item()].item()
+            #    if current_confidence > target_confidence_goal:
+            #        break
             y_target_end_confidence[i] = current_confidence
             list_counterfactuals[i] = counterfactual
 

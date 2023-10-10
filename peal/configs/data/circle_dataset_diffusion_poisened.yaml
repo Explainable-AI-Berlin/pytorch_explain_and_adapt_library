@@ -1,5 +1,5 @@
 'dataset_class'           : 'circle'
-'dataset_path'            : 'datasets/circle/size_500_radius_1_seed_0'
+'dataset_path'            : 'datasets/circle/size_1088_radius_1_seed_0'
 'radius'                  : 1
 'noise_scale'             : 0.0
 'num_samples'             : 250
