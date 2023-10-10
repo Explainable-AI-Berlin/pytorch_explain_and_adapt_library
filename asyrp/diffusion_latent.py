@@ -75,14 +75,18 @@ class Asyrp(object):
             self.trg_txts = SRC_TRG_TXT_DIC[self.args.edit_attr][1]
 
     def load_pretrained_model(self):
+        import pdb; pdb.set_trace()
         # ----------- Model -----------#
         if self.config.data.dataset == "LSUN":
             if self.config.data.category == "bedroom":
                 url = "https://image-editing-test-12345.s3-us-west-2.amazonaws.com/checkpoints/bedroom.ckpt"
+
             elif self.config.data.category == "church_outdoor":
                 url = "https://image-editing-test-12345.s3-us-west-2.amazonaws.com/checkpoints/church_outdoor.ckpt"
+
         elif self.config.data.dataset in ["CelebA_HQ", "CUSTOM", "CelebA_HQ_Dialog"]:
             url = "https://image-editing-test-12345.s3-us-west-2.amazonaws.com/checkpoints/celeba_hq.ckpt"
+
         elif self.config.data.dataset in ["FFHQ", "AFHQ", "IMAGENET", "MetFACE"]:
             # get the model ["FFHQ", "AFHQ", "MetFACE"] from
             # https://1drv.ms/u/s!AkQjJhxDm0Fyhqp_4gkYjwVRBe8V_w?e=Et3ITH
@@ -93,6 +97,7 @@ class Asyrp(object):
             # https://openaipublic.blob.core.windows.net/diffusion/jul-2021/256x256_diffusion_uncond.pt
             # reference : ADM (https://arxiv.org/abs/2105.05233)
             pass
+
         else:
             # if you want to use LSUN-horse, LSUN-cat -> https://github.com/openai/guided-diffusion
             # if you want to use CUB, Flowers -> https://1drv.ms/u/s!AkQjJhxDm0Fyhqp_4gkYjwVRBe8V_w?e=Et3ITH
@@ -108,23 +113,29 @@ class Asyrp(object):
                 )
             self.learn_sigma = False
             print("Original diffusion Model loaded.")
+
         elif self.config.data.dataset in ["FFHQ", "AFHQ", "IMAGENET"]:
             model = i_DDPM(
                 self.config.data.dataset
             )  # Get_h(self.config, model="i_DDPM", layer_num=self.args.get_h_num) #
             if self.args.model_path:
                 init_ckpt = torch.load(self.args.model_path)
+
             else:
                 init_ckpt = torch.load(MODEL_PATHS[self.config.data.dataset])
+
             self.learn_sigma = True
             print("Improved diffusion Model loaded.")
+
         elif self.config.data.dataset in ["MetFACE", "CelebA_HQ_P2"]:
             model = guided_Diffusion(self.config.data.dataset)
             init_ckpt = torch.load(MODEL_PATHS[self.config.data.dataset])
             self.learn_sigma = True
+
         else:
             print("Not implemented dataset")
             raise ValueError
+
         model.load_state_dict(init_ckpt, strict=False)
 
         return model
@@ -213,8 +224,10 @@ class Asyrp(object):
             )
 
         except Exception:
-            print('Error in SGD')
-            import pdb; pdb.set_trace()
+            print("Error in SGD")
+            import pdb
+
+            pdb.set_trace()
 
         scheduler_ft = torch.optim.lr_scheduler.StepLR(
             optim_ft, step_size=self.args.scheduler_step_size, gamma=self.args.sch_gamma
@@ -1679,21 +1692,24 @@ class Asyrp(object):
 
         with open(
             os.path.join(
-                self.args.exp, f"{(self.args.config).split('.')[0]}_LPIPS_distance_x.tsv"
+                self.args.exp,
+                f"{(self.args.config).split('.')[0]}_LPIPS_distance_x.tsv",
             ),
             "w",
         ) as f:
             f.write(result_x_tsv)
         with open(
             os.path.join(
-                self.args.exp, f"{(self.args.config).split('.')[0]}_LPIPS_distance_x_std.tsv"
+                self.args.exp,
+                f"{(self.args.config).split('.')[0]}_LPIPS_distance_x_std.tsv",
             ),
             "w",
         ) as f:
             f.write(result_x_std_tsv)
         with open(
             os.path.join(
-                self.args.exp, f"{(self.args.config).split('.')[0]}_LPIPS_distance_x0_t.tsv"
+                self.args.exp,
+                f"{(self.args.config).split('.')[0]}_LPIPS_distance_x0_t.tsv",
             ),
             "w",
         ) as f:
@@ -1742,8 +1758,8 @@ class Asyrp(object):
 
         dataset_name = str(self.args.config).split(".")[0]
         # TODO why???
-        '''if dataset_name == "custom":
-            dataset_name = self.args.custom_dataset_name'''
+        """if dataset_name == "custom":
+            dataset_name = self.args.custom_dataset_name"""
         LPIPS_file_name = f"{dataset_name}_LPIPS_distance_x0_t.tsv"
         LPIPS_file_path = os.path.join(self.args.exp, LPIPS_file_name)
         if not os.path.exists(LPIPS_file_path):
@@ -1758,7 +1774,9 @@ class Asyrp(object):
                 else:
                     return cosine
             else:
-                import pdb; pdb.set_trace()
+                import pdb
+
+                pdb.set_trace()
                 print(
                     f"LPIPS file not found, get LPIPS distance first!  : {LPIPS_file_path}"
                 )

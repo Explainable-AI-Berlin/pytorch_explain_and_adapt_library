@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 
 
-def slerp(t,v0,v1):
+def slerp(t, v0, v1):
     _shape = v0.shape
 
     v0_origin = v0.clone()
@@ -39,6 +39,7 @@ def slerp(t,v0,v1):
     # v2 = v2.view(_shape)
     return v2
 
+
 def get_timestep_embedding(timesteps, embedding_dim):
     """
     This matches the implementation in Denoising Diffusion Probabilistic Models:
@@ -66,7 +67,9 @@ def nonlinearity(x):
 
 
 def Normalize(in_channels):
-    return torch.nn.GroupNorm(num_groups=32, num_channels=in_channels, eps=1e-6, affine=True)
+    return torch.nn.GroupNorm(
+        num_groups=32, num_channels=in_channels, eps=1e-6, affine=True
+    )
 
 
 class Upsample(nn.Module):
@@ -74,15 +77,12 @@ class Upsample(nn.Module):
         super().__init__()
         self.with_conv = with_conv
         if self.with_conv:
-            self.conv = torch.nn.Conv2d(in_channels,
-                                        in_channels,
-                                        kernel_size=3,
-                                        stride=1,
-                                        padding=1)
+            self.conv = torch.nn.Conv2d(
+                in_channels, in_channels, kernel_size=3, stride=1, padding=1
+            )
 
     def forward(self, x):
-        x = torch.nn.functional.interpolate(
-            x, scale_factor=2.0, mode="nearest")
+        x = torch.nn.functional.interpolate(x, scale_factor=2.0, mode="nearest")
         if self.with_conv:
             x = self.conv(x)
         return x
@@ -94,11 +94,9 @@ class Downsample(nn.Module):
         self.with_conv = with_conv
         if self.with_conv:
             # no asymmetric padding in torch conv, must do it ourselves
-            self.conv = torch.nn.Conv2d(in_channels,
-                                        in_channels,
-                                        kernel_size=3,
-                                        stride=2,
-                                        padding=0)
+            self.conv = torch.nn.Conv2d(
+                in_channels, in_channels, kernel_size=3, stride=2, padding=0
+            )
 
     def forward(self, x):
         if self.with_conv:
@@ -111,8 +109,15 @@ class Downsample(nn.Module):
 
 
 class ResnetBlock(nn.Module):
-    def __init__(self, *, in_channels, out_channels=None, conv_shortcut=False,
-                 dropout, temb_channels=512):
+    def __init__(
+        self,
+        *,
+        in_channels,
+        out_channels=None,
+        conv_shortcut=False,
+        dropout,
+        temb_channels=512,
+    ):
         super().__init__()
         self.in_channels = in_channels
         out_channels = in_channels if out_channels is None else out_channels
@@ -120,40 +125,31 @@ class ResnetBlock(nn.Module):
         self.use_conv_shortcut = conv_shortcut
 
         self.norm1 = Normalize(in_channels)
-        self.conv1 = torch.nn.Conv2d(in_channels,
-                                     out_channels,
-                                     kernel_size=3,
-                                     stride=1,
-                                     padding=1)
-        self.temb_proj = torch.nn.Linear(temb_channels,
-                                         out_channels)
+        self.conv1 = torch.nn.Conv2d(
+            in_channels, out_channels, kernel_size=3, stride=1, padding=1
+        )
+        self.temb_proj = torch.nn.Linear(temb_channels, out_channels)
         self.norm2 = Normalize(out_channels)
         self.dropout = torch.nn.Dropout(dropout)
-        self.conv2 = torch.nn.Conv2d(out_channels,
-                                     out_channels,
-                                     kernel_size=3,
-                                     stride=1,
-                                     padding=1)
+        self.conv2 = torch.nn.Conv2d(
+            out_channels, out_channels, kernel_size=3, stride=1, padding=1
+        )
         if self.in_channels != self.out_channels:
             if self.use_conv_shortcut:
-                self.conv_shortcut = torch.nn.Conv2d(in_channels,
-                                                     out_channels,
-                                                     kernel_size=3,
-                                                     stride=1,
-                                                     padding=1)
+                self.conv_shortcut = torch.nn.Conv2d(
+                    in_channels, out_channels, kernel_size=3, stride=1, padding=1
+                )
             else:
-                self.nin_shortcut = torch.nn.Conv2d(in_channels,
-                                                    out_channels,
-                                                    kernel_size=1,
-                                                    stride=1,
-                                                    padding=0)
+                self.nin_shortcut = torch.nn.Conv2d(
+                    in_channels, out_channels, kernel_size=1, stride=1, padding=0
+                )
 
     def forward(self, x, temb):
         h = x
         h = self.norm1(h)
         h = nonlinearity(h)
         h = self.conv1(h)
-        
+
         h = h + self.temb_proj(nonlinearity(temb))[:, :, None, None]
 
         h = self.norm2(h)
@@ -176,26 +172,18 @@ class AttnBlock(nn.Module):
         self.in_channels = in_channels
 
         self.norm = Normalize(in_channels)
-        self.q = torch.nn.Conv2d(in_channels,
-                                 in_channels,
-                                 kernel_size=1,
-                                 stride=1,
-                                 padding=0)
-        self.k = torch.nn.Conv2d(in_channels,
-                                 in_channels,
-                                 kernel_size=1,
-                                 stride=1,
-                                 padding=0)
-        self.v = torch.nn.Conv2d(in_channels,
-                                 in_channels,
-                                 kernel_size=1,
-                                 stride=1,
-                                 padding=0)
-        self.proj_out = torch.nn.Conv2d(in_channels,
-                                        in_channels,
-                                        kernel_size=1,
-                                        stride=1,
-                                        padding=0)
+        self.q = torch.nn.Conv2d(
+            in_channels, in_channels, kernel_size=1, stride=1, padding=0
+        )
+        self.k = torch.nn.Conv2d(
+            in_channels, in_channels, kernel_size=1, stride=1, padding=0
+        )
+        self.v = torch.nn.Conv2d(
+            in_channels, in_channels, kernel_size=1, stride=1, padding=0
+        )
+        self.proj_out = torch.nn.Conv2d(
+            in_channels, in_channels, kernel_size=1, stride=1, padding=0
+        )
 
     def forward(self, x):
         h_ = x
@@ -226,27 +214,28 @@ class AttnBlock(nn.Module):
 
 
 class DeltaBlock(nn.Module):
-    def __init__(self, *, in_channels, out_channels=None, conv_shortcut=False,
-                 dropout, temb_channels=512):
+    def __init__(
+        self,
+        *,
+        in_channels,
+        out_channels=None,
+        conv_shortcut=False,
+        dropout,
+        temb_channels=512,
+    ):
         super().__init__()
         self.in_channels = in_channels
         out_channels = in_channels if out_channels is None else out_channels
         self.out_channels = out_channels
         self.use_conv_shortcut = conv_shortcut
-        self.conv1 = torch.nn.Conv2d(in_channels,
-                                     out_channels,
-                                     kernel_size=1,
-                                     stride=1,
-                                     padding=0)
-        self.temb_proj = torch.nn.Linear(temb_channels,
-                                         out_channels)
+        self.conv1 = torch.nn.Conv2d(
+            in_channels, out_channels, kernel_size=1, stride=1, padding=0
+        )
+        self.temb_proj = torch.nn.Linear(temb_channels, out_channels)
         self.norm2 = Normalize(out_channels)
-        self.conv2 = torch.nn.Conv2d(out_channels,
-                                     out_channels,
-                                     kernel_size=1,
-                                     stride=1,
-                                     padding=0)
-
+        self.conv2 = torch.nn.Conv2d(
+            out_channels, out_channels, kernel_size=1, stride=1, padding=0
+        )
 
     def forward(self, x, temb=None):
         h = x
@@ -264,55 +253,55 @@ class DeltaBlock(nn.Module):
 
 
 class DeltaBlock_global(nn.Module):
-    def __init__(self, *, in_channels, out_channels=None, conv_shortcut=False,
-                 dropout, temb_channels=512, clip_channels=512):
+    def __init__(
+        self,
+        *,
+        in_channels,
+        out_channels=None,
+        conv_shortcut=False,
+        dropout,
+        temb_channels=512,
+        clip_channels=512,
+    ):
         super().__init__()
         self.in_channels = in_channels
         out_channels = in_channels if out_channels is None else out_channels
         self.out_channels = out_channels
         self.use_conv_shortcut = conv_shortcut
-        self.conv1 = torch.nn.Conv2d(in_channels,
-                                     out_channels,
-                                     kernel_size=3,
-                                     stride=1,
-                                     padding=1)
-        self.temb_proj = torch.nn.Linear(temb_channels,
-                                         out_channels)
-        self.clip_proj = torch.nn.Linear(clip_channels,
-                                            out_channels)
-        self.clip_proj_2 = torch.nn.Linear(clip_channels,
-                                            512*8*8)
+        self.conv1 = torch.nn.Conv2d(
+            in_channels, out_channels, kernel_size=3, stride=1, padding=1
+        )
+        self.temb_proj = torch.nn.Linear(temb_channels, out_channels)
+        self.clip_proj = torch.nn.Linear(clip_channels, out_channels)
+        self.clip_proj_2 = torch.nn.Linear(clip_channels, 512 * 8 * 8)
         self.norm2 = Normalize(out_channels)
-        self.conv2 = torch.nn.Conv2d(out_channels,
-                                     out_channels,
-                                     kernel_size=1,
-                                     stride=1,
-                                     padding=0)
+        self.conv2 = torch.nn.Conv2d(
+            out_channels, out_channels, kernel_size=1, stride=1, padding=0
+        )
         self.norm3 = Normalize(out_channels)
-        self.conv3 = torch.nn.Conv2d(out_channels,
-                                        out_channels,
-                                        kernel_size=1,
-                                        stride=1,
-                                        padding=0)
-                    
-        self.norm4 = Normalize(out_channels)
-        self.conv4 = torch.nn.Conv2d(out_channels,
-                                        out_channels,
-                                        kernel_size=1,
-                                        stride=1,
-                                        padding=0)
+        self.conv3 = torch.nn.Conv2d(
+            out_channels, out_channels, kernel_size=1, stride=1, padding=0
+        )
 
+        self.norm4 = Normalize(out_channels)
+        self.conv4 = torch.nn.Conv2d(
+            out_channels, out_channels, kernel_size=1, stride=1, padding=0
+        )
 
     def forward(self, x, temb, clip_direction):
         h = x
 
         h = self.conv1(h)
-        h = h + self.temb_proj(nonlinearity(temb))[:, :, None, None] + self.clip_proj(clip_direction)[:, :, None, None]
+        h = (
+            h
+            + self.temb_proj(nonlinearity(temb))[:, :, None, None]
+            + self.clip_proj(clip_direction)[:, :, None, None]
+        )
         h = self.norm2(h)
         h = nonlinearity(h)
         h = self.conv2(h)
         clip_pro = self.clip_proj_2(clip_direction).reshape(1, 512, 8, 8)
-        h = h + clip_pro 
+        h = h + clip_pro
         h = self.norm3(h)
         h = nonlinearity(h)
         h = self.conv3(h)
@@ -323,12 +312,15 @@ class DeltaBlock_global(nn.Module):
         return h
 
 
-
 class DDPM(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.config = config
-        ch, out_ch, ch_mult = config.model.ch, config.model.out_ch, tuple(config.model.ch_mult)
+        ch, out_ch, ch_mult = (
+            config.model.ch,
+            config.model.out_ch,
+            tuple(config.model.ch_mult),
+        )
         num_res_blocks = config.model.num_res_blocks
         attn_resolutions = config.model.attn_resolutions
         dropout = config.model.dropout
@@ -345,19 +337,17 @@ class DDPM(nn.Module):
 
         # timestep embedding
         self.temb = nn.Module()
-        self.temb.dense = nn.ModuleList([
-            torch.nn.Linear(self.ch,
-                            self.temb_ch),
-            torch.nn.Linear(self.temb_ch,
-                            self.temb_ch),
-        ])
+        self.temb.dense = nn.ModuleList(
+            [
+                torch.nn.Linear(self.ch, self.temb_ch),
+                torch.nn.Linear(self.temb_ch, self.temb_ch),
+            ]
+        )
 
         # downsampling
-        self.conv_in = torch.nn.Conv2d(in_channels,
-                                       self.ch,
-                                       kernel_size=3,
-                                       stride=1,
-                                       padding=1)
+        self.conv_in = torch.nn.Conv2d(
+            in_channels, self.ch, kernel_size=3, stride=1, padding=1
+        )
 
         curr_res = resolution
         in_ch_mult = (1,) + ch_mult
@@ -369,10 +359,14 @@ class DDPM(nn.Module):
             block_in = ch * in_ch_mult[i_level]
             block_out = ch * ch_mult[i_level]
             for i_block in range(self.num_res_blocks):
-                block.append(ResnetBlock(in_channels=block_in,
-                                         out_channels=block_out,
-                                         temb_channels=self.temb_ch,
-                                         dropout=dropout))
+                block.append(
+                    ResnetBlock(
+                        in_channels=block_in,
+                        out_channels=block_out,
+                        temb_channels=self.temb_ch,
+                        dropout=dropout,
+                    )
+                )
                 block_in = block_out
                 if curr_res in attn_resolutions:
                     attn.append(AttnBlock(block_in))
@@ -386,15 +380,19 @@ class DDPM(nn.Module):
 
         # middle
         self.mid = nn.Module()
-        self.mid.block_1 = ResnetBlock(in_channels=block_in,
-                                       out_channels=block_in,
-                                       temb_channels=self.temb_ch,
-                                       dropout=dropout)
+        self.mid.block_1 = ResnetBlock(
+            in_channels=block_in,
+            out_channels=block_in,
+            temb_channels=self.temb_ch,
+            dropout=dropout,
+        )
         self.mid.attn_1 = AttnBlock(block_in)
-        self.mid.block_2 = ResnetBlock(in_channels=block_in,
-                                       out_channels=block_in,
-                                       temb_channels=self.temb_ch,
-                                       dropout=dropout)
+        self.mid.block_2 = ResnetBlock(
+            in_channels=block_in,
+            out_channels=block_in,
+            temb_channels=self.temb_ch,
+            dropout=dropout,
+        )
 
         # upsampling
         self.up = nn.ModuleList()
@@ -406,10 +404,14 @@ class DDPM(nn.Module):
             for i_block in range(self.num_res_blocks + 1):
                 if i_block == self.num_res_blocks:
                     skip_in = ch * in_ch_mult[i_level]
-                block.append(ResnetBlock(in_channels=block_in + skip_in,
-                                         out_channels=block_out,
-                                         temb_channels=self.temb_ch,
-                                         dropout=dropout))
+                block.append(
+                    ResnetBlock(
+                        in_channels=block_in + skip_in,
+                        out_channels=block_out,
+                        temb_channels=self.temb_ch,
+                        dropout=dropout,
+                    )
+                )
                 block_in = block_out
                 if curr_res in attn_resolutions:
                     attn.append(AttnBlock(block_in))
@@ -423,12 +425,9 @@ class DDPM(nn.Module):
 
         # end
         self.norm_out = Normalize(block_in)
-        self.conv_out = torch.nn.Conv2d(block_in,
-                                        out_ch,
-                                        kernel_size=3,
-                                        stride=1,
-                                        padding=1)
-
+        self.conv_out = torch.nn.Conv2d(
+            block_in, out_ch, kernel_size=3, stride=1, padding=1
+        )
 
     def setattr_layers(self, nums):
         ch, ch_mult = self.config.model.ch, tuple(self.config.model.ch_mult)
@@ -437,16 +436,20 @@ class DDPM(nn.Module):
             block_in = ch * ch_mult[i_level]
 
         for i in range(nums):
-            setattr(self, f"layer_{i}", DeltaBlock(in_channels=block_in,
-                                       out_channels=block_in,
-                                       temb_channels=self.temb_ch,
-                                       dropout=0.0)
+            setattr(
+                self,
+                f"layer_{i}",
+                DeltaBlock(
+                    in_channels=block_in,
+                    out_channels=block_in,
+                    temb_channels=self.temb_ch,
+                    dropout=0.0,
+                ),
             )
 
     # def setattr_delta_h(self, shape):
-        
-    #     setattr(self, "delta_h", torch.nn.Parameter(torch.randn(shape)*0.2))
 
+    #     setattr(self, "delta_h", torch.nn.Parameter(torch.randn(shape)*0.2))
 
     def setattr_global_layer(self, nums):
         ch, ch_mult = self.config.model.ch, tuple(self.config.model.ch_mult)
@@ -454,11 +457,15 @@ class DDPM(nn.Module):
         for i_level in range(self.num_resolutions):
             block_in = ch * ch_mult[i_level]
 
-
-        setattr(self, "layer_0", DeltaBlock_global(in_channels=block_in,
-                                    out_channels=block_in,
-                                    temb_channels=self.temb_ch,
-                                    dropout=0.0)
+        setattr(
+            self,
+            "layer_0",
+            DeltaBlock_global(
+                in_channels=block_in,
+                out_channels=block_in,
+                temb_channels=self.temb_ch,
+                dropout=0.0,
+            ),
         )
 
     def get_temb(self, t):
@@ -469,8 +476,17 @@ class DDPM(nn.Module):
         temb = self.temb.dense[1](temb)
         return temb
 
-
-    def forward(self, x, t, index=None, t_edit=400, hs_coeff=(1.0, 1.0), delta_h=None, ignore_timestep=False, use_mask=False):
+    def forward(
+        self,
+        x,
+        t,
+        index=None,
+        t_edit=400,
+        hs_coeff=(1.0, 1.0),
+        delta_h=None,
+        ignore_timestep=False,
+        use_mask=False,
+    ):
         assert x.shape[2] == x.shape[3] == self.resolution
 
         # timestep embedding
@@ -480,20 +496,18 @@ class DDPM(nn.Module):
         temb = self.temb.dense[1](temb)
 
         cnt = 0
-        
+
         # downsampling
         hs = [self.conv_in(x)]
         for i_level in range(self.num_resolutions):
             for i_block in range(self.num_res_blocks):
-                
                 h = self.down[i_level].block[i_block](hs[-1], temb)
                 if len(self.down[i_level].attn) > 0:
                     h = self.down[i_level].attn[i_block](h)
                 hs.append(h)
-                
+
             if i_level != self.num_resolutions - 1:
                 hs.append(self.down[i_level].downsample(hs[-1]))
-            
 
         # middle
 
@@ -506,37 +520,49 @@ class DDPM(nn.Module):
 
         if index is not None:
             # assert len(hs_coeff) == index + 1 + 1
-            # check t_edit 
+            # check t_edit
             if t[0] >= t_edit:
                 # use DeltaBlock
-                if delta_h is None: #Asyrp
+                if delta_h is None:  # Asyrp
                     h2 = h * hs_coeff[0]
-                    for i in range(index+1):
-                        delta_h = getattr(self, f"layer_{i}")(h, None if ignore_timestep else temb)
-                        h2 += delta_h * hs_coeff[i+1]
+                    for i in range(index + 1):
+                        delta_h = getattr(self, f"layer_{i}")(
+                            h, None if ignore_timestep else temb
+                        )
+                        h2 += delta_h * hs_coeff[i + 1]
                 # use input delta_h  : even tough you does not use DeltaBlock, you need to use index is 0.
-                else: # DiffStyle; Just ignore this code. We will update about it in README.md later.
+                else:  # DiffStyle; Just ignore this code. We will update about it in README.md later.
                     if use_mask:
                         mask = torch.zeros_like(h)
-                        mask[:,:,4:-1,3:5] = 1.0
+                        mask[:, :, 4:-1, 3:5] = 1.0
                         inverted_mask = 1 - mask
 
                         masked_delta_h = delta_h * mask
                         masked_h = h * mask
 
-                        partial_h2 = slerp(1-hs_coeff[0], masked_h, masked_delta_h)
+                        partial_h2 = slerp(1 - hs_coeff[0], masked_h, masked_delta_h)
                         h2 = partial_h2 + inverted_mask * h
 
                     else:
                         h_shape = h.shape
-                        h_copy = h.clone().view(h_shape[0],-1)
-                        delta_h_copy = delta_h.clone().view(h_shape[0],-1)
+                        h_copy = h.clone().view(h_shape[0], -1)
+                        delta_h_copy = delta_h.clone().view(h_shape[0], -1)
 
-                        h_norm = torch.norm(h_copy, dim=1).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
-                        delta_h_norm = torch.norm(delta_h_copy, dim=1).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
+                        h_norm = (
+                            torch.norm(h_copy, dim=1)
+                            .unsqueeze(-1)
+                            .unsqueeze(-1)
+                            .unsqueeze(-1)
+                        )
+                        delta_h_norm = (
+                            torch.norm(delta_h_copy, dim=1)
+                            .unsqueeze(-1)
+                            .unsqueeze(-1)
+                            .unsqueeze(-1)
+                        )
                         normalized_delta_h = h_norm * delta_h / delta_h_norm
-                        
-                        h2 = slerp(1.0-hs_coeff[0], h, normalized_delta_h)
+
+                        h2 = slerp(1.0 - hs_coeff[0], h, normalized_delta_h)
             # when t[0] < t_edit : pass the delta_h
             else:
                 h2 = h
@@ -546,7 +572,8 @@ class DDPM(nn.Module):
             for i_level in reversed(range(self.num_resolutions)):
                 for i_block in range(self.num_res_blocks + 1):
                     h2 = self.up[i_level].block[i_block](
-                        torch.cat([h2, hs[hs_index]], dim=1), temb)
+                        torch.cat([h2, hs[hs_index]], dim=1), temb
+                    )
                     hs_index -= 1
                     if len(self.up[i_level].attn) > 0:
                         h2 = self.up[i_level].attn[i_block](h2)
@@ -558,28 +585,35 @@ class DDPM(nn.Module):
             h2 = nonlinearity(h2)
             h2 = self.conv_out(h2)
 
-        
-
         # upsampling
         for i_level in reversed(range(self.num_resolutions)):
             for i_block in range(self.num_res_blocks + 1):
                 h = self.up[i_level].block[i_block](
-                    torch.cat([h, hs.pop()], dim=1), temb)
+                    torch.cat([h, hs.pop()], dim=1), temb
+                )
                 if len(self.up[i_level].attn) > 0:
                     h = self.up[i_level].attn[i_block](h)
-            
-                
+
             if i_level != 0:
                 h = self.up[i_level].upsample(h)
 
-        # end   
+        # end
         h = self.norm_out(h)
         h = nonlinearity(h)
         h = self.conv_out(h)
 
         return h, h2, delta_h, middle_h
 
-    def forward_layer_check(self, x, t, index=None, t_edit=400, hs_coeff=(1.0, 1.0), delta_h=None, ignore_timestep=False):
+    def forward_layer_check(
+        self,
+        x,
+        t,
+        index=None,
+        t_edit=400,
+        hs_coeff=(1.0, 1.0),
+        delta_h=None,
+        ignore_timestep=False,
+    ):
         assert x.shape[2] == x.shape[3] == self.resolution
 
         # timestep embedding
@@ -589,30 +623,34 @@ class DDPM(nn.Module):
         temb = self.temb.dense[1](temb)
 
         cnt = 0
-        
-        print(f"{cnt}<-x.shape:{x.shape}"); cnt+=1
+
+        print(f"{cnt}<-x.shape:{x.shape}")
+        cnt += 1
         # downsampling
         hs = [self.conv_in(x)]
-        print(f"{cnt}<-h.shape:{hs[-1].shape}"); cnt+=1
+        print(f"{cnt}<-h.shape:{hs[-1].shape}")
+        cnt += 1
         for i_level in range(self.num_resolutions):
-            if i_level > 0.1: print(f"{cnt}<-h.shape:{h.shape},i_level:{i_level}"); cnt+=1
+            if i_level > 0.1:
+                print(f"{cnt}<-h.shape:{h.shape},i_level:{i_level}")
+                cnt += 1
             for i_block in range(self.num_res_blocks):
-                
                 h = self.down[i_level].block[i_block](hs[-1], temb)
                 if len(self.down[i_level].attn) > 0:
                     h = self.down[i_level].attn[i_block](h)
                 hs.append(h)
-                
+
             if i_level != self.num_resolutions - 1:
                 hs.append(self.down[i_level].downsample(hs[-1]))
-            
 
         # middle
 
         h = hs[-1]
-        print(f"{cnt}<-mid,h.shape:{h.shape}"); cnt+=1
+        print(f"{cnt}<-mid,h.shape:{h.shape}")
+        cnt += 1
         h = self.mid.block_1(h, temb)
-        print(f"{cnt}<-mid,h.shape:{h.shape}"); cnt+=1
+        print(f"{cnt}<-mid,h.shape:{h.shape}")
+        cnt += 1
         h = self.mid.attn_1(h)
         h = self.mid.block_2(h, temb)
         middle_h = h
@@ -620,14 +658,16 @@ class DDPM(nn.Module):
 
         if index is not None:
             assert len(hs_coeff) == index + 1 + 1
-            # check t_edit 
+            # check t_edit
             if t[0] >= t_edit:
                 # use DeltaBlock
                 if delta_h is None:
                     h2 = h * hs_coeff[0]
-                    for i in range(index+1):
-                        delta_h = getattr(self, f"layer_{i}")(h, None if ignore_timestep else temb)
-                        h2 += delta_h * hs_coeff[i+1]
+                    for i in range(index + 1):
+                        delta_h = getattr(self, f"layer_{i}")(
+                            h, None if ignore_timestep else temb
+                        )
+                        h2 += delta_h * hs_coeff[i + 1]
                 # use input delta_h  : even tough you does not use DeltaBlock, you need to use index is 0.
                 else:
                     h2 = h * hs_coeff[0] + delta_h * hs_coeff[1]
@@ -640,7 +680,8 @@ class DDPM(nn.Module):
             for i_level in reversed(range(self.num_resolutions)):
                 for i_block in range(self.num_res_blocks + 1):
                     h2 = self.up[i_level].block[i_block](
-                        torch.cat([h2, hs[hs_index]], dim=1), temb)
+                        torch.cat([h2, hs[hs_index]], dim=1), temb
+                    )
                     hs_index -= 1
                     if len(self.up[i_level].attn) > 0:
                         h2 = self.up[i_level].attn[i_block](h2)
@@ -652,34 +693,35 @@ class DDPM(nn.Module):
             h2 = nonlinearity(h2)
             h2 = self.conv_out(h2)
 
-        
-
         # upsampling
         for i_level in reversed(range(self.num_resolutions)):
-            print(f"{cnt}<-h.shape:{h.shape},i_level:{i_level}"); cnt+=1
+            print(f"{cnt}<-h.shape:{h.shape},i_level:{i_level}")
+            cnt += 1
             for i_block in range(self.num_res_blocks + 1):
                 h = self.up[i_level].block[i_block](
-                    torch.cat([h, hs.pop()], dim=1), temb)
+                    torch.cat([h, hs.pop()], dim=1), temb
+                )
                 if len(self.up[i_level].attn) > 0:
                     h = self.up[i_level].attn[i_block](h)
-            
-                
+
             if i_level != 0:
                 h = self.up[i_level].upsample(h)
 
-        print(f"{cnt}<-,h.shape:{h.shape}"); cnt+=1
-        # end   
+        print(f"{cnt}<-,h.shape:{h.shape}")
+        cnt += 1
+        # end
         h = self.norm_out(h)
         h = nonlinearity(h)
         h = self.conv_out(h)
-        print(f"{cnt}<-h.shape:{h.shape}"); cnt+=1
-        import pdb; pdb.set_trace()
+        print(f"{cnt}<-h.shape:{h.shape}")
+        cnt += 1
+        import pdb
+
+        pdb.set_trace()
 
         return h, h2, delta_h, middle_h
 
-
-
-    def multiple_attr(self, x, t, index=None, maintain=400, rambda=(1.0,1.0)):
+    def multiple_attr(self, x, t, index=None, maintain=400, rambda=(1.0, 1.0)):
         assert x.shape[2] == x.shape[3] == self.resolution
 
         # timestep embedding
@@ -706,7 +748,6 @@ class DDPM(nn.Module):
         h = self.mid.block_2(h, temb)
 
         if index is not None:
-
             if t[0] >= maintain:
                 delta_h_sum = None
                 for i in range(index):
@@ -716,7 +757,7 @@ class DDPM(nn.Module):
                     else:
                         delta_h_sum = delta_h_sum + delta_h * rambda[i]
 
-                h2 = h + delta_h_sum / (index)**(1/2)
+                h2 = h + delta_h_sum / (index) ** (1 / 2)
             else:
                 h2 = h
 
@@ -725,7 +766,8 @@ class DDPM(nn.Module):
             for i_level in reversed(range(self.num_resolutions)):
                 for i_block in range(self.num_res_blocks + 1):
                     h2 = self.up[i_level].block[i_block](
-                        torch.cat([h2, hs[hs_index]], dim=1), temb)
+                        torch.cat([h2, hs[hs_index]], dim=1), temb
+                    )
                     hs_index -= 1
                     if len(self.up[i_level].attn) > 0:
                         h2 = self.up[i_level].attn[i_block](h2)
@@ -741,7 +783,8 @@ class DDPM(nn.Module):
         for i_level in reversed(range(self.num_resolutions)):
             for i_block in range(self.num_res_blocks + 1):
                 h = self.up[i_level].block[i_block](
-                    torch.cat([h, hs.pop()], dim=1), temb)
+                    torch.cat([h, hs.pop()], dim=1), temb
+                )
                 if len(self.up[i_level].attn) > 0:
                     h = self.up[i_level].attn[i_block](h)
             if i_level != 0:
@@ -756,7 +799,6 @@ class DDPM(nn.Module):
             return h, h2
         else:
             return h
-
 
     def interpolation2(self, x, t, index=None, maintain=400, alpha=None):
         assert x.shape[2] == x.shape[3] == self.resolution
@@ -785,7 +827,6 @@ class DDPM(nn.Module):
         h = self.mid.block_2(h, temb)
 
         if index is not None:
-
             if t[0] >= maintain:
                 h_index_0 = torch.stack([h[0] for i in range(h.shape[0])])
                 h_index_last = torch.stack([h[-1] for i in range(h.shape[0])])
@@ -799,7 +840,8 @@ class DDPM(nn.Module):
             for i_level in reversed(range(self.num_resolutions)):
                 for i_block in range(self.num_res_blocks + 1):
                     h2 = self.up[i_level].block[i_block](
-                        torch.cat([h2, hs[hs_index]], dim=1), temb)
+                        torch.cat([h2, hs[hs_index]], dim=1), temb
+                    )
                     hs_index -= 1
                     if len(self.up[i_level].attn) > 0:
                         h2 = self.up[i_level].attn[i_block](h2)
@@ -815,7 +857,8 @@ class DDPM(nn.Module):
         for i_level in reversed(range(self.num_resolutions)):
             for i_block in range(self.num_res_blocks + 1):
                 h = self.up[i_level].block[i_block](
-                    torch.cat([h, hs.pop()], dim=1), temb)
+                    torch.cat([h, hs.pop()], dim=1), temb
+                )
                 if len(self.up[i_level].attn) > 0:
                     h = self.up[i_level].attn[i_block](h)
             if i_level != 0:
@@ -830,7 +873,6 @@ class DDPM(nn.Module):
             return h, h2
         else:
             return h
-
 
     def forward_at(self, x, t, index=None):
         assert x.shape[2] == x.shape[3] == self.resolution
@@ -859,8 +901,7 @@ class DDPM(nn.Module):
         h = self.mid.block_2(h, temb)
 
         if index is not None:
-
-            delta_h = getattr(self, f"layer_{index}")(h, temb)  #.roll(1, dims=3)
+            delta_h = getattr(self, f"layer_{index}")(h, temb)  # .roll(1, dims=3)
             h2 = h + delta_h
 
             hs_index = -1
@@ -868,7 +909,8 @@ class DDPM(nn.Module):
             for i_level in reversed(range(self.num_resolutions)):
                 for i_block in range(self.num_res_blocks + 1):
                     h2 = self.up[i_level].block[i_block](
-                        torch.cat([h2, hs[hs_index]], dim=1), temb)
+                        torch.cat([h2, hs[hs_index]], dim=1), temb
+                    )
                     hs_index -= 1
                     if len(self.up[i_level].attn) > 0:
                         h2 = self.up[i_level].attn[i_block](h2)
@@ -884,7 +926,8 @@ class DDPM(nn.Module):
         for i_level in reversed(range(self.num_resolutions)):
             for i_block in range(self.num_res_blocks + 1):
                 h = self.up[i_level].block[i_block](
-                    torch.cat([h, hs.pop()], dim=1), temb)
+                    torch.cat([h, hs.pop()], dim=1), temb
+                )
                 if len(self.up[i_level].attn) > 0:
                     h = self.up[i_level].attn[i_block](h)
             if i_level != 0:
@@ -899,7 +942,6 @@ class DDPM(nn.Module):
             return h, h2
         else:
             return h
-
 
     def forward_global(self, x, t, index=None, maintain=400, direction=None):
         assert x.shape[2] == x.shape[3] == self.resolution
@@ -929,7 +971,9 @@ class DDPM(nn.Module):
 
         if index is not None:
             if t[0] >= maintain:
-                delta_h = getattr(self, "layer_0")(h, temb, direction)  #.roll(1, dims=3)
+                delta_h = getattr(self, "layer_0")(
+                    h, temb, direction
+                )  # .roll(1, dims=3)
                 h2 = h + delta_h
             else:
                 h2 = h
@@ -939,7 +983,8 @@ class DDPM(nn.Module):
             for i_level in reversed(range(self.num_resolutions)):
                 for i_block in range(self.num_res_blocks + 1):
                     h2 = self.up[i_level].block[i_block](
-                        torch.cat([h2, hs[hs_index]], dim=1), temb)
+                        torch.cat([h2, hs[hs_index]], dim=1), temb
+                    )
                     hs_index -= 1
                     if len(self.up[i_level].attn) > 0:
                         h2 = self.up[i_level].attn[i_block](h2)
@@ -955,7 +1000,8 @@ class DDPM(nn.Module):
         for i_level in reversed(range(self.num_resolutions)):
             for i_block in range(self.num_res_blocks + 1):
                 h = self.up[i_level].block[i_block](
-                    torch.cat([h, hs.pop()], dim=1), temb)
+                    torch.cat([h, hs.pop()], dim=1), temb
+                )
                 if len(self.up[i_level].attn) > 0:
                     h = self.up[i_level].attn[i_block](h)
             if i_level != 0:

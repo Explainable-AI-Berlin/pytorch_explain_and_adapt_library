@@ -1,4 +1,4 @@
-apptainer run --nv asyrp_container.sif python edit_images.py  \
+apptainer run --nv asyrp_container.sif python run_asyrp.py  \
 --run_train          \
 --edit_attr test     \
 --do_train 1         \
