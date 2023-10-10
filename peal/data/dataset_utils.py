@@ -112,10 +112,14 @@ def parse_csv(
         data = {}
         for idx, line in enumerate(raw_data):
             key, instances_tensor = extract_instances_tensor(idx, line)
-            data[key] = torch.maximum(
-                torch.zeros_like(instances_tensor),
-                instances_tensor,
-            )
+            if set_negative_to_zero:
+                data[key] = torch.maximum(
+                    torch.zeros_like(instances_tensor),
+                    instances_tensor,
+                )
+
+            else:
+                data[key] = instances_tensor
 
         keys = list(data.keys())
         if mode == "train":

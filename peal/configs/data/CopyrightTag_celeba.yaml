@@ -8,3 +8,4 @@
 'output_size'             : [41]
 'downsize'                : 'Resize'
 'confounding'             : 'copyrighttag'
+'delimiter'               : ','

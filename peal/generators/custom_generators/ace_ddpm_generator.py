@@ -121,7 +121,7 @@ class AceDDPMAdaptor(EditCapableGenerator):
         self.dataset.serialize_dataset(
             output_dir=self.data_dir,
             x_list=x_in,
-            y_list=target_classes,
+            y_list=source_classes,
             sample_names=list(
                 map(lambda x: embed_numberstring(str(x)) + ".jpg", range(x_in.shape[0]))
             ),
@@ -141,6 +141,7 @@ class AceDDPMAdaptor(EditCapableGenerator):
         args.output_path = self.counterfactual_path
         args.batch_size = x_in.shape[0]
         if self.config.method == "ace":
+            # TODO this does not use the target_classes yet!!!
             ace_main(args=args)
             ending = ".png"
 
