@@ -44,7 +44,7 @@ class TaskConfig:
     """
     The name of the class.
     """
-    __name__ : str = 'peal.TaskConfig'
+    __name__: str = "peal.TaskConfig"
 
     def __init__(
         self,
@@ -87,7 +87,7 @@ class ModelConfig:
     """
     The name of the model.
     """
-    model_name : str = 'model_run1'
+    model_name: str = "model_run1"
     """
     A dict containing all variables that could not be given with the current config structure
     """
@@ -99,7 +99,7 @@ class ModelConfig:
     """
     The name of the class.
     """
-    __name__ : str = 'peal.ModelConfig'
+    __name__: str = "peal.ModelConfig"
 
     def __init__(
         self,

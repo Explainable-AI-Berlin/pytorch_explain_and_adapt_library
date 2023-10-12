@@ -14,33 +14,47 @@ from peal.configs.architectures.architecture_template import (
     TransformerConfig,
 )
 
-class FCBlock(nn.Sequential):
-    '''
-    The FCBlock class implements a fully connected block as a sequential module.
-    '''
 
-    def __init__(self, layer_config : FCConfig, num_neurons_previous : PositiveInt, activation : Type[nn.Module]):
-        '''
+class FCBlock(nn.Sequential):
+    """
+    The FCBlock class implements a fully connected block as a sequential module.
+    """
+
+    def __init__(
+        self,
+        layer_config: FCConfig,
+        num_neurons_previous: PositiveInt,
+        activation: Type[nn.Module] = None,
+    ):
+        """
         The __init__ method initializes the FCBlock class.
         Args:
             layer_config: The config of the last layer.
             num_neurons_previous: The number of neurons in the previous layer.
             activation: The activation function class.
-        '''
+        """
         submodules = []
         if layer_config.tensor_dim == 0:
             submodules.append(nn.Linear(num_neurons_previous, layer_config.num_neurons))
 
         elif layer_config.tensor_dim == 1:
-            submodules.append(nn.Conv1d(num_neurons_previous, layer_config.num_neurons, 1))
+            submodules.append(
+                nn.Conv1d(num_neurons_previous, layer_config.num_neurons, 1)
+            )
 
         elif layer_config.tensor_dim == 2:
-            submodules.append(nn.Conv2d(num_neurons_previous, layer_config.num_neurons, 1))
+            submodules.append(
+                nn.Conv2d(num_neurons_previous, layer_config.num_neurons, 1)
+            )
 
         elif layer_config.tensor_dim == 3:
-            submodules.append(nn.Conv3d(num_neurons_previous, layer_config.num_neurons, 1))
+            submodules.append(
+                nn.Conv3d(num_neurons_previous, layer_config.num_neurons, 1)
+            )
 
-        submodules.append(activation())
+        if not activation is None:
+            submodules.append(activation())
+
         if layer_config.dropout > 0.0:
             submodules.append(nn.Dropout(layer_config.dropout))
 
@@ -57,12 +71,12 @@ class VGGBlock(nn.Sequential):
 
     def __init__(
         self,
-        input_channels : PositiveInt,
-        activation : Type[nn.Module],
-        stride : PositiveInt,
-        conv : Type[nn.Module],
-        batchnorm : Type[nn.Module],
-        config : VGGConfig,
+        input_channels: PositiveInt,
+        activation: Type[nn.Module],
+        stride: PositiveInt,
+        conv: Type[nn.Module],
+        batchnorm: Type[nn.Module],
+        config: VGGConfig,
     ):
         """
         The __init__ method initializes the VGGBlock class.
@@ -77,7 +91,13 @@ class VGGBlock(nn.Sequential):
         submodules = []
         padding = int(config.receptive_field / 2)
         submodules.append(
-            conv(input_channels, config.num_neurons, config.receptive_field, stride, padding)
+            conv(
+                input_channels,
+                config.num_neurons,
+                config.receptive_field,
+                stride,
+                padding,
+            )
         )
 
         #
@@ -99,12 +119,12 @@ class ResnetBlock(nn.Sequential):
 
     def __init__(
         self,
-        input_channels : PositiveInt,
-        activation : Type[nn.Module],
-        stride : PositiveInt,
-        conv : Type[nn.Module],
-        batchnorm : Type[nn.Module],
-        config : ResnetConfig,
+        input_channels: PositiveInt,
+        activation: Type[nn.Module],
+        stride: PositiveInt,
+        conv: Type[nn.Module],
+        batchnorm: Type[nn.Module],
+        config: ResnetConfig,
     ):
         """
         The __init__ method initializes the ResnetBlock class.
@@ -196,7 +216,6 @@ def create_cnn_layer(
         )
 
     return nn.Sequential(*blocks)
-
 
 
 class TransformerBlock(nn.Sequential):

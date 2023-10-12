@@ -243,11 +243,13 @@ class ImageDataset(PealDataset):
         for i in range(len(x_list)):
             heatmap_red = torch.maximum(
                 torch.tensor(0.0),
-                torch.sum(x_list[i], dim=0) - torch.sum(x_counterfactual_list[i], dim=0),
+                torch.sum(x_list[i], dim=0)
+                - torch.sum(x_counterfactual_list[i], dim=0),
             )
             heatmap_blue = torch.maximum(
                 torch.tensor(0.0),
-                torch.sum(x_counterfactual_list[i], dim=0) - torch.sum(x_list[i], dim=0),
+                torch.sum(x_counterfactual_list[i], dim=0)
+                - torch.sum(x_list[i], dim=0),
             )
             if x_counterfactual_list[i].shape[0] == 3:
                 heatmap_green = torch.abs(x_list[i][0] - x_counterfactual_list[i][0])
@@ -264,24 +266,33 @@ class ImageDataset(PealDataset):
             else:
                 heatmap_green = torch.zeros_like(heatmap_red)
                 x_in = torch.tile(x_list[i], [3, 1, 1])
-                counterfactual_rgb = torch.tile(torch.clone(x_counterfactual_list[i]), [3, 1, 1])
+                counterfactual_rgb = torch.tile(
+                    torch.clone(x_counterfactual_list[i]), [3, 1, 1]
+                )
 
             heatmap = torch.stack([heatmap_red, heatmap_green, heatmap_blue], dim=0)
-            if torch.abs(heatmap.sum() - torch.abs(x_list[i] - x_counterfactual_list[i]).sum()) > 0.1:
-                print("Error: Heatmap does not add up to absolute counterfactual difference.")
+            if (
+                torch.abs(
+                    heatmap.sum()
+                    - torch.abs(x_list[i] - x_counterfactual_list[i]).sum()
+                )
+                > 0.1
+            ):
+                print(
+                    "Error: Heatmap does not add up to absolute counterfactual difference."
+                )
 
             heatmap_high_contrast = torch.clamp(heatmap / heatmap.max(), 0.0, 1.0)
             current_collage = torch.cat(
                 [x_in, counterfactual_rgb, heatmap_high_contrast], -1
             )
-            current_collage = torchvision.utils.make_grid(
-                current_collage, nrow=3
-            )
+            current_collage = torchvision.utils.make_grid(current_collage, nrow=3)
             plt.gcf()
             plt.imshow(current_collage.permute(1, 2, 0))
             title_string = (
-                str(int(y_list[i])) + " -> " +
-                str(int(y_source_list[i]))
+                str(int(y_list[i]))
+                + " -> "
+                + str(int(y_source_list[i]))
                 + " -> "
                 + str(int(y_target_list[i]))
             )
@@ -295,9 +306,7 @@ class ImageDataset(PealDataset):
                 )
                 + " -> "
             )
-            title_string += str(
-                round(float(y_target_end_confidence_list[i]), 2)
-            )
+            title_string += str(round(float(y_target_end_confidence_list[i]), 2))
             plt.title(title_string)
             collage_path = os.path.join(
                 base_path,
@@ -337,7 +346,9 @@ class ImageDataset(PealDataset):
         with open(os.path.join(output_dir, "data.csv"), "w") as f:
             f.write(data)
 
-    def track_generator_performance(self, generator: Union[Generator, torch.Tensor], batch_size=1):
+    def track_generator_performance(
+        self, generator: Union[Generator, torch.Tensor], batch_size=1
+    ):
         """
         This function tracks the performance of the generator
 
@@ -360,20 +371,26 @@ class ImageDataset(PealDataset):
             raise NotImplementedError("Generator type not supported")
 
         if not hasattr(self, "fid"):
-            self.fid = torchmetrics.image.fid.FrechetInceptionDistance(feature=192, reset_real_features=False)
+            self.fid = torchmetrics.image.fid.FrechetInceptionDistance(
+                feature=192, reset_real_features=False
+            )
             self.fid.to(generated_images.device)
             real_images = []
             for i in range(20):
                 real_images.append(self[i][0])
 
             real_images = torch.stack(real_images, dim=0).to(generated_images.device)
-            self.fid.update(torch.tensor(255 * real_images, dtype=torch.uint8), real=True)
+            self.fid.update(
+                torch.tensor(255 * real_images, dtype=torch.uint8), real=True
+            )
 
         generated_images = generated_images[:20]
-        self.fid.update(torch.tensor(255 * generated_images, dtype=torch.uint8), real=False)
+        self.fid.update(
+            torch.tensor(255 * generated_images, dtype=torch.uint8), real=False
+        )
         fid_score = float(self.fid.compute())
 
-        return {'fid': fid_score}
+        return {"fid": fid_score}
 
 
 class Image2MixedDataset(ImageDataset):
@@ -454,7 +471,7 @@ class Image2MixedDataset(ImageDataset):
 
         else:
             target = torch.tensor(
-                targets[:self.config.output_size[0]], dtype=torch.float32
+                targets[: self.config.output_size[0]], dtype=torch.float32
             )
 
         if not self.task_config is None and "ce" in self.task_config.criterions:

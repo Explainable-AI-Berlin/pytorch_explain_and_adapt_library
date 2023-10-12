@@ -45,6 +45,7 @@ CELEBA_HQ_P2_DICT = dict(
     use_new_attention_order=False,
 )
 
+
 def diffusion_defaults():
     """
     Defaults for image and classifier training.
@@ -170,10 +171,10 @@ def create_model_and_diffusion(
     return model, diffusion
 
 
-def guided_Diffusion(dataset_name = 'MetFACE'):
-    if dataset_name == 'MetFACE':
+def guided_Diffusion(dataset_name="MetFACE"):
+    if dataset_name == "MetFACE":
         return create_model(**METFACE_DICT)
-    elif dataset_name =="CelebA_HQ_P2":
+    elif dataset_name == "CelebA_HQ_P2":
         return create_model(**CELEBA_HQ_P2_DICT)
 
 

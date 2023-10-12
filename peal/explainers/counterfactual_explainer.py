@@ -98,8 +98,7 @@ class CounterfactualExplainer(ExplainerInterface):
             img = self.dataset.project_to_pytorch_default(img)
 
             logits = self.downstream_model(
-                img
-                + self.explainer_config.img_noise_injection * torch.randn_like(img)
+                img + self.explainer_config.img_noise_injection * torch.randn_like(img)
             )
             loss = self.loss(logits, target_classes.to(self.device))
             l1_losses = []
@@ -220,7 +219,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 batch["x_counterfactual_list"],
                 batch["z_difference_list"],
                 batch["y_target_end_confidence_list"],
-                batch["x_list"]
+                batch["x_list"],
             ) = self.generator.edit(
                 x_in=batch["x_list"],
                 target_confidence_goal=target_confidence_goal,

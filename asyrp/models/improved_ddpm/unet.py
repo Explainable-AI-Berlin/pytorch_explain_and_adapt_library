@@ -23,7 +23,8 @@ from .nn import (
     timestep_embedding,
 )
 
-def slerp(t,v0,v1):
+
+def slerp(t, v0, v1):
     _shape = v0.shape
 
     v0_origin = v0.clone()
@@ -60,7 +61,6 @@ def slerp(t,v0,v1):
     return v2
 
 
-
 class AttentionPool2d(nn.Module):
     """
     Adapted from CLIP: https://github.com/openai/CLIP/blob/main/clip/model.py
@@ -75,7 +75,7 @@ class AttentionPool2d(nn.Module):
     ):
         super().__init__()
         self.positional_embedding = nn.Parameter(
-            th.randn(embed_dim, spacial_dim ** 2 + 1) / embed_dim ** 0.5
+            th.randn(embed_dim, spacial_dim**2 + 1) / embed_dim**0.5
         )
         self.qkv_proj = conv_nd(1, embed_dim, 3 * embed_dim, 1)
         self.c_proj = conv_nd(1, embed_dim, output_dim or embed_dim, 1)
@@ -363,7 +363,7 @@ def count_flops_attn(model, _x, y):
     # We perform two matmuls with the same number of ops.
     # The first computes the weight matrix, the second computes
     # the combination of the value vectors.
-    matmul_ops = 2 * b * (num_spatial ** 2) * c
+    matmul_ops = 2 * b * (num_spatial**2) * c
     model.total_ops += th.DoubleTensor([matmul_ops])
 
 
@@ -673,7 +673,18 @@ class UNetModel(nn.Module):
         self.middle_block.apply(convert_module_to_f32)
         self.output_blocks.apply(convert_module_to_f32)
 
-    def forward(self, x, timesteps, y=None, index=None, t_edit=400, hs_coeff=(1.0, 1.0), delta_h=None, ignore_timestep=False, use_mask=False):
+    def forward(
+        self,
+        x,
+        timesteps,
+        y=None,
+        index=None,
+        t_edit=400,
+        hs_coeff=(1.0, 1.0),
+        delta_h=None,
+        ignore_timestep=False,
+        use_mask=False,
+    ):
         """
         Apply the model to an input batch.
 
@@ -693,41 +704,52 @@ class UNetModel(nn.Module):
 
         middle_h = h
         h2 = None
-        
+
         if index is not None:
             # assert len(hs_coeff) == index + 1 + 1
-            # check t_edit 
+            # check t_edit
             if timesteps[0] >= t_edit:
                 # use DeltaBlock
-                if delta_h is None: #Asyrp
+                if delta_h is None:  # Asyrp
                     h2 = h * hs_coeff[0]
-                    for i in range(index+1):
-                        delta_h = getattr(self, f"layer_{i}")(h, None if ignore_timestep else emb)
-                        h2 += delta_h * hs_coeff[i+1]
+                    for i in range(index + 1):
+                        delta_h = getattr(self, f"layer_{i}")(
+                            h, None if ignore_timestep else emb
+                        )
+                        h2 += delta_h * hs_coeff[i + 1]
                 # use input delta_h  : even tough you does not use DeltaBlock, you need to use index is 0.
-                else:  #DiffStyle # DiffStyle; Just ignore this code. We will update about it in README.md later.
+                else:  # DiffStyle # DiffStyle; Just ignore this code. We will update about it in README.md later.
                     if use_mask:
                         mask = th.zeros_like(h)
-                        mask[:,:,4:-1,3:5] = 1.0
+                        mask[:, :, 4:-1, 3:5] = 1.0
                         inverted_mask = 1 - mask
 
                         masked_delta_h = delta_h * mask
                         masked_h = h * mask
 
-                        partial_h2 = slerp(1-hs_coeff[0], masked_h, masked_delta_h)
+                        partial_h2 = slerp(1 - hs_coeff[0], masked_h, masked_delta_h)
                         h2 = partial_h2 + inverted_mask * h
-
 
                     else:
                         h_shape = h.shape
-                        h_copy = h.clone().view(h_shape[0],-1)
-                        delta_h_copy = delta_h.clone().view(h_shape[0],-1)
+                        h_copy = h.clone().view(h_shape[0], -1)
+                        delta_h_copy = delta_h.clone().view(h_shape[0], -1)
 
-                        h_norm = th.norm(h_copy, dim=1).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
-                        delta_h_norm = th.norm(delta_h_copy, dim=1).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
+                        h_norm = (
+                            th.norm(h_copy, dim=1)
+                            .unsqueeze(-1)
+                            .unsqueeze(-1)
+                            .unsqueeze(-1)
+                        )
+                        delta_h_norm = (
+                            th.norm(delta_h_copy, dim=1)
+                            .unsqueeze(-1)
+                            .unsqueeze(-1)
+                            .unsqueeze(-1)
+                        )
                         normalized_delta_h = h_norm * delta_h / delta_h_norm
-                        
-                        h2 = slerp(1.0-hs_coeff[0], h, normalized_delta_h)
+
+                        h2 = slerp(1.0 - hs_coeff[0], h, normalized_delta_h)
 
             # when t[0] < t_edit : pass the delta_h
             else:
@@ -748,10 +770,8 @@ class UNetModel(nn.Module):
         h = h.type(x.dtype)
 
         h = self.out(h)
-        
-        return h, h2, delta_h, middle_h
-        
 
+        return h, h2, delta_h, middle_h
 
     def setattr_layers(self, nums):
         ch = int(self.channel_mult[0] * self.model_channels)
@@ -766,10 +786,12 @@ class UNetModel(nn.Module):
             #                            temb_channels=self.model_channels * 4,
             #                            dropout=0.0)
             # )
-            setattr(self, f"layer_{i}", DeltaBlock(channels=ch,
-                                       emb_channels=self.model_channels * 4,
-                                       dropout=0.0
-                                       )
+            setattr(
+                self,
+                f"layer_{i}",
+                DeltaBlock(
+                    channels=ch, emb_channels=self.model_channels * 4, dropout=0.0
+                ),
             )
 
 
@@ -829,10 +851,8 @@ class DeltaBlock(TimestepBlock):
             normalization(self.out_channels),
             nn.SiLU(),
             nn.Dropout(p=dropout),
-            conv_nd(dims, self.out_channels, self.out_channels, 1, padding=0)
-            ,
+            conv_nd(dims, self.out_channels, self.out_channels, 1, padding=0),
         )
-
 
     def forward(self, x, emb=None):
         h = self.in_layers(x)
@@ -848,10 +868,9 @@ class DeltaBlock(TimestepBlock):
             h = out_rest(h)
         else:
             if emb is not None:
-                h = h + emb_out 
+                h = h + emb_out
             h = self.out_layers(h)
         return h
-
 
 
 # class DeltaBlock(nn.Module):

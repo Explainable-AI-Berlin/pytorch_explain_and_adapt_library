@@ -6,8 +6,10 @@ import torch.nn as nn
 class Identity(nn.Module):
     def __init__(self):
         super().__init__()
+
     def forward(self, x):
         return x
+
 
 class DenseNet121(nn.Module):
     def __init__(self, pretrained=False):
@@ -21,7 +23,6 @@ class DenseNet121(nn.Module):
 
 
 class DecisionDensenetModel(nn.Module):
-
     def __init__(self, num_classes=40, pretrained=False, query_label=-1):
         super().__init__()
         self.feat_extract = DenseNet121(pretrained=pretrained)
@@ -29,7 +30,6 @@ class DecisionDensenetModel(nn.Module):
         self.query_label = query_label
 
     def forward(self, x, before_sigmoid=True):
-
         x = self.feat_extract(x)
         x = self.classifier(x)
         if not before_sigmoid:

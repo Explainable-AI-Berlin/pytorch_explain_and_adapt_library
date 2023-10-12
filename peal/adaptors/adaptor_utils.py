@@ -24,9 +24,7 @@ def integrate_data_config_into_adaptor_config(
             adaptor_config.task = dataset.task_config
 
         elif isinstance(dataset, Image2MixedDataset):
-            adaptor_config.task.selection = [
-                dataset.config.confounding_factors[0]
-            ]
+            adaptor_config.task.selection = [dataset.config.confounding_factors[0]]
             adaptor_config.task.output_size = 2
             dataset.task_config = adaptor_config.task
 

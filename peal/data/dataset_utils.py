@@ -68,7 +68,6 @@ def parse_csv(
     while "" in raw_data:
         raw_data.remove("")
 
-
     def extract_instances_tensor(idx, line):
         instance_attributes = line.split(delimiter)
 
@@ -92,6 +91,7 @@ def parse_csv(
         return key, instances_tensor
 
     if len(config.confounding_factors) == 2:
+
         def extract_instances_tensor_confounder(idx, line):
             selection_idx1 = attributes.index(config.confounding_factors[0])
             selection_idx2 = attributes.index(config.confounding_factors[1])
@@ -127,9 +127,7 @@ def parse_csv(
 
         elif mode == "val":
             keys_out = keys[
-                int(len(keys) * config.split[0]) : int(
-                    len(keys) * config.split[1]
-                )
+                int(len(keys) * config.split[0]) : int(len(keys) * config.split[1])
             ]
 
         elif mode == "test":

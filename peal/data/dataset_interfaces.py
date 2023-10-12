@@ -1,6 +1,8 @@
 import torch
 
 from peal.generators.interfaces import Generator
+
+
 class PealDataset(torch.utils.data.Dataset):
     """
     This is the base class for all datasets in PEAL. It is a wrapper around

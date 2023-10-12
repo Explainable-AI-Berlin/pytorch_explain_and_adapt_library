@@ -339,9 +339,7 @@ def main(args=None):
         model, diffusion = create_model_and_diffusion(
             **args_to_dict(args, model_and_diffusion_defaults().keys())
         )
-        model.load_state_dict(
-            load_state_dict(args.model_path, map_location="cpu")
-        )
+        model.load_state_dict(load_state_dict(args.model_path, map_location="cpu"))
 
     else:
         model = args.model
@@ -365,9 +363,7 @@ def main(args=None):
         module_path = os.path.abspath(os.path.join(".."))
         if module_path not in sys.path:
             sys.path.append(module_path)
-        classifier = torch.load(args.classifier_path, map_location=dev()).to(
-            dev()
-        )
+        classifier = torch.load(args.classifier_path, map_location=dev()).to(dev())
 
     elif args.classifier_path[-4:] == ".pth":
         classifier = ClassificationModel(args.classifier_path, args.query_label).to(
@@ -381,9 +377,7 @@ def main(args=None):
 
     if args.l_perc != 0:
         print("Loading Perceptual Loss")
-        vggloss = PerceptualLoss(layer=args.l_perc_layer, c=args.l_perc).to(
-            dev()
-        )
+        vggloss = PerceptualLoss(layer=args.l_perc_layer, c=args.l_perc).to(dev())
         vggloss.eval()
     else:
         vggloss = None
@@ -476,7 +470,9 @@ def main(args=None):
                 clip_denoised=args.clip_denoised,
                 model_kwargs=model_kwargs,
                 device=dev(),
-                class_grad_fn=clean_multiclass_cond_fn if isinstance(classifier, SequentialModel) else clean_class_cond_fn,
+                class_grad_fn=clean_multiclass_cond_fn
+                if isinstance(classifier, SequentialModel)
+                else clean_class_cond_fn,
                 class_grad_kwargs={
                     "y": target[~transformed],
                     "classifier": classifier,

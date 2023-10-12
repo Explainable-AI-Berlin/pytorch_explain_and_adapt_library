@@ -1,4 +1,4 @@
-#
+'name'              : 'symbolic_vae'
 'training'          : '<PEAL_BASE>/configs/training/img_generator.yaml'
 'architecture'      : '<PEAL_BASE>/configs/architectures/symbolic_vae.yaml'
 'task':

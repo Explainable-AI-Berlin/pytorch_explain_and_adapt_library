@@ -1,9 +1,9 @@
-'''
+"""
 COUT metric extratec from: https://github.com/khorrams/c3lt
 
 We implemented the RGB version for the evaluation and
 the binary version
-'''
+"""
 
 
 from tqdm import tqdm
@@ -17,7 +17,8 @@ import matplotlib.pyplot as plt
 
 from pdb import set_trace
 
-def gen_masks(inputs, targets, mode='abs'):
+
+def gen_masks(inputs, targets, mode="abs"):
     """
         generates a difference masks give two images (inputs and targets).
     :param inputs:
@@ -28,7 +29,7 @@ def gen_masks(inputs, targets, mode='abs'):
     masks = targets - inputs
     masks = masks.view(inputs.size(0), 3, -1)
 
-    if mode == 'abs':
+    if mode == "abs":
         masks = masks.abs()
         masks = masks.sum(dim=1)
         # normalize 0 to 1
@@ -36,7 +37,7 @@ def gen_masks(inputs, targets, mode='abs'):
         masks /= masks.max(1, keepdim=True)[0]
 
     elif mode == "mse":
-        masks = masks ** 2
+        masks = masks**2
         masks = masks.sum(dim=1)
         masks -= masks.min(1, keepdim=True)[0]
         masks /= masks.max(1, keepdim=True)[0]
@@ -67,8 +68,7 @@ def evaluate(label, target, classifier, loader, device, binary):
     # init scores
     cout = 0
     total_samples = 0
-    plot_data = {'c_curve': [],
-                 'c_prime_curve': []}
+    plot_data = {"c_curve": [], "c_prime_curve": []}
 
     with torch.no_grad():
         for i, (img, cf) in enumerate(tqdm(loader)):
@@ -79,15 +79,15 @@ def evaluate(label, target, classifier, loader, device, binary):
             cout_score, plot_info = calculate_cout(
                 img,
                 cf,
-                gen_masks(img, cf, mode='abs'),
+                gen_masks(img, cf, mode="abs"),
                 classifier,
                 label,
                 target,
                 max(1, (img.size(2) * img.size(3)) // cout_num_steps),
-                binary
+                binary,
             )
-            plot_data['c_curve'].append([d.cpu() for d in plot_info[0]])
-            plot_data['c_prime_curve'].append([d.cpu() for d in plot_info[1]])
+            plot_data["c_curve"].append([d.cpu() for d in plot_info[0]])
+            plot_data["c_prime_curve"].append([d.cpu() for d in plot_info[1]])
             cout += cout_score
 
             # update total sample number
@@ -95,21 +95,25 @@ def evaluate(label, target, classifier, loader, device, binary):
 
     # process plot info
     curves = torch.zeros(2, len(plot_info[2]))
-    for idx, curve_name in enumerate(['c_curve', 'c_prime_curve']):
+    for idx, curve_name in enumerate(["c_curve", "c_prime_curve"]):
         for data_points in plot_data[curve_name]:
             data_points = torch.cat([d.unsqueeze(dim=1) for d in data_points], dim=1)
             curves[idx, :] += data_points.sum(dim=0)
     curves /= total_samples
     cout /= total_samples
     print(f"\nEVAL [COUT: {cout:.4f}]")
-    return cout, {'indexes': plot_info[2], 'c_curve': curves[0, :].numpy(), 'c_prime_curve': curves[1, :].numpy()}
+    return cout, {
+        "indexes": plot_info[2],
+        "c_curve": curves[0, :].numpy(),
+        "c_prime_curve": curves[1, :].numpy(),
+    }
 
 
 @torch.no_grad()
 def get_probs(label, target, img, model, binary):
-    '''
-        Computes the probabilities of the target/label classes
-    '''
+    """
+    Computes the probabilities of the target/label classes
+    """
     if binary:
         # for the binary classification, the target is irrelevant since it is 1 - label
         output = model(img)
@@ -117,7 +121,7 @@ def get_probs(label, target, img, model, binary):
         c_curve = torch.sigmoid(pos * output - (1 - pos) * output)
         c_prime_curve = 1 - c_curve
     else:
-        output =  F.softmax(model(img))
+        output = F.softmax(model(img))
         c_curve = output[:, label]
         c_prime_curve = output[:, target]
 
@@ -148,13 +152,13 @@ def calculate_cout(imgs, cfs, masks, model, label, target, step, binary):
     l = torch.arange(imgs.shape[0])
 
     if binary:
-        label = (model(imgs) > 0.0)
+        label = model(imgs) > 0.0
 
     # Initial values for the curves
     c_curve, c_prime_curve = get_probs(label, target, imgs, model, binary)
     c_curve = [c_curve]
     c_prime_curve = [c_prime_curve]
-    index = [0.]
+    index = [0.0]
 
     # init upsampler
     up_sample = torch.nn.UpsamplingBilinear2d(size=img_size).to(imgs.device)
@@ -165,7 +169,7 @@ def calculate_cout(imgs, cfs, masks, model, label, target, step, binary):
 
     for pixels in range(0, num_pixels, step):
         # Get the indices used in this iteration
-        indices = elements[l, pixels:pixels + step].squeeze().view(imgs.shape[0], -1)
+        indices = elements[l, pixels : pixels + step].squeeze().view(imgs.shape[0], -1)
 
         # Set those indices to 1
         cur_mask[l, indices.permute(1, 0)] = 1
@@ -196,7 +200,7 @@ def phi(img, baseline, mask):
     :param mask:
     :return:
     """
-    return img.mul(mask) + baseline.mul(1-mask)
+    return img.mul(mask) + baseline.mul(1 - mask)
 
 
 def auc(curve):
@@ -205,4 +209,4 @@ def auc(curve):
     :param curve:
     :return:
     """
-    return curve[0]/2 + sum(curve[1:-1]) + curve[-1]/2
+    return curve[0] / 2 + sum(curve[1:-1]) + curve[-1] / 2

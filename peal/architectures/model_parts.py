@@ -22,7 +22,7 @@ class Img2LatentEncoder(nn.Sequential):
         use_batchnorm,
         activation,
     ):
-        '''
+        """
         This is the encoder part of the Img2Latent architecture.
 
         Args:
@@ -32,7 +32,7 @@ class Img2LatentEncoder(nn.Sequential):
             input_channels (int): The number of channels in the input image
             use_batchnorm (bool): True if batchnorm should be used
             activation (function): The activation function to use
-        '''
+        """
         #
         layers = []
         #
@@ -107,7 +107,7 @@ class Sequence2LatentEncoder(nn.Sequential):
         input_channels,
         activation,
     ):
-        '''
+        """
         The encoder takes a sequence and outputs a latent vector
 
         Args:
@@ -116,7 +116,7 @@ class Sequence2LatentEncoder(nn.Sequential):
             num_heads (int): The number of heads in the multi-head attention
             input_channels (int): The number of channels in the input
             activation (nn.Module): The activation function to use
-        '''
+        """
         layers = []
         # layers.append(nn.Embedding(input_channels + 2, embedding_dim))
         layers.append(OneHotEncoding(input_channels))
@@ -143,14 +143,14 @@ class Vector2LatentEncoder(nn.Sequential):
     """
 
     def __init__(self, input_channels, activation, neuron_numbers=[]):
-        '''
+        """
         The encoder takes an image and outputs a latent vector
 
         Args:
             input_channels (int): The number of channels in the input
             activation (function): The activation function to use
             neuron_numbers (list, optional): The number of neurons in each layer. Defaults to []. If empty, the output is a single vector
-        '''
+        """
         layers = []
         neurons = [input_channels] + neuron_numbers
         for i in range(len(neurons) - 1):
@@ -174,7 +174,7 @@ class Latent2ImgDecoder(nn.Sequential):
         use_batchnorm,
         activation,
     ):
-        '''
+        """
         The decoder takes a latent vector and outputs an image
 
         Args:
@@ -184,7 +184,7 @@ class Latent2ImgDecoder(nn.Sequential):
             output_size (int): The number of channels in the output
             use_batchnorm (bool): True if batchnorm should be used
             activation (int): The activation function to use
-        '''
+        """
         #
         layers = []
         if block_type == "resnet":
@@ -196,8 +196,7 @@ class Latent2ImgDecoder(nn.Sequential):
             sublayers = []
             for j in range(blocks_per_layer - 1):
                 sublayers.append(
-                    block_factory(
-                        neuron_numbers[i], neuron_numbers[i], 1, activation)
+                    block_factory(neuron_numbers[i], neuron_numbers[i], 1, activation)
                 )
 
             sublayers.append(
@@ -211,16 +210,15 @@ class Latent2ImgDecoder(nn.Sequential):
             )
             layers.append(nn.Sequential(*sublayers))
         #
-        layers.append(nn.ConvTranspose2d(
-            neuron_numbers[-1], output_size, 3, 2, 1, 1))
+        layers.append(nn.ConvTranspose2d(neuron_numbers[-1], output_size, 3, 2, 1, 1))
         #
         super().__init__(*layers)
 
 
 class Latent2SequenceDecoder(nn.Module):
-    '''
+    """
     Decodes a latent vector into a sequence of vectors
-    '''
+    """
 
     def __init__(
         self,
@@ -232,7 +230,7 @@ class Latent2SequenceDecoder(nn.Module):
         embedding,
         max_length,
     ):
-        '''
+        """
         The decoder takes a latent vector and outputs a sequence of vectors
 
         Args:
@@ -242,7 +240,7 @@ class Latent2SequenceDecoder(nn.Module):
             input_channels (int): The number of channels in the input
             activation (nn.Module): The activation function to use
             embedding (nn.Module): The embedding function to use
-        '''
+        """
         #
         layers = []
         for i in range(num_blocks):
@@ -266,7 +264,7 @@ class Latent2SequenceDecoder(nn.Module):
         self.max_length = max_length
 
     def forward(self, z, max_length=None):
-        '''
+        """
         Forward pass
 
         Args:
@@ -274,14 +272,13 @@ class Latent2SequenceDecoder(nn.Module):
 
         Returns:
             torch.Tensor: The output tensor
-        '''
+        """
         if isinstance(z, list):
             tokens_in = z[1]
             tokens_in = torch.cat(
                 [
-                    self.unknown_token *
-                    torch.ones([z[1].shape[0], 1]).to(tokens_in),
-                    tokens_in[:, :-1]
+                    self.unknown_token * torch.ones([z[1].shape[0], 1]).to(tokens_in),
+                    tokens_in[:, :-1],
                 ],
                 dim=1,
             )
@@ -312,7 +309,7 @@ class Latent2VectorDecoder(nn.Sequential):
         dimension_reduction=None,
         neuron_numbers=[],
     ):
-        '''
+        """
         The decoder takes a latent vector and outputs a vector
 
         Args:
@@ -323,7 +320,7 @@ class Latent2VectorDecoder(nn.Sequential):
             latent_height (int, optional): The latent height
             dimension_reduction (int, optional): The type of dimensionality reduction to use
             neuron_numbers (list, optional): The number of neurons in each layer
-        '''
+        """
         layers = {}
         if dimension_reduction == "mean":
             layers["dimensionality_reductor"] = Mean([-2, -1], keepdim=True)
@@ -345,8 +342,7 @@ class Latent2VectorDecoder(nn.Sequential):
         elif dimension_reduction == ["flatten"]:
             if dropout > 0.0:
                 layers["dropout1"] = nn.Dropout(dropout / 2)
-            layers["layer1"] = nn.Conv2d(
-                num_hidden_in, num_hidden, kernel_size)
+            layers["layer1"] = nn.Conv2d(num_hidden_in, num_hidden, kernel_size)
             layers["activation1"] = activation()
             if dropout > 0.0:
                 layers["dropout2"] = nn.Dropout(dropout)
@@ -354,8 +350,7 @@ class Latent2VectorDecoder(nn.Sequential):
             layers["squeezer"] = Squeeze([-1, -1])
 
         elif dimension_reduction == "attention":
-            layers["layer1"] = DimensionSwitchAttentionLayer(
-                output_size, num_hidden, 2)
+            layers["layer1"] = DimensionSwitchAttentionLayer(output_size, num_hidden, 2)
             layers["activation1"] = activation()
             if dropout > 0.0:
                 layers["dropout2"] = nn.Dropout(dropout)

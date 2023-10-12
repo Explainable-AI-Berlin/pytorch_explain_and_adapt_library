@@ -12,14 +12,15 @@ class SegmentationMaskTeacher(TeacherInterface):
         for idx, heatmap in enumerate(heatmaps):
             #
             attribution_relative = (heatmap * hints[idx]).sum() / heatmap.sum()
-            masked_pixels_relative = hints[idx].sum(
-            ) / torch.prod(torch.tensor(list(hints[idx].shape)))
+            masked_pixels_relative = hints[idx].sum() / torch.prod(
+                torch.tensor(list(hints[idx].shape))
+            )
             attribution_relative = attribution_relative / masked_pixels_relative
             #
             if attribution_relative > self.attribution_threshold:
-                feedback.append('true')
+                feedback.append("true")
 
             else:
-                feedback.append('false')
+                feedback.append("false")
 
         return feedback

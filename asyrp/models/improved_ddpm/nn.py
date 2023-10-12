@@ -158,7 +158,7 @@ class CheckpointFunction(th.autograd.Function):
             # Tensors.
             shallow_copies = [x.view_as(x) for x in ctx.input_tensors]
             output_tensors = ctx.run_function(*shallow_copies)
-        
+
         for params in ctx.input_params:
             origin_param_require = params.requires_grad
             params.requires_grad_(True)

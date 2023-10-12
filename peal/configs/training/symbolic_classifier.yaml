@@ -1,11 +1,11 @@
 'train_batch_size'        : 100
 'val_batch_size'          : 100
 'test_batch_size'         : 100
-'max_epochs'              : 12 #150
+'max_epochs'              : 10 #150
 'learning_rate'           : 0.0001
 'optimizer'               : 'adam'
 'global_train_step'       : 0
 'global_validation_step'  : 0
 'epoch'                   : -1
-'steps_per_epoch'  : 1000
+'steps_per_epoch'         : 1000
 'verbosity'               : 1

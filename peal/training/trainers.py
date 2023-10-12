@@ -12,7 +12,13 @@ from pathlib import Path
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from peal.global_utils import orthogonal_initialization, move_to_device, load_yaml_config, save_yaml_config, log_images_to_writer
+from peal.global_utils import (
+    orthogonal_initialization,
+    move_to_device,
+    load_yaml_config,
+    save_yaml_config,
+    log_images_to_writer,
+)
 from peal.training.loggers import Logger
 from peal.training.criterions import get_criterions
 from peal.data.dataloaders import create_dataloaders_from_datasource
@@ -139,9 +145,7 @@ class ModelTrainer:
             criterions = get_criterions(config)
             self.criterions = {}
             for criterion_key in self.config.task.criterions:
-                if inspect.isclass(
-                    criterions[criterion_key]
-                ):
+                if inspect.isclass(criterions[criterion_key]):
                     # and issubclass(criterions[criterion_key], nn.Module):
                     self.criterions[criterion_key] = criterions[criterion_key](
                         self.config, None, self.device
@@ -253,7 +257,9 @@ class ModelTrainer:
             )
 
             log_images_to_writer(self.train_dataloader, self.logger.writer, "train")
-            log_images_to_writer(self.val_dataloaders[0], self.logger.writer, "validation")
+            log_images_to_writer(
+                self.val_dataloaders[0], self.logger.writer, "validation"
+            )
 
             self.config.is_loaded = True
             save_yaml_config(self.config, os.path.join(self.base_dir, "config.yaml"))

@@ -214,10 +214,14 @@ class TrainLoop:
                 )
                 pbar.config.current_fid = train_generator_performance["fid"]
                 pbar.writer.add_scalar(
-                    "fid", train_generator_performance["fid"], self.step + self.resume_step
+                    "fid",
+                    train_generator_performance["fid"],
+                    self.step + self.resume_step,
                 )
                 self.save()
-                save_yaml_config(pbar.config, os.path.join(self.model_dir, "config.yaml"))
+                save_yaml_config(
+                    pbar.config, os.path.join(self.model_dir, "config.yaml")
+                )
 
                 # Run for a finite amount of time in integration tests.
                 if os.environ.get("DIFFUSION_TRAINING_TEST", "") and self.step > 0:
@@ -275,7 +279,9 @@ class TrainLoop:
             #     self.diffusion, t, {k: v * weights for k, v in losses.items()}
             # )
             self.mp_trainer.backward(loss)
-            pbar.writer.add_scalar("loss", loss.detach().item(), self.step + self.resume_step)
+            pbar.writer.add_scalar(
+                "loss", loss.detach().item(), self.step + self.resume_step
+            )
 
     def _update_ema(self):
         for rate, params in zip(self.ema_rate, self.ema_params):
@@ -293,21 +299,28 @@ class TrainLoop:
         logger.logkv("step", self.step + self.resume_step)
         logger.logkv("samples", (self.step + self.resume_step + 1) * self.global_batch)
 
-    def save(self, pbar = None):
+    def save(self, pbar=None):
         def save_checkpoint(rate, params):
             state_dict = self.mp_trainer.master_params_to_state_dict(params)
             if dist.get_rank() == 0:
                 print(f"saving model {rate}...")
                 if not rate:
-                    filename = os.path.join(f"model",  f"{(self.step+self.resume_step):06d}.pt")
-                    if not pbar is None and pbar.config.current_fid < pbar.config.best_fid:
+                    filename = os.path.join(
+                        f"model", f"{(self.step+self.resume_step):06d}.pt"
+                    )
+                    if (
+                        not pbar is None
+                        and pbar.config.current_fid < pbar.config.best_fid
+                    ):
                         pbar.config.best_fid = pbar.config.current_fid
                         with bf.BlobFile(
                             bf.join(copy.deepcopy(self.model_dir), f"final.pt"), "wb"
                         ) as f:
                             th.save(state_dict, f)
                 else:
-                    filename = os.path.join(f"ema", f"{rate}_{(self.step+self.resume_step):06d}.pt")
+                    filename = os.path.join(
+                        f"ema", f"{rate}_{(self.step+self.resume_step):06d}.pt"
+                    )
 
                 with bf.BlobFile(
                     bf.join(copy.deepcopy(self.model_dir), filename), "wb"

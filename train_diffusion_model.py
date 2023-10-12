@@ -29,7 +29,7 @@ def main():
         args = load_yaml_config(args.generator_config)
 
     dist_util.setup_dist(args.gpus)
-    logger.configure(dir=os.path.join(args.base_path, 'output'))
+    logger.configure(dir=os.path.join(args.base_path, "output"))
 
     logger.log("creating model and diffusion...")
     model, diffusion = create_model_and_diffusion(
@@ -53,7 +53,7 @@ def main():
 
     else:
         args.data = load_yaml_config(args.data, DataConfig)
-        dataset,_,_ = get_datasets(args.data)
+        dataset, _, _ = get_datasets(args.data)
         dataset.return_dict = True
         args.train_batch_size = args.batch_size
         args.steps_per_epoch = args.max_train_steps
@@ -96,8 +96,8 @@ def create_argparser():
         resume_checkpoint="",
         use_fp16=False,
         fp16_scale_growth=1e-3,
-        output_path='/data/chercheurs/jeanner211/RESULTS/DCF-CelebA/ddpm',
-        gpus='',
+        output_path="/data/chercheurs/jeanner211/RESULTS/DCF-CelebA/ddpm",
+        gpus="",
         use_hdf5=False,
         use_celeba_HQ=False,
         generator_config=None,

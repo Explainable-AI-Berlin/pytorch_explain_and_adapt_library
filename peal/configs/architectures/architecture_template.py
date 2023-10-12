@@ -168,7 +168,7 @@ class ArchitectureConfig:
     """
     The name of the class.
     """
-    __name__ : str = 'peal.ArchitectureConfig'
+    __name__: str = "peal.ArchitectureConfig"
 
     def __init__(self, layers: list, activation: str = "ReLU", **kwargs):
         self.activation = activation
