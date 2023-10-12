@@ -24,7 +24,7 @@ class FCBlock(nn.Sequential):
         self,
         layer_config: FCConfig,
         num_neurons_previous: PositiveInt,
-        activation: Type[nn.Module],
+        activation: Type[nn.Module] = None,
     ):
         """
         The __init__ method initializes the FCBlock class.
@@ -52,7 +52,9 @@ class FCBlock(nn.Sequential):
                 nn.Conv3d(num_neurons_previous, layer_config.num_neurons, 1)
             )
 
-        submodules.append(activation())
+        if not activation is None:
+            submodules.append(activation())
+
         if layer_config.dropout > 0.0:
             submodules.append(nn.Dropout(layer_config.dropout))
 

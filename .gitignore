@@ -6,6 +6,7 @@ notebooks/peal_runs
 notebooks/*.png
 notebooks/static
 notebooks/templates
+notebooks
 datasets
 peal_runs
 static
@@ -21,4 +22,4 @@ ace/outputs
 environment.yaml
 logs/
 notebooks/*
-peal/configs/*
+peal/configs

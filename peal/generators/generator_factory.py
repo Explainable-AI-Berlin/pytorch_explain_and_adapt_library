@@ -9,7 +9,6 @@ from peal.generators.interfaces import (
     Generator,
 )
 from peal.generators.normalizing_flows import Glow
-from peal.generators.diffusion_models import DimeDDPMAdaptor
 from peal.global_utils import (
     load_yaml_config,
     find_subclasses,
@@ -64,11 +63,6 @@ def get_generator(
                 config=generator_config,
                 dataset=train_dataloader.dataset,
                 device=device,
-            )
-
-        elif generator_config.generator_type == "ddpm":
-            generator_out = DimeDDPMAdaptor(
-                config=generator_config, dataset=train_dataloader.dataset, device=device
             )
 
         elif generator_config.generator_type == "glow":

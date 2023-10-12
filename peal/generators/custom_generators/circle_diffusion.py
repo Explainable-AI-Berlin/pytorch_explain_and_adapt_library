@@ -178,7 +178,8 @@ class CircleDiffusionAdaptor(EditCapableGenerator):
             model.load_state_dict(torch.load(self.model_path))
             logging.info(f'Model found with path {self.model_path}')
         elif model_name not in os.listdir(self.model_dir) and mode != 'train':
-            logging.info('Model not found. Please run train_and_load_diffusion method and set its argument mode="train" ')
+            logging.info(
+                'Model not found. Please run train_and_load_diffusion method and set its argument mode="train" ')
         else:
             logging.info(
                 f'Training model with path {self.model_path}'
@@ -236,11 +237,12 @@ class CircleDiffusionAdaptor(EditCapableGenerator):
 
         self.model = model
 
+    @torch.no_grad()
     def sample_ddpm(self, model: nn.Module, n_samples: int = 256, label=None):
         """
         iteratively denoises pure noise to produce a list of denoised samples at each timestep
         """
-
+        model.eval()
         x_pred = []
         x = torch.randn(n_samples, self.input_dim)
         x_pred.append(x)
@@ -351,7 +353,12 @@ class CircleDiffusionAdaptor(EditCapableGenerator):
         guided_grads = torch.stack(guided_grads).permute(1, 0, 2)
         unguided_grads = torch.stack(unconditional_grads).permute(1, 0, 2)
 
+        self.counterfactuals_series = counterfactuals
+        self.guided_grads = guided_grads
+        self.unguided_grads = unguided_grads
+
         return counterfactuals, guided_grads, unguided_grads, total_series
+
 
     def discard_counterfactuals(self, counterfactuals, classifier, target_classes, target_confidence,
                                 minimal_counterfactuals, tolerance=0.1):
@@ -394,10 +401,11 @@ class CircleDiffusionAdaptor(EditCapableGenerator):
     ) -> Tuple[
         list[torch.Tensor], list[torch.Tensor], list[torch.Tensor], list[torch.Tensor]
     ]:
-        minimal_counterfactuals = torch.zeros(size=x_in.shape)
 
-        # scales = self.config['grad_scales']
-        # noise_steps = self.config['noise_steps_for_counterfactuals']
+        self.original_sample = x_in
+
+        #scales = self.config['grad_scales']
+        #noise_steps = self.config['noise_steps_for_counterfactuals']
 
         scales = self.config.grad_scales
         noise_steps = self.config.noise_steps_for_counterfactuals
