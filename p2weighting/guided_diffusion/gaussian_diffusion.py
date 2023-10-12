@@ -123,6 +123,8 @@ class GaussianDiffusion:
         model_var_type,
         loss_type,
         rescale_timesteps=False,
+        p2_gamma=0,
+        p2_k=1,
     ):
         self.model_mean_type = model_mean_type
         self.model_var_type = model_var_type
@@ -167,6 +169,11 @@ class GaussianDiffusion:
             * np.sqrt(alphas)
             / (1.0 - self.alphas_cumprod)
         )
+
+        # P2 weighting
+        self.p2_gamma = p2_gamma
+        self.p2_k = p2_k
+        self.snr = 1.0 / (1 - self.alphas_cumprod) - 1
 
     def q_mean_variance(self, x_start, t):
         """
@@ -364,7 +371,7 @@ class GaussianDiffusion:
         """
         gradient = cond_fn(x, self._scale_timesteps(t), **model_kwargs)
         new_mean = (
-            p_mean_var["mean"].float() - p_mean_var["variance"] * gradient.float()
+            p_mean_var["mean"].float() + p_mean_var["variance"] * gradient.float()
         )
         return new_mean
 
@@ -470,7 +477,6 @@ class GaussianDiffusion:
         :return: a non-differentiable batch of samples.
         """
         final = None
-        i = 0
         for sample in self.p_sample_loop_progressive(
             model,
             shape,
@@ -483,9 +489,6 @@ class GaussianDiffusion:
             progress=progress,
         ):
             final = sample
-            print(i)
-            print(final["sample"].shape)
-            i += 1
         return final["sample"]
 
     def p_sample_loop_progressive(
@@ -580,7 +583,7 @@ class GaussianDiffusion:
         noise = th.randn_like(x)
         mean_pred = (
             out["pred_xstart"] * th.sqrt(alpha_bar_prev)
-            + th.sqrt(1 - alpha_bar_prev - sigma**2) * eps
+            + th.sqrt(1 - alpha_bar_prev - sigma ** 2) * eps
         )
         nonzero_mask = (
             (t != 0).float().view(-1, *([1] * (len(x.shape) - 1)))
@@ -810,7 +813,11 @@ class GaussianDiffusion:
                 ModelMeanType.EPSILON: noise,
             }[self.model_mean_type]
             assert model_output.shape == target.shape == x_start.shape
-            terms["mse"] = mean_flat((target - model_output) ** 2)
+
+            # P2 weighting
+            weight = _extract_into_tensor(1 / (self.p2_k + self.snr)**self.p2_gamma, t, target.shape)
+            terms["mse"] = mean_flat(weight * (target - model_output) ** 2)
+
             if "vb" in terms:
                 terms["loss"] = terms["mse"] + terms["vb"]
             else:

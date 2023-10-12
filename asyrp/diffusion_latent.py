@@ -1,4 +1,5 @@
 import time
+import torchvision
 from tqdm import tqdm
 import os
 import numpy as np
@@ -8,6 +9,9 @@ from torch import nn
 import torchvision.utils as tvu
 import torchvision.transforms as transforms
 import copy
+
+from ace.guided_diffusion.gaussian_diffusion import GaussianDiffusion
+from ace.guided_diffusion.script_util import create_gaussian_diffusion
 
 from asyrp.models.guided_diffusion.script_util import guided_Diffusion
 from asyrp.losses.clip_loss import CLIPLoss
@@ -75,7 +79,6 @@ class Asyrp(object):
             self.trg_txts = SRC_TRG_TXT_DIC[self.args.edit_attr][1]
 
     def load_pretrained_model(self):
-        import pdb; pdb.set_trace()
         # ----------- Model -----------#
         if self.config.data.dataset == "LSUN":
             if self.config.data.category == "bedroom":
@@ -137,6 +140,13 @@ class Asyrp(object):
             raise ValueError
 
         model.load_state_dict(init_ckpt, strict=False)
+        diffusion = create_gaussian_diffusion()
+        model.h_only = True
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        model.to(device)
+        samples = diffusion.p_sample_loop(model, [3, 3, 256, 256])
+        torchvision.utils.save_image(samples, os.path.join(self.args.exp, "generator_samples.png"))
+        import pdb; pdb.set_trace()
 
         return model
 
