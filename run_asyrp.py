@@ -584,10 +584,8 @@ def parse_args_and_config():
         config = yaml.safe_load(f)
     new_config = dict2namespace(config)
 
-    args.exp = (
-        args.exp
-        + f"_LC_{new_config.data.category}_t{args.t_0}_ninv{args.n_inv_step}_ngen{args.n_train_step}"
-    )
+    # TODO why is this done?
+    # args.exp = args.exp + f'_LC_{new_config.data.category}_t{args.t_0}_ninv{args.n_inv_step}_ngen{args.n_train_step}'
 
     level = getattr(logging, args.verbose.upper(), None)
     if not isinstance(level, int):
@@ -602,10 +600,10 @@ def parse_args_and_config():
     logger.addHandler(handler1)
     logger.setLevel(level)
 
-    os.makedirs("checkpoint", exist_ok=True)
-    os.makedirs("checkpoint_latent", exist_ok=True)
-    os.makedirs("precomputed", exist_ok=True)
-    os.makedirs("runs", exist_ok=True)
+    os.makedirs(os.path.join(args.exp, "checkpoint"), exist_ok=True)
+    os.makedirs(os.path.join(args.exp, "checkpoint_latent"), exist_ok=True)
+    os.makedirs(os.path.join(args.exp, "precomputed"), exist_ok=True)
+    os.makedirs(os.path.join(args.exp, "runs"), exist_ok=True)
     os.makedirs(args.exp, exist_ok=True)
 
     import shutil
@@ -705,8 +703,10 @@ def main():
         # check the example script files for essential parameters
         if args.run_train:
             runner.run_training()
+
         elif args.run_test:
             runner.run_test()
+
         elif args.lpips:
             runner.compute_lpips_distance()
 
