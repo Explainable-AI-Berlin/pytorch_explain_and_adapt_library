@@ -174,6 +174,7 @@ def create_model_and_diffusion(
 def guided_Diffusion(dataset_name="MetFACE"):
     if dataset_name == "MetFACE":
         return create_model(**METFACE_DICT)
+
     elif dataset_name == "CelebA_HQ_P2":
         return create_model(**CELEBA_HQ_P2_DICT)
 
@@ -455,12 +456,16 @@ def create_gaussian_diffusion(
     betas = gd.get_named_beta_schedule(noise_schedule, steps)
     if use_kl:
         loss_type = gd.LossType.RESCALED_KL
+
     elif rescale_learned_sigmas:
         loss_type = gd.LossType.RESCALED_MSE
+
     else:
         loss_type = gd.LossType.MSE
+
     if not timestep_respacing:
         timestep_respacing = [steps]
+
     return SpacedDiffusion(
         use_timesteps=space_timesteps(steps, timestep_respacing),
         betas=betas,

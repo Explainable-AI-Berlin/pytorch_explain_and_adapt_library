@@ -508,6 +508,7 @@ class UNetModel(nn.Module):
         self.num_heads = num_heads
         self.num_head_channels = num_head_channels
         self.num_heads_upsample = num_heads_upsample
+        self.h_only = False
 
         time_embed_dim = model_channels * 4
         self.time_embed = nn.Sequential(
@@ -777,7 +778,11 @@ class UNetModel(nn.Module):
 
         h = self.out(h)
 
-        return h, h2, delta_h, middle_h
+        if self.h_only:
+            return h
+
+        else:
+            return h, h2, delta_h, middle_h
 
     def setattr_layers(self, nums):
         ch = int(self.channel_mult[0] * self.model_channels)
