@@ -1,3 +1,5 @@
+logs/
+notebooks/*
 peal_env
 *__pycache__*
 notebooks/.ipynb_checkpoints
@@ -20,6 +22,3 @@ outputs
 dime2/outputs
 ace/outputs
 environment.yaml
-logs/
-notebooks/*
-peal/configs

@@ -1,21 +1,22 @@
-'batch_size'                           :  5
-'min_train_samples'                    :  32 #hyperparameter as proportion of the full dataset
+'batch_size'                           :  20
+'min_train_samples'                    :  64 #hyperparameter as proportion of the full dataset
 'mixing_ratio'                         :  0.5 # 1 `only new dataset, 0 `only old dataset
-'finetune_iterations'                  :  50 #hyperparameter
-'max_validation_samples'               :  10
+'finetune_iterations'                  :  5 #hyperparameter
+'max_validation_samples'               :  32
+'continuous_learning'                  :  False
 'replace_model'                        :  True
 'explainer'                            :  '<PEAL_BASE>/configs/explainers/counterfactual_default.yaml'
-'training'                             :  '<PEAL_BASE>/configs/training/img_classifier.yaml'
-'data'                                 :  '<PEAL_BASE>/configs/data/circle_dataset_poisened.yaml'
-'test_data'                            :  '<PEAL_BASE>/configs/data/circle_dataset_poisened.yaml'
+'training'                             :  '<PEAL_BASE>/configs/training/symbolic_classifier.yaml'
+'data'                                 :  '<PEAL_BASE>/configs/data/circle_dataset_diffusion_poisened.yaml'
+'test_data'                            :  '<PEAL_BASE>/configs/data/circle_dataset_diffusion_unpoisened.yaml'
 'student'                              :  'peal_runs/artificial_circle_poisened_classifier/model.cpl'
 'teacher'                              :  'peal_runs/artificial_circle_unpoisened_classifier/model.cpl'
 'generator'                            :  'peal_runs/artificial_circle_diffusion_generator/config.yaml'
-'base_dir'                             :  'peal_runs/artificial_circle_poisened_classifier/steps_50_grad_1_l1_10000'
+'base_dir'                             :  'peal_runs/artificial_circle_poisened_classifier/steps_5_grad_1_l1_100_lr_0.0001'
 'task':
   'criterions':
     'ce'     : 1.0
-    'l1'     : 10000.0
+    'l1'     : 100.0
   'output_type'             : 'multiclass'
   'output_channels'         : 2
   'y_selection'             : ['Target']
