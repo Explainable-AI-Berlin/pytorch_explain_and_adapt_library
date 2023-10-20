@@ -1,7 +1,7 @@
 import torch
+import torchvision
 
 from torch import nn
-from tqdm import tqdm
 from typing import Union
 
 from peal.global_utils import load_yaml_config
@@ -60,6 +60,7 @@ class CounterfactualExplainer(ExplainerInterface):
         """
         x = torch.clone(x_in)
         x = self.dataset.project_from_pytorch_default(x)
+        x = torchvision.transforms.Resize(self.generator.config.data.input_size[1:])(x)
         v_original = self.generator.encode(x.to(self.device))
         if isinstance(v_original, list):
             v = []
@@ -94,6 +95,8 @@ class CounterfactualExplainer(ExplainerInterface):
 
             optimizer.zero_grad()
             img = self.generator.decode(latent_code)
+
+            img = torchvision.transforms.Resize(self.dataset.config.input_size[1:])(img)
 
             img = self.dataset.project_to_pytorch_default(img)
 
