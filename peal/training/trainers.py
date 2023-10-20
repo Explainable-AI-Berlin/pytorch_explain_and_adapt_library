@@ -116,6 +116,9 @@ class ModelTrainer:
             config=self.config, datasource=datasource, gigabyte_vram=gigabyte_vram
         )
 
+        if isinstance(self.val_dataloaders, tuple):
+            self.val_dataloaders = list(self.val_dataloaders)
+
         if not isinstance(self.val_dataloaders, list):
             self.val_dataloaders = [self.val_dataloaders]
 
@@ -309,13 +312,14 @@ class ModelTrainer:
             val_accuracy = 0.0
             for idx, val_dataloader in enumerate(self.val_dataloaders):
                 if len(val_dataloader) >= 1:
-                    val_loss, val_accuracy = self.run_epoch(
+                    val_loss, val_accuracy_current = self.run_epoch(
                         val_dataloader, mode="validation_" + str(idx), pbar=pbar
                     )
-                    val_accuracy += self.val_dataloader_weights[idx] * val_accuracy
+                    val_accuracy += self.val_dataloader_weights[idx] * val_accuracy_current
 
+            val_accuracy = val_accuracy / len(self.val_dataloaders)
             self.logger.writer.add_scalar(
-                "val_accuracy", val_accuracy, self.config.training.epoch
+                "epoch_validation_accuracy", val_accuracy, self.config.training.epoch
             )
             if isinstance(self.model, Generator):
                 val_generator_performance = self.val_dataloaders[

@@ -17,14 +17,14 @@ class CounterfactualExplainer(ExplainerInterface):
     """
 
     def __init__(
-        self,
-        downstream_model: nn.Module,
-        generator: InvertibleGenerator,
-        input_type: str,
-        dataset: PealDataset,
-        explainer_config: Union[
-            dict, str, ExplainerConfig
-        ] = "<PEAL_BASE>/configs/explainers/counterfactual_default.yaml",
+            self,
+            downstream_model: nn.Module,
+            generator: InvertibleGenerator,
+            input_type: str,
+            dataset: PealDataset,
+            explainer_config: Union[
+                dict, str, ExplainerConfig
+            ] = "<PEAL_BASE>/configs/explainers/counterfactual_default.yaml",
     ):
         """
         This class implements the counterfactual explanation method
@@ -47,7 +47,7 @@ class CounterfactualExplainer(ExplainerInterface):
         self.loss = torch.nn.CrossEntropyLoss()
 
     def gradient_based_counterfactual(
-        self, x_in, target_confidence_goal, target_classes, pbar=None, mode=""
+            self, x_in, target_confidence_goal, target_classes, pbar=None, mode=""
     ):
         """
         This function generates a counterfactual for a given batch of inputs.
@@ -84,8 +84,8 @@ class CounterfactualExplainer(ExplainerInterface):
         for i in range(self.explainer_config.gradient_steps):
             if self.explainer_config.use_masking:
                 mask = (
-                    torch.tensor(target_confidences).to(self.device)
-                    < target_confidence_goal
+                        torch.tensor(target_confidences).to(self.device)
+                        < target_confidence_goal
                 )
                 if torch.sum(mask) == 0.0:
                     break
@@ -173,14 +173,16 @@ class CounterfactualExplainer(ExplainerInterface):
         return counterfactual, attributions, target_confidences
 
     def explain_batch(
-        self,
-        batch: dict,
-        base_path: str = "collages",
-        start_idx: int = 0,
-        y_target_goal_confidence_in: int = None,
-        remove_below_threshold: bool = True,
-        pbar=None,
-        mode="",
+            self,
+            batch: dict,
+            base_path: str = "collages",
+            start_idx: int = 0,
+            y_target_goal_confidence_in: int = None,
+            remove_below_threshold: bool = True,
+            pbar=None,
+            mode="",
+            model: nn.Module = None,
+            dataloader=None,
     ) -> dict:
         """
         This function generates a counterfactual for a given batch of inputs.
@@ -236,22 +238,25 @@ class CounterfactualExplainer(ExplainerInterface):
                 batch_out[key] = []
                 for sample_idx in range(len(batch[key])):
                     if (
-                        batch["y_target_end_confidence_list"][sample_idx]
-                        >= target_confidence_goal
+                            batch["y_target_end_confidence_list"][sample_idx]
+                            >= target_confidence_goal
                     ):
                         batch_out[key].append(batch[key][sample_idx])
 
         else:
             batch_out = batch
-
+        #try:
         (
             batch_out["x_attribution_list"],
             batch_out["collage_path_list"],
         ) = self.dataset.generate_contrastive_collage(
             target_confidence_goal=target_confidence_goal,
             base_path=base_path,
+            classifier=model,
             start_idx=start_idx,
+            dataloader=dataloader,
             **batch_out,
         )
-
+        #except TypeError:
+        #    import pdb; pdb.set_trace()
         return batch_out

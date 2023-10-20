@@ -1,12 +1,12 @@
 #
-'name'              : 'symbolic_classifier'
+#'name'              : 'symbolic_classifier'
 'data'              : '<PEAL_BASE>/configs/data/circle_dataset_diffusion_unpoisened.yaml'
 'training'          : '<PEAL_BASE>/configs/training/symbolic_classifier.yaml'
 'architecture'      : '<PEAL_BASE>/configs/architectures/symbolic2vector.yaml'
 'task':
   'criterions':
     'ce'     : 1.0
-    'l1'     : 10000.0
+    'l1'     : 100.0
   'output_type'             : 'multiclass'
   'output_size'             : 2
   'x_selection'             : ['x1', 'x2']

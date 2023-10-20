@@ -181,6 +181,7 @@ class CounterfactualKnowledgeDistillation:
             self.adaptor_config.training, self.train_dataloader
         )
         self.datastack = DataStack(self.train_dataloader, self.output_size)
+
         self.explainer = CounterfactualExplainer(
             downstream_model=self.student,
             generator=self.generator,
@@ -215,7 +216,8 @@ class CounterfactualKnowledgeDistillation:
         self.validation_data_config.data.num_samples = (
             self.adaptor_config.max_validation_samples
         )
-        self.validation_data_config.data.split = [1.0, 1.0]
+        self.validation_data_config.data.split = [0.0, 1.0]
+
 
     def get_batch(
         self,
@@ -262,6 +264,8 @@ class CounterfactualKnowledgeDistillation:
 
         x_batch = torch.stack(x_batch)
         y_target_batch = torch.stack(y_target_batch)
+        #if np.random.rand() < 0.3:
+        #    import pdb; pdb.set_trace()
         return {
             "x_list": x_batch,
             "y_list": y_batch,
@@ -327,6 +331,8 @@ class CounterfactualKnowledgeDistillation:
                     remove_below_threshold=True,
                     pbar=pbar,
                     mode="Training",
+                    model=self.student,
+                    dataloader=self.dataloader_mixer
                 )
                 for key in tracked_keys:
                     tracked_values[key].extend(values[key])
@@ -393,6 +399,7 @@ class CounterfactualKnowledgeDistillation:
             self.base_dir, str(finetune_iteration), "validation_tracked_values.npz"
         )
         if not os.path.exists(validation_values_path):
+
             (
                 validation_tracked_values,
                 validation_stats,
@@ -411,6 +418,7 @@ class CounterfactualKnowledgeDistillation:
                 max_validation_samples=self.adaptor_config.max_validation_samples,
                 min_start_target_percentile=self.adaptor_config.min_start_target_percentile,
             )
+
             os.makedirs(
                 os.path.join(self.base_dir, str(finetune_iteration)), exist_ok=True
             )
@@ -570,7 +578,7 @@ class CounterfactualKnowledgeDistillation:
             for key in validation_stats.keys():
                 if isinstance(validation_stats[key], float):
                     writer.add_scalar(
-                        key,
+                        "validation_" + key,
                         validation_stats[key],
                         self.adaptor_config.current_iteration,
                     )
@@ -830,24 +838,30 @@ class CounterfactualKnowledgeDistillation:
             )
 
             #
+            self.dataloader_mixer = DataloaderMixer(
+                self.adaptor_config.training, self.train_dataloader
+            )
+
+            #
             if not self.adaptor_config.mixing_ratio is None:
                 priority = (
-                    (1 / (1 - self.adaptor_config.mixing_ratio))
-                    * self.adaptor_config.mixing_ratio
-                    * len(self.dataloader_mixer)
-                    / len(dataloader.dataset)
+                        (1 / (1 - self.adaptor_config.mixing_ratio))
+                        * self.adaptor_config.mixing_ratio
+                        * len(self.dataloader_mixer)
+                        / len(dataloader.dataset)
                 )
 
             else:
                 priority = 1
 
             self.dataloader_mixer.append(dataloader, priority=priority)
+
             assert (
-                abs(
-                    self.dataloader_mixer.priorities[-1]
-                    - self.adaptor_config.mixing_ratio
-                )
-                < 0.01
+                    abs(
+                        self.dataloader_mixer.priorities[-1]
+                        - self.adaptor_config.mixing_ratio
+                    )
+                    < 0.01
             ), "priorities do not match! " + str(self.dataloader_mixer.priorities)
             self.dataloaders_val[1] = dataloader_val
 
@@ -869,7 +883,7 @@ class CounterfactualKnowledgeDistillation:
                 val_dataloader_weights=[
                     1 - self.adaptor_config.mixing_ratio,
                     self.adaptor_config.mixing_ratio,
-                ],
+                    ],
             )
             finetune_trainer.fit(continue_training=True)
 

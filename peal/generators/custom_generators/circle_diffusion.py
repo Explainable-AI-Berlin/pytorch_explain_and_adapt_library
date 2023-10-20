@@ -409,32 +409,34 @@ class CircleDiffusionAdaptor(EditCapableGenerator):
 
         scales = self.config.grad_scales
         noise_steps = self.config.noise_steps_for_counterfactuals
+        num_iterations = self.config.attack_iterations
 
         minimal_counterfactuals = x_in.clone()
 
-        for steps in noise_steps:
-            for s in scales:
-                (
-                    counterfactuals,
-                    guided_grads,
-                    unguided_grads,
-                    total_series,
-                ) = self.sample_counterfactual_ddpm(
-                    clean_batch=minimal_counterfactuals,
-                    model=self.model,
-                    classifier=classifier,
-                    num_noise_steps=steps,
-                    target_classes=target_classes,
-                    classifier_grad_weight=s,
-                )
+        for it in range(num_iterations):
+            for steps in noise_steps:
+                for s in scales:
+                    (
+                        counterfactuals,
+                        guided_grads,
+                        unguided_grads,
+                        total_series,
+                    ) = self.sample_counterfactual_ddpm(
+                        clean_batch=minimal_counterfactuals,
+                        model=self.model,
+                        classifier=classifier,
+                        num_noise_steps=steps,
+                        target_classes=target_classes,
+                        classifier_grad_weight=s,
+                    )
 
-                minimal_counterfactuals = self.discard_counterfactuals(
-                    counterfactuals=counterfactuals,
-                    classifier=classifier,
-                    target_confidence=target_confidence_goal,
-                    target_classes=target_classes,
-                    minimal_counterfactuals=minimal_counterfactuals,
-                )
+                    minimal_counterfactuals = self.discard_counterfactuals(
+                        counterfactuals=counterfactuals,
+                        classifier=classifier,
+                        target_confidence=target_confidence_goal,
+                        target_classes=target_classes,
+                        minimal_counterfactuals=minimal_counterfactuals,
+                    )
 
         list_counterfactuals = [row_tensor for row_tensor in minimal_counterfactuals]
         diff_latent = x_in - minimal_counterfactuals
