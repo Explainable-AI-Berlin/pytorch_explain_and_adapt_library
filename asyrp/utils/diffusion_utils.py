@@ -58,7 +58,9 @@ def denoising_step(
         et, logvar_learned = torch.split(et, et.shape[1] // 2, dim=1)
         if index is not None:
             et_modified, _ = torch.split(et_modified, et_modified.shape[1] // 2, dim=1)
+
         logvar = logvar_learned
+
     else:
         logvar = extract(logvars, t, xt.shape)
 

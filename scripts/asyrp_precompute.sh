@@ -1,6 +1,5 @@
 apptainer run --nv asyrp_container.sif python run_asyrp.py  \
 --run_train          \
---edit_attr test     \
 --do_train 1         \
 --do_test 1          \
 --n_train_img 100    \
@@ -9,11 +8,12 @@ apptainer run --nv asyrp_container.sif python run_asyrp.py  \
 --n_inv_step 50      \
 --n_train_step 50    \
 --n_test_step 50     \
+--get_h_num 1                  \
+--train_delta_block            \
 --just_precompute \
 --config custom.yml         \
---train_delta_block            \
---get_h_num 1                  \
 --exp peal_runs/asyrp_test         \
+--edit_attr test     \
 --sh_file_name "/home/sidney/workspace/peal/scripts/asyrp_precompute.sh"   \
 --custom_train_dataset_dir "datasets/celeba/imgs"    \
 --custom_test_dataset_dir "datasets/celeba/imgs"  \

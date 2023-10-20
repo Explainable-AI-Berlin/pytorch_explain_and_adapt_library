@@ -8,4 +8,4 @@ apptainer run --nv asyrp_container.sif python run_asyrp.py  \
 --custom_train_dataset_dir "datasets/celeba/imgs"    \
 --custom_test_dataset_dir "datasets/celeba/imgs"  \
 --sh_file_name "/home/sidney/workspace/peal/scripts/asyrp_calculate_lpips.sh"   \
---model_path peal_runs/celebahq_ddpm/final.pt
+--model_path peal_runs/asyrp_test/celebahq_p2.pt

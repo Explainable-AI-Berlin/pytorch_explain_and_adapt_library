@@ -4,9 +4,7 @@ apptainer run --nv asyrp_container.sif python run_asyrp.py  \
 --do_test 1                    \
 --n_train_img 100              \
 --n_test_img 32                \
---n_iter 5                     \
 --bs_train 1                   \
---t_0 999                      \
 --n_inv_step 50                \
 --n_train_step 50              \
 --n_test_step 50               \
@@ -20,6 +18,8 @@ apptainer run --nv asyrp_container.sif python run_asyrp.py  \
 --add_noise_from_xt            \
 --lpips_addnoise_th 1.2        \
 --lpips_edit_th 0.33           \
+--n_iter 5                     \
+--t_0 999                      \
 --config custom.yml         \
 --edit_attr "smiling"              \
 --sh_file_name "/home/sidney/workspace/peal/scripts/asyrp_train.sh"   \

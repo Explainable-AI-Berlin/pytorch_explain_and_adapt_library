@@ -316,6 +316,8 @@ class DDPM(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.config = config
+        # TODO this should be worked in better!
+        self.h_only = False
         ch, out_ch, ch_mult = (
             config.model.ch,
             config.model.out_ch,
@@ -602,7 +604,11 @@ class DDPM(nn.Module):
         h = nonlinearity(h)
         h = self.conv_out(h)
 
-        return h, h2, delta_h, middle_h
+        if self.h_only:
+            return h
+
+        else:
+            return h, h2, delta_h, middle_h
 
     def forward_layer_check(
         self,

@@ -8,6 +8,8 @@ import torch
 import numpy as np
 
 from asyrp.diffusion_latent import Asyrp
+from asyrp.asyrp_utils.compute_lpips_distance import compute_lpips_distance
+from asyrp.asyrp_utils.testing import run_test
 
 
 def parse_args_and_config():
@@ -613,6 +615,7 @@ def parse_args_and_config():
             args.sh_file_name,
             os.path.join(args.exp, f"{(args.sh_file_name).split('.')[0]}_test.sh"),
         )
+
     elif args.style_transfer:
         shutil.copy(
             args.sh_file_name,
@@ -620,11 +623,13 @@ def parse_args_and_config():
                 args.exp, f"{(args.sh_file_name).split('.')[0]}_style_transfer.sh"
             ),
         )
+
     elif args.run_train:
         shutil.copy(
             args.sh_file_name,
             os.path.join(args.exp, f"{args.sh_file_name.split('.')[0]}_train.sh"),
         )
+
     elif args.lpips:
         pass
 
@@ -681,9 +686,12 @@ def dict2namespace(config):
     for key, value in config.items():
         if isinstance(value, dict):
             new_value = dict2namespace(value)
+
         else:
             new_value = value
+
         setattr(namespace, key, new_value)
+
     return namespace
 
 
@@ -705,10 +713,10 @@ def main():
             runner.run_training()
 
         elif args.run_test:
-            runner.run_test()
+            run_test(runner)
 
         elif args.lpips:
-            runner.compute_lpips_distance()
+            compute_lpips_distance(runner)
 
     except Exception:
         logging.error(traceback.format_exc())
