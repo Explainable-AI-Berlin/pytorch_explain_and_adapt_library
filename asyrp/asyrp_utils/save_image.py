@@ -87,6 +87,7 @@ def save_image(
 
         if runner.args.pass_editing:
             pass
+
         else:
             if not isinstance(hs_coeff, list):
                 hs_coeff = [hs_coeff]

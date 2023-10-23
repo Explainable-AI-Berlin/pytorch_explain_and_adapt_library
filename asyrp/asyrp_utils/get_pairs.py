@@ -203,6 +203,7 @@ def precompute_pairs(runner, model, save_imgs=False):
                     "precomputed/",
                     f"{runner.config.data.category}_{IMAGENET_DIC[str(runner.args.target_class_num)][1]}_{mode}_t{runner.args.t_0}_nim{runner.args.n_precomp_img}_ninv{runner.args.n_inv_step}_pairs.pth",
                 )
+
             else:
                 pairs_path = os.path.join(
                     "precomputed/",
@@ -215,11 +216,13 @@ def precompute_pairs(runner, model, save_imgs=False):
                     "precomputed/",
                     f"{runner.config.data.category}_{mode}_t{runner.args.t_0}_nim{runner.args.n_train_img}_ninv{runner.args.n_inv_step}_pairs.pth",
                 )
+
             else:
                 pairs_path = os.path.join(
                     "precomputed/",
                     f"{runner.config.data.category}_{mode}_t{runner.args.t_0}_nim{runner.args.n_test_img}_ninv{runner.args.n_inv_step}_pairs.pth",
                 )
+
         print(pairs_path)
         if os.path.exists(pairs_path) and not runner.args.re_precompute:
             print(f"{mode} pairs exists")
@@ -244,6 +247,7 @@ def precompute_pairs(runner, model, save_imgs=False):
                     if step == runner.args.n_precomp_img - 1:
                         break
             continue
+
         else:
             exist_num = 0
             for exist_precompute_num in reversed(
@@ -298,6 +302,7 @@ def precompute_pairs(runner, model, save_imgs=False):
             if exist_num != 0:
                 exist_num = exist_num - 1
                 continue
+
             x0 = img.to(runner.config.device)
             if save_imgs:
                 tvu.save_image(
