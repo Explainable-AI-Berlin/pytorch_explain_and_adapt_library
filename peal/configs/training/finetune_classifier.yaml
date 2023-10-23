@@ -5,7 +5,7 @@
 'gigabyte_vram'           : 40
 'assumed_input_size'      : [3, 64, 64]
 'max_epochs'              : 1 # [1, 12]
-'learning_rate'           : 0.0 # [0.00005, 0.0001]
+'learning_rate'           : 0.0001 # [0.00005, 0.0001]
 'optimizer'               : 'adam'
 'global_train_step'       : 0
 'global_validation_step'  : 0

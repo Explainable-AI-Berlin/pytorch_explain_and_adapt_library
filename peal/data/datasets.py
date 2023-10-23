@@ -90,7 +90,7 @@ class SymbolicDataset(PealDataset):
         config,
         transform=ToTensor(),
         task_config=None,
-        **kargs,
+        **kwargs,
     ):
         """
         Initialize the dataset.
@@ -175,6 +175,7 @@ class SymbolicDataset(PealDataset):
         target_confidence_goal,
         base_path,
         start_idx,
+        classifier=None,
         **args,
     ):
         # TODO

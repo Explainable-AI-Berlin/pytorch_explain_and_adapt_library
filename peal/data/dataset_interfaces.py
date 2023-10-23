@@ -20,6 +20,7 @@ class PealDataset(torch.utils.data.Dataset):
         y_source,
         base_path,
         start_idx,
+        classifier=None,
     ):
         """
         This function generates a collage of the input and the counterfactual
