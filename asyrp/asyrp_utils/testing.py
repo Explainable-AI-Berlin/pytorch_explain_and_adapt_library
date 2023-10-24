@@ -96,11 +96,11 @@ def run_test(runner):
                 continue
 
             save_image(
-                runner,
-                model,
-                x_lat_tensor,
-                seq_test,
-                seq_test_next,
+                runner=runner,
+                model=model,
+                x_lat_tensor=x_lat_tensor,
+                seq_inv=seq_test,
+                seq_inv_next=seq_test_next,
                 save_x0=runner.args.save_x0,
                 save_x_origin=runner.args.save_x_origin,
                 x0_tensor=x0_tensor,
@@ -222,6 +222,9 @@ def get_delta_h_dict(runner, seq_train, seq_test, load_dict, seq_test_edit, save
             interval_seq = seq_train[1] - seq_train[0]
 
             if not load_dict:
+                print('Create Dict!!!')
+                print('Create Dict!!!')
+                print('Create Dict!!!')
                 for i in seq_test_edit:
                     test_delta_h_dict[i] = delta_h_dict[seq_train[trained_idx]]
 
@@ -233,6 +236,9 @@ def get_delta_h_dict(runner, seq_train, seq_test, load_dict, seq_test_edit, save
                 delta_h_dict = test_delta_h_dict
 
             else:
+                print('Load Dict!!!')
+                print('Load Dict!!!')
+                print('Load Dict!!!')
                 delta_h_dict = {}
                 for i in seq_test:
                     delta_h_dict[i] = None
@@ -324,7 +330,7 @@ def get_hs_coeff(runner, save_name):
         print(f"Max cosine: {max_cosine}, Max attribute: {max_attr}")
         runner.src_txts = SRC_TRG_TXT_DIC[max_attr][0]
         runner.trg_txts = SRC_TRG_TXT_DIC[max_attr][1]
-        cosine = set_t_edit_t_addnoise(
+        set_t_edit_t_addnoise(
             runner=runner,
             LPIPS_th=runner.args.lpips_edit_th,
             LPIPS_addnoise_th=runner.args.lpips_addnoise_th,
@@ -445,5 +451,9 @@ def get_sequence(runner):
     seq_test_edit = [int(s + 1e-6) for s in list(seq_test_edit)]
     seq_test = [int(s + 1e-6) for s in list(seq_test)]
     seq_test_next = [-1] + list(seq_test[:-1])
+
+    print(f"seq_train: {seq_train}")
+    print(f"seq_test: {seq_test}")
+    print(f"seq_test_edit: {seq_test_edit}")
 
     return seq_test, seq_train, seq_test_next, seq_test_edit

@@ -1,0 +1,29 @@
+apptainer run --nv asyrp_container.sif python run_asyrp.py  \
+--run_test                    \
+--do_test 1                   \
+--n_test_img 32               \
+--n_iter 5                    \
+--bs_train 1                  \
+--t_0 999                     \
+--n_inv_step 50               \
+--n_train_step 50             \
+--n_test_step 50      \
+--train_delta_block           \
+--get_h_num 1                 \
+--add_noise_from_xt           \
+--lpips_addnoise_th 1.2       \
+--lpips_edit_th 0.33          \
+--save_x0                     \
+--use_x0_tensor               \
+--hs_coeff_origin_h 1.0        \
+--hs_coeff_delta_h 0.0        \
+--hs_coeff 0.0 \
+--config custom.yml         \
+--edit_attr "smiling"              \
+--user_defined_t_edit 999       \
+--user_defined_t_addnoise 0   \
+--sh_file_name "/home/sidney/workspace/peal/scripts/asyrp_inference_playground.sh"   \
+--exp peal_runs/asyrp_test_playground2        \
+--custom_train_dataset_dir "datasets/celeba/imgs"    \
+--custom_test_dataset_dir "datasets/celeba/imgs"  \
+--model_path peal_runs/celebahq_ddpm/final.pt

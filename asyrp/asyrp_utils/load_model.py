@@ -74,12 +74,12 @@ def load_pretrained_model(runner):
 
         model.load_state_dict(init_ckpt, strict=False)
         print(runner.config.data.dataset)
-        diffusion = create_gaussian_diffusion(learn_sigma=True)
+        '''diffusion = create_gaussian_diffusion(learn_sigma=True)
         model.h_only = True
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         model.to(device)
         samples = diffusion.p_sample_loop(model, [3, 3, 256, 256])
         torchvision.utils.save_image(samples, os.path.join(runner.args.exp, "generator_samples.png"))
-        model.h_only = False
+        model.h_only = False'''
 
         return model

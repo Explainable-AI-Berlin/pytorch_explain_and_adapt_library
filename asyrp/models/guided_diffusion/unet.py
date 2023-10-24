@@ -719,26 +719,20 @@ class UNetModel(nn.Module):
             # check t_edit
             if timesteps[0] >= t_edit:
                 # use DeltaBlock
-                if delta_h is None:  # Asyrp
+                if delta_h is None:
+                    # Asyrp
                     h2 = h * hs_coeff[0]
                     for i in range(index + 1):
                         delta_h = getattr(self, f"layer_{i}")(
                             h, None if ignore_timestep else emb
                         )
                         h2 += delta_h * hs_coeff[i + 1]
-                # use input delta_h  : even tough you does not use DeltaBlock, you need to use index is 0.
-                else:  # DiffStyle; Just ignore this code. We will update about it in README.md later.
-                    if use_mask:
-                        mask = th.zeros_like(h)
-                        mask[:, :, 4:-1, 3:5] = 1.0
-                        inverted_mask = 1 - mask
 
-                        masked_delta_h = delta_h * mask
-                        masked_h = h * mask
+                    #import pdb; pdb.set_trace()
 
-                        partial_h2 = slerp(1 - hs_coeff[0], masked_h, masked_delta_h)
-                        h2 = partial_h2 + inverted_mask * h
-                    else:
+                else:
+                    # use input delta_h  : even if you do not use DeltaBlock, you need to use index is 0.
+                    if not use_mask:
                         h_shape = h.shape
                         h_copy = h.clone().view(h_shape[0], -1)
                         delta_h_copy = delta_h.clone().view(h_shape[0], -1)
@@ -758,8 +752,21 @@ class UNetModel(nn.Module):
                         normalized_delta_h = h_norm * delta_h / delta_h_norm
 
                         h2 = slerp(1.0 - hs_coeff[0], h, normalized_delta_h)
-            # when t[0] < t_edit : pass the delta_h
+
+                    else:
+                        # DiffStyle; Just ignore this code. We will update about it in README.md later.
+                        mask = th.zeros_like(h)
+                        mask[:, :, 4:-1, 3:5] = 1.0
+                        inverted_mask = 1 - mask
+
+                        masked_delta_h = delta_h * mask
+                        masked_h = h * mask
+
+                        partial_h2 = slerp(1 - hs_coeff[0], masked_h, masked_delta_h)
+                        h2 = partial_h2 + inverted_mask * h
+
             else:
+                # if t[0] < t_edit : pass the delta_h
                 h2 = h
 
             hs_index = -1
@@ -767,6 +774,7 @@ class UNetModel(nn.Module):
                 h2 = th.cat([h2, hs[hs_index]], dim=1)
                 hs_index -= 1
                 h2 = module(h2, emb)
+
             h2 = h2.type(x.dtype)
 
             h2 = self.out(h2)

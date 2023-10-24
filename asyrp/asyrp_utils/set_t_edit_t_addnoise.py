@@ -43,7 +43,7 @@ def set_t_edit_t_addnoise(
     LPIPS_file_name = f"{dataset_name}_LPIPS_distance_x0_t.tsv"
     LPIPS_file_path = os.path.join(runner.args.exp, LPIPS_file_name)
     if not os.path.exists(LPIPS_file_path):
-        if runner.args.user_defined_t_edit and runner.args.user_defined_t_addnoise:
+        if runner.args.user_defined_t_edit and (runner.args.user_defined_t_addnoise or runner.args.user_defined_t_addnoise == 0):
             runner.t_edit = runner.args.user_defined_t_edit
             runner.t_addnoise = runner.args.user_defined_t_addnoise
             print("user_defined t_edit and t_addnoise")
@@ -53,14 +53,15 @@ def set_t_edit_t_addnoise(
                 return cosine, clip_loss_func
             else:
                 return cosine
-        else:
-            import pdb
 
-            pdb.set_trace()
+        else:
             print(
                 f"LPIPS file not found, get LPIPS distance first!  : {LPIPS_file_path}"
             )
+            import pdb
+            pdb.set_trace()
             raise ValueError
+
     import csv
 
     lpips_dict = {}
@@ -75,9 +76,10 @@ def set_t_edit_t_addnoise(
         # even if not fully steps, it's okay.
         print("Warning: LPIPS file not fully steps! (But it's okay. lol)")
 
-    if runner.args.user_defined_t_edit:
+    if runner.args.user_defined_t_edit or runner.args.user_defined_t_edit == 0:
         # when you use user_defined_t_edit but not user_defined_t_addnoise
         t_edit = runner.args.user_defined_t_edit
+
     else:
         # get t_edit
         for key in sorted_lpips_dict_key_list:
@@ -91,7 +93,7 @@ def set_t_edit_t_addnoise(
     t_addnoise = None
 
     # t_boost is from LPIPS(xt, x0)
-    if runner.args.user_defined_t_addnoise:
+    if runner.args.user_defined_t_addnoise or runner.args.user_defined_t_addnoise == 0:
         # when you use user_defined_t_addnoise but not user_defined_t_edit
         t_addnoise = runner.args.user_defined_t_addnoise
 
@@ -124,6 +126,7 @@ def set_t_edit_t_addnoise(
 
     runner.t_addnoise = t_addnoise
     print(f"t_addnoise: {runner.t_addnoise}")
+
 
     if return_clip_loss:
         return cosine, clip_loss_func

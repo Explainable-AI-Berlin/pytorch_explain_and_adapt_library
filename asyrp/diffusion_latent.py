@@ -156,16 +156,9 @@ class Asyrp(object):
                 optim_param_list = optim_param_list + [delta_h_dict[key]]
 
         # optim_ft = torch.optim.Adam(optim_get_h_list, weight_decay=0, lr=self.args.lr_latent_clr)
-        try:
-            optim_ft = torch.optim.SGD(
-                optim_param_list, weight_decay=0, lr=self.args.lr_training
-            )
-
-        except Exception:
-            print("Error in SGD")
-            import pdb
-
-            pdb.set_trace()
+        optim_ft = torch.optim.SGD(
+            optim_param_list, weight_decay=0, lr=self.args.lr_training
+        )
 
         scheduler_ft = torch.optim.lr_scheduler.StepLR(
             optim_ft, step_size=self.args.scheduler_step_size, gamma=self.args.sch_gamma

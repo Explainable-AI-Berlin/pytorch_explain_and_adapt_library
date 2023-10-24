@@ -30,6 +30,7 @@ def random_noise_pairs(runner, model, saved_noise=False, save_imgs=False):
             if runner.config.data.dataset == "IMAGENET":
                 if runner.args.target_class_num is not None:
                     pairs_path = os.path.join(
+                        runner.args.exp,
                         "precomputed/",
                         f"{runner.config.data.category}_{IMAGENET_DIC[str(runner.args.target_class_num)][1]}_" +
                         f"{mode}_random_noise_nim{runner.args.n_precomp_img}_ninv{runner.args.n_inv_step}_pairs.pth",
@@ -37,6 +38,7 @@ def random_noise_pairs(runner, model, saved_noise=False, save_imgs=False):
 
                 else:
                     pairs_path = os.path.join(
+                        runner.args.exp,
                         "precomputed/",
                         f"{runner.config.data.category}_{mode}_random_noise_nim{runner.args.n_precomp_img}" +
                         f"_ninv{runner.args.n_inv_step}_pairs.pth",
@@ -45,6 +47,7 @@ def random_noise_pairs(runner, model, saved_noise=False, save_imgs=False):
             else:
                 if mode == "train":
                     pairs_path = os.path.join(
+                        runner.args.exp,
                         "precomputed/",
                         f"{runner.config.data.category}_{mode}_random_noise_nim{runner.args.n_train_img}" +
                         f"_ninv{runner.args.n_inv_step}_pairs.pth",
@@ -52,6 +55,7 @@ def random_noise_pairs(runner, model, saved_noise=False, save_imgs=False):
 
                 else:
                     pairs_path = os.path.join(
+                        runner.args.exp,
                         "precomputed/",
                         f"{runner.config.data.category}_{mode}_random_noise_nim{runner.args.n_test_img}" +
                         f"_ninv{runner.args.n_inv_step}_pairs.pth",
@@ -200,12 +204,14 @@ def precompute_pairs(runner, model, save_imgs=False):
         if runner.config.data.dataset == "IMAGENET":
             if runner.args.target_class_num is not None:
                 pairs_path = os.path.join(
+                    runner.args.exp,
                     "precomputed/",
                     f"{runner.config.data.category}_{IMAGENET_DIC[str(runner.args.target_class_num)][1]}_{mode}_t{runner.args.t_0}_nim{runner.args.n_precomp_img}_ninv{runner.args.n_inv_step}_pairs.pth",
                 )
 
             else:
                 pairs_path = os.path.join(
+                    runner.args.exp,
                     "precomputed/",
                     f"{runner.config.data.category}_{mode}_t{runner.args.t_0}_nim{runner.args.n_precomp_img}_ninv{runner.args.n_inv_step}_pairs.pth",
                 )
@@ -213,12 +219,14 @@ def precompute_pairs(runner, model, save_imgs=False):
         else:
             if mode == "train":
                 pairs_path = os.path.join(
+                    runner.args.exp,
                     "precomputed/",
                     f"{runner.config.data.category}_{mode}_t{runner.args.t_0}_nim{runner.args.n_train_img}_ninv{runner.args.n_inv_step}_pairs.pth",
                 )
 
             else:
                 pairs_path = os.path.join(
+                    runner.args.exp,
                     "precomputed/",
                     f"{runner.config.data.category}_{mode}_t{runner.args.t_0}_nim{runner.args.n_test_img}_ninv{runner.args.n_inv_step}_pairs.pth",
                 )
@@ -258,6 +266,7 @@ def precompute_pairs(runner, model, save_imgs=False):
                 )
             ):
                 tmp_path = os.path.join(
+                    runner.args.exp,
                     "precomputed/",
                     f"{runner.config.data.category}_{mode}_t{runner.args.t_0}_nim{exist_precompute_num}_ninv{runner.args.n_inv_step}_pairs.pth",
                 )
@@ -412,8 +421,8 @@ def precompute_pairs(runner, model, save_imgs=False):
 
 @torch.no_grad()
 def precompute_pairs_with_h(runner, model, img_path):
-    if not os.path.exists("./precomputed"):
-        os.mkdir("./precomputed")
+    if not os.path.exists(os.path.join(runner.args.exp, "precomputed")):
+        os.mkdir(os.path.exists(os.path.join(runner.args.exp, "precomputed")))
 
     save_path = "_".join(img_path.split(".")[-2].split("/")[-2:])
     save_path = (
@@ -424,7 +433,7 @@ def precompute_pairs_with_h(runner, model, img_path):
         + save_path
         + ".pt"
     )
-    save_path = os.path.join("precomputed", save_path)
+    save_path = os.path.join(runner.args.exp, "precomputed", save_path)
 
     n = 1
 
