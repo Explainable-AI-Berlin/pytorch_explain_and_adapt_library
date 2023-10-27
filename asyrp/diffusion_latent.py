@@ -241,16 +241,20 @@ class Asyrp(object):
                             ), "target_image_id is only supported for batch_size == 1"
                             if not step in self.args.target_image_id:
                                 continue
+
                         if x_lat_tensor is None:
                             x_lat_tensor = x_lat
                             if self.args.use_x0_tensor:
                                 x0_tensor = x0
+
                         else:
                             x_lat_tensor = torch.cat((x_lat_tensor, x_lat), dim=0)
                             if self.args.use_x0_tensor:
                                 x0_tensor = torch.cat((x0_tensor, x0), dim=0)
+
                         if (step + 1) % self.args.bs_train != 0:
                             continue
+
                         # LoL. now x_lat_tensor has batch_size == bs_train
 
                         # torch.cuda.empty.cache()

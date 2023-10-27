@@ -5,6 +5,7 @@ import yaml
 import sys
 import os
 import torch
+import yaml
 import numpy as np
 
 from asyrp.diffusion_latent import Asyrp
@@ -695,8 +696,20 @@ def dict2namespace(config):
     return namespace
 
 
-def main():
-    args, config = parse_args_and_config()
+def main(args=None):
+    if args is None:
+        args, config = parse_args_and_config()
+        args.config = config
+
+    else:
+        config = args.config
+
+    # Define the file name where you want to save the namespace
+    output_file = "namespace.yaml"
+
+    # Save the namespace to a YAML file
+    with open(os.path.join(args.exp, 'config.yaml'), "w") as file:
+        yaml.dump(args, file)
 
     # This code is for me. If you don't need it, just remove it out.
     if torch.cuda.is_available():

@@ -16,14 +16,14 @@ apptainer run --nv asyrp_container.sif python run_asyrp.py  \
 --save_x0                     \
 --use_x0_tensor               \
 --hs_coeff_origin_h 1.0        \
---hs_coeff_delta_h 0.0        \
+--hs_coeff_delta_h 0.001        \
 --hs_coeff 0.0 \
 --config custom.yml         \
 --edit_attr "smiling"              \
---user_defined_t_edit 999       \
+--user_defined_t_edit 800       \
 --user_defined_t_addnoise 0   \
 --sh_file_name "/home/sidney/workspace/peal/scripts/asyrp_inference_playground.sh"   \
---exp peal_runs/asyrp_test_playground2        \
+--exp peal_runs/asyrp_test_playground3        \
 --custom_train_dataset_dir "datasets/celeba/imgs"    \
 --custom_test_dataset_dir "datasets/celeba/imgs"  \
 --model_path peal_runs/celebahq_ddpm/final.pt
