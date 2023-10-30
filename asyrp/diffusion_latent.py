@@ -90,14 +90,19 @@ class Asyrp(object):
             LPIPS_addnoise_th=self.args.lpips_addnoise_th,
             return_clip_loss=True,
         )
-        clip_loss_func = clip_loss_func.to(self.device)
+        if not self.args.classifier:
+            counterfactual_loss_func = clip_loss_func.to(self.device)
 
-        # For memory
-        for p in clip_loss_func.parameters():
-            p.requires_grad = False
+            # For memory
+            for p in counterfactual_loss_func.parameters():
+                p.requires_grad = False
 
-        for p in clip_loss_func.model.parameters():
-            p.requires_grad = False
+            for p in counterfactual_loss_func.model.parameters():
+                p.requires_grad = False
+
+        else:
+            counterfactual_loss_func = self.args.classifier
+
 
         # ----------- Get seq -----------#
         if self.args.n_train_step != 0:
@@ -343,15 +348,20 @@ class Asyrp(object):
                                 loss_l1 += nn.L1Loss()(x0_t, x0_t_origin)
 
                                 # Following DiffusionCLIP, we use direction clip loss as below
-                                loss_clip = -torch.log(
-                                    (
-                                        2
-                                        - clip_loss_func(
-                                            x0, self.src_txts[0], x0_t, self.trg_txts[0]
+                                if not self.args.classifier:
+                                    loss_clip = -torch.log(
+                                        (
+                                            2
+                                            - counterfactual_loss_func(
+                                                x0, self.src_txts[0], x0_t, self.trg_txts[0]
+                                            )
                                         )
+                                        / 2
                                     )
-                                    / 2
-                                )
+
+                                else:
+                                    # TODO implement this
+                                    pass
 
                                 if self.args.use_id_loss:
                                     # We don't use this.
@@ -446,6 +456,7 @@ class Asyrp(object):
                             os.remove(f"checkpoint/{exp_id}_{it_out - 1}.pth")
 
         # ------------------ Test ------------------#
+        counterfactual_list = []
         if self.args.do_test:
             x_lat_tensor = None
             x0_tensor = None
@@ -462,7 +473,7 @@ class Asyrp(object):
                 if (step + 1) % self.args.bs_train != 0:
                     continue
 
-                save_image(
+                counterfactual_list.append(save_image(
                     self,
                     model,
                     x_lat_tensor,
@@ -475,7 +486,7 @@ class Asyrp(object):
                     folder_dir=self.args.test_image_folder,
                     file_name=f"test_{step}_{self.args.n_iter - 1}",
                     hs_coeff=hs_coeff,
-                )
+                ))
 
                 if step == self.args.n_test_img - 1:
                     break
@@ -483,3 +494,5 @@ class Asyrp(object):
                 save_image_iter += 1
                 x_lat_tensor = None
                 x0_tensor = None
+
+        return counterfactual_list

@@ -77,8 +77,11 @@ class EditCapableGenerator(Generator):
         self,
         x_in: torch.Tensor,
         target_confidence_goal: float,
+        source_classes: torch.Tensor,
         target_classes: torch.Tensor,
         classifier: nn.Module,
+        pbar=None,
+        mode="",
     ) -> Tuple[
         list[torch.Tensor], list[torch.Tensor], list[torch.Tensor], list[torch.Tensor]
     ]:
@@ -87,8 +90,11 @@ class EditCapableGenerator(Generator):
         Args:
             x_in: The input
             target_confidence_goal: The target confidence goal
+            source_classes: The source classes
             target_classes: The target classes
             classifier: The classifier according to which the confidence is measured
+            pbar: A progress bar
+            mode: The mode of the edit. This is used to determine the edit method
 
         Returns:
             list[torch.Tensor]: List of the counterfactuals

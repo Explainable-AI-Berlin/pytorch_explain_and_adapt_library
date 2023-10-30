@@ -696,7 +696,7 @@ def dict2namespace(config):
     return namespace
 
 
-def main(args=None):
+def asyrp_main(args=None):
     if args is None:
         args, config = parse_args_and_config()
         args.config = config
@@ -723,19 +723,20 @@ def main(args=None):
     try:
         # check the example script files for essential parameters
         if args.run_train:
-            runner.run_training()
+            counterfactual_list = runner.run_training()
 
         elif args.run_test:
-            run_test(runner)
+            counterfactual_list = run_test(runner)
 
         elif args.lpips:
             compute_lpips_distance(runner)
+            counterfactual_list = []
 
     except Exception:
         logging.error(traceback.format_exc())
 
-    return 0
+    return counterfactual_list
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    asyrp_main()
