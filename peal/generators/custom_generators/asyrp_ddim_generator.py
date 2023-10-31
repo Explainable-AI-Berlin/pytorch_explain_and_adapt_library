@@ -1,41 +1,33 @@
 import torch
-import torchvision
 import os
-import types
 import shutil
 import copy
+import types
 
-from pathlib import Path
 from torch import nn
-from PIL import Image
-from torchvision.transforms import ToTensor
 
 from peal.generators.interfaces import EditCapableGenerator
 from peal.data.datasets import Image2ClassDataset
 from peal.global_utils import load_yaml_config, embed_numberstring
 from run_asyrp import asyrp_main
-from ace.guided_diffusion import dist_util, logger
-from ace.guided_diffusion.resample import create_named_schedule_sampler
-from ace.guided_diffusion.script_util import (
-    create_model_and_diffusion,
-)
-from ace.guided_diffusion.train_util import TrainLoop
 from peal.data.dataset_factory import get_datasets
-from peal.data.dataloaders import get_dataloader
-from dime2.core.dist_util import (
-    load_state_dict,
-)
+
+def recursive_dict_to_namespace(d):
+    for key in d.keys():
+        if isinstance(d[key], dict):
+            d[key] = recursive_dict_to_namespace(d[key])
+
+    return types.SimpleNamespace(**d)
 
 
 class AsyrpDDIMAdaptor(EditCapableGenerator):
     def __init__(self, config, dataset=None, model_dir=None, device="cpu"):
         super().__init__()
         self.config = load_yaml_config(config)
+        self.config.config = recursive_dict_to_namespace(self.config.config)
         self.dataset = (
             dataset if not dataset is None else get_datasets(self.config.data)[0]
         )
-        if not self.config.image_size is None:
-            self.config.image_size = self.dataset.config.input_size[-1]
 
         if not model_dir is None:
             self.model_dir = model_dir
@@ -47,7 +39,7 @@ class AsyrpDDIMAdaptor(EditCapableGenerator):
         self.counterfactual_path = os.path.join(self.model_dir, "counterfactuals")
 
     def sample_x(self, batch_size=1):
-        pass
+        return None
 
     def edit(
         self,
@@ -59,24 +51,43 @@ class AsyrpDDIMAdaptor(EditCapableGenerator):
         pbar=None,
         mode="",
     ):
+        """
+        This function edits the input image to match the target confidence goal.
+        Args:
+            x_in:
+            target_confidence_goal:
+            source_classes:
+            target_classes:
+            classifier:
+            pbar:
+            mode:
+
+        Returns:
+
+
+        apptainer run --nv asyrp_container.sif python run_cfkd.py \
+        --adaptor_config "<PEAL_BASE>/configs/adaptors/Blond_Hair_confounding_Smiling_celeba_asyrp_cfkd.yaml"
+        """
         shutil.rmtree(self.data_dir, ignore_errors=True)
         shutil.rmtree(self.counterfactual_path, ignore_errors=True)
+        os.makedirs(self.counterfactual_path, exist_ok=True)
         self.dataset.serialize_dataset(
             output_dir=self.data_dir,
             x_list=x_in,
-            y_list=source_classes,
+            y_list=target_classes,
             sample_names=list(
                 map(lambda x: embed_numberstring(str(x)) + ".jpg", range(x_in.shape[0]))
             ),
         )
 
         args = copy.deepcopy(self.config)
-        args.dataset = Image2ClassDataset(
+        dataset = Image2ClassDataset(
             root_dir=self.data_dir,
             mode=None,
             config=copy.deepcopy(self.dataset.config),
             transform=self.dataset.transform,
         )
+        args.datasets = dataset, dataset
         args.model_path = os.path.join(self.model_dir, "final.pt")
         args.classifier = classifier
         args.exp = self.counterfactual_path

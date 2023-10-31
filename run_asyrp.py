@@ -720,20 +720,19 @@ def asyrp_main(args=None):
     runner = Asyrp(
         args, config
     )  # if you want to specify the device, add device="something" in the argument
-    try:
-        # check the example script files for essential parameters
-        if args.run_train:
-            counterfactual_list = runner.run_training()
+    # check the example script files for essential parameters
+    if args.run_train:
+        counterfactual_list = runner.run_training()
 
-        elif args.run_test:
-            counterfactual_list = run_test(runner)
+    elif args.run_test:
+        counterfactual_list = run_test(runner)
 
-        elif args.lpips:
-            compute_lpips_distance(runner)
-            counterfactual_list = []
+    elif args.lpips:
+        compute_lpips_distance(runner)
+        counterfactual_list = []
 
-    except Exception:
-        logging.error(traceback.format_exc())
+    else:
+        import pdb; pdb.set_trace()
 
     return counterfactual_list
 

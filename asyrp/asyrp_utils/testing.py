@@ -6,8 +6,9 @@ import numpy as np
 from asyrp.utils.text_dic import SRC_TRG_TXT_DIC
 from asyrp.asyrp_utils.set_t_edit_t_addnoise import set_t_edit_t_addnoise
 from asyrp.asyrp_utils.save_image import save_image
-from asyrp.asyrp_utils.get_pairs import precompute_pairs, random_noise_pairs
+from asyrp.asyrp_utils.get_pairs import precompute_pairs
 from asyrp.asyrp_utils.load_model import load_pretrained_model
+from asyrp.asyrp_utils.create_sequence import create_sequence
 
 # test
 @torch.no_grad()
@@ -43,7 +44,7 @@ def run_test(runner):
 
     save_name, load_dict = get_save_name(runner)
 
-    seq_test, seq_train, seq_test_next, seq_test_edit = get_sequence(runner)
+    seq_train, seq_train_next, seq_test, seq_test_next, seq_test_edit = create_sequence(runner)
 
     hs_coeff, save_name_list = get_hs_coeff(runner, save_name)
 
@@ -52,7 +53,7 @@ def run_test(runner):
     # ----------- Pre-compute -----------#
     print("Prepare identity latent...")
     # get xT
-    if runner.args.load_random_noise:
+    """if runner.args.load_random_noise:
         img_lat_pairs_dic = random_noise_pairs(
             runner,
             model,
@@ -60,10 +61,10 @@ def run_test(runner):
             save_imgs=runner.args.save_precomputed_images,
         )
 
-    else:
-        img_lat_pairs_dic = precompute_pairs(
-            runner, model, runner.args.save_precomputed_images
-        )
+    else:"""
+    img_lat_pairs_dic = precompute_pairs(
+        runner, model, runner.args.save_precomputed_images
+    )
 
     # Unfortunately, ima_lat_pairs_dic does not match with batch_size
     x0_tensor = None
@@ -428,32 +429,3 @@ def get_save_name(runner):
             load_dict = False
 
     return save_name, load_dict
-
-
-def get_sequence(runner):
-    # ----------- Get seq -----------#
-    # For editing timesteps
-    if runner.args.n_train_step != 0:
-        seq_train = np.linspace(0, 1, runner.args.n_train_step) * runner.args.t_0
-        seq_train = seq_train[seq_train >= runner.t_edit]
-        seq_train = [int(s + 1e-6) for s in list(seq_train)]
-        print("Uniform skip type")
-
-    else:
-        seq_train = list(range(runner.t_edit, runner.args.t_0))
-        print("No skip")
-
-    seq_train_next = [-1] + list(seq_train[:-1])
-
-    # For sampling
-    seq_test = np.linspace(0, 1, runner.args.n_test_step) * runner.args.t_0
-    seq_test_edit = seq_test[seq_test >= runner.t_edit]
-    seq_test_edit = [int(s + 1e-6) for s in list(seq_test_edit)]
-    seq_test = [int(s + 1e-6) for s in list(seq_test)]
-    seq_test_next = [-1] + list(seq_test[:-1])
-
-    print(f"seq_train: {seq_train}")
-    print(f"seq_test: {seq_test}")
-    print(f"seq_test_edit: {seq_test_edit}")
-
-    return seq_test, seq_train, seq_test_next, seq_test_edit

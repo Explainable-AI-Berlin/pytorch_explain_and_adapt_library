@@ -544,19 +544,22 @@ class CounterfactualKnowledgeDistillation:
                 generator_sample = self.generator.sample_x(
                     batch_size=self.adaptor_config.batch_size
                 )
-                torchvision.utils.save_image(
-                    generator_sample,
-                    os.path.join(self.base_dir, "generator_sample.png"),
-                    normalize=True,
-                )
+                if not generator_sample is None:
+                    torchvision.utils.save_image(
+                        generator_sample,
+                        os.path.join(self.base_dir, "generator_sample.png"),
+                        normalize=True,
+                    )
 
-            generator_performance = (
-                self.val_dataloader.dataset.track_generator_performance(
-                    self.generator, self.adaptor_config.batch_size
-                )
-            )
-            print("Generator performance: " + str(generator_performance))
-            self.adaptor_config.generator_performance = generator_performance
+                    # TODO move this back!!!
+                    generator_performance = (
+                        self.val_dataloader.dataset.track_generator_performance(
+                            self.generator, self.adaptor_config.batch_size
+                        )
+                    )
+                    print("Generator performance: " + str(generator_performance))
+
+                    self.adaptor_config.generator_performance = generator_performance
 
             save_yaml_config(
                 self.adaptor_config, os.path.join(self.base_dir, "config.yaml")
@@ -564,14 +567,6 @@ class CounterfactualKnowledgeDistillation:
 
             with open(os.path.join(self.base_dir, "platform.txt"), "w") as f:
                 f.write(platform.node())
-
-            test_accuracy = calculate_test_accuracy(
-                self.student, self.test_dataloader, self.device
-            )
-            writer.add_scalar(
-                "test_accuracy", test_accuracy, self.adaptor_config.current_iteration
-            )
-            self.adaptor_config.test_accuracies = [test_accuracy]
 
             validation_stats = self.retrieve_validation_stats(finetune_iteration=0)
 
@@ -582,6 +577,14 @@ class CounterfactualKnowledgeDistillation:
                         validation_stats[key],
                         self.adaptor_config.current_iteration,
                     )
+
+            test_accuracy = calculate_test_accuracy(
+                self.student, self.test_dataloader, self.device
+            )
+            writer.add_scalar(
+                "test_accuracy", test_accuracy, self.adaptor_config.current_iteration
+            )
+            self.adaptor_config.test_accuracies = [test_accuracy]
 
             """if self.output_size == 2 and self.use_visualization:
                 self.visualize_progress(

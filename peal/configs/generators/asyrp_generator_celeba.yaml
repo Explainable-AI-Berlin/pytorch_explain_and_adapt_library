@@ -1,4 +1,5 @@
-!!python/object:argparse.Namespace
+generator_type: 'AsyrpDDIMAdaptor'
+base_path: 'peal_runs/celebahq_ddpm'
 DirectionalClipSmilarity: false
 LPIPS_addnoise_th: 0.1
 Three_compare_addnoise: false
@@ -18,8 +19,8 @@ clip_model_name: ViT-B/32
 clr_loss_w: 3
 comment: ''
 compute_distance_graph: false
-config: !!python/object:argparse.Namespace
-  data: !!python/object:argparse.Namespace
+config:
+  data:
     category: CUSTOM
     channels: 3
     dataset: CelebA_HQ_P2
@@ -30,14 +31,13 @@ config: !!python/object:argparse.Namespace
     random_flip: true
     rescaled: true
     uniform_dequantization: false
-  device: !!python/object/apply:torch.device
-  - cuda
-  diffusion: !!python/object:argparse.Namespace
+  device: cuda
+  diffusion:
     beta_end: 0.02
     beta_schedule: linear
     beta_start: 0.0001
     num_diffusion_timesteps: 1000
-  model: !!python/object:argparse.Namespace
+  model:
     attn_resolutions:
     - 16
     ch: 128
@@ -57,7 +57,7 @@ config: !!python/object:argparse.Namespace
     resamp_with_conv: true
     type: simple
     var_type: fixedsmall
-  sampling: !!python/object:argparse.Namespace
+  sampling:
     batch_size: 4
     last_only: true
 content_dir: ./source_images/content
@@ -147,9 +147,9 @@ re_precompute: false
 retrain: 0
 run_optimize_delta_h: false
 run_origin: false
-run_test: true
+run_test: false
 run_test_pretrained_self_delta_h: false
-run_train: false
+run_train: true
 sample_type: ddim
 save_checkpoint_during_iter: false
 save_checkpoint_only_last_iter: false

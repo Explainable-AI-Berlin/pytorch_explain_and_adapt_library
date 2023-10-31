@@ -1,5 +1,5 @@
 apptainer run --nv asyrp_container.sif python run_asyrp.py  \
---run_test                    \
+--run_train                    \
 --do_test 1                   \
 --n_test_img 32               \
 --n_iter 5                    \
