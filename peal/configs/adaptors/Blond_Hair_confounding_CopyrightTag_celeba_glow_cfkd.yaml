@@ -9,7 +9,7 @@
 'test_data'                            :  '<PEAL_BASE>/configs/data/Blond_Hair_confounding_Copyrighttag_celeba.yaml'
 'student'                              :  'peal_runs/Blond_Hair_confounding_CopyrightTag_celeba_classifier_poisened/model.cpl'
 'teacher'                              :  'peal_runs/Blond_Hair_confounding_CopyrightTag_celeba_classifier_unpoisened/model.cpl'
-'generator'                            :  'peal_runs/celeba_poised100_copyrighttag_generator/config.yaml'
+'generator'                            :  'peal_runs/glow_celeba_copyrighttag_generator_old/config.yaml'
 'base_dir'                             :  'peal_runs/Blond_Hair_confounding_CopyrightTag_celeba_classifier_poisened/cfkd_glow_oracle'
 'task':
   'criterions':

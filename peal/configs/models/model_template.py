@@ -107,6 +107,7 @@ class ModelConfig:
         training: Union[dict, TrainingConfig],
         task: Union[dict, TaskConfig],
         data: Union[dict, DataConfig] = None,
+        model_name: str = "model_run1",
         **kwargs
     ):
         if isinstance(architecture, ArchitectureConfig) or isinstance(
@@ -134,5 +135,7 @@ class ModelConfig:
 
         else:
             self.data = DataConfig(**data)
+
+        self.model_name = model_name
 
         self.kwargs = kwargs

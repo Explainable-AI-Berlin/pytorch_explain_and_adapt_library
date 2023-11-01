@@ -68,20 +68,25 @@ def get_generator(
         elif generator_config.generator_type == "glow":
             # TODO this should be moved into the glow class
             generator_config.data = data_config
-            generator_out = Glow(generator_config).to(device)
-            generator_trainer = ModelTrainer(
-                config=generator_config,
-                model=generator_out,
-                datasource=(
-                    train_dataloader.dataset,
-                    dataloaders_val[0].dataset,
-                ),
-                base_dir=base_dir,
-                model_name="generator",
-                gigabyte_vram=gigabyte_vram,
-            )
-            print("Train generator model!")
-            generator_trainer.fit()
+            if os.path.exists(os.path.join(generator_config.base_path, "model.cpl")):
+                generator_out = torch.load(os.path.join(generator_config.base_path, "model.cpl"))
+                generator_out.config = generator_config
+
+            else:
+                generator_out = Glow(generator_config).to(device)
+                generator_trainer = ModelTrainer(
+                    config=generator_config,
+                    model=generator_out,
+                    datasource=(
+                        train_dataloader.dataset,
+                        dataloaders_val[0].dataset,
+                    ),
+                    base_dir=base_dir,
+                    model_name="generator",
+                    gigabyte_vram=gigabyte_vram,
+                )
+                print("Train generator model!")
+                generator_trainer.fit()
 
     else:
         generator_out = generator
