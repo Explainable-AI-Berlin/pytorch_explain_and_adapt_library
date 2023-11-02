@@ -1,5 +1,5 @@
 generator_type: glow
-base_path : peal_runs/glow_celeba_copyrighttag_generator_old
+base_path : peal_runs/glow_generator_celeba_copyrighttag_old
 architecture:
   affine: false
   conv_lu: true

@@ -1,5 +1,7 @@
-generator_type: glow
-base_path : peal_runs/glow_celeba_copyrighttag_generator
+# python train_model.py --model_config '<PEAL_BASE>/peal/configs/generators/glow_generator_celeba_copyrighttag.yaml'
+model_type: generator
+model_name: glow_generator_celeba_copyrighttag
+base_path : peal_runs/glow_generator_celeba_copyrighttag
 architecture:
   affine: false
   conv_lu: true
@@ -8,25 +10,18 @@ architecture:
   n_flow: 32
   temp: 0.7
 data:
-  confounder_probability: 1.0
-  confounding_factors:
-  - Blond_Hair
-  - Confounder
-  downsize: Resize
+  dataset_path: datasets/celeba_copyrighttag
+  downsize: Downsample #Resize
   input_size:
   - 3
   - 64
   - 64
   input_type: image
-  invariances: []
-  normalization: []
-  num_samples: 20000
-  output_size: 41
+  output_size: [41]
   output_type: multiclass
   split:
-  - 0.8
-  - 0.9
-  use_normalization: false
+  - 0.99
+  - 1.0
 task:
   criterions:
     constant: 1.0
@@ -39,14 +34,14 @@ training:
   - 64
   - 64
   base_batch_size: 32
-  epoch: 161
+  epoch: 0
   gigabyte_vram: 40
-  global_train_step: 162000
-  global_validation_0_step: 9558
+  global_train_step: 0
+  global_validation_0_step: 0
   global_validation_step: 0
-  iterations_per_episode: 1000
+  steps_per_epoch: 10000
   learning_rate: 1.0e-05
-  max_epochs: 400
+  max_epochs: 40
   optimizer: adam
   test_batch_size: 34
   train_batch_size: 34

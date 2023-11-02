@@ -161,7 +161,7 @@ class CounterfactualKnowledgeDistillation:
             base_dir=base_dir,
             gigabyte_vram=gigabyte_vram,
             device=self.device,
-        )
+        ).to(self.device)
 
         self.output_size = (
             self.adaptor_config.task.output_channels
@@ -399,7 +399,6 @@ class CounterfactualKnowledgeDistillation:
             self.base_dir, str(finetune_iteration), "validation_tracked_values.npz"
         )
         if not os.path.exists(validation_values_path):
-
             (
                 validation_tracked_values,
                 validation_stats,
@@ -554,7 +553,7 @@ class CounterfactualKnowledgeDistillation:
                     # TODO move this back!!!
                     generator_performance = (
                         self.val_dataloader.dataset.track_generator_performance(
-                            self.generator, self.adaptor_config.batch_size
+                            self.generator
                         )
                     )
                     print("Generator performance: " + str(generator_performance))

@@ -348,7 +348,7 @@ class ImageDataset(PealDataset):
             f.write(data)
 
     def track_generator_performance(
-        self, generator: Union[Generator, torch.Tensor], batch_size=1
+        self, generator: Union[Generator, torch.Tensor], batch_size=None, num_samples=None
     ):
         """
         This function tracks the performance of the generator
@@ -356,14 +356,23 @@ class ImageDataset(PealDataset):
         Args:
             generator (Generator): The generator
         """
+        if batch_size is None:
+            if hasattr(generator, "config"):
+                batch_size = generator.config.training.val_batch_size
+
+            else:
+                batch_size = 1
+
+        if num_samples is None:
+            num_samples = batch_size
 
         if isinstance(generator, torch.Tensor):
             generated_images = torch.clone(generator)
 
         elif isinstance(generator, Generator):
             # TODO set device
-            generated_images = generator.sample_x(batch_size=batch_size)
-            while generated_images.shape[0] < 20:
+            generated_images = generator.sample_x(batch_size=batch_size).detach()
+            while generated_images.shape[0] < num_samples:
                 generated_images = torch.cat(
                     [generated_images, generator.sample_x(batch_size=batch_size)], dim=0
                 )
@@ -371,24 +380,26 @@ class ImageDataset(PealDataset):
         else:
             raise NotImplementedError("Generator type not supported")
 
+        generated_images = generated_images[:num_samples]
+
         if not hasattr(self, "fid"):
             self.fid = torchmetrics.image.fid.FrechetInceptionDistance(
                 feature=192, reset_real_features=False
             )
             self.fid.to(generated_images.device)
             real_images = []
-            for i in range(20):
+            for i in range(num_samples):
                 real_images.append(self[i][0])
 
             real_images = torch.stack(real_images, dim=0).to(generated_images.device)
+            if hasattr(generator, "config"):
+                real_images = torchvision.transforms.Resize(generator.config.data.input_size[1:])(real_images)
+
             self.fid.update(
                 torch.tensor(255 * real_images, dtype=torch.uint8), real=True
             )
 
-        generated_images = generated_images[:20]
-        self.fid.update(
-            torch.tensor(255 * generated_images, dtype=torch.uint8), real=False
-        )
+        self.fid.update(torch.tensor(255 * generated_images, dtype=torch.uint8), real=False)
         fid_score = float(self.fid.compute())
 
         return {"fid": fid_score}

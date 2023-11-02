@@ -5,4 +5,4 @@
 'output_type'             : 'multiclass'
 'output_size'             : [41]
 'confounder_probability'  : 0.5
-'confounding_factors'     : ['Smiling', 'Confounder'] #'CopyrightTag']
+'confounding_factors'     : ['Smiling', 'Confounder'] #'copyrighttag']

@@ -1,6 +1,6 @@
 #
-'model_name'        : 'Blond_Hair_confounding_Copyrighttag_celeba_classifier_unpoisened'
-'data'              : '<PEAL_BASE>/configs/data/Blond_Hair_confounding_Copyrighttag_celeba.yaml'
+'model_name'        : 'Blond_Hair_confounding_copyrighttag_celeba_classifier_unpoisened'
+'data'              : '<PEAL_BASE>/configs/data/Blond_Hair_confounding_copyrighttag_celeba.yaml'
 'training'          : '<PEAL_BASE>/configs/training/img_classifier.yaml'
 'architecture'      : '<PEAL_BASE>/configs/architectures/resnet18.yaml'
 'task':

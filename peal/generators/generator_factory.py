@@ -15,6 +15,7 @@ from peal.global_utils import (
     get_project_resource_dir,
 )
 from peal.training.trainers import ModelTrainer
+from peal.configs.models.model_template import ModelConfig
 
 
 def get_generator(
@@ -48,7 +49,7 @@ def get_generator(
         isinstance(generator, InvertibleGenerator)
         or isinstance(generator, EditCapableGenerator)
     ):
-        generator_config = load_yaml_config(generator)
+        generator_config = load_yaml_config(generator, ModelConfig)
         generator_config.batch_size = train_dataloader.batch_size
         generator_class_list = find_subclasses(
             Generator,
@@ -58,16 +59,16 @@ def get_generator(
             generator_class.__name__: generator_class
             for generator_class in generator_class_list
         }
-        if generator_config.generator_type in generator_class_dict.keys():
+        if hasattr(generator_config, "generator_type") and generator_config.generator_type in generator_class_dict.keys():
             generator_out = generator_class_dict[generator_config.generator_type](
                 config=generator_config,
                 dataset=train_dataloader.dataset,
                 device=device,
             )
 
-        elif generator_config.generator_type == "glow":
+        elif hasattr(generator_config.architecture, "n_flow"):
             # TODO this should be moved into the glow class
-            generator_config.data = data_config
+            #generator_config.data = data_config
             if os.path.exists(os.path.join(generator_config.base_path, "model.cpl")):
                 generator_out = torch.load(os.path.join(generator_config.base_path, "model.cpl"))
                 generator_out.config = generator_config

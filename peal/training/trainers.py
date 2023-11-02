@@ -25,6 +25,7 @@ from peal.data.dataloaders import create_dataloaders_from_datasource
 from peal.generators.interfaces import Generator
 from peal.architectures.downstream_models import SequentialModel
 from peal.generators.variational_autoencoders import VAE
+from peal.generators.normalizing_flows import Glow
 from peal.configs.architectures.architecture_template import ArchitectureConfig
 from peal.configs.generators.generator_template import VAEConfig
 
@@ -101,6 +102,10 @@ class ModelTrainer:
 
             elif isinstance(self.config.architecture, VAEConfig):
                 self.model = VAE(self.config.architecture, input_channels)
+
+            elif hasattr(self.config.architecture, "n_flow"):
+                self.model = Glow(self.config)
+
 
         else:
             self.model = model

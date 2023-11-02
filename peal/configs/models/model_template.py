@@ -1,3 +1,6 @@
+import types
+import os
+
 from pydantic import BaseModel, PositiveInt
 from typing import Union
 
@@ -71,7 +74,7 @@ class ModelConfig:
     """
     The config of the architecture of the model.
     """
-    architecture: Union[ArchitectureConfig, VAEConfig]
+    architecture: Union[ArchitectureConfig, VAEConfig, types.SimpleNamespace]
     """
     The config of the training of the model.
     """
@@ -100,6 +103,14 @@ class ModelConfig:
     The name of the class.
     """
     __name__: str = "peal.ModelConfig"
+    """
+    The name of the class.
+    """
+    model_type: str = "discriminator"
+    """
+    The name of the class.
+    """
+    base_path: str = None
 
     def __init__(
         self,
@@ -108,18 +119,24 @@ class ModelConfig:
         task: Union[dict, TaskConfig],
         data: Union[dict, DataConfig] = None,
         model_name: str = "model_run1",
+        model_type: str = "discriminator",
+        base_path: str = None,
         **kwargs
     ):
+        self.model_type = model_type
         if isinstance(architecture, ArchitectureConfig) or isinstance(
             architecture, VAEConfig
         ):
             self.architecture = architecture
 
+        if model_type == "discriminator":
+            self.architecture = ArchitectureConfig(**architecture)
+
         elif "encoder" in architecture.keys():
             self.architecture = VAEConfig(**architecture)
 
         else:
-            self.architecture = ArchitectureConfig(**architecture)
+            self.architecture = types.SimpleNamespace(**architecture)
 
         self.training = (
             training
@@ -137,5 +154,13 @@ class ModelConfig:
             self.data = DataConfig(**data)
 
         self.model_name = model_name
+
+        if base_path is None:
+            self.base_path = os.path.join(
+                "peal_runs", self.model_name
+            )
+
+        else:
+            self.base_path = base_path
 
         self.kwargs = kwargs
