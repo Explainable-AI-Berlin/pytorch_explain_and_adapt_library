@@ -1,7 +1,7 @@
 # python train_model.py --model_config '<PEAL_BASE>/peal/configs/generators/glow_generator_celeba128x128_copyrighttag.yaml'
 model_type: generator
-model_name: glow_generator_celeba_copyrighttag
-base_path : peal_runs/glow_generator_celeba_copyrighttag
+model_name: glow_generator_celeba128x128_copyrighttag
+base_path : peal_runs/glow_generator_celeba128x128_copyrighttag
 architecture:
   affine: false
   conv_lu: true
