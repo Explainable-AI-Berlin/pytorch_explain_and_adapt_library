@@ -189,6 +189,8 @@ def precompute_pairs(runner, model, save_imgs=False):
             "precomputed/",
             f"{runner.config.data.category}_{mode}_t{runner.args.t_0}_nim{runner.args.n_train_img}_ninv{runner.args.n_inv_step}_pairs.pth",
         )
+        if not os.path.exists(os.path.dirname(pairs_path)):
+            os.makedirs(os.path.dirname(pairs_path))
 
         print(pairs_path)
         '''if os.path.exists(pairs_path) and not runner.args.re_precompute:

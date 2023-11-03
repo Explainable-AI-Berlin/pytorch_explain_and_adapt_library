@@ -43,7 +43,7 @@ training:
   learning_rate: 1.0e-05
   max_epochs: 40
   optimizer: adam
-  test_batch_size: 34
-  train_batch_size: 34
-  val_batch_size: 34
+  test_batch_size: 16
+  train_batch_size: 16
+  val_batch_size: 16
   verbosity: 1

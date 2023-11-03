@@ -64,9 +64,6 @@ class AsyrpDDIMAdaptor(EditCapableGenerator):
 
         Returns:
 
-
-        apptainer run --nv asyrp_container.sif python run_cfkd.py \
-        --adaptor_config "<PEAL_BASE>/configs/adaptors/Blond_Hair_confounding_Smiling_celeba_asyrp_cfkd.yaml"
         """
         shutil.rmtree(self.data_dir, ignore_errors=True)
         shutil.rmtree(self.counterfactual_path, ignore_errors=True)
@@ -98,9 +95,14 @@ class AsyrpDDIMAdaptor(EditCapableGenerator):
         x_counterfactuals = torch.stack(x_counterfactuals)
         x_counterfactuals = self.dataset.project_from_pytorch_default(x_counterfactuals)
         device = [p for p in classifier.parameters()][0].device
-        preds = torch.nn.Softmax(dim=-1)(
-            classifier(x_counterfactuals.to(device)).detach().cpu()
-        )
+        try:
+            preds = torch.nn.Softmax(dim=-1)(
+                classifier(x_counterfactuals.to(device)).detach().cpu()
+            )
+
+        except Exception as e:
+            import pdb; pdb.set_trace()
+
         y_target_end_confidence = torch.zeros([x_in.shape[0]])
         for i in range(x_in.shape[0]):
             y_target_end_confidence[i] = preds[i, target_classes[i]]

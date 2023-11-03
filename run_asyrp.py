@@ -719,7 +719,8 @@ def asyrp_main(args=None):
 
     runner = Asyrp(
         args, config
-    )  # if you want to specify the device, add device="something" in the argument
+    )
+    # if you want to specify the device, add device="something" in the argument
     # check the example script files for essential parameters
     if args.run_train:
         counterfactual_list = runner.run_training()
@@ -730,9 +731,6 @@ def asyrp_main(args=None):
     elif args.lpips:
         compute_lpips_distance(runner)
         counterfactual_list = []
-
-    else:
-        import pdb; pdb.set_trace()
 
     return counterfactual_list
 

@@ -82,6 +82,9 @@ class Asyrp(object):
         if self.args.use_id_loss:
             id_loss_func = id_loss.IDLoss().to(self.device)
 
+        else:
+            id_loss_func = None
+
         # Set self.t_edit & self.t_addnoise & return cosine similarity of attribute
         cosine, clip_loss_func = set_t_edit_t_addnoise(
             runner=self,
@@ -100,7 +103,7 @@ class Asyrp(object):
                 p.requires_grad = False
 
         else:
-            counterfactual_loss_func = lambda x, target: torch.nn.CrossEntropyLoss(self.args.classifier(x), target)
+            counterfactual_loss_func = lambda x, target: torch.nn.CrossEntropyLoss()(self.args.classifier(x), target)
 
         (
             seq_train,
@@ -214,15 +217,17 @@ class Asyrp(object):
         x_lat_tensor = None
         x0_tensor = None
 
-        for step, (x0, _, x_lat) in enumerate(img_lat_pairs_dic["test"]):
+        for step, (x0, _, x_lat, target) in enumerate(img_lat_pairs_dic["test"]):
             if x_lat_tensor is None:
                 x_lat_tensor = x_lat
                 if self.args.use_x0_tensor:
                     x0_tensor = x0
+
             else:
                 x_lat_tensor = torch.cat((x_lat_tensor, x_lat), dim=0)
                 if self.args.use_x0_tensor:
                     x0_tensor = torch.cat((x0_tensor, x0), dim=0)
+
             if (step + 1) % self.args.bs_train != 0:
                 continue
 
@@ -411,6 +416,8 @@ def inner_train_loop(
             it_out,
             x0,
             target,
+            xt_next,
+            x_origin,
         )
 
         # save image
@@ -503,6 +510,8 @@ def train_step(
     it_out,
     x0,
     target,
+    xt_next,
+    x_origin,
 ):
     # Finally, go into training
     with tqdm(total=len(seq_train), desc=f"training iteration") as progress_bar:

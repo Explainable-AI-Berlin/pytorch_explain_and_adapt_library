@@ -201,10 +201,15 @@ def load_yaml_config(config_path, config_model=None):
         return types.SimpleNamespace(**config_data)
 
     elif isinstance(config_data, dict):
-        return config_model(**config_data)
+        # TODO this is very very bad style!
+        try:
+            return config_model(**config_data)
+
+        except Exception:
+            return types.SimpleNamespace(**config_data)
 
     else:
-        return config_path
+        return config_data
 
 
 def save_yaml_config(config, config_path):

@@ -172,4 +172,4 @@ def save_image(
     print(
         f"{time_e - time_s} seconds, {file_name}_ngen{runner.args.n_train_step}.png is saved"
     )
-    return x
+    return x[1].detach().cpu()

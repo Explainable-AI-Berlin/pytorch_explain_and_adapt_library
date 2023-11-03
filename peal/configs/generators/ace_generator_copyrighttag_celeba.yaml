@@ -1,3 +1,4 @@
+# python train_diffusion_model.py --generator_config '<PEAL_BASE>/configs/generators/ace_generator_copyrighttag_celeba.yaml'
 'attention_resolutions' : '32,16,8'
 'batch_size' : 50
 'channel_mult' : ''
