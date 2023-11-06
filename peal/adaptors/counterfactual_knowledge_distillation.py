@@ -140,16 +140,6 @@ class CounterfactualKnowledgeDistillation:
         self.dataloaders_val = [self.val_dataloader, None]
         self.adaptor_config.data = self.train_dataloader.dataset.config
 
-        # in case the used dataloader has a non-default data normalization it is assumed
-        # the inverse function of this normalization is attribute of the underlying dataset
-        if hasattr(self.train_dataloader.dataset, "project_to_pytorch_default"):
-            self.project_to_pytorch_default = (
-                self.train_dataloader.dataset.project_to_pytorch_default
-            )
-
-        else:
-            self.project_to_pytorch_default = lambda x: x
-
         #
         self.generator = get_generator(
             generator=generator

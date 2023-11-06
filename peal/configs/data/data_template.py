@@ -57,7 +57,7 @@ class DataConfig(BaseModel):
     The applied normalization.
     Options: ['mean0std1']
     """
-    normalization: str = None
+    normalization: list = None
     """
     A list of the invariances exploited for data augmentation:
     Options: ['hflipping', 'vflipping', 'rotation', 'circlecut']

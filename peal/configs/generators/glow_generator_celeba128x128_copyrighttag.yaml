@@ -28,22 +28,4 @@ task:
     ldj: 1.0
     logprob: 1.0
   selection: {}
-training:
-  assumed_input_size:
-  - 3
-  - 64
-  - 64
-  base_batch_size: 32
-  epoch: 0
-  gigabyte_vram: 40
-  global_train_step: 0
-  global_validation_0_step: 0
-  global_validation_step: 0
-  steps_per_epoch: 10000
-  learning_rate: 1.0e-05
-  max_epochs: 40
-  optimizer: adam
-  test_batch_size: 16
-  train_batch_size: 16
-  val_batch_size: 16
-  verbosity: 1
+training: '<PEAL_BASE>/configs/training/img_generator.yaml'

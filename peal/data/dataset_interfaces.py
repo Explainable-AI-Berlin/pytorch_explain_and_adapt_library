@@ -56,6 +56,9 @@ class PealDataset(torch.utils.data.Dataset):
         Returns:
             torch.tensor: The data sample in the pytorch default format
         """
+        if hasattr(self, "normalization"):
+            x = self.normalization.invert(x)
+
         return x
 
     def project_from_pytorch_default(self, x):
@@ -68,6 +71,9 @@ class PealDataset(torch.utils.data.Dataset):
         Returns:
             torch.tensor: The data sample in the processed format
         """
+        if hasattr(self, "normalization"):
+            x = self.normalization(x)
+
         return x
 
     def track_generator_performance(self, generator: Generator, batch_size=1):

@@ -1,5 +1,19 @@
 generator_type: 'AsyrpDDIMAdaptor'
 base_path: 'peal_runs/celebahq_ddpm'
+exp: peal_runs/asyrp_test_playground3
+# important parameters
+user_defined_t_addnoise: 0
+user_defined_t_edit: 1000
+hs_coeff_delta_h: 0.0
+hs_coeff_origin_h: 1.0
+n_inv_step: 50
+n_iter: 5
+n_test_img: 32
+n_test_pretrained_inv_step: 40
+n_test_step: 50
+n_train_img: 50
+n_train_step: 50
+#
 DirectionalClipSmilarity: false
 LPIPS_addnoise_th: 0.1
 Three_compare_addnoise: false
@@ -81,15 +95,12 @@ edit_one_image: false
 edit_one_image_eff: false
 eta: 0.0
 eval_latent_clr: false
-exp: peal_runs/asyrp_test_playground3
 from_noise: false
 get_SNR: false
 get_h_num: 1
 global_clip: false
 global_cliploss: false
 hs_coeff: 0.0
-hs_coeff_delta_h: 0.001
-hs_coeff_origin_h: 1.0
 hybrid_noise: 0
 id_loss_w: 0
 ignore_timesteps: false
@@ -127,14 +138,7 @@ model_ratio: 1
 multiple_attr: ''
 multiple_hs_coeff: ''
 n_gen_step: 1000
-n_inv_step: 50
-n_iter: 5
 n_precomp_img: 100
-n_test_img: 32
-n_test_pretrained_inv_step: 40
-n_test_step: 50
-n_train_img: 50
-n_train_step: 50
 ni: 1
 num_delta: 5
 num_mean_of_delta_hs: 0
@@ -196,8 +200,6 @@ unseen2unseen: false
 use_id_loss: false
 use_mask: false
 use_x0_tensor: true
-user_defined_t_addnoise: 0
-user_defined_t_edit: 800
 var: 100
 verbose: info
 warigari: 0.0

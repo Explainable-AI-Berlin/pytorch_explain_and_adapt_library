@@ -226,56 +226,58 @@ class SymbolicDataset(PealDataset):
 class ImageDataset(PealDataset):
     def generate_contrastive_collage(
         self,
-        x_list,
-        x_counterfactual_list,
-        y_target_list,
-        y_source_list,
-        y_list,
-        target_confidence_goal,
-        y_target_start_confidence_list,
-        y_target_end_confidence_list,
-        base_path,
-        start_idx,
-        **args,
-    ):
+        x_list: list,
+        x_counterfactual_list: list,
+        y_target_list: list,
+        y_source_list: list,
+        y_list: list,
+        target_confidence_goal: float,
+        y_target_start_confidence_list: list,
+        y_target_end_confidence_list: list,
+        base_path: str,
+        start_idx: int,
+        **args: dict,
+    ) -> tuple:
         Path(base_path).mkdir(parents=True, exist_ok=True)
         collage_paths = []
         heatmap_list = []
         for i in range(len(x_list)):
+            x = self.project_to_pytorch_default(x_list[i])
+            counterfactual = self.project_to_pytorch_default(x_counterfactual_list[i])
             heatmap_red = torch.maximum(
                 torch.tensor(0.0),
-                torch.sum(x_list[i], dim=0)
-                - torch.sum(x_counterfactual_list[i], dim=0),
+                torch.sum(x, dim=0)
+                - torch.sum(counterfactual, dim=0),
             )
             heatmap_blue = torch.maximum(
                 torch.tensor(0.0),
-                torch.sum(x_counterfactual_list[i], dim=0)
-                - torch.sum(x_list[i], dim=0),
+                torch.sum(counterfactual, dim=0)
+                - torch.sum(x, dim=0),
             )
-            if x_counterfactual_list[i].shape[0] == 3:
-                heatmap_green = torch.abs(x_list[i][0] - x_counterfactual_list[i][0])
+            if counterfactual.shape[0] == 3:
+                heatmap_green = torch.abs(x[0] - counterfactual[0])
                 heatmap_green = heatmap_green + torch.abs(
-                    x_list[i][1] - x_counterfactual_list[i][1]
+                    x[1] - counterfactual[1]
                 )
                 heatmap_green = heatmap_green + torch.abs(
-                    x_list[i][2] - x_counterfactual_list[i][2]
+                    x[2] - counterfactual[2]
                 )
                 heatmap_green = heatmap_green - heatmap_red - heatmap_blue
-                x_in = torch.clone(x_list[i])
-                counterfactual_rgb = torch.clone(x_counterfactual_list[i])
+                x_in = torch.clone(x)
+                counterfactual_rgb = torch.clone(counterfactual)
 
             else:
                 heatmap_green = torch.zeros_like(heatmap_red)
-                x_in = torch.tile(x_list[i], [3, 1, 1])
+                x_in = torch.tile(x, [3, 1, 1])
                 counterfactual_rgb = torch.tile(
-                    torch.clone(x_counterfactual_list[i]), [3, 1, 1]
+                    torch.clone(counterfactual), [3, 1, 1]
                 )
 
             heatmap = torch.stack([heatmap_red, heatmap_green, heatmap_blue], dim=0)
             if (
                 torch.abs(
                     heatmap.sum()
-                    - torch.abs(x_list[i] - x_counterfactual_list[i]).sum()
+                    - torch.abs(x - counterfactual).sum()
                 )
                 > 0.1
             ):
@@ -331,6 +333,7 @@ class ImageDataset(PealDataset):
         data = []
         for idx, x in enumerate(x_list):
             class_name = int(y_list[idx])
+            x = self.project_to_pytorch_default(x)
             img = Image.fromarray(
                 np.array(255 * x.cpu().numpy().transpose(1, 2, 0), dtype=np.uint8)
             )
