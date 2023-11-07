@@ -81,11 +81,11 @@ class Normalization(object):
 
     def __call__(self, sample):
         """ """
-        return (sample - self.mean) / self.std
+        return (sample - self.mean.to(sample.device)) / self.std.to(sample.device)
 
     def invert(self, batch):
         """ """
-        return batch * self.std + self.mean
+        return batch * self.std.to(batch.device) + self.mean.to(batch.device)
 
 
 class SetChannels(object):

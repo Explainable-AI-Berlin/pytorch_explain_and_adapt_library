@@ -1,5 +1,7 @@
 import torch
 
+from torchvision import transforms
+
 from peal.generators.interfaces import Generator
 
 
@@ -73,6 +75,9 @@ class PealDataset(torch.utils.data.Dataset):
         """
         if hasattr(self, "normalization"):
             x = self.normalization(x)
+
+        if list(x.shape[-3:]) != self.config.input_size:
+            x = transforms.Resize(self.config.input_size[1:])(x)
 
         return x
 

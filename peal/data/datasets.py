@@ -244,6 +244,14 @@ class ImageDataset(PealDataset):
         for i in range(len(x_list)):
             x = self.project_to_pytorch_default(x_list[i])
             counterfactual = self.project_to_pytorch_default(x_counterfactual_list[i])
+            if i == 0:
+                print(f"x: [{x.min()}, {x.max()}], {x.shape}")
+                print(f"x: [{x.min()}, {x.max()}]")
+                print(f"x: [{x.min()}, {x.max()}]")
+                print(f"counterfactual: [{counterfactual.min()}, {counterfactual.max()}], {counterfactual.shape}")
+                print(f"counterfactual: [{counterfactual.min()}, {counterfactual.max()}]")
+                print(f"counterfactual: [{counterfactual.min()}, {counterfactual.max()}]")
+
             heatmap_red = torch.maximum(
                 torch.tensor(0.0),
                 torch.sum(x, dim=0)

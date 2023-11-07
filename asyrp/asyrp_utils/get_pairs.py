@@ -30,6 +30,7 @@ def precompute(loader, mode, runner, save_imgs, model, seq_inv, seq_inv_next, im
             mode == "test" and step == runner.args.n_test_img
         ):
             break
+
         if exist_num != 0:
             exist_num = exist_num - 1
             continue
@@ -253,14 +254,18 @@ def precompute_pairs(runner, model, save_imgs=False):
         else:
             train_dataset, test_dataset = runner.args.datasets
 
-        loader_dic = get_dataloader(
-            train_dataset,
-            test_dataset,
-            bs_train=1,  # runner.args.bs_train,
-            num_workers=runner.config.data.num_workers,
-            shuffle=runner.args.shuffle_train_dataloader,
-        )
-        loader = loader_dic[mode]
+        if mode == "test" and not hasattr(runner.args, "datasets"):
+            loader = test_dataset
+
+        else:
+            loader_dic = get_dataloader(
+                train_dataset,
+                test_dataset,
+                bs_train=1,  # runner.args.bs_train,
+                num_workers=runner.config.data.num_workers,
+                shuffle=runner.args.shuffle_train_dataloader,
+            )
+            loader = loader_dic[mode]
 
         save_process_folder = "process_origin"
         """if runner.args.save_process_origin:

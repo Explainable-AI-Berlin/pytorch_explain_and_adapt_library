@@ -7,4 +7,4 @@
 'output_size'             : [41]
 'confounder_probability'  : 1.0
 'confounding_factors'     : ['Blond_Hair', 'Smiling']
-'normalization'           : [0.5,0.5]
+#'normalization'           : [0.5,0.5]

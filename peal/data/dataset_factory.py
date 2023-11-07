@@ -154,14 +154,15 @@ def get_datasets(
 
     #
     if config.input_type == "image" and not config.normalization is None:
-        stats_dataset = dataset(base_dir, "train", config, transform_test)
-        samples = []
-        for idx in range(stats_dataset.__len__()):
-            samples.append(stats_dataset.__getitem__(idx)[0])
+        if len(config.normalization) == 0:
+            stats_dataset = dataset(base_dir, "train", config, transform_test)
+            samples = []
+            for idx in range(stats_dataset.__len__()):
+                samples.append(stats_dataset.__getitem__(idx)[0])
 
-        samples = torch.stack(samples)
-        config.normalization.append(list(torch.mean(samples, [0, 2, 3]).numpy()))
-        config.normalization.append(list(torch.std(samples, [0, 2, 3]).numpy()))
+            samples = torch.stack(samples)
+            config.normalization.append(list(torch.mean(samples, [0, 2, 3]).numpy()))
+            config.normalization.append(list(torch.std(samples, [0, 2, 3]).numpy()))
 
         #
         normalization = Normalization(config.normalization[0], config.normalization[1])

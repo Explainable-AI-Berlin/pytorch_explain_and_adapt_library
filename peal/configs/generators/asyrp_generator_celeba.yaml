@@ -1,17 +1,27 @@
 generator_type: 'AsyrpDDIMAdaptor'
 base_path: 'peal_runs/celebahq_ddpm'
 exp: peal_runs/asyrp_test_playground3
+data:
+  'dataset_class'           : 'celeba'
+  'dataset_path'            : 'datasets/celeba_copyrighttag'
+  'num_samples'             : 20000
+  'input_type'              : 'image'
+  'input_size'              : [3, 256, 256]
+  'output_type'             : 'multiclass'
+  'output_size'             : [41]
+  'normalization'           : [0.5,0.5]
+# training hyperparameters
+n_iter: 1 #5
+n_train_img: 5 #50
+n_test_img: 5 #32
 # important parameters
-user_defined_t_addnoise: 0
+user_defined_t_addnoise: 200
 user_defined_t_edit: 1000
 hs_coeff_delta_h: 0.0
 hs_coeff_origin_h: 1.0
 n_inv_step: 50
-n_iter: 5
-n_test_img: 32
 n_test_pretrained_inv_step: 40
-n_test_step: 50
-n_train_img: 50
+n_test_step: 500 #50
 n_train_step: 50
 #
 DirectionalClipSmilarity: false

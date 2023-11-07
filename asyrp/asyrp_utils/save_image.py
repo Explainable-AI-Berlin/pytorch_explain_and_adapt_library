@@ -158,6 +158,7 @@ def save_image(
                 x_list.append(x)
 
     x = torch.cat(x_list, dim=0)
+    counterfactual = x[1].detach().cpu()
     x = (x + 1) * 0.5
 
     grid = tvu.make_grid(x, nrow=runner.args.bs_train, padding=1)
@@ -172,4 +173,4 @@ def save_image(
     print(
         f"{time_e - time_s} seconds, {file_name}_ngen{runner.args.n_train_step}.png is saved"
     )
-    return x[1].detach().cpu()
+    return counterfactual

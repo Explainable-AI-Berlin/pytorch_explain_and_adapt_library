@@ -1,8 +1,8 @@
 # python run_cfkd.py --adaptor_config "<PEAL_BASE>/configs/adaptors/Blond_Hair_confounding_Smiling_celeba_asyrp_cfkd.yaml"
-'batch_size'                           :  50
-'min_train_samples'                    :  50
+'batch_size'                           :  5
+'min_train_samples'                    :  5
 'finetune_iterations'                  :  3
-'max_validation_samples'               :  20
+'max_validation_samples'               :  5
 'replace_model'                        :  True
 'explainer'                            :  '<PEAL_BASE>/configs/explainers/counterfactual_default.yaml'
 'training'                             :  '<PEAL_BASE>/configs/training/img_classifier.yaml'
