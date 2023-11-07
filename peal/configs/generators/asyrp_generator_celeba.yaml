@@ -15,13 +15,13 @@ n_iter: 1 #5
 n_train_img: 5 #50
 n_test_img: 5 #32
 # important parameters
-user_defined_t_addnoise: 200
+user_defined_t_addnoise: 0
 user_defined_t_edit: 1000
 hs_coeff_delta_h: 0.0
 hs_coeff_origin_h: 1.0
 n_inv_step: 50
 n_test_pretrained_inv_step: 40
-n_test_step: 500 #50
+n_test_step: 1000 #50
 n_train_step: 50
 #
 DirectionalClipSmilarity: false

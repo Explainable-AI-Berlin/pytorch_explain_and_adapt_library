@@ -2,7 +2,7 @@
 'dataset_path'            : 'datasets/celeba'
 'num_samples'             : 7000
 'input_type'              : 'image'
-'input_size'              : [3, 128, 128]
+'input_size'              : [3, 256, 256]
 'output_type'             : 'multiclass'
 'output_size'             : [41]
 'confounder_probability'  : 1.0

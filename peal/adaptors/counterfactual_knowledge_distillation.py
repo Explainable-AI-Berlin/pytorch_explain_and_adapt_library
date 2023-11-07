@@ -754,7 +754,6 @@ class CounterfactualKnowledgeDistillation:
             self.base_dir, str(finetune_iteration), mode + "_dataset"
         )
         #
-        sample_idx = 0
         x_list = []
         y_list = []
         sample_names = []
@@ -763,7 +762,7 @@ class CounterfactualKnowledgeDistillation:
                 continue
 
             elif feedback[sample_idx] == "true":
-                sample_name = (
+                '''sample_name = (
                     "true_"
                     + str(int(y_source_list[sample_idx]))
                     + "_to_"
@@ -774,7 +773,8 @@ class CounterfactualKnowledgeDistillation:
                 x_list.append(x_counterfactual_list[sample_idx])
                 y_list.append(int(y_target_list[sample_idx]))
                 sample_names.append(sample_name)
-                sample_idx += 1
+                sample_idx += 1'''
+                continue
 
             elif feedback[sample_idx] == "false":
                 sample_name = (
