@@ -164,6 +164,7 @@ class CounterfactualKnowledgeDistillation:
             teacher=teacher if not teacher is None else self.adaptor_config.teacher,
             output_size=self.output_size,
             adaptor_config=self.adaptor_config,
+            dataset=self.val_dataloader.dataset,
             device=self.device,
         )
 
