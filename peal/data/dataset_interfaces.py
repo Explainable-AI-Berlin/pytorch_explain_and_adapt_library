@@ -15,14 +15,20 @@ class PealDataset(torch.utils.data.Dataset):
 
     def generate_contrastive_collage(
         self,
-        x,
-        x_counterfactual,
-        target_confidence_goal,
-        y_target,
-        y_source,
-        base_path,
-        start_idx,
-        classifier=None,
+        x_list: list,
+        x_counterfactual_list: list,
+        y_target_list: list,
+        y_source_list: list,
+        y_list: list,
+        target_confidence_goal: float,
+        y_target_start_confidence_list: list,
+        y_target_end_confidence_list: list,
+        base_path: str,
+        start_idx: int,
+        y_counterfactual_teacher_list=None,
+        y_original_teacher_list=None,
+        feedback_list=None,
+        **kwargs: dict,
     ):
         """
         This function generates a collage of the input and the counterfactual

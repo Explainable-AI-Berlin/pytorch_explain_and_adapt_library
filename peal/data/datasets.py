@@ -235,8 +235,11 @@ class ImageDataset(PealDataset):
         y_target_start_confidence_list: list,
         y_target_end_confidence_list: list,
         base_path: str,
-        start_idx: int,
-        **args: dict,
+        start_idx: int = 0,
+        y_original_teacher_list=None,
+        y_counterfactual_teacher_list=None,
+        feedback_list=None,
+        **kwargs: dict,
     ) -> tuple:
         Path(base_path).mkdir(parents=True, exist_ok=True)
         collage_paths = []
@@ -318,6 +321,16 @@ class ImageDataset(PealDataset):
                 + " -> "
             )
             title_string += str(round(float(y_target_end_confidence_list[i]), 2))
+            if not feedback_list is None:
+                title_string = (
+                    ", Teacher: "
+                    + str(int(y_original_teacher_list[i]))
+                    + " -> "
+                    + str(int(y_counterfactual_teacher_list[i]))
+                    + " -> "
+                    + str(feedback_list[i])
+                )
+
             plt.title(title_string)
             collage_path = os.path.join(
                 base_path,
