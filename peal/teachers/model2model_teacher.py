@@ -35,6 +35,7 @@ class Model2ModelTeacher(TeacherInterface):
             teacher_original.append(pred_original)
             teacher_counterfactual.append(pred_counterfactual)
 
+        import pdb; pdb.set_trace()
         self.dataset.generate_contrastive_collage(
             base_dir=base_dir,
             teacher_counterfactual=teacher_counterfactual,

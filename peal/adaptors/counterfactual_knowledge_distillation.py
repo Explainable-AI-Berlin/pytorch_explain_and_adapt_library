@@ -534,7 +534,7 @@ class CounterfactualKnowledgeDistillation:
                 generator_sample = self.generator.sample_x(
                     batch_size=self.adaptor_config.batch_size
                 )
-                if not generator_sample is None:
+                if not generator_sample is None and hasattr(self.generator.config, "training"):
                     torchvision.utils.save_image(
                         generator_sample,
                         os.path.join(self.base_dir, "generator_sample.png"),
@@ -656,7 +656,7 @@ class CounterfactualKnowledgeDistillation:
         ):
             feedback = self.teacher.get_feedback(
                 base_dir=os.path.join(
-                    self.base_dir, str(finetune_iteration), "teacher"
+                    self.base_dir, str(finetune_iteration), mode + "_teacher"
                 ),
                 **tracked_values,
             )
