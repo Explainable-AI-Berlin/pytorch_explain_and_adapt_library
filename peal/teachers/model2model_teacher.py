@@ -37,10 +37,14 @@ class Model2ModelTeacher(TeacherInterface):
 
         import pdb; pdb.set_trace()
         self.dataset.generate_contrastive_collage(
-            base_dir=base_dir,
-            teacher_counterfactual=teacher_counterfactual,
-            teacher_original=teacher_original,
-            feedback=feedback,
+            y_counterfactual_teacher_list=teacher_counterfactual,
+            y_original_teacher_list=teacher_original,
+            feedback_list=feedback,
+            x_counterfactual_list=x_counterfactual_list,
+            y_source_list=y_source_list,
+            y_target_list=y_target_list,
+            x_list=x_list,
+            base_path=base_dir,
             **kwargs,
         )
 

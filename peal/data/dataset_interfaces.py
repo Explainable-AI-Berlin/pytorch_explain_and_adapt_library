@@ -20,7 +20,6 @@ class PealDataset(torch.utils.data.Dataset):
         y_target_list: list,
         y_source_list: list,
         y_list: list,
-        target_confidence_goal: float,
         y_target_start_confidence_list: list,
         y_target_end_confidence_list: list,
         base_path: str,
