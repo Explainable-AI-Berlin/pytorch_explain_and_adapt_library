@@ -322,7 +322,6 @@ class ModelTrainer:
                     )
                     val_accuracy += self.val_dataloader_weights[idx] * val_accuracy_current
 
-            val_accuracy = val_accuracy / len(self.val_dataloaders)
             self.logger.writer.add_scalar(
                 "epoch_validation_accuracy", val_accuracy, self.config.training.epoch
             )

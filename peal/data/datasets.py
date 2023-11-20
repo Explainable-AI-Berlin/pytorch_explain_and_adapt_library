@@ -231,7 +231,6 @@ class ImageDataset(PealDataset):
         y_target_list: list,
         y_source_list: list,
         y_list: list,
-        target_confidence_goal: float,
         y_target_start_confidence_list: list,
         y_target_end_confidence_list: list,
         base_path: str,
@@ -322,7 +321,7 @@ class ImageDataset(PealDataset):
             )
             title_string += str(round(float(y_target_end_confidence_list[i]), 2))
             if not feedback_list is None:
-                title_string = (
+                title_string += (
                     ", Teacher: "
                     + str(int(y_original_teacher_list[i]))
                     + " -> "

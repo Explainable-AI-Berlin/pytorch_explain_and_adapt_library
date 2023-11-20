@@ -22,3 +22,4 @@ outputs
 dime2/outputs
 ace/outputs
 environment.yaml
+dive/*

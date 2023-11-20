@@ -1,0 +1,37 @@
+"wrapper": "tcvae",
+# Hardware
+"ngpu": ngpu,
+"amp": 1,
+
+# Optimization
+"batch_size": 64 * ngpu,
+"target_loss": "val_loss",
+"lr": [0.0004],
+"max_epoch": 400,
+
+# Model
+"model": "biggan",
+"backbone": "resnet",
+"channels_width": 4,
+"z_dim": 128,
+"mlp_width": 4,
+"mlp_depth": 2,
+
+# TCVAE
+"beta": [0.001], # the idea is to be able to interpolate while getting good reconstructions
+"tc_weight": [1], # we keep the total_correlation penalty high to encourage disentanglement
+"vgg_weight": [1],
+"beta_annealing": [True],
+"dp_prob": 0.3,
+
+# Data
+"height": 128,
+"width": 128,
+"crop": 150,
+
+"dataset": "biased_celeba",
+"transforms": [["flip"]],
+"labels_path":   "celeba_meta_explanations/list_eval_unbiased.csv",
+"dataset_train": "celeba",
+"dataset_val":   "celeba",
+"dataset_test":  "celeba",

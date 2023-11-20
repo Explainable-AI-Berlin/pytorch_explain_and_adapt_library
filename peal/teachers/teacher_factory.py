@@ -55,7 +55,7 @@ def get_teacher(
         teacher = VirelayTeacher(num_classes=output_size, port=int(teacher[-4:]))
 
     elif teacher[-4:] == ".cpl":
-        teacher = Model2ModelTeacher(torch.load(teacher, map_location=device))
+        teacher = Model2ModelTeacher(torch.load(teacher, map_location=device), dataset)
 
     else:
         raise ValueError(f"Unknown teacher {teacher}")
