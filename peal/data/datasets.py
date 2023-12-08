@@ -531,7 +531,52 @@ class Image2MixedDataset(ImageDataset):
 
             else:
                 return img_tensor, (target, mask_tensor)
+                
+    def _initialize_performance_metrics(self):
+        self.lpips = lpips.LPIPS(net="vgg", spatial=False).to('cuda')
+        self.fid = torchmetrics.image.fid.FrechetInceptionDistance(
+            feature=192, reset_real_features=False
+        )
+        real_images = [self[i][0] for i in range(100)]
+        self.fid = self.fid.to('cuda')
+        self.fid.update(
+            torch.tensor(255 * torch.stack(real_images, dim=0), dtype=torch.uint8).to('cuda'), real=True
+        )
 
+    def distribution_distance(self, x_list):
+
+        fids = []
+        for i in range(len(x_list)):
+            self.fid.update(torch.tensor(255 * torch.stack(x_list[i], dim=0).to('cuda'), dtype=torch.uint8), real=False)
+            fid_score = float(self.fid.compute())
+            fids.append(fid_score)
+
+        return np.mean(fids)
+
+    def pair_wise_distance(self, x1, x2):
+
+        distances = []
+        for i in range(len(x1)):
+            distance = self.lpips.forward(torch.stack(x1[i], dim=0).to('cuda'), torch.stack(x2[i], dim=0).to('cuda')).squeeze(1, 2, 3).detach().cpu().numpy().mean()
+            distances.append(distance)
+
+        return np.mean(distances)
+
+    def variance(self, x_list):
+        variances = []
+        for i in range(len(x_list[0])):
+            variance = torch.mean(torch.var(torch.stack([x_list[j][i] for j in range(len(x_list))], dim=0), dim=0))
+            variances.append(variance)
+
+        return np.mean(variances)
+
+    def flip_rate(self, y_confidence_list):
+        flip_rates = []
+        for i in range(len(y_confidence_list)):
+            flip_rate = torch.mean((torch.stack(y_confidence_list[i]) > 0.5).float())
+            flip_rates.append(flip_rate)
+
+        return np.mean(flip_rates)
 
 class Image2ClassDataset(ImageDataset):
     """
