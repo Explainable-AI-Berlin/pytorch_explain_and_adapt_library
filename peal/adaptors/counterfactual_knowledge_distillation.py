@@ -241,9 +241,7 @@ class CounterfactualKnowledgeDistillation:
             y_target_start_confidence = torch.nn.Softmax()(logits)[y_target]
             prediction = self.logits_to_prediction(logits)
             if (
-                prediction == y == y_source
-                and y_target_start_confidence
-                > confidence_score_stats[y_source][y_target]
+                prediction == y_source
             ):
                 x_batch.append(x)
                 y_source_batch.append(y_source)
