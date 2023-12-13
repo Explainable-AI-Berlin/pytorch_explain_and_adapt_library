@@ -19,25 +19,25 @@ class Model2ModelTeacher(TeacherInterface):
 
             # TODO here has to be somehing added for OOD e.g. with FID score
             #if y_source_list[idx] == y_list[idx]:                
-            #    if pred_original != pred_counterfactual:
-            #        feedback.append("true")
-            #    else:
-            #        feedback.append("false")
+            if pred_original == pred_counterfactual:
+                feedback.append("true")
+            else:
+                feedback.append("false")
             #else:
             #    feedback.append("ood")
-            if pred_original == y_source_list[idx]:
-                if pred_counterfactual == y_target_list[idx]:
-                    feedback.append("true")
+            #if pred_original == y_source_list[idx]:
+            #    if pred_counterfactual == y_target_list[idx]:
+            #        feedback.append("true")
+                
+            #    else:
+            #        feedback.append("false")
 
-                else:
-                    feedback.append("false")
-
-            else:
-                if pred_counterfactual == y_target_list[idx]:
-                    feedback.append("false")
-
-                else:
-                    feedback.append("true")
+ #           else:
+ #               if pred_counterfactual == y_target_list[idx]:
+ #                   feedback.append("false")
+#
+#                else:
+#                    feedback.append("true")#
 
             teacher_original.append(pred_original)
             teacher_counterfactual.append(pred_counterfactual)
