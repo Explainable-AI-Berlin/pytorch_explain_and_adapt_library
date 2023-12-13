@@ -14,7 +14,7 @@ class Model2ModelTeacher(TeacherInterface):
         is_train = self.model.training
         self.model.eval()
         for idx, counterfactual in enumerate(x_counterfactual_list):
-            pred_original = self.model(counterfactual.unsqueeze(0).to(self.device)).squeeze(0).detach().cpu().argmax(-1)
+            pred_original = self.model(x_list[idx].unsqueeze(0).to(self.device)).squeeze(0).detach().cpu().argmax(-1)
             pred_counterfactual = self.model(counterfactual.unsqueeze(0).to(self.device)).squeeze(0).detach().cpu().argmax(-1)
             pred = self.model(counterfactual.unsqueeze(0).to(self.device)).squeeze(0)
 

@@ -18,7 +18,7 @@ class CircleDataset(SymbolicDataset):
     @staticmethod
     def circle_fid(samples):
         radius = 1
-        return (((samples.pow(2)).sum(dim=-1) - radius).pow(2)).mean()
+        return (((samples.pow(2)).sum(dim=-1) - radius).pow(0.5)).mean()
 
     @staticmethod
     def angle_cdf(samples):
@@ -187,3 +187,47 @@ class CircleDataset(SymbolicDataset):
         plt.savefig(contour_path)
 
         return x_list, collage_paths
+
+    def _initialize_performance_metrics(self):
+        data = torch.zeros([len(self.data), len(self.attributes)], dtype=torch.float16)
+        for idx, key in enumerate(self.data):
+            data[idx] = self.data[key]
+        self.true_data = data
+        self.true_thetas = CircleDataset.angle_cdf(data)
+
+    def distribution_distance(self, x_list):
+
+        fid_like = []
+        for i in range(len(x_list)):
+            counterfactuals = torch.stack(x_list[i], dim=0)
+            manifold_distance = self.circle_fid(counterfactuals)
+            sample_thetas = CircleDataset.angle_cdf(counterfactuals)
+            ecdf = torch.arange(self.config['num_samples']) / self.config['num_samples']
+            true_cdf = (sample_thetas[:, None] >= self.true_thetas[None, :]).sum(-1) / len(self.true_data)
+            uniformity = torch.max(torch.abs((true_cdf - ecdf)))
+            fid_like.append(1 / (1 / manifold_distance + 1 / uniformity))
+
+    def pair_wise_distance(self, x1, x2):
+
+        distances = []
+        for i in range(len(x1)):
+            distance = (x1[i] - x2[i]).pow(2).sum().pow(0.5)
+            distances.append(distance)
+
+        return np.mean(distances)
+
+    def variance(self, x_list):
+        variances = []
+        for i in range(len(x_list[0])):
+            variance = torch.mean(torch.var(torch.stack([x_list[j][i] for j in range(len(x_list))], dim=0), dim=0))
+            variances.append(variance)
+
+        return np.mean(variances)
+
+    def flip_rate(self, y_confidence_list):
+        flip_rates = []
+        for i in range(len(y_confidence_list)):
+            flip_rate = torch.mean((torch.stack(y_confidence_list[i]) > 0.5).float())
+            flip_rates.append(flip_rate)
+
+        return np.mean(flip_rates)
