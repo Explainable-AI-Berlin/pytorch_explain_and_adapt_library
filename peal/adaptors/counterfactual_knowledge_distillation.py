@@ -234,14 +234,14 @@ class CounterfactualKnowledgeDistillation:
             if isinstance(self.teacher, SegmentationMaskTeacher):
                 y, hint = y
             """
-
+            
             logits = (
                 self.student(x.to(self.device).unsqueeze(0)).squeeze(0).detach().cpu()
             )
             y_target_start_confidence = torch.nn.Softmax()(logits)[y_target]
             prediction = self.logits_to_prediction(logits)
             if (
-                prediction == y_source
+                prediction == y == y_source
             ):
                 x_batch.append(x)
                 y_source_batch.append(y_source)
@@ -250,7 +250,9 @@ class CounterfactualKnowledgeDistillation:
                 y_target_start_confidence_batch.append(y_target_start_confidence)
                 hint_batch.append(torch.zeros_like(x))
                 sample_idx += 1
-
+        print(f'y_batch: {y_batch}')
+        print(f'count 1: {torch.sum(torch.tensor(y_batch) == 1)}')
+        #import pdb; pdb.set_trace()
         x_batch = torch.stack(x_batch)
         y_target_batch = torch.stack(y_target_batch)
         #if np.random.rand() < 0.3:
@@ -388,25 +390,37 @@ class CounterfactualKnowledgeDistillation:
             self.base_dir, str(finetune_iteration), "validation_tracked_values.npz"
         )
         if not os.path.exists(validation_values_path):
-            (
-                validation_tracked_values,
-                validation_stats,
-            ) = calculate_validation_statistics(
-                model=self.student,
-                dataloader=self.dataloaders_val[0],
-                tracked_keys=self.tracked_keys,
-                base_path=os.path.join(
-                    self.base_dir, str(finetune_iteration), "validation_collages"
-                ),
-                output_size=self.output_size,
-                explainer=self.explainer,
-                device=self.device,
-                logits_to_prediction=self.logits_to_prediction,
-                use_confusion_matrix=self.adaptor_config.use_confusion_matrix,
-                max_validation_samples=self.adaptor_config.max_validation_samples,
-                min_start_target_percentile=self.adaptor_config.min_start_target_percentile,
-            )
+            x_list_collection = []
+            x_counterfactual_collection = []
+            y_confidence_list = []
+            for i in range(1):
+                (
+                    validation_tracked_values,
+                    validation_stats,
+                ) = calculate_validation_statistics(
+                    model=self.student,
+                    dataloader=self.dataloaders_val[0],
+                    tracked_keys=self.tracked_keys,
+                    base_path=os.path.join(
+                        self.base_dir, str(finetune_iteration), "validation_collages"
+                    ),
+                    output_size=self.output_size,
+                    explainer=self.explainer,
+                    device=self.device,
+                    logits_to_prediction=self.logits_to_prediction,
+                    use_confusion_matrix=self.adaptor_config.use_confusion_matrix,
+                    max_validation_samples=self.adaptor_config.max_validation_samples,
+                    min_start_target_percentile=self.adaptor_config.min_start_target_percentile,
+                )
+                x_list_collection.append(validation_tracked_values['x_list'])
+                x_counterfactual_collection.append(validation_tracked_values['x_counterfactual_list'])
+                y_confidence_list.append(validation_tracked_values['y_target_end_confidence_list'])
 
+            self.datastack.dataset._initialize_performance_metrics()
+            validation_stats['distance_to_manifold'] = self.datastack.dataset.distribution_distance(x_counterfactual_collection)
+            validation_stats['pairwise_distance'] = self.datastack.dataset.pair_wise_distance(x_list_collection, x_counterfactual_collection)
+            validation_stats['diversity'] = self.datastack.dataset.variance(x_counterfactual_collection)
+            validation_stats['validity'] = self.datastack.dataset.flip_rate(y_confidence_list)
             os.makedirs(
                 os.path.join(self.base_dir, str(finetune_iteration)), exist_ok=True
             )
