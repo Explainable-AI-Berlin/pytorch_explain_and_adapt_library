@@ -367,7 +367,6 @@ class ConfounderDatasetGenerator:
                 axis=0,
             )
 
-        attribute_vs_no_attribute_idxs = np.zeros([2], dtype=np.int32)
         num_samples = (
             self.num_samples if not self.num_samples is None else len(instance_names)
         )
@@ -378,21 +377,11 @@ class ConfounderDatasetGenerator:
                     "\n".join(lines_out)
                 )
 
-            has_attribute = int(sample_idx % 4 == 0 or sample_idx % 4 == 1)
             has_confounder = bool(sample_idx % 2 == 0)
 
-            if not self.attribute is None:
-                while (
-                    not data[attribute_vs_no_attribute_idxs[has_attribute]][
-                        attributes.index(self.attribute)
-                    ]
-                    == has_attribute
-                ):
-                    attribute_vs_no_attribute_idxs[has_attribute] += 1
-
-            name = instance_names[attribute_vs_no_attribute_idxs[has_attribute]]
+            name = instance_names[sample_idx]
             img = Image.open(os.path.join(self.dataset_origin_path, "imgs", name))
-            sample = data[attribute_vs_no_attribute_idxs[has_attribute]]
+            sample = data[sample_idx]
 
             if sample_idx < 0.9 * self.num_samples:
                 confounder_intensity = random.uniform(0, 1)
@@ -446,7 +435,6 @@ class ConfounderDatasetGenerator:
             lines_out.append(
                 name + "," + ",".join(list(map(lambda x: str(float(x)), sample)))
             )
-            attribute_vs_no_attribute_idxs[has_attribute] += 1
 
         open(os.path.join(self.dataset_dir, "data.csv"), "w").write(
             "\n".join(lines_out)
