@@ -49,19 +49,19 @@ class CounterfactualKnowledgeDistillation:
     """
 
     def __init__(
-            self,
-            student: nn.Module = None,
-            datasource: Union[list, tuple] = None,
-            output_size: int = None,
-            generator: Union[InvertibleGenerator, Path, str] = None,
-            base_dir: Union[str, Path] = None,
-            teacher: Union[str, TeacherInterface] = None,
-            adaptor_config: Union[
-                dict, str, Path, AdaptorConfig
-            ] = "<PEAL_BASE>/configs/adaptors/symbolic_cfkd.yaml",
-            gigabyte_vram: float = None,
-            overwrite: bool = None,
-            visualization: callable = lambda x: x,
+        self,
+        student: nn.Module = None,
+        datasource: Union[list, tuple] = None,
+        output_size: int = None,
+        generator: Union[InvertibleGenerator, Path, str] = None,
+        base_dir: Union[str, Path] = None,
+        teacher: Union[str, TeacherInterface] = None,
+        adaptor_config: Union[
+            dict, str, Path, AdaptorConfig
+        ] = "<PEAL_BASE>/configs/adaptors/symbolic_cfkd.yaml",
+        gigabyte_vram: float = None,
+        overwrite: bool = None,
+        visualization: callable = lambda x: x,
     ):
         """
         This is the constructor for the CounterfactualKnowledgeDistillation class.
@@ -124,7 +124,7 @@ class CounterfactualKnowledgeDistillation:
         self.adaptor_config.training.val_batch_size = self.adaptor_config.batch_size
         # TODO this does not sound like the best solution
         self.adaptor_config.training.steps_per_epoch = (
-                10 * self.adaptor_config.min_train_samples / self.adaptor_config.batch_size
+            10 * self.adaptor_config.min_train_samples / self.adaptor_config.batch_size
         )
         (
             self.train_dataloader,
@@ -209,10 +209,11 @@ class CounterfactualKnowledgeDistillation:
         )
         self.validation_data_config.data.split = [0.0, 1.0]
 
+
     def get_batch(
-            self,
-            error_matrix: torch.Tensor,
-            confidence_score_stats: torch.tensor,
+        self,
+        error_matrix: torch.Tensor,
+        confidence_score_stats: torch.tensor,
     ):
         x_batch = []
         y_source_batch = []
@@ -221,16 +222,10 @@ class CounterfactualKnowledgeDistillation:
         y_target_start_confidence_batch = []
         hint_batch = []
         sample_idx = 0
-
-        # TODO this is hacky! Fix later!
-        torch.manual_seed(torch.seed())
-
         error_distribution = torch.distributions.Categorical(error_matrix)
-        print(f'error distribution: {error_distribution.probs}')
         while not sample_idx >= self.adaptor_config.batch_size:
-
             cm_idx = error_distribution.sample()
-            print(f'cm_idx: {cm_idx}')
+            # TODO verify that this is actually balancing itself!
             y_source = int(cm_idx / self.output_size)
             y_target = int(cm_idx % self.output_size)
             x, y = self.datastack.pop(int(y_source))
@@ -246,7 +241,7 @@ class CounterfactualKnowledgeDistillation:
             y_target_start_confidence = torch.nn.Softmax()(logits)[y_target]
             prediction = self.logits_to_prediction(logits)
             if (
-                    prediction == y == y_source
+                prediction == y == y_source
             ):
                 x_batch.append(x)
                 y_source_batch.append(y_source)
@@ -257,10 +252,10 @@ class CounterfactualKnowledgeDistillation:
                 sample_idx += 1
         print(f'y_batch: {y_batch}')
         print(f'count 1: {torch.sum(torch.tensor(y_batch) == 1)}')
-        # import pdb; pdb.set_trace()
+        #import pdb; pdb.set_trace()
         x_batch = torch.stack(x_batch)
         y_target_batch = torch.stack(y_target_batch)
-        # if np.random.rand() < 0.3:
+        #if np.random.rand() < 0.3:
         #    import pdb; pdb.set_trace()
         return {
             "x_list": x_batch,
@@ -272,11 +267,11 @@ class CounterfactualKnowledgeDistillation:
         }
 
     def generate_x_counterfactual_list(
-            self,
-            error_matrix,
-            confidence_score_stats,
-            finetune_iteration,
-            tracked_keys,
+        self,
+        error_matrix,
+        confidence_score_stats,
+        finetune_iteration,
+        tracked_keys,
     ):
         # TODO this should be done with a context manager
         """if isinstance(self.teacher, SegmentationMaskTeacher):
@@ -304,7 +299,7 @@ class CounterfactualKnowledgeDistillation:
                 self.adaptor_config.min_train_samples / self.adaptor_config.batch_size
                 + 0.99
             )
-                  * self.adaptor_config.explainer.gradient_steps,
+            * self.adaptor_config.explainer.gradient_steps,
         )
         pbar.stored_values = {}
         pbar.stored_values["n_total"] = 0
@@ -312,8 +307,8 @@ class CounterfactualKnowledgeDistillation:
             num_batches_per_iteration = int(
                 1
                 + (
-                        self.adaptor_config.min_train_samples
-                        - len(list(tracked_values.values())[0])
+                    self.adaptor_config.min_train_samples
+                    - len(list(tracked_values.values())[0])
                 )
                 / self.adaptor_config.batch_size
             )
@@ -334,30 +329,30 @@ class CounterfactualKnowledgeDistillation:
                     tracked_values[key].extend(values[key])
 
                 pbar.stored_values["n_valid"] = (
-                        str(len(list(tracked_values.values())[0]))
-                        + "/"
-                        + str(self.adaptor_config.min_train_samples)
+                    str(len(list(tracked_values.values())[0]))
+                    + "/"
+                    + str(self.adaptor_config.min_train_samples)
                 )
                 pbar.stored_values["th"] = acceptance_threshold
                 pbar.stored_values["n_total"] += self.adaptor_config.batch_size
                 pbar.stored_values["fr"] = (
-                        len(list(tracked_values.values())[0])
-                        / pbar.stored_values["n_total"]
+                    len(list(tracked_values.values())[0])
+                    / pbar.stored_values["n_total"]
                 )
 
             if (
-                    len(list(tracked_values.values())[0])
-                    < self.adaptor_config.min_train_samples
+                len(list(tracked_values.values())[0])
+                < self.adaptor_config.min_train_samples
             ):
                 if (
-                        acceptance_threshold == 0.51
-                        and len(list(tracked_values.values())[0]) == 0
+                    acceptance_threshold == 0.51
+                    and len(list(tracked_values.values())[0]) == 0
                 ):
                     continue_collecting = False
 
                 elif (
-                        len(list(values.values())[0])
-                        < self.adaptor_config.min_train_samples / 2
+                    len(list(values.values())[0])
+                    < self.adaptor_config.min_train_samples / 2
                 ):
                     acceptance_threshold = float(
                         np.maximum(0.51, acceptance_threshold - 0.1)
@@ -376,13 +371,13 @@ class CounterfactualKnowledgeDistillation:
 
     def retrieve_validation_stats(self, finetune_iteration):
         if os.path.exists(
-                os.path.join(self.base_dir, str(finetune_iteration), "validation_stats.npz")
+            os.path.join(self.base_dir, str(finetune_iteration), "validation_stats.npz")
         ):
             with open(
-                    os.path.join(
-                        self.base_dir, str(finetune_iteration), "validation_stats.npz"
-                    ),
-                    "rb",
+                os.path.join(
+                    self.base_dir, str(finetune_iteration), "validation_stats.npz"
+                ),
+                "rb",
             ) as f:
                 validation_stats = {}
                 validation_tracked_file = np.load(f, allow_pickle=True)
@@ -398,7 +393,6 @@ class CounterfactualKnowledgeDistillation:
             x_list_collection = []
             x_counterfactual_collection = []
             y_confidence_list = []
-            accuracy_collection = []
             for i in range(3):
                 (
                     validation_tracked_values,
@@ -421,23 +415,18 @@ class CounterfactualKnowledgeDistillation:
                 x_list_collection.append(validation_tracked_values['x_list'])
                 x_counterfactual_collection.append(validation_tracked_values['x_counterfactual_list'])
                 y_confidence_list.append(validation_tracked_values['y_target_end_confidence_list'])
-                accuracy_collection.append(validation_stats['accuracy'])
+
             self.datastack.dataset._initialize_performance_metrics()
-
-            validation_stats['accuracy'] = float(np.mean(accuracy_collection))
-            validation_stats['distance_to_manifold'] = float(
-                self.datastack.dataset.distribution_distance(x_counterfactual_collection))
-            validation_stats['minimality'] = float(
-                self.datastack.dataset.pair_wise_distance(x_list_collection, x_counterfactual_collection))
-            validation_stats['diversity'] = float(self.datastack.dataset.variance(x_counterfactual_collection))
-            validation_stats['validity'] = float(self.datastack.dataset.flip_rate(y_confidence_list))
-
+            validation_stats['distance_to_manifold'] = self.datastack.dataset.distribution_distance(x_counterfactual_collection)
+            validation_stats['pairwise_distance'] = self.datastack.dataset.pair_wise_distance(x_list_collection, x_counterfactual_collection)
+            validation_stats['diversity'] = self.datastack.dataset.variance(x_counterfactual_collection)
+            validation_stats['validity'] = self.datastack.dataset.flip_rate(y_confidence_list)
             os.makedirs(
                 os.path.join(self.base_dir, str(finetune_iteration)), exist_ok=True
             )
             with open(
-                    validation_values_path,
-                    "wb",
+                validation_values_path,
+                "wb",
             ) as f:
                 tracked_values_file = {}
                 for key in self.tracked_keys:
@@ -447,7 +436,7 @@ class CounterfactualKnowledgeDistillation:
                         ).numpy()
 
                     elif isinstance(
-                            validation_tracked_values[key][0], int
+                        validation_tracked_values[key][0], int
                     ) or isinstance(validation_tracked_values[key][0], float):
                         tracked_values_file[key] = np.array(
                             validation_tracked_values[key]
@@ -456,10 +445,10 @@ class CounterfactualKnowledgeDistillation:
                 np.savez(f, **tracked_values_file)
 
             with open(
-                    os.path.join(
-                        self.base_dir, str(finetune_iteration), "validation_stats.npz"
-                    ),
-                    "wb",
+                os.path.join(
+                    self.base_dir, str(finetune_iteration), "validation_stats.npz"
+                ),
+                "wb",
             ) as f:
                 validation_stats_file = {}
                 for key in validation_stats.keys():
@@ -467,7 +456,7 @@ class CounterfactualKnowledgeDistillation:
                         validation_stats_file[key] = validation_stats[key].numpy()
 
                     elif isinstance(validation_stats[key], int) or isinstance(
-                            validation_stats[key], float
+                        validation_stats[key], float
                     ):
                         validation_stats_file[key] = np.array(validation_stats[key])
 
@@ -476,8 +465,8 @@ class CounterfactualKnowledgeDistillation:
         else:
             # TODO think about this again
             with open(
-                    validation_values_path,
-                    "rb",
+                validation_values_path,
+                "rb",
             ) as f:
                 validation_tracked_values = {}
                 validation_tracked_value_file = np.load(f, allow_pickle=True)
@@ -521,10 +510,10 @@ class CounterfactualKnowledgeDistillation:
         )
 
         with open(
-                os.path.join(
-                    self.base_dir, str(finetune_iteration), "validation_stats.npz"
-                ),
-                "wb",
+            os.path.join(
+                self.base_dir, str(finetune_iteration), "validation_stats.npz"
+            ),
+            "wb",
         ) as f:
             validation_stats_file = {}
             for key in validation_stats.keys():
@@ -532,7 +521,7 @@ class CounterfactualKnowledgeDistillation:
                     validation_stats_file[key] = validation_stats[key].numpy()
 
                 elif isinstance(validation_stats[key], int) or isinstance(
-                        validation_stats[key], float
+                    validation_stats[key], float
                 ):
                     validation_stats_file[key] = np.array(validation_stats[key])
 
@@ -542,7 +531,7 @@ class CounterfactualKnowledgeDistillation:
 
     def initialize_run(self):
         if self.overwrite or not os.path.exists(
-                os.path.join(self.base_dir, "0", "validation_tracked_values.npz")
+            os.path.join(self.base_dir, "0", "validation_tracked_values.npz")
         ):
             assert self.adaptor_config.current_iteration == 0
             print("Create base_dir in: " + str(self.base_dir))
@@ -632,8 +621,8 @@ class CounterfactualKnowledgeDistillation:
                 return tracked_values
 
             with open(
-                    tracked_values_path,
-                    "wb",
+                tracked_values_path,
+                "wb",
             ) as f:
                 tracked_values_file = {}
                 for key in self.tracked_keys:
@@ -643,7 +632,7 @@ class CounterfactualKnowledgeDistillation:
                         ).numpy()
 
                     elif isinstance(tracked_values[key][0], int) or isinstance(
-                            tracked_values[key][0], float
+                        tracked_values[key][0], float
                     ):
                         tracked_values_file[key] = np.array(tracked_values[key])
 
@@ -651,8 +640,8 @@ class CounterfactualKnowledgeDistillation:
 
         else:
             with open(
-                    tracked_values_path,
-                    "rb",
+                tracked_values_path,
+                "rb",
             ) as f:
                 tracked_values = {}
                 tracked_values_file = np.load(f, allow_pickle=True)
@@ -675,7 +664,7 @@ class CounterfactualKnowledgeDistillation:
 
     def retrieve_feedback(self, tracked_values, finetune_iteration, mode):
         if not os.path.exists(
-                os.path.join(self.base_dir, str(finetune_iteration), mode + "_feedback.txt")
+            os.path.join(self.base_dir, str(finetune_iteration), mode + "_feedback.txt")
         ):
             feedback = self.teacher.get_feedback(
                 base_dir=os.path.join(
@@ -688,19 +677,19 @@ class CounterfactualKnowledgeDistillation:
                 os.path.join(self.base_dir, str(finetune_iteration)), exist_ok=True
             )
             with open(
-                    os.path.join(
-                        self.base_dir, str(finetune_iteration), mode + "_feedback.txt"
-                    ),
-                    "w",
+                os.path.join(
+                    self.base_dir, str(finetune_iteration), mode + "_feedback.txt"
+                ),
+                "w",
             ) as f:
                 f.write("\n".join(feedback))
 
         else:
             with open(
-                    os.path.join(
-                        self.base_dir, str(finetune_iteration), mode + "_feedback.txt"
-                    ),
-                    "r",
+                os.path.join(
+                    self.base_dir, str(finetune_iteration), mode + "_feedback.txt"
+                ),
+                "r",
             ) as f:
                 feedback = f.read().split("\n")
 
@@ -727,8 +716,8 @@ class CounterfactualKnowledgeDistillation:
             list(
                 filter(
                     lambda x: x[1] == "true"
-                              and tracked_values["y_list"][x[0]]
-                              == tracked_values["y_source_list"][x[0]],
+                    and tracked_values["y_list"][x[0]]
+                    == tracked_values["y_source_list"][x[0]],
                     enumerate(feedback),
                 )
             )
@@ -737,8 +726,8 @@ class CounterfactualKnowledgeDistillation:
             list(
                 filter(
                     lambda x: x[1] == "false"
-                              and tracked_values["y_list"][x[0]]
-                              == tracked_values["y_source_list"][x[0]],
+                    and tracked_values["y_list"][x[0]]
+                    == tracked_values["y_source_list"][x[0]],
                     enumerate(feedback),
                 )
             )
@@ -757,21 +746,21 @@ class CounterfactualKnowledgeDistillation:
         return feedback, feedback_stats
 
     def create_dataset(
-            self,
-            x_counterfactual_list,
-            feedback,
-            y_source_list,
-            y_target_list,
-            finetune_iteration,
-            config,
-            mode="",
-            **args,
+        self,
+        x_counterfactual_list,
+        feedback,
+        y_source_list,
+        y_target_list,
+        finetune_iteration,
+        config,
+        mode="",
+        **args,
     ):
         assert (
-                len(x_counterfactual_list)
-                == len(feedback)
-                == len(y_source_list)
-                == len(y_target_list)
+            len(x_counterfactual_list)
+            == len(feedback)
+            == len(y_source_list)
+            == len(y_target_list)
         ), "missmatch in list lengths"
 
         dataset_dir = os.path.join(
@@ -802,12 +791,12 @@ class CounterfactualKnowledgeDistillation:
 
             elif feedback[sample_idx] == "false":
                 sample_name = (
-                        "false_"
-                        + str(int(y_source_list[sample_idx]))
-                        + "_to_"
-                        + str(int(y_target_list[sample_idx]))
-                        + "_"
-                        + str(sample_idx)
+                    "false_"
+                    + str(int(y_source_list[sample_idx]))
+                    + "_to_"
+                    + str(int(y_target_list[sample_idx]))
+                    + "_"
+                    + str(sample_idx)
                 )
                 x_list.append(x_counterfactual_list[sample_idx])
                 y_list.append(int(y_source_list[sample_idx]))
@@ -824,12 +813,12 @@ class CounterfactualKnowledgeDistillation:
 
     def finetune_student(self, finetune_iteration, dataset_path):
         if not os.path.exists(
-                os.path.join(
-                    self.base_dir,
-                    str(finetune_iteration),
-                    "finetuned_model",
-                    "model.cpl",
-                )
+            os.path.join(
+                self.base_dir,
+                str(finetune_iteration),
+                "finetuned_model",
+                "model.cpl",
+            )
         ):
             shutil.rmtree(
                 os.path.join(self.base_dir, str(finetune_iteration), "finetuned_model"),
@@ -899,7 +888,7 @@ class CounterfactualKnowledgeDistillation:
                 val_dataloader_weights=[
                     1 - self.adaptor_config.mixing_ratio,
                     self.adaptor_config.mixing_ratio,
-                ],
+                    ],
             )
             finetune_trainer.fit(continue_training=True)
 
@@ -923,15 +912,15 @@ class CounterfactualKnowledgeDistillation:
 
         # iterate over the finetune iterations
         for finetune_iteration in range(
-                self.adaptor_config.current_iteration + 1,
-                self.adaptor_config.finetune_iterations + 1,
+            self.adaptor_config.current_iteration + 1,
+            self.adaptor_config.finetune_iterations + 1,
         ):
             tracked_values = self.retrieve_counterfactual_list(
                 validation_stats=validation_stats, finetune_iteration=finetune_iteration
             )
             if (
-                    len(list(tracked_values.values())[0])
-                    < self.adaptor_config.min_train_samples
+                len(list(tracked_values.values())[0])
+                < self.adaptor_config.min_train_samples
             ):
                 print("No counterfactuals could be found anymore!")
                 open(os.path.join(self.base_dir, "warning.txt"), "w").write(
@@ -992,8 +981,8 @@ class CounterfactualKnowledgeDistillation:
                 )"""
 
             if (
-                    self.adaptor_config.replacement_strategy == "delayed"
-                    and self.adaptor_config.replace_model
+                self.adaptor_config.replacement_strategy == "delayed"
+                and self.adaptor_config.replace_model
             ):
                 torch.save(self.student, os.path.join(self.base_dir, "model.cpl"))
 
@@ -1009,7 +998,7 @@ class CounterfactualKnowledgeDistillation:
                 self.adaptor_config.replace_model = False
 
             self.adaptor_config.current_iteration = (
-                    self.adaptor_config.current_iteration + 1
+                self.adaptor_config.current_iteration + 1
             )
             save_yaml_config(
                 self.adaptor_config, os.path.join(self.base_dir, "config.yaml")
