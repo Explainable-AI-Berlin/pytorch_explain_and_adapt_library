@@ -25,13 +25,13 @@ class SequenceDataset(PealDataset):
     """Sequence dataset."""
 
     def __init__(
-        self,
-        data_dir,
-        mode,
-        config,
-        transform=ToTensor(),
-        task_config=None,
-        **args,
+            self,
+            data_dir,
+            mode,
+            config,
+            transform=ToTensor(),
+            task_config=None,
+            **args,
     ):
         """
         Initialize the dataset.
@@ -84,13 +84,13 @@ class SymbolicDataset(PealDataset):
     """Symbolic dataset."""
 
     def __init__(
-        self,
-        data_dir,
-        mode,
-        config,
-        transform=ToTensor(),
-        task_config=None,
-        **kwargs,
+            self,
+            data_dir,
+            mode,
+            config,
+            transform=ToTensor(),
+            task_config=None,
+            **kwargs,
     ):
         """
         Initialize the dataset.
@@ -132,9 +132,9 @@ class SymbolicDataset(PealDataset):
         data = self.data[name].clone().detach().to(torch.float32)
 
         if (
-            not self.task_config is None
-            and not self.task_config.x_selection is None
-            and not len(self.task_config.x_selection) == 0
+                not self.task_config is None
+                and not self.task_config.x_selection is None
+                and not len(self.task_config.x_selection) == 0
         ):
             x = torch.zeros([len(self.task_config.x_selection)], dtype=torch.float32)
             for idx, selection in enumerate(self.task_config.x_selection):
@@ -144,9 +144,9 @@ class SymbolicDataset(PealDataset):
             x = data[:-1].to(torch.float32)
 
         if (
-            not self.task_config is None
-            and not self.task_config.y_selection is None
-            and not self.task_config.y_selection is None
+                not self.task_config is None
+                and not self.task_config.y_selection is None
+                and not self.task_config.y_selection is None
         ):
             y = torch.zeros([len(self.task_config.y_selection)])
             for idx, selection in enumerate(self.task_config.y_selection):
@@ -167,16 +167,16 @@ class SymbolicDataset(PealDataset):
         return x, y
 
     def generate_contrastive_collage(
-        self,
-        x_list,
-        x_counterfactual_list,
-        y_target_list,
-        y_source_list,
-        target_confidence_goal,
-        base_path,
-        start_idx,
-        classifier=None,
-        **args,
+            self,
+            x_list,
+            x_counterfactual_list,
+            y_target_list,
+            y_source_list,
+            target_confidence_goal,
+            base_path,
+            start_idx,
+            classifier=None,
+            **args,
     ):
         # TODO
         collage_paths = [
@@ -195,9 +195,9 @@ class SymbolicDataset(PealDataset):
         y = torch.stack([torch.tensor([y]) for y in y_list], dim=0)
         data = torch.cat([x, y], dim=1)
         if (
-            not self.task_config is None
-            and not self.task_config.x_selection is None
-            and not len(self.task_config.x_selection) == 0
+                not self.task_config is None
+                and not self.task_config.x_selection is None
+                and not len(self.task_config.x_selection) == 0
         ):
             features = copy.deepcopy(self.task_config.x_selection)
 
@@ -205,9 +205,9 @@ class SymbolicDataset(PealDataset):
             features = copy.deepcopy(self.attributes[:-1])
 
         if (
-            not self.task_config is None
-            and not self.task_config.y_selection is None
-            and not self.task_config.y_selection is None
+                not self.task_config is None
+                and not self.task_config.y_selection is None
+                and not self.task_config.y_selection is None
         ):
             targets = copy.deepcopy(self.task_config.y_selection)
 
@@ -225,20 +225,20 @@ class SymbolicDataset(PealDataset):
 
 class ImageDataset(PealDataset):
     def generate_contrastive_collage(
-        self,
-        x_list: list,
-        x_counterfactual_list: list,
-        y_target_list: list,
-        y_source_list: list,
-        y_list: list,
-        y_target_start_confidence_list: list,
-        y_target_end_confidence_list: list,
-        base_path: str,
-        start_idx: int = 0,
-        y_original_teacher_list=None,
-        y_counterfactual_teacher_list=None,
-        feedback_list=None,
-        **kwargs: dict,
+            self,
+            x_list: list,
+            x_counterfactual_list: list,
+            y_target_list: list,
+            y_source_list: list,
+            y_list: list,
+            y_target_start_confidence_list: list,
+            y_target_end_confidence_list: list,
+            base_path: str,
+            start_idx: int = 0,
+            y_original_teacher_list=None,
+            y_counterfactual_teacher_list=None,
+            feedback_list=None,
+            **kwargs: dict,
     ) -> tuple:
         Path(base_path).mkdir(parents=True, exist_ok=True)
         collage_paths = []
@@ -285,11 +285,11 @@ class ImageDataset(PealDataset):
 
             heatmap = torch.stack([heatmap_red, heatmap_green, heatmap_blue], dim=0)
             if (
-                torch.abs(
-                    heatmap.sum()
-                    - torch.abs(x - counterfactual).sum()
-                )
-                > 0.1
+                    torch.abs(
+                        heatmap.sum()
+                        - torch.abs(x - counterfactual).sum()
+                    )
+                    > 0.1
             ):
                 print(
                     "Error: Heatmap does not add up to absolute counterfactual difference."
@@ -303,31 +303,31 @@ class ImageDataset(PealDataset):
             plt.gcf()
             plt.imshow(current_collage.permute(1, 2, 0))
             title_string = (
-                str(int(y_list[i]))
-                + " -> "
-                + str(int(y_source_list[i]))
-                + " -> "
-                + str(int(y_target_list[i]))
+                    str(int(y_list[i]))
+                    + " -> "
+                    + str(int(y_source_list[i]))
+                    + " -> "
+                    + str(int(y_target_list[i]))
             )
             title_string += (
-                ", Target: "
-                + str(
-                    round(
-                        float(y_target_start_confidence_list[i]),
-                        2,
-                    )
+                    ", Target: "
+                    + str(
+                round(
+                    float(y_target_start_confidence_list[i]),
+                    2,
                 )
-                + " -> "
+            )
+                    + " -> "
             )
             title_string += str(round(float(y_target_end_confidence_list[i]), 2))
             if not feedback_list is None:
                 title_string += (
-                    ", Teacher: "
-                    + str(int(y_original_teacher_list[i]))
-                    + " -> "
-                    + str(int(y_counterfactual_teacher_list[i]))
-                    + " -> "
-                    + str(feedback_list[i])
+                        ", Teacher: "
+                        + str(int(y_original_teacher_list[i]))
+                        + " -> "
+                        + str(int(y_counterfactual_teacher_list[i]))
+                        + " -> "
+                        + str(feedback_list[i])
                 )
 
             plt.title(title_string)
@@ -371,7 +371,7 @@ class ImageDataset(PealDataset):
             f.write(data)
 
     def track_generator_performance(
-        self, generator: Union[Generator, torch.Tensor], batch_size=None, num_samples=None
+            self, generator: Union[Generator, torch.Tensor], batch_size=None, num_samples=None
     ):
         """
         This function tracks the performance of the generator
@@ -437,13 +437,13 @@ class Image2MixedDataset(ImageDataset):
     """
 
     def __init__(
-        self,
-        root_dir,
-        mode,
-        config,
-        transform=ToTensor(),
-        task_config=None,
-        return_dict=False,
+            self,
+            root_dir,
+            mode,
+            config,
+            transform=ToTensor(),
+            task_config=None,
+            return_dict=False,
     ):
         """
         This class is used to load a dataset with images and other data.
@@ -511,7 +511,7 @@ class Image2MixedDataset(ImageDataset):
 
         if not self.task_config is None and "ce" in self.task_config.criterions:
             assert (
-                target.shape[0] == 1
+                    target.shape[0] == 1
             ), "output shape inacceptable for singleclass classification"
             target = target[0].to(torch.int64)
 
@@ -531,7 +531,7 @@ class Image2MixedDataset(ImageDataset):
 
             else:
                 return img_tensor, (target, mask_tensor)
-                
+
     def _initialize_performance_metrics(self):
         self.lpips = lpips.LPIPS(net="vgg", spatial=False).to('cuda')
         self.fid = torchmetrics.image.fid.FrechetInceptionDistance(
@@ -557,7 +557,9 @@ class Image2MixedDataset(ImageDataset):
 
         distances = []
         for i in range(len(x1)):
-            distance = self.lpips.forward(torch.stack(x1[i], dim=0).to('cuda'), torch.stack(x2[i], dim=0).to('cuda')).squeeze(1, 2, 3).detach().cpu().numpy().mean()
+            distance = self.lpips.forward(torch.stack(x1[i], dim=0).to('cuda'),
+                                          torch.stack(x2[i], dim=0).to('cuda')).squeeze(1, 2,
+                                                                                        3).detach().cpu().numpy().mean()
             distances.append(distance)
 
         return np.mean(distances)
@@ -578,6 +580,7 @@ class Image2MixedDataset(ImageDataset):
 
         return np.mean(flip_rates)
 
+
 class Image2ClassDataset(ImageDataset):
     """
     This dataset is used for image classification tasks.
@@ -587,13 +590,13 @@ class Image2ClassDataset(ImageDataset):
     """
 
     def __init__(
-        self,
-        root_dir,
-        mode,
-        config,
-        transform=ToTensor(),
-        task_config=None,
-        return_dict=False,
+            self,
+            root_dir,
+            mode,
+            config,
+            transform=ToTensor(),
+            task_config=None,
+            return_dict=False,
     ):
         """
         This method initializes the dataset.
@@ -634,13 +637,13 @@ class Image2ClassDataset(ImageDataset):
 
         elif mode == "val":
             self.urls = self.urls[
-                int(config.split[0] * len(self.urls)) : int(
-                    config.split[1] * len(self.urls)
-                )
-            ]
+                        int(config.split[0] * len(self.urls)): int(
+                            config.split[1] * len(self.urls)
+                        )
+                        ]
 
         elif mode == "test":
-            self.urls = self.urls[int(config.split[1] * len(self.urls)) :]
+            self.urls = self.urls[int(config.split[1] * len(self.urls)):]
 
         if self.config.has_hints:
             self.all_urls = copy.deepcopy(self.urls)

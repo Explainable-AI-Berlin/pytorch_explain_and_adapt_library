@@ -393,7 +393,7 @@ class CounterfactualKnowledgeDistillation:
             x_list_collection = []
             x_counterfactual_collection = []
             y_confidence_list = []
-            for i in range(1):
+            for i in range(3):
                 (
                     validation_tracked_values,
                     validation_stats,
