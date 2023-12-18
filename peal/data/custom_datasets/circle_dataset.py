@@ -18,7 +18,7 @@ class CircleDataset(SymbolicDataset):
     @staticmethod
     def circle_fid(samples):
         radius = 1
-        return (((samples.pow(2)).sum(dim=-1) - radius).pow(2)).mean()
+        return (((samples.pow(2)).sum(dim=-1) - radius).pow(0.5)).mean()
 
     @staticmethod
     def angle_cdf(samples):
@@ -96,6 +96,7 @@ class CircleDataset(SymbolicDataset):
         for i, point in enumerate(x_counterfactual_list):
             plt.scatter(x_list[i][0], x_list[i][1], color='green')
             plt.scatter(point[0], point[1], color='red', label='end')
+            import pdb; pdb.set_trace()
             plt.arrow(
                 x_list[i][0], x_list[i][1],
                 point[0] - x_list[i][0],
@@ -103,6 +104,7 @@ class CircleDataset(SymbolicDataset):
                 head_width=0.05, head_length=0.05, fc='blue', ec='blue',
 
             )
+        #flip_rate = np.mean((classifier(torch.stack(x_counterfactual_list, dim=0)).softmax(dim=-1).argmax(dim=-1) != classifier(torch.stack(x_list, dim=0)).softmax(dim=-1).argmax(dim=-1)).numpy())
         plt.show()
         plt.savefig(counterfactual_path + '/counterfactuals.png')
         collage_paths.append(counterfactual_path)
@@ -187,3 +189,48 @@ class CircleDataset(SymbolicDataset):
         plt.savefig(contour_path)
 
         return x_list, collage_paths
+
+    def _initialize_performance_metrics(self):
+        data = torch.zeros([len(self.data), len(self.attributes)], dtype=torch.float32)
+        for idx, key in enumerate(self.data):
+            data[idx] = self.data[key]
+        self.true_data = data
+        self.true_thetas = CircleDataset.angle_cdf(data)
+
+    def distribution_distance(self, x_list_collection):
+
+        fid_like = []
+        for i in range(len(x_list_collection)):
+            counterfactuals = torch.stack(x_list_collection[i], dim=0)
+            manifold_distance = self.circle_fid(counterfactuals)
+            sample_thetas = CircleDataset.angle_cdf(counterfactuals)
+            ecdf = torch.arange(len(counterfactuals)) / len(counterfactuals)
+            true_cdf = (sample_thetas[:, None] >= self.true_thetas[None, :]).sum(-1) / len(self.true_data)
+            # how far is the cdf from uniform distribution
+            uniformity = torch.max(torch.abs((true_cdf - ecdf)))
+            fid_like.append(1 / (1 / manifold_distance + 1 / uniformity))
+
+    def pair_wise_distance(self, x1_collection, x2_collection):
+
+        distances = []
+        for i in range(len(x1_collection)):
+            distance = (torch.stack(x1_collection[i], dim=0) - torch.stack(x2_collection[i], dim=0)).pow(2).sum().pow(0.5)
+            distances.append(distance.item())
+
+        return np.mean(distances)
+
+    def variance(self, x_list_collection):
+        variances = []
+        for i in range(len(x_list_collection[0])):
+            variance = torch.mean(torch.var(torch.stack([x_list_collection[j][i] for j in range(len(x_list_collection))], dim=0), dim=0))
+            variances.append(variance)
+
+        return np.mean(variances)
+
+    def flip_rate(self, y_confidence_list):
+        flip_rates = []
+        for i in range(len(y_confidence_list)):
+            flip_rate = torch.mean((torch.stack(y_confidence_list[i]) > 0.5).float())
+            flip_rates.append(flip_rate)
+
+        return np.mean(flip_rates)

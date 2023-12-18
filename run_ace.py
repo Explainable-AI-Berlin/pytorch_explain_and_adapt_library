@@ -469,7 +469,6 @@ def main(args=None):
 
         elif isinstance(classifier, SequentialModel):
             target = 1 - c_pred
-
         acc1, acc5 = accuracy(
             c_log,
             lab,
@@ -498,9 +497,17 @@ def main(args=None):
             ispeal=isinstance(classifier, SequentialModel),
         )
         noise = (noise * 255).to(dtype=torch.uint8).detach().cpu()
+        import torchvision
+        torchvision.utils.save_image(img, "img.png", normalize=False)
+        torchvision.utils.save_image(pe_mask, "pe_mask.png", normalize=False)
+        torchvision.utils.save_image(pe, "pe.png", normalize=False)
+
         pe_mask = (pe_mask * 255).to(dtype=torch.uint8).detach().cpu()
+        ce_mask = generate_mask(img, ce, 1)[0]
+        torchvision.utils.save_image(ce_mask, "ce_mask.png", normalize=False)
+        torchvision.utils.save_image(ce, "ce.png", normalize=False)
         ce_mask = (
-            (generate_mask(img, ce, 1)[0] * 255).to(dtype=torch.uint8).detach().cpu()
+            (ce_mask * 255).to(dtype=torch.uint8).detach().cpu()
         )
 
         # evaluate the cf and check whether the model flipped the prediction

@@ -94,3 +94,15 @@ class PealDataset(torch.utils.data.Dataset):
             generator (Generator): The generator
         """
         return {}
+
+    def distribution_distance(self, x_list):
+        pass
+
+    def pair_wise_distance(self, x1, x2):
+        pass
+
+    def variance(self, x_list):
+        pass
+
+    def flip_rate(self, y_list, y_counterfactual_list):
+        pass
