@@ -1,5 +1,5 @@
 python3 generate_dataset.py \
---data_config '<PEAL_BASE>/configs/data/CopyrightTag_celeba.yaml'
+--data_config '<PEAL_BASE>/configs/data/copyrighttag_celeba.yaml'
 python3 train_model.py \
 --model_config "<PEAL_BASE>/configs/models/Smiling_confounding_CopyrightTag_celeba_classifier.yaml" \
 --model_name "Smiling_confounding_CopyrightTag_celeba_classifier_unpoisened"
