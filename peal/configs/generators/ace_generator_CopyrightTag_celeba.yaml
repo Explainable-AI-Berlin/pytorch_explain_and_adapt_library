@@ -9,7 +9,8 @@
 'base_path' : 'peal_runs/ddpm_CopyrightTag_celeba_1000' # 'peal_runs/celeba_ddpm' # 'peal_runs/celeba_ddpm_downloaded' #
 'sampling_stochastic' : True  # Set to False to remove the noise when sampling  # Dilation size for the mask generation
 'learn_sigma' : True
-'data' : '<PEAL_BASE>/configs/data/CopyrightTag_celeba.yaml'
+'data' : '<PEAL_BASE>/configs/data/copyrighttag_celeba.yaml'
+architecture: {}
 # Other parameters - careful might not have any effect since they are ported from DiME!!!
 'start_step' : 60
 'attention_resolutions' : '32,16,8'

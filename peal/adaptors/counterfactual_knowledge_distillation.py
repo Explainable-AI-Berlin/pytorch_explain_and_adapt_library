@@ -13,6 +13,7 @@ from pathlib import Path
 from tqdm import tqdm
 from typing import Union
 from torch import nn
+from types import SimpleNamespace
 
 from peal.global_utils import (
     load_yaml_config,
@@ -30,7 +31,7 @@ from peal.explainers.counterfactual_explainer import CounterfactualExplainer
 from peal.data.dataset_interfaces import PealDataset
 from peal.visualization.model_comparison import create_comparison
 from peal.teachers.segmentation_mask_teacher import SegmentationMaskTeacher
-from peal.data.datasets import ImageDataset
+from peal.data.datasets import ImageDataset, Image2MixedDataset
 from peal.teachers.teacher_factory import get_teacher
 from peal.teachers.teacher_interface import TeacherInterface
 from peal.generators.interfaces import InvertibleGenerator
@@ -61,7 +62,7 @@ class CounterfactualKnowledgeDistillation:
         ] = "<PEAL_BASE>/configs/adaptors/symbolic_cfkd.yaml",
         gigabyte_vram: float = None,
         overwrite: bool = None,
-        visualization: callable = lambda x: x,
+        use_visualization: bool = False,
     ):
         """
         This is the constructor for the CounterfactualKnowledgeDistillation class.
@@ -181,7 +182,7 @@ class CounterfactualKnowledgeDistillation:
             dataset=self.val_dataloader.dataset,
         )
         self.logits_to_prediction = lambda logits: logits.argmax(-1)
-        self.use_visualization = visualization
+        self.use_visualization = use_visualization
         self.tracked_keys = [
             "x_list",
             "x_counterfactual_list",
@@ -208,7 +209,6 @@ class CounterfactualKnowledgeDistillation:
             self.adaptor_config.max_validation_samples
         )
         self.validation_data_config.data.split = [0.0, 1.0]
-
 
     def get_batch(
         self,
@@ -240,9 +240,7 @@ class CounterfactualKnowledgeDistillation:
             )
             y_target_start_confidence = torch.nn.Softmax()(logits)[y_target]
             prediction = self.logits_to_prediction(logits)
-            if (
-                prediction == y == y_source
-            ):
+            if prediction == y == y_source:
                 x_batch.append(x)
                 y_source_batch.append(y_source)
                 y_target_batch.append(torch.tensor(y_target))
@@ -250,12 +248,12 @@ class CounterfactualKnowledgeDistillation:
                 y_target_start_confidence_batch.append(y_target_start_confidence)
                 hint_batch.append(torch.zeros_like(x))
                 sample_idx += 1
-        print(f'y_batch: {y_batch}')
-        print(f'count 1: {torch.sum(torch.tensor(y_batch) == 1)}')
-        #import pdb; pdb.set_trace()
+        print(f"y_batch: {y_batch}")
+        print(f"count 1: {torch.sum(torch.tensor(y_batch) == 1)}")
+        # import pdb; pdb.set_trace()
         x_batch = torch.stack(x_batch)
         y_target_batch = torch.stack(y_target_batch)
-        #if np.random.rand() < 0.3:
+        # if np.random.rand() < 0.3:
         #    import pdb; pdb.set_trace()
         return {
             "x_list": x_batch,
@@ -323,7 +321,7 @@ class CounterfactualKnowledgeDistillation:
                     pbar=pbar,
                     mode="Training",
                     model=self.student,
-                    dataloader=self.dataloader_mixer
+                    dataloader=self.dataloader_mixer,
                 )
                 for key in tracked_keys:
                     tracked_values[key].extend(values[key])
@@ -412,15 +410,31 @@ class CounterfactualKnowledgeDistillation:
                     max_validation_samples=self.adaptor_config.max_validation_samples,
                     min_start_target_percentile=self.adaptor_config.min_start_target_percentile,
                 )
-                x_list_collection.append(validation_tracked_values['x_list'])
-                x_counterfactual_collection.append(validation_tracked_values['x_counterfactual_list'])
-                y_confidence_list.append(validation_tracked_values['y_target_end_confidence_list'])
+                x_list_collection.append(validation_tracked_values["x_list"])
+                x_counterfactual_collection.append(
+                    validation_tracked_values["x_counterfactual_list"]
+                )
+                y_confidence_list.append(
+                    validation_tracked_values["y_target_end_confidence_list"]
+                )
 
             self.datastack.dataset._initialize_performance_metrics()
-            validation_stats['distance_to_manifold'] = self.datastack.dataset.distribution_distance(x_counterfactual_collection)
-            validation_stats['pairwise_distance'] = self.datastack.dataset.pair_wise_distance(x_list_collection, x_counterfactual_collection)
-            validation_stats['diversity'] = self.datastack.dataset.variance(x_counterfactual_collection)
-            validation_stats['validity'] = self.datastack.dataset.flip_rate(y_confidence_list)
+            validation_stats[
+                "distance_to_manifold"
+            ] = self.datastack.dataset.distribution_distance(
+                x_counterfactual_collection
+            )
+            validation_stats[
+                "pairwise_distance"
+            ] = self.datastack.dataset.pair_wise_distance(
+                x_list_collection, x_counterfactual_collection
+            )
+            validation_stats["diversity"] = self.datastack.dataset.variance(
+                x_counterfactual_collection
+            )
+            validation_stats["validity"] = self.datastack.dataset.flip_rate(
+                y_confidence_list
+            )
             os.makedirs(
                 os.path.join(self.base_dir, str(finetune_iteration)), exist_ok=True
             )
@@ -542,11 +556,23 @@ class CounterfactualKnowledgeDistillation:
             log_images_to_writer(self.val_dataloader, writer, "validation")
             log_images_to_writer(self.test_dataloader, writer, "test")
 
+            if self.output_size == 2 and self.use_visualization:
+                print('visualize progress!!!')
+                print('visualize progress!!!')
+                print('visualize progress!!!')
+                print('visualize progress!!!')
+                print('visualize progress!!!')
+                self.visualize_progress(
+                    [os.path.join(self.base_dir, "visualization.png")]
+                )
+
             if isinstance(self.val_dataloader.dataset, ImageDataset):
                 generator_sample = self.generator.sample_x(
                     batch_size=self.adaptor_config.batch_size
                 )
-                if not generator_sample is None and hasattr(self.generator.config, "training"):
+                if not generator_sample is None and hasattr(
+                    self.generator.config, "training"
+                ):
                     torchvision.utils.save_image(
                         generator_sample,
                         os.path.join(self.base_dir, "generator_sample.png"),
@@ -587,11 +613,6 @@ class CounterfactualKnowledgeDistillation:
                 "test_accuracy", test_accuracy, self.adaptor_config.current_iteration
             )
             self.adaptor_config.test_accuracies = [test_accuracy]
-
-            """if self.output_size == 2 and self.use_visualization:
-                self.visualize_progress(
-                    [os.path.join(self.base_dir, "visualization.png")]
-                )"""
 
         else:
             with open(os.path.join(self.base_dir, "platform.txt"), "w") as f:
@@ -775,7 +796,7 @@ class CounterfactualKnowledgeDistillation:
                 continue
 
             elif feedback[sample_idx] == "true":
-                '''sample_name = (
+                """sample_name = (
                     "true_"
                     + str(int(y_source_list[sample_idx]))
                     + "_to_"
@@ -786,7 +807,7 @@ class CounterfactualKnowledgeDistillation:
                 x_list.append(x_counterfactual_list[sample_idx])
                 y_list.append(int(y_target_list[sample_idx]))
                 sample_names.append(sample_name)
-                sample_idx += 1'''
+                sample_idx += 1"""
                 continue
 
             elif feedback[sample_idx] == "false":
@@ -850,10 +871,10 @@ class CounterfactualKnowledgeDistillation:
             #
             if not self.adaptor_config.mixing_ratio is None:
                 priority = (
-                        (1 / (1 - self.adaptor_config.mixing_ratio))
-                        * self.adaptor_config.mixing_ratio
-                        * len(self.dataloader_mixer)
-                        / len(dataloader.dataset)
+                    (1 / (1 - self.adaptor_config.mixing_ratio))
+                    * self.adaptor_config.mixing_ratio
+                    * len(self.dataloader_mixer)
+                    / len(dataloader.dataset)
                 )
 
             else:
@@ -862,11 +883,11 @@ class CounterfactualKnowledgeDistillation:
             self.dataloader_mixer.append(dataloader, priority=priority)
 
             assert (
-                    abs(
-                        self.dataloader_mixer.priorities[-1]
-                        - self.adaptor_config.mixing_ratio
-                    )
-                    < 0.01
+                abs(
+                    self.dataloader_mixer.priorities[-1]
+                    - self.adaptor_config.mixing_ratio
+                )
+                < 0.01
             ), "priorities do not match! " + str(self.dataloader_mixer.priorities)
             self.dataloaders_val[1] = dataloader_val
 
@@ -888,7 +909,7 @@ class CounterfactualKnowledgeDistillation:
                 val_dataloader_weights=[
                     1 - self.adaptor_config.mixing_ratio,
                     self.adaptor_config.mixing_ratio,
-                    ],
+                ],
             )
             finetune_trainer.fit(continue_training=True)
 
@@ -902,6 +923,71 @@ class CounterfactualKnowledgeDistillation:
                 ),
                 map_location=self.device,
             )
+
+    def visualize_progress(self, paths):
+        task_config_buffer = copy.deepcopy(self.test_dataloader.dataset.task_config)
+        criterions = {}
+        if (
+            isinstance(self.test_dataloader.dataset, Image2MixedDataset)
+            and "Confounder" in self.test_dataloader.dataset.attributes
+        ):
+            self.test_dataloader.dataset.task_config = SimpleNamespace(**{
+                "y_selection": None,
+                "criterions": [],
+            })
+            criterions["class"] = lambda X, y: int(
+                y[
+                    self.test_dataloader.dataset.attributes.index(
+                        task_config_buffer.y_selection[0]
+                    )
+                ]
+            )
+            criterions["confounder"] = lambda X, y: int(
+                y[self.test_dataloader.dataset.attributes.index("Confounder")]
+            )
+            criterions["uncorrected"] = lambda X, y: int(
+                self.original_student(X.unsqueeze(0).to(self.device))
+                .squeeze(0)
+                .cpu()
+                .argmax()
+            )
+            criterions["cfkd"] = lambda X, y: int(
+                self.student(X.unsqueeze(0).to(self.device)).squeeze(0).cpu().argmax()
+            )
+
+        else:
+            criterions["class"] = lambda X, y: int(y)
+            criterions["uncorrected"] = lambda X, y: int(
+                self.original_student(X.unsqueeze(0).to(self.device))
+                .squeeze(0)
+                .cpu()
+                .argmax()
+            )
+            criterions["cfkd"] = lambda X, y: int(
+                self.student(X.unsqueeze(0).to(self.device)).squeeze(0).cpu().argmax()
+            )
+
+        img = create_comparison(
+            dataset=self.test_dataloader.dataset,
+            criterions=criterions,
+            columns={
+                "Counterfactual\nExplanation": [
+                    "cf",
+                    self.original_student,
+                    "uncorrected",
+                ],
+                "CFKD\ncorrected": ["cf", self.student, "cfkd"],
+            },
+            score_reference_idx=1,
+            generator=self.generator,
+            device=self.device,
+            explainer_config=self.adaptor_config.explainer,
+        )
+        self.test_dataloader.dataset.task_config = task_config_buffer
+        for path in paths:
+            img.save(path)
+
+        return img
 
     def run(self):
         """
@@ -970,7 +1056,7 @@ class CounterfactualKnowledgeDistillation:
             )
             writer.add_scalar("test_accuracy", test_accuracy, finetune_iteration)
 
-            """if self.output_size == 2 and self.use_visualization:
+            if self.output_size == 2 and self.use_visualization:
                 self.visualize_progress(
                     [
                         os.path.join(
@@ -978,7 +1064,7 @@ class CounterfactualKnowledgeDistillation:
                         ),
                         os.path.join(self.base_dir, "visualization.png"),
                     ]
-                )"""
+                )
 
             if (
                 self.adaptor_config.replacement_strategy == "delayed"

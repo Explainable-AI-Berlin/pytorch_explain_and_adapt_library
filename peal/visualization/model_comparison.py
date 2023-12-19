@@ -35,8 +35,10 @@ def get_explanation(
     scores,
     checkbox_dict,
     generator,
+    dataset,
     score_reference_idx,
     explainer_config=None,
+    counterfactual_explainer=None,
 ):
     explanation_type, model, target_key = description
     lrp_target = checkbox_dict[target_key]
@@ -60,7 +62,7 @@ def get_explanation(
         cfkd_target = torch.abs(lrp_target - 1)
         if explainer_config is None:
             student_cfkd_counterfactual_explainer = CounterfactualExplainer(
-                downstream_model=model, generator=generator
+                downstream_model=model, generator=generator, input_type="image", dataset=dataset
             )
 
         else:
@@ -68,18 +70,22 @@ def get_explanation(
                 downstream_model=model,
                 generator=generator,
                 explainer_config=explainer_config,
+                input_type="image",
+                dataset=dataset
             )
+
+        batch = {"x_list" : X, "y_target_list" : cfkd_target, "y_source_list" : lrp_target}
         student_cfkd_counterfactual_explanation = (
             student_cfkd_counterfactual_explainer.explain_batch(
-                X, cfkd_target, source_classes=lrp_target
+                batch, remove_below_threshold=False
             )
         )
-        cfkd_counterfactual = student_cfkd_counterfactual_explanation[1].cpu()
-        cfkd_heatmap = student_cfkd_counterfactual_explanation[2].cpu()
+        cfkd_counterfactual = student_cfkd_counterfactual_explanation["x_counterfactual_list"].cpu()
+        cfkd_heatmap = student_cfkd_counterfactual_explanation["x_attribution_list"].cpu()
         scores_before = scores
         scores_after = torch.abs(
             torch.abs(
-                cfkd_target - torch.tensor(student_cfkd_counterfactual_explanation[3])
+                cfkd_target - torch.tensor(student_cfkd_counterfactual_explanation["y_target_end_confidence_list"])
             )
             - 1
         )
@@ -116,7 +122,11 @@ def create_comparison(
             X, y = dataset[i]
             current_results = torch.zeros([len(criterions.keys())], dtype=torch.long)
             for idx, key in enumerate(criterions.keys()):
-                current_results[idx] = criterions[key](X, y)
+                try:
+                    current_results[idx] = criterions[key](X, y)
+
+                except Exception:
+                    import pdb; pdb.set_trace()
 
             if sample_idxs[list(current_results)] == 0:
                 sample_idxs[list(current_results)] = 1
@@ -153,8 +163,9 @@ def create_comparison(
             scores_dict[key],
             checkbox_dict,
             generator,
-            score_reference_idx,
-            explainer_config,
+            dataset=dataset,
+            score_reference_idx=score_reference_idx,
+            explainer_config=explainer_config,
         )
 
     img = make_image_grid(checkbox_dict=checkbox_dict, image_dicts=image_dicts)

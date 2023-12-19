@@ -1,11 +1,12 @@
-import torch
-import torchvision
 import os
 import types
 import shutil
 import copy
+import torch
+import io
+import blobfile as bf
 
-from pathlib import Path
+from mpi4py import MPI
 from torch import nn
 from PIL import Image
 from torchvision.transforms import ToTensor
@@ -13,7 +14,6 @@ from torchvision.transforms import ToTensor
 from peal.generators.interfaces import EditCapableGenerator
 from peal.data.datasets import Image2ClassDataset
 from peal.global_utils import load_yaml_config, embed_numberstring
-from run_dime import main as dime_main
 from run_ace import main as ace_main
 from ace.guided_diffusion import dist_util, logger
 from ace.guided_diffusion.resample import create_named_schedule_sampler
@@ -23,9 +23,28 @@ from ace.guided_diffusion.script_util import (
 from ace.guided_diffusion.train_util import TrainLoop
 from peal.data.dataset_factory import get_datasets
 from peal.data.dataloaders import get_dataloader
-from dime2.core.dist_util import (
-    load_state_dict,
-)
+
+def load_state_dict(path, **kwargs):
+    """
+    Load a PyTorch file without redundant fetches across MPI ranks.
+    """
+    chunk_size = 2**30  # MPI has a relatively small size limit
+    if MPI.COMM_WORLD.Get_rank() == 0:
+        with bf.BlobFile(path, "rb") as f:
+            data = f.read()
+        num_chunks = len(data) // chunk_size
+        if len(data) % chunk_size:
+            num_chunks += 1
+        MPI.COMM_WORLD.bcast(num_chunks)
+        for i in range(0, len(data), chunk_size):
+            MPI.COMM_WORLD.bcast(data[i : i + chunk_size])
+    else:
+        num_chunks = MPI.COMM_WORLD.bcast(None)
+        data = bytes()
+        for _ in range(num_chunks):
+            data += MPI.COMM_WORLD.bcast(None)
+
+    return torch.load(io.BytesIO(data), **kwargs)
 
 
 class AceDDPMAdaptor(EditCapableGenerator):
@@ -158,10 +177,6 @@ class AceDDPMAdaptor(EditCapableGenerator):
             # TODO this does not use the target_classes yet!!!
             ace_main(args=args)
             ending = ".png"
-
-        elif self.config.method == "dime":
-            dime_main(args=args)
-            ending = ".jpg"
 
         x_counterfactuals = []
         x_list = []

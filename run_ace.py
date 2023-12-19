@@ -1,6 +1,5 @@
 import os
 import shutil
-
 import yaml
 import copy
 import math
@@ -10,6 +9,10 @@ import itertools
 import numpy as np
 import os.path as osp
 import matplotlib.pyplot as plt
+import io
+import blobfile as bf
+
+from mpi4py import MPI
 
 from PIL import Image
 from time import time
@@ -55,9 +58,6 @@ from ace.guided_diffusion.image_datasets import (
     BINARYDATASET,
     MULTICLASSDATASETS,
 )
-from dime2.core.dist_util import (
-    load_state_dict,
-)
 
 # core imports
 from ace.core.utils import print_dict, merge_all_chunks, generate_mask
@@ -80,6 +80,28 @@ matplotlib.use("Agg")  # to disable display
 # Functions
 # =======================================================
 # =======================================================
+
+def load_state_dict(path, **kwargs):
+    """
+    Load a PyTorch file without redundant fetches across MPI ranks.
+    """
+    chunk_size = 2**30  # MPI has a relatively small size limit
+    if MPI.COMM_WORLD.Get_rank() == 0:
+        with bf.BlobFile(path, "rb") as f:
+            data = f.read()
+        num_chunks = len(data) // chunk_size
+        if len(data) % chunk_size:
+            num_chunks += 1
+        MPI.COMM_WORLD.bcast(num_chunks)
+        for i in range(0, len(data), chunk_size):
+            MPI.COMM_WORLD.bcast(data[i : i + chunk_size])
+    else:
+        num_chunks = MPI.COMM_WORLD.bcast(None)
+        data = bytes()
+        for _ in range(num_chunks):
+            data += MPI.COMM_WORLD.bcast(None)
+
+    return torch.load(io.BytesIO(data), **kwargs)
 
 
 def create_args():

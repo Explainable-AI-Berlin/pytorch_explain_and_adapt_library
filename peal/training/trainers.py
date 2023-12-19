@@ -285,7 +285,8 @@ class ModelTrainer:
         )
         pbar.stored_values = {}
         val_accuracy_max = 0.0
-        train_accuracy_max = 0.0
+        val_accuracy_previous = 0.0
+        train_accuracy_previous = 0.0
         self.config.training.epoch = 0
         while self.config.training.epoch < self.config.training.max_epochs:
             pbar.stored_values["Epoch"] = self.config.training.epoch
@@ -360,13 +361,13 @@ class ModelTrainer:
                 self.model.to(self.device)
 
             # increase regularization and reset checkpoint if overfitting occurs
-            if train_accuracy > train_accuracy_max:
-                if val_accuracy < val_accuracy_max:
+            if train_accuracy >= train_accuracy_previous:
+                if val_accuracy < val_accuracy_previous:
                     if self.regularization_level == 0:
                         self.regularization_level = 1
 
                     else:
-                        self.regularization_level *= 2
+                        self.regularization_level *= 1.3
 
                     checkpoint = torch.load(
                         os.path.join(
@@ -379,7 +380,12 @@ class ModelTrainer:
                     self.model.load_state_dict(checkpoint)
 
                 else:
-                    train_accuracy_max = train_accuracy
+                    train_accuracy_previous = train_accuracy
+                    val_accuracy_previous = val_accuracy
+
+            else:
+                train_accuracy_previous = train_accuracy
+                val_accuracy_previous = val_accuracy
 
             save_yaml_config(self.config, os.path.join(self.base_dir, "config.yaml"))
 
