@@ -129,6 +129,10 @@ class AdaptorConfig:
     """
     overwrite: bool = True
     """
+    Whether to overwrite the logs and intermediate results.
+    """
+    use_visualization: bool = False
+    """
     A dict containing all variables that could not be given with the current config structure
     """
     kwargs: dict = {}
@@ -164,6 +168,7 @@ class AdaptorConfig:
         finetune_iterations: PositiveInt = None,
         current_iteration: PositiveInt = None,
         overwrite: bool = None,
+        use_visualization: bool = None,
         **kwargs,
     ):
         """
@@ -194,6 +199,7 @@ class AdaptorConfig:
             finetune_iterations: The number of finetune iterations when executing the adaptor.
             current_iteration: Logging of the current finetune iteration
             overwrite: Whether to overwrite the logs and intermediate results.
+            use_visualization: Whether to visualize the results.
             **kwargs: A dict containing all variables that could not be given with the current config structure
         """
         self.training = (
@@ -286,4 +292,5 @@ class AdaptorConfig:
             else self.current_iteration
         )
         self.overwrite = overwrite if not overwrite is None else self.overwrite
+        self.use_visualization = use_visualization if not use_visualization is None else self.use_visualization
         self.kwargs = kwargs

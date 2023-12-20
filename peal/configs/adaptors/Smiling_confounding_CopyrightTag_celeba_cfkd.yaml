@@ -6,6 +6,7 @@
 'max_validation_samples'               :  10
 'continuous_learning'                  :  False
 'replace_model'                        :  True
+'use_visualization'                    :  True
 'explainer'                            :  '<PEAL_BASE>/configs/explainers/counterfactual_default.yaml'
 'training'                             :  '<PEAL_BASE>/configs/training/img_classifier.yaml'
 'data'                                 :  '<PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba_poisened.yaml'

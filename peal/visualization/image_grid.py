@@ -69,9 +69,10 @@ def embed_text_in_image(text, width, height):
     draw = ImageDraw.Draw(image)
 
     # Add text to image
-    font = ImageFont.truetype(
+    '''font = ImageFont.truetype(
         "/usr/share/fonts/truetype/freefont/FreeMono.ttf", size=10
-    )
+    )'''
+    font = ImageFont.load_default()
     try:
         w, h = draw.textsize(text, font)
 

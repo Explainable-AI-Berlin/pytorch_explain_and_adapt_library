@@ -39,6 +39,7 @@ def get_explanation(
     score_reference_idx,
     explainer_config=None,
     counterfactual_explainer=None,
+    batch_size=1,
 ):
     explanation_type, model, target_key = description
     lrp_target = checkbox_dict[target_key]
@@ -62,7 +63,10 @@ def get_explanation(
         cfkd_target = torch.abs(lrp_target - 1)
         if explainer_config is None:
             student_cfkd_counterfactual_explainer = CounterfactualExplainer(
-                downstream_model=model, generator=generator, input_type="image", dataset=dataset
+                downstream_model=model,
+                generator=generator,
+                input_type="image",
+                dataset=dataset,
             )
 
         else:
@@ -71,32 +75,64 @@ def get_explanation(
                 generator=generator,
                 explainer_config=explainer_config,
                 input_type="image",
-                dataset=dataset
+                dataset=dataset,
             )
 
-        batch = {"x_list" : X, "y_target_list" : cfkd_target, "y_source_list" : lrp_target}
-        student_cfkd_counterfactual_explanation = (
-            student_cfkd_counterfactual_explainer.explain_batch(
-                batch, remove_below_threshold=False
+        current_idx = 0
+        while current_idx < X.shape[0]:
+            # TODO these entries are not correct
+            batch = {
+                "x_list": X[current_idx : current_idx + batch_size],
+                "y_target_list": cfkd_target[current_idx : current_idx + batch_size],
+                "y_source_list": lrp_target[current_idx : current_idx + batch_size],
+                "y_list": lrp_target[current_idx : current_idx + batch_size],
+                "y_target_start_confidence_list": torch.zeros([batch_size]),
+            }
+            student_cfkd_counterfactual_explanation = (
+                student_cfkd_counterfactual_explainer.explain_batch(
+                    batch, remove_below_threshold=False
+                )
             )
-        )
-        cfkd_counterfactual = student_cfkd_counterfactual_explanation["x_counterfactual_list"].cpu()
-        cfkd_heatmap = student_cfkd_counterfactual_explanation["x_attribution_list"].cpu()
-        scores_before = scores
-        scores_after = torch.abs(
-            torch.abs(
-                cfkd_target - torch.tensor(student_cfkd_counterfactual_explanation["y_target_end_confidence_list"])
+            cfkd_counterfactual = torch.stack(student_cfkd_counterfactual_explanation[
+                "x_counterfactual_list"
+            ]).cpu()
+            cfkd_heatmap = torch.stack(student_cfkd_counterfactual_explanation[
+                "x_attribution_list"
+            ]).cpu()
+            scores_before = scores[current_idx : current_idx + batch_size]
+            scores_after = torch.abs(
+                torch.abs(
+                    cfkd_target[current_idx : current_idx + batch_size]
+                    - torch.tensor(
+                        student_cfkd_counterfactual_explanation[
+                            "y_target_end_confidence_list"
+                        ]
+                    )
+                )
+                - 1
             )
-            - 1
-        )
-        cfkd_scores = list(
-            map(
-                lambda i: str(round(float(scores_before[i]), 2))
-                + " -> "
-                + str(round(float(scores_after[i]), 2)),
-                range(scores.shape[0]),
+            cfkd_score = list(
+                map(
+                    lambda i: str(round(float(scores_before[i]), 2))
+                    + " -> "
+                    + str(round(float(scores_after[i]), 2)),
+                    range(scores_before.shape[0]),
+                )
             )
-        )
+            if current_idx == 0:
+                cfkd_counterfactuals = cfkd_counterfactual
+                cfkd_heatmaps = cfkd_heatmap
+                cfkd_scores = cfkd_score
+
+            else:
+                cfkd_counterfactuals = torch.cat(
+                    [cfkd_counterfactuals, cfkd_counterfactual], dim=0
+                )
+                cfkd_heatmaps = torch.cat([cfkd_heatmaps, cfkd_heatmap], dim=0)
+                cfkd_scores = cfkd_scores + cfkd_score
+
+            current_idx += batch_size
+
         return [cfkd_counterfactual, cfkd_heatmap], cfkd_scores
 
 
@@ -126,7 +162,9 @@ def create_comparison(
                     current_results[idx] = criterions[key](X, y)
 
                 except Exception:
-                    import pdb; pdb.set_trace()
+                    import pdb
+
+                    pdb.set_trace()
 
             if sample_idxs[list(current_results)] == 0:
                 sample_idxs[list(current_results)] = 1

@@ -62,7 +62,6 @@ class CounterfactualKnowledgeDistillation:
         ] = "<PEAL_BASE>/configs/adaptors/symbolic_cfkd.yaml",
         gigabyte_vram: float = None,
         overwrite: bool = None,
-        use_visualization: bool = False,
     ):
         """
         This is the constructor for the CounterfactualKnowledgeDistillation class.
@@ -182,7 +181,6 @@ class CounterfactualKnowledgeDistillation:
             dataset=self.val_dataloader.dataset,
         )
         self.logits_to_prediction = lambda logits: logits.argmax(-1)
-        self.use_visualization = use_visualization
         self.tracked_keys = [
             "x_list",
             "x_counterfactual_list",
@@ -556,7 +554,7 @@ class CounterfactualKnowledgeDistillation:
             log_images_to_writer(self.val_dataloader, writer, "validation")
             log_images_to_writer(self.test_dataloader, writer, "test")
 
-            if self.output_size == 2 and self.use_visualization:
+            if self.output_size == 2 and self.adaptor_config.use_visualization:
                 print('visualize progress!!!')
                 print('visualize progress!!!')
                 print('visualize progress!!!')
@@ -987,6 +985,9 @@ class CounterfactualKnowledgeDistillation:
         for path in paths:
             img.save(path)
 
+        # TODO use predefined checkpoint dict
+        #checkbox_dict =
+
         return img
 
     def run(self):
@@ -1056,7 +1057,7 @@ class CounterfactualKnowledgeDistillation:
             )
             writer.add_scalar("test_accuracy", test_accuracy, finetune_iteration)
 
-            if self.output_size == 2 and self.use_visualization:
+            if self.output_size == 2 and self.adaptor_config.use_visualization:
                 self.visualize_progress(
                     [
                         os.path.join(
