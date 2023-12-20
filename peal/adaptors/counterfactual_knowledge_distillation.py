@@ -222,6 +222,7 @@ class CounterfactualKnowledgeDistillation:
         y_target_start_confidence_batch = []
         hint_batch = []
         sample_idx = 0
+        torch.manual_seed(torch.seed())
         error_distribution = torch.distributions.Categorical(error_matrix)
         while not sample_idx >= self.adaptor_config.batch_size:
             cm_idx = error_distribution.sample()
