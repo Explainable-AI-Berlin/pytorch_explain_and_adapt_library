@@ -270,3 +270,121 @@ class AceDDPMAdaptor(EditCapableGenerator):
             list(y_target_end_confidence),
             list(x_list),
         )
+
+
+class AceDDPMAdaptorAligned(EditCapableGenerator):
+    def __init__(self, config, dataset=None, model_dir=None, device="cpu"):
+        super().__init__()
+        self.config = load_yaml_config(config)
+        self.classifier_dataset = dataset
+
+        if not model_dir is None:
+            self.model_dir = model_dir
+
+        else:
+            self.model_dir = self.config.base_path
+
+        self.data_dir = os.path.join(self.model_dir, "data_test")
+        self.counterfactual_path = os.path.join(self.model_dir, "counterfactuals_test")
+
+        self.model, self.diffusion = create_model_and_diffusion(**self.config.__dict__)
+        self.model.to(device)
+        self.model_path = os.path.join(self.model_dir, "final.pt")
+        if os.path.exists(self.model_path):
+            self.model.load_state_dict(
+                load_state_dict(self.model_path, map_location=device)
+            )
+
+    def sample_x(self, batch_size=1):
+        return self.diffusion.p_sample_loop(
+            self.model, [batch_size] + self.classifier_dataset.config.input_size
+        )
+
+    def train_model(
+            self,
+            dataset_train,
+            training_config="<PEAL_BASE>/configs/training/train_ddpm.yaml",
+    ):
+        training_config = load_yaml_config(training_config)
+        args = types.SimpleNamespace(**training_config)
+        shutil.rmtree(self.model_dir, ignore_errors=True)
+
+        dist_util.setup_dist(args.gpus)
+        logger.configure(dir=self.model_dir)
+
+        schedule_sampler = create_named_schedule_sampler(
+            args.schedule_sampler, self.diffusion
+        )
+
+        logger.log("creating data loader...")
+        data = iter(
+            get_dataloader(
+                dataset_train,
+                mode="train",
+                batch_size=args.batch_size,
+                training_config={"steps_per_epoch": training_config.max_steps},
+            )
+        )
+
+        logger.log("training...")
+        TrainLoop(
+            model=self.model,
+            diffusion=self.diffusion,
+            data=data,
+            batch_size=args.batch_size,
+            microbatch=args.microbatch,
+            lr=args.lr,
+            ema_rate=args.ema_rate,
+            log_interval=args.log_interval,
+            save_interval=args.save_interval,
+            resume_checkpoint=args.resume_checkpoint,
+            use_fp16=args.use_fp16,
+            fp16_scale_growth=args.fp16_scale_growth,
+            schedule_sampler=schedule_sampler,
+            weight_decay=args.weight_decay,
+            lr_anneal_steps=args.lr_anneal_steps,
+            model_dir=self.model_dir,
+        ).run_loop()
+
+    def edit(
+            self,
+            x_in: torch.Tensor,
+            target_confidence_goal: float,
+            source_classes: torch.Tensor,
+            target_classes: torch.Tensor,
+            classifier: nn.Module,
+            pbar=None,
+            mode="",
+    ):
+        dataset = [(
+            torch.zeros([len(x_in)], dtype=torch.long),
+            x_in,
+            [source_classes, target_classes]
+        )]
+        args = copy.deepcopy(self.config)
+        args.dataset = dataset
+        args.model_path = os.path.join(self.model_dir, "final.pt")
+        args.classifier = classifier
+        args.diffusion = self.diffusion
+        args.model = self.model
+        args.output_path = self.counterfactual_path
+        args.batch_size = x_in.shape[0]
+        x_counterfactuals = ace_main(args=args)
+        x_counterfactuals = torch.cat(x_counterfactuals, dim=0)
+        print(x_counterfactuals.shape)
+
+        device = [p for p in classifier.parameters()][0].device
+        preds = torch.nn.Softmax(dim=-1)(
+            classifier(x_counterfactuals.to(device)).detach().cpu()
+        )
+
+        y_target_end_confidence = torch.zeros([x_in.shape[0]])
+        for i in range(x_in.shape[0]):
+            y_target_end_confidence[i] = preds[i, target_classes[i]]
+
+        return (
+            list(x_counterfactuals),
+            list(x_in - x_counterfactuals),
+            list(y_target_end_confidence),
+            list(x_in),
+        )

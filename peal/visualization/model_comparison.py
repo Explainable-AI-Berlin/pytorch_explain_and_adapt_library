@@ -133,7 +133,7 @@ def get_explanation(
 
             current_idx += batch_size
 
-        return [cfkd_counterfactual, cfkd_heatmap], cfkd_scores
+        return [cfkd_counterfactuals, cfkd_heatmaps], cfkd_scores
 
 
 def create_comparison(
@@ -145,55 +145,88 @@ def create_comparison(
     device,
     max_samples=100000000,
     explainer_config=None,
+    checkbox_dict_in=None,
+    batch_size=1,
 ):
-    checkbox_dict = create_checkbox_dict(criterions.keys())
     scores_dict = {}
-    for key in columns.keys():
-        scores_dict[key] = torch.zeros([2] * len(criterions.keys()))
 
-    samples = torch.zeros([2] * len(criterions.keys()) + list(dataset[0][0].shape))
-    sample_idxs = torch.zeros([2] * len(criterions.keys()))
+    if checkbox_dict_in is None:
+        checkbox_dict = create_checkbox_dict(criterions.keys())
+        samples = torch.zeros([2] * len(criterions.keys()) + list(dataset[0][0].shape))
+        sample_idxs = torch.zeros([2] * len(criterions.keys()))
+        for key in columns.keys():
+            scores_dict[key] = torch.zeros([2] * len(criterions.keys()))
+
+    else:
+        checkbox_dict = checkbox_dict_in
+        samples = torch.zeros([checkbox_dict['class'].shape[0]] + list(dataset[0][0].shape))
+        sample_idxs = torch.zeros([checkbox_dict['class'].shape[0]])
+        checkbox_criterions = torch.zeros([checkbox_dict['class'].shape[0], len(criterions.keys())])
+        for i, criterion in enumerate(criterions.keys()):
+            for j in range(checkbox_criterions.shape[0]):
+                checkbox_criterions[j][i] = checkbox_dict[criterion][j]
+
+        for key in columns.keys():
+            scores_dict[key] = torch.zeros(checkbox_dict['class'].shape[0])
+
     with tqdm(range(50, 50 + min(max_samples, len(dataset) - 50))) as pbar:
         for i in pbar:
             X, y = dataset[i]
             current_results = torch.zeros([len(criterions.keys())], dtype=torch.long)
             for idx, key in enumerate(criterions.keys()):
-                try:
-                    current_results[idx] = criterions[key](X, y)
+                current_results[idx] = criterions[key](X, y)
 
-                except Exception:
-                    import pdb
+            if checkbox_dict_in is None:
+                if sample_idxs[list(current_results)] == 0:
+                    sample_idxs[list(current_results)] = 1
+                    samples[list(current_results)] = X
+                    for key in columns.keys():
+                        scores = torch.nn.Softmax()(
+                            columns[key][1](X.unsqueeze(0).to(device)).squeeze(0).cpu()
+                        )
+                        scores_dict[key][list(current_results)] = scores[
+                            score_reference_idx
+                        ]
 
-                    pdb.set_trace()
+                else:
+                    sample_idxs[list(current_results)] += 1
 
-            if sample_idxs[list(current_results)] == 0:
-                sample_idxs[list(current_results)] = 1
-                samples[list(current_results)] = X
-                for key in columns.keys():
-                    scores = torch.nn.Softmax()(
-                        columns[key][1](X.unsqueeze(0).to(device)).squeeze(0).cpu()
-                    )
-                    scores_dict[key][list(current_results)] = scores[
-                        score_reference_idx
-                    ]
+                pbar.set_description("num_samples: " + str(torch.sum(sample_idxs != -1)))
 
             else:
-                sample_idxs[list(current_results)] += 1
+                for i in range(checkbox_dict['class'].shape[0]):
+                    if sample_idxs[i] == 0 and torch.sum(current_results == checkbox_criterions[i]) == len(checkbox_criterions[i]):
+                        sample_idxs[i] = 1
+                        samples[i] = X
+                        for key in columns.keys():
+                            scores = torch.nn.Softmax()(
+                                columns[key][1](X.unsqueeze(0).to(device)).squeeze(0).cpu()
+                            )
+                            scores_dict[key][i] = scores[score_reference_idx]
 
-            pbar.set_description("num_samples: " + str(torch.sum(sample_idxs != -1)))
+                        break
 
-    X = samples.reshape(
-        [2 ** len(criterions.keys())] + list(samples.shape[len(criterions.keys()) :])
-    )
-    sample_idxs = sample_idxs.flatten()
-    sample_idxs = list(
-        map(lambda i: str(int(sample_idxs[i])), range(sample_idxs.shape[0]))
-    )
+                if torch.sum(sample_idxs) == checkbox_dict['class'].shape[0]:
+                    break
+
+    if checkbox_dict_in is None:
+        X = samples.reshape(
+            [2 ** len(criterions.keys())] + list(samples.shape[len(criterions.keys()) :])
+        )
+        sample_idxs = sample_idxs.flatten()
+        sample_idxs_str = list(
+            map(lambda i: str(int(sample_idxs[i])), range(sample_idxs.shape[0]))
+        )
+
+    else:
+        X = samples
+        sample_idxs_str = X.shape[0] * [""]
+
     for key in columns.keys():
         scores_dict[key] = scores_dict[key].flatten()
 
     image_dicts = {}
-    image_dicts["Image"] = [X, sample_idxs]
+    image_dicts["Image"] = [X, sample_idxs_str]
     for key in columns.keys():
         image_dicts[key] = get_explanation(
             X.cpu(),
@@ -204,6 +237,7 @@ def create_comparison(
             dataset=dataset,
             score_reference_idx=score_reference_idx,
             explainer_config=explainer_config,
+            batch_size=batch_size,
         )
 
     img = make_image_grid(checkbox_dict=checkbox_dict, image_dicts=image_dicts)

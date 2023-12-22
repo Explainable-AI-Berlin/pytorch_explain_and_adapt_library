@@ -69,17 +69,11 @@ def embed_text_in_image(text, width, height):
     draw = ImageDraw.Draw(image)
 
     # Add text to image
-    '''font = ImageFont.truetype(
+    """font = ImageFont.truetype(
         "/usr/share/fonts/truetype/freefont/FreeMono.ttf", size=10
-    )'''
+    )"""
     font = ImageFont.load_default()
-    try:
-        w, h = draw.textsize(text, font)
-
-    except Exception:
-        from IPython.core.debugger import set_trace
-
-        set_trace()
+    w, h = draw.textsize(text, font)
 
     # calculate x,y cordinate for text
     x = (image.width - w) / 2
@@ -147,14 +141,17 @@ def make_image_grid(checkbox_dict, image_dicts):
         )
 
     for key in image_dicts.keys():
-        columns.append(
-            make_column(
-                image_dicts[key][0]
-                if not isinstance(image_dicts[key][0], list)
-                else zip_tensors(image_dicts[key][0]),
-                image_dicts[key][1],
-                key,
+        try:
+            columns.append(
+                make_column(
+                    image_dicts[key][0]
+                    if not isinstance(image_dicts[key][0], list)
+                    else zip_tensors(image_dicts[key][0]),
+                    image_dicts[key][1],
+                    key,
+                )
             )
-        )
+        except Exception:
+            import pdb; pdb.set_trace()
 
     return Image.fromarray(np.concatenate(columns, axis=1))

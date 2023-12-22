@@ -270,11 +270,11 @@ def main(args=None):
     random.seed(args.seed)
     np.random.seed(args.seed)
 
-    print("Loading Classifier")
     if hasattr(args, "classifier"):
         classifier = args.classifier
 
     elif args.classifier_path[-4:] == ".cpl":
+        print("Loading Classifier")
         module_path = os.path.abspath(os.path.join(".."))
         if module_path not in sys.path:
             sys.path.append(module_path)
@@ -287,45 +287,46 @@ def main(args=None):
 
     classifier.to(dist_util.dev()).eval()
 
-    # ========================================
-    # Load Dataset
-    # ========================================
-    if isinstance(args.dataset, PealDataset):
-        dataset = args.dataset
+
+    if isinstance(args.dataset, list):
+        loader = args.dataset
 
     else:
-        dataset = get_dataset(args)
+        # ========================================
+        # Load Dataset
+        # ========================================
+        if isinstance(args.dataset, PealDataset):
+            dataset = args.dataset
 
-    target = -1
-    if args.label_target != -1:
-        target = (
-            1 - args.label_target
-            if args.dataset in BINARYDATASET
-            and not isinstance(classifier, SequentialModel)
-            else args.label_query
+        else:
+            dataset = get_dataset(args)
+
+        target = -1
+        if args.label_target != -1:
+            target = (
+                1 - args.label_target
+                if args.dataset in BINARYDATASET
+                and not isinstance(classifier, SequentialModel)
+                else args.label_query
+            )
+        dataset = SlowSingleLabel(target, dataset, args.num_samples)
+        dataset = ChunkedDataset(dataset=dataset, chunk=args.chunk, num_chunks=args.chunks)
+        print("Images on the dataset:", len(dataset))
+        loader = data.DataLoader(
+            dataset,
+            batch_size=args.batch_size,
+            shuffle=False,
+            num_workers=4,
+            pin_memory=True,
         )
-
-    dataset = SlowSingleLabel(target, dataset, args.num_samples)
-
-    dataset = ChunkedDataset(dataset=dataset, chunk=args.chunk, num_chunks=args.chunks)
-
-    print("Images on the dataset:", len(dataset))
-
-    loader = data.DataLoader(
-        dataset,
-        batch_size=args.batch_size,
-        shuffle=False,
-        num_workers=4,
-        pin_memory=True,
-    )
 
     # ========================================
     # load models
     # ========================================
 
-    print("Loading Model and diffusion model")
     # respaced diffusion has the respaced strategy
     if not hasattr(args, "model"):
+        print("Loading Model and diffusion model")
         model, respaced_diffusion = create_model_and_diffusion(
             **args_to_dict(args, model_and_diffusion_defaults().keys())
         )
@@ -453,54 +454,75 @@ def main(args=None):
         "explanation": copy.deepcopy(stats),
         "pre-explanation": copy.deepcopy(stats),
     }
+    counterfactuals = []
 
-    print("Starting Image Generation")
+    if args.save_images:
+        print("Starting Image Generation")
+
     for idx, (indexes, img, lab) in enumerate(loader):
-        print(
-            f"[Chunks ({args.chunk}+1) / {args.chunks}] {idx} / {len(loader)}"
-            + " | Time: {int(time() - start_time)}s"
-        )
+        if args.save_images:
+            print(
+                f"[Chunks ({args.chunk}+1) / {args.chunks}] {idx} / {len(loader)}"
+                + " | Time: {int(time() - start_time)}s"
+            )
 
         img = img.to(dist_util.dev())
-        lab = lab.to(
-            dist_util.dev(),
-            dtype=torch.float
-            if args.dataset in BINARYDATASET or isinstance(args.dataset, PealDataset)
-            else torch.long,
-        )
+        if isinstance(lab, list):
+            lab, target = lab
+            lab = lab.to(
+                dist_util.dev(),
+                dtype=torch.float
+                if args.dataset in BINARYDATASET or isinstance(args.dataset, PealDataset)
+                else torch.long,
+            )
+            target = target.to(
+                dist_util.dev(),
+                dtype=torch.float
+                if args.dataset in BINARYDATASET or isinstance(args.dataset, PealDataset)
+                else torch.long,
+            )
 
-        # Initial Classification, no noise included
-        c_log, c_pred = get_prediction(
-            classifier,
-            img,
-            args.dataset in BINARYDATASET
-            and not isinstance(classifier, SequentialModel),
-        )
+        else:
+            lab = lab.to(
+                dist_util.dev(),
+                dtype=torch.float
+                if args.dataset in BINARYDATASET or isinstance(args.dataset, PealDataset)
+                else torch.long,
+            )
 
-        # construct target
-        target = None
-        if args.label_target != -1:
-            target = torch.ones_like(lab) * args.label_target
-            target[lab != c_pred] = lab[lab != c_pred]
+            # Initial Classification, no noise included
+            c_log, c_pred = get_prediction(
+                classifier,
+                img,
+                args.dataset in BINARYDATASET
+                and not isinstance(classifier, SequentialModel),
+            )
 
-        elif args.dataset in BINARYDATASET and not isinstance(
-            classifier, SequentialModel
-        ):
-            target = 1 - c_pred
-            target[lab != c_pred] = lab[lab != c_pred]
+            # construct target
+            target = None
+            if args.label_target != -1:
+                target = torch.ones_like(lab) * args.label_target
+                target[lab != c_pred] = lab[lab != c_pred]
 
-        elif isinstance(classifier, SequentialModel):
-            target = 1 - c_pred
-        acc1, acc5 = accuracy(
-            c_log,
-            lab,
-            topk=[1] if isinstance(classifier, SequentialModel) else (1, 5),
-            binary=args.dataset in BINARYDATASET
-            and not isinstance(classifier, SequentialModel),
-        )
-        stats["clean acc"] += acc1.sum().item()
-        stats["clean acc5"] += acc5.sum().item()
-        stats["n"] += lab.size(0)
+            elif args.dataset in BINARYDATASET and not isinstance(
+                classifier, SequentialModel
+            ):
+                target = 1 - c_pred
+                target[lab != c_pred] = lab[lab != c_pred]
+
+            elif isinstance(classifier, SequentialModel):
+                target = 1 - c_pred
+
+            acc1, acc5 = accuracy(
+                c_log,
+                lab,
+                topk=[1] if isinstance(classifier, SequentialModel) else (1, 5),
+                binary=args.dataset in BINARYDATASET
+                and not isinstance(classifier, SequentialModel),
+            )
+            stats["clean acc"] += acc1.sum().item()
+            stats["clean acc5"] += acc5.sum().item()
+            stats["n"] += lab.size(0)
 
         # sample image from the noisy_img
         ce, pe, noise, pe_mask = filter_fn(
@@ -518,118 +540,124 @@ def main(args=None):
             dilation=args.sampling_dilation,
             ispeal=isinstance(classifier, SequentialModel),
         )
-        noise = (noise * 255).to(dtype=torch.uint8).detach().cpu()
-        import torchvision
-        torchvision.utils.save_image(img, "img.png", normalize=False)
-        torchvision.utils.save_image(pe_mask, "pe_mask.png", normalize=False)
-        torchvision.utils.save_image(pe, "pe.png", normalize=False)
+        counterfactuals.append(ce.detach().cpu())
+        if args.save_images:
+            noise = (noise * 255).to(dtype=torch.uint8).detach().cpu()
+            import torchvision
+            torchvision.utils.save_image(img, "img.png", normalize=False)
+            torchvision.utils.save_image(pe_mask, "pe_mask.png", normalize=False)
+            torchvision.utils.save_image(pe, "pe.png", normalize=False)
 
-        pe_mask = (pe_mask * 255).to(dtype=torch.uint8).detach().cpu()
-        ce_mask = generate_mask(img, ce, 1)[0]
-        torchvision.utils.save_image(ce_mask, "ce_mask.png", normalize=False)
-        torchvision.utils.save_image(ce, "ce.png", normalize=False)
-        ce_mask = (
-            (ce_mask * 255).to(dtype=torch.uint8).detach().cpu()
-        )
+            pe_mask = (pe_mask * 255).to(dtype=torch.uint8).detach().cpu()
+            ce_mask = generate_mask(img, ce, 1)[0]
+            torchvision.utils.save_image(ce_mask, "ce_mask.png", normalize=False)
+            torchvision.utils.save_image(ce, "ce.png", normalize=False)
+            ce_mask = (
+                (ce_mask * 255).to(dtype=torch.uint8).detach().cpu()
+            )
 
-        # evaluate the cf and check whether the model flipped the prediction
-        with torch.no_grad():
-            for data_type, data_img, data_mask in zip(
-                ["pre-explanation", "explanation"], [pe, ce], [pe_mask, ce_mask]
-            ):
-                data_log, data_pred = get_prediction(
-                    classifier,
-                    data_img,
-                    binary=args.dataset in BINARYDATASET
-                    and not isinstance(classifier, SequentialModel),
-                )
-                cf, cf5 = accuracy(
-                    data_log,
-                    target,
-                    topk=[1] if isinstance(classifier, SequentialModel) else (1, 5),
-                    binary=args.dataset in BINARYDATASET
-                    and not isinstance(classifier, SequentialModel),
-                )
-                un, un5 = accuracy(
-                    data_log,
-                    c_pred,
-                    topk=[1] if isinstance(classifier, SequentialModel) else (1, 5),
-                    binary=args.dataset in BINARYDATASET
-                    and not isinstance(classifier, SequentialModel),
-                )
-                stats[data_type]["cf"] += cf.sum().item()
-                stats[data_type]["cf5"] += cf5.sum().item()
-                stats[data_type]["untargeted"] += un.size(0) - un.sum().item()
-                stats[data_type]["untargeted5"] += un5.size(0) - un5.sum().item()
-                l1 = (
-                    (img - data_img)
-                    .abs()
-                    .view(img.size(0), -1)
-                    .mean(dim=1)
-                    .detach()
-                    .cpu()
-                )
-                linf = (
-                    (img - data_img)
-                    .abs()
-                    .view(img.size(0), -1)
-                    .max(dim=1)[0]
-                    .detach()
-                    .cpu()
-                )
-                stats[data_type]["l1"] += l1.sum().item()
-                stats[data_type]["l inf"] += linf.sum().item()
-
-                # transfor images to standard format
-                img255 = (img * 255).to(dtype=torch.uint8).detach().cpu()
-                data_img = (data_img * 255).to(dtype=torch.uint8).detach().cpu()
-
-                if args.save_images:
-                    save_imgs[data_type](
-                        imgs=img255.permute(0, 2, 3, 1).numpy(),
-                        cfs=data_img.permute(0, 2, 3, 1).numpy(),
-                        noises=noise.permute(0, 2, 3, 1).numpy(),
-                        target=target if target is not None else lab,
-                        label=lab,
-                        pred=c_pred,
-                        pred_cf=data_pred,
-                        l_inf=linf,
-                        l_1=l1,
-                        indexes=indexes.numpy(),
-                        masks=data_mask.permute(0, 2, 3, 1).squeeze(-1).numpy(),
+            # evaluate the cf and check whether the model flipped the prediction
+            with torch.no_grad():
+                for data_type, data_img, data_mask in zip(
+                    ["pre-explanation", "explanation"], [pe, ce], [pe_mask, ce_mask]
+                ):
+                    data_log, data_pred = get_prediction(
+                        classifier,
+                        data_img,
+                        binary=args.dataset in BINARYDATASET
+                        and not isinstance(classifier, SequentialModel),
                     )
+                    cf, cf5 = accuracy(
+                        data_log,
+                        target,
+                        topk=[1] if isinstance(classifier, SequentialModel) else (1, 5),
+                        binary=args.dataset in BINARYDATASET
+                        and not isinstance(classifier, SequentialModel),
+                    )
+                    un, un5 = accuracy(
+                        data_log,
+                        c_pred,
+                        topk=[1] if isinstance(classifier, SequentialModel) else (1, 5),
+                        binary=args.dataset in BINARYDATASET
+                        and not isinstance(classifier, SequentialModel),
+                    )
+                    stats[data_type]["cf"] += cf.sum().item()
+                    stats[data_type]["cf5"] += cf5.sum().item()
+                    stats[data_type]["untargeted"] += un.size(0) - un.sum().item()
+                    stats[data_type]["untargeted5"] += un5.size(0) - un5.sum().item()
+                    l1 = (
+                        (img - data_img)
+                        .abs()
+                        .view(img.size(0), -1)
+                        .mean(dim=1)
+                        .detach()
+                        .cpu()
+                    )
+                    linf = (
+                        (img - data_img)
+                        .abs()
+                        .view(img.size(0), -1)
+                        .max(dim=1)[0]
+                        .detach()
+                        .cpu()
+                    )
+                    stats[data_type]["l1"] += l1.sum().item()
+                    stats[data_type]["l inf"] += linf.sum().item()
 
-        if ((idx + 1) % 50) == 0:
-            print("=" * 50)
-            print("\nCurrent Stats at iteration", idx + 1, ":")
+                    # transfor images to standard format
+                    img255 = (img * 255).to(dtype=torch.uint8).detach().cpu()
+                    data_img = (data_img * 255).to(dtype=torch.uint8).detach().cpu()
+
+                    if args.save_images:
+                        save_imgs[data_type](
+                            imgs=img255.permute(0, 2, 3, 1).numpy(),
+                            cfs=data_img.permute(0, 2, 3, 1).numpy(),
+                            noises=noise.permute(0, 2, 3, 1).numpy(),
+                            target=target if target is not None else lab,
+                            label=lab,
+                            pred=c_pred,
+                            pred_cf=data_pred,
+                            l_inf=linf,
+                            l_1=l1,
+                            indexes=indexes.numpy(),
+                            masks=data_mask.permute(0, 2, 3, 1).squeeze(-1).numpy(),
+                        )
+
+
+            if ((idx + 1) % 50) == 0:
+                print("=" * 50)
+                print("\nCurrent Stats at iteration", idx + 1, ":")
+                print_dict(stats)
+                print("=" * 50)
+
+            if (idx + 1) == len(loader):
+                print(
+                    f"[Chunks ({args.chunk}+1) / {args.chunks}] {idx + 1} / {len(loader)} | "
+                    + "Time: {int(time() - start_time)}s"
+                )
+                print("\nDone")
+                break
+
+    if args.save_images:
+        for data_type in ["pre-explanation", "explanation"]:
+            for k, v in stats[data_type].items():
+                stats[data_type][k] /= stats["n"]
+
+        stats["clean acc"] /= stats["n"]
+        stats["clean acc5"] /= stats["n"]
+
+        if args.chunks == 1:
+            print("=" * 50, "\nResults:\n\n")
             print_dict(stats)
             print("=" * 50)
+        prefix = "" if args.chunks == 1 else f"c-{args.chunk}_{args.chunks}-"
+        with open(
+            osp.join(args.output_path, "Results", args.exp_name, prefix + "summary.yaml"),
+            "w",
+        ) as f:
+            f.write(str(stats))
 
-        if (idx + 1) == len(loader):
-            print(
-                f"[Chunks ({args.chunk}+1) / {args.chunks}] {idx + 1} / {len(loader)} | "
-                + "Time: {int(time() - start_time)}s"
-            )
-            print("\nDone")
-            break
-
-    for data_type in ["pre-explanation", "explanation"]:
-        for k, v in stats[data_type].items():
-            stats[data_type][k] /= stats["n"]
-
-    stats["clean acc"] /= stats["n"]
-    stats["clean acc5"] /= stats["n"]
-
-    if args.chunks == 1:
-        print("=" * 50, "\nResults:\n\n")
-        print_dict(stats)
-        print("=" * 50)
-    prefix = "" if args.chunks == 1 else f"c-{args.chunk}_{args.chunks}-"
-    with open(
-        osp.join(args.output_path, "Results", args.exp_name, prefix + "summary.yaml"),
-        "w",
-    ) as f:
-        f.write(str(stats))
+    return counterfactuals
 
 
 if __name__ == "__main__":

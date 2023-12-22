@@ -29,7 +29,9 @@ from peal.data.dataloaders import (
 from peal.training.trainers import ModelTrainer, calculate_test_accuracy
 from peal.explainers.counterfactual_explainer import CounterfactualExplainer
 from peal.data.dataset_interfaces import PealDataset
-from peal.visualization.model_comparison import create_comparison
+from peal.visualization.model_comparison import (
+    create_comparison,
+)
 from peal.teachers.segmentation_mask_teacher import SegmentationMaskTeacher
 from peal.data.datasets import ImageDataset, Image2MixedDataset
 from peal.teachers.teacher_factory import get_teacher
@@ -555,11 +557,11 @@ class CounterfactualKnowledgeDistillation:
             log_images_to_writer(self.test_dataloader, writer, "test")
 
             if self.output_size == 2 and self.adaptor_config.use_visualization:
-                print('visualize progress!!!')
-                print('visualize progress!!!')
-                print('visualize progress!!!')
-                print('visualize progress!!!')
-                print('visualize progress!!!')
+                print("visualize progress!!!")
+                print("visualize progress!!!")
+                print("visualize progress!!!")
+                print("visualize progress!!!")
+                print("visualize progress!!!")
                 self.visualize_progress(
                     [os.path.join(self.base_dir, "visualization.png")]
                 )
@@ -929,10 +931,12 @@ class CounterfactualKnowledgeDistillation:
             isinstance(self.test_dataloader.dataset, Image2MixedDataset)
             and "Confounder" in self.test_dataloader.dataset.attributes
         ):
-            self.test_dataloader.dataset.task_config = SimpleNamespace(**{
-                "y_selection": None,
-                "criterions": [],
-            })
+            self.test_dataloader.dataset.task_config = SimpleNamespace(
+                **{
+                    "y_selection": None,
+                    "criterions": [],
+                }
+            )
             criterions["class"] = lambda X, y: int(
                 y[
                     self.test_dataloader.dataset.attributes.index(
@@ -965,7 +969,14 @@ class CounterfactualKnowledgeDistillation:
                 self.student(X.unsqueeze(0).to(self.device)).squeeze(0).cpu().argmax()
             )
 
-        img = create_comparison(
+        checkbox_dict = {
+            "class": torch.tensor([0, 0, 0, 1, 1, 1]),
+            "confounder": torch.tensor([1, 1, 1, 0, 0, 0]),
+            "uncorrected": torch.tensor([1, 1, 1, 0, 0, 0]),
+            "cfkd": torch.tensor([0, 0, 0, 1, 1, 1]),
+        }
+        # TODO introduce column for teacher
+        img_success = create_comparison(
             dataset=self.test_dataloader.dataset,
             criterions=criterions,
             columns={
@@ -980,14 +991,34 @@ class CounterfactualKnowledgeDistillation:
             generator=self.generator,
             device=self.device,
             explainer_config=self.adaptor_config.explainer,
+            checkbox_dict_in=checkbox_dict,
+            batch_size=self.adaptor_config.batch_size,
         )
-        self.test_dataloader.dataset.task_config = task_config_buffer
+        for path in paths:
+            img_success.save(path.replace(".png", "_success.png"))
+
+        img = create_comparison(
+            dataset=self.test_dataloader.dataset,
+            criterions=criterions,
+            columns={
+                "Counterfactual\nExplanation": [
+                    "cf",
+                    self.original_student,
+                    "uncorrected",
+                ],
+                "CFKD\ncorrected": ["cf", self.teacher.model, "cfkd"],
+            },
+            score_reference_idx=1,
+            generator=self.generator,
+            device=self.device,
+            explainer_config=self.adaptor_config.explainer,
+            batch_size=self.adaptor_config.batch_size,
+        )
+
         for path in paths:
             img.save(path)
 
-        # TODO use predefined checkpoint dict
-        #checkbox_dict =
-
+        self.test_dataloader.dataset.task_config = task_config_buffer
         return img
 
     def run(self):

@@ -361,27 +361,22 @@ class ModelTrainer:
                 self.model.to(self.device)
 
             # increase regularization and reset checkpoint if overfitting occurs
-            if train_accuracy >= train_accuracy_previous:
-                if val_accuracy < val_accuracy_previous:
-                    if self.regularization_level == 0:
-                        self.regularization_level = 1
-
-                    else:
-                        self.regularization_level *= 1.3
-
-                    checkpoint = torch.load(
-                        os.path.join(
-                            self.base_dir,
-                            "checkpoints",
-                            str(self.config.training.epoch - 1) + ".cpl",
-                        ),
-                        map_location=torch.device(self.device),
-                    )
-                    self.model.load_state_dict(checkpoint)
+            if train_accuracy >= train_accuracy_previous and val_accuracy < val_accuracy_previous:
+                if self.regularization_level == 0:
+                    self.regularization_level = 1
 
                 else:
-                    train_accuracy_previous = train_accuracy
-                    val_accuracy_previous = val_accuracy
+                    self.regularization_level *= 1.3
+
+                checkpoint = torch.load(
+                    os.path.join(
+                        self.base_dir,
+                        "checkpoints",
+                        str(self.config.training.epoch - 1) + ".cpl",
+                    ),
+                    map_location=torch.device(self.device),
+                )
+                self.model.load_state_dict(checkpoint)
 
             else:
                 train_accuracy_previous = train_accuracy

@@ -249,7 +249,7 @@ class CounterfactualExplainer(ExplainerInterface):
 
         else:
             batch_out = batch
-        #try:
+
         (
             batch_out["x_attribution_list"],
             batch_out["collage_path_list"],
@@ -261,6 +261,4 @@ class CounterfactualExplainer(ExplainerInterface):
             dataloader=dataloader,
             **batch_out,
         )
-        #except TypeError:
-        #    import pdb; pdb.set_trace()
         return batch_out
