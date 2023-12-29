@@ -460,6 +460,9 @@ class Image2MixedDataset(ImageDataset):
         self.transform = transform
         self.task_config = task_config
         self.hints_enabled = False
+        self.groups_enabled = False
+        self.idx_enabled = False
+        self.return_dict = return_dict
         data_dir = os.path.join(root_dir, "data.csv")
         if not config.delimiter is None:
             delimiter = config.delimiter
@@ -470,7 +473,6 @@ class Image2MixedDataset(ImageDataset):
         self.attributes, self.data, self.keys = parse_csv(
             data_dir, config, mode, key_type="name", delimiter=delimiter
         )
-        self.return_dict = return_dict
 
     @property
     def output_size(self):
@@ -488,6 +490,18 @@ class Image2MixedDataset(ImageDataset):
 
     def disable_hints(self):
         self.hints_enabled = False
+
+    def enable_groups(self):
+        self.groups_enabled = True
+
+    def disable_groups(self):
+        self.groups_enabled = False
+
+    def enable_idx(self):
+        self.idx_enabled = True
+
+    def disable_idx(self):
+        self.idx_enabled = False
 
     def __getitem__(self, idx):
         name = self.keys[idx]
@@ -515,25 +529,31 @@ class Image2MixedDataset(ImageDataset):
             ), "output shape inacceptable for singleclass classification"
             target = target[0].to(torch.int64)
 
-        if not self.hints_enabled:
-            if self.return_dict:
-                return img_tensor, {}  # TODO  {"target": target}
+        return_dict = {'x': img_tensor, 'target': target}
 
-            else:
-                return img_tensor, target
-
-        else:
+        if self.hints_enabled:
             mask = Image.open(os.path.join(self.root_dir, "masks", name))
             torch.set_rng_state(state)
             mask_tensor = self.transform(mask)
-            if self.return_dict:
-                return img_tensor, {}  # TODO  {"target": target, "mask": mask_tensor}
+            return_dict['hint'] = mask_tensor
 
-            else:
-                return img_tensor, (target, mask_tensor)
+        if self.groups_enabled:
+            has_confounder = targets[self.attributes.index(self.config.confounding_factors[-1])]
+            return_dict['has_confounder'] = has_confounder
+
+        if self.idx_enabled:
+            return_dict['idx'] = idx
+
+        if self.return_dict:
+            return return_dict
+
+        else:
+            return_list = list(return_dict.values())
+            return return_list[0], return_list[1:] if len(return_list) > 2 else return_list[1]
 
     def _initialize_performance_metrics(self):
-        self.lpips = lpips.LPIPS(net="vgg", spatial=False).to('cuda')
+        #self.lpips = torchmetrics.image.lpips.LPIPS(net="vgg", spatial=False).to('cuda')
+        self.lpips = torchmetrics.image.lpip.LearnedPerceptualImagePatchSimilarity(net_type="vgg").to('cuda')
         self.fid = torchmetrics.image.fid.FrechetInceptionDistance(
             feature=192, reset_real_features=False
         )

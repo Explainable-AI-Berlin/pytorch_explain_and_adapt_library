@@ -1,9 +1,8 @@
 # python run_cfkd.py --adaptor_config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba_cfkd_ace.yaml"
-'batch_size'                           :  1
-'min_train_samples'                    :  10
-'mixing_ratio'                         :  0.5
+'batch_size'                           :  5
+'min_train_samples'                    :  1000
 'finetune_iterations'                  :  5
-'max_validation_samples'               :  10
+'max_validation_samples'               :  100
 'continuous_learning'                  :  False
 'replace_model'                        :  True
 'use_visualization'                    :  True

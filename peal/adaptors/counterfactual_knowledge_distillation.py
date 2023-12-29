@@ -833,7 +833,7 @@ class CounterfactualKnowledgeDistillation:
         )
         return dataset_dir
 
-    def finetune_student(self, finetune_iteration, dataset_path):
+    def finetune_student(self, finetune_iteration, dataset_path, writer):
         if not os.path.exists(
             os.path.join(
                 self.base_dir,
@@ -870,10 +870,12 @@ class CounterfactualKnowledgeDistillation:
             )
 
             #
-            if not self.adaptor_config.mixing_ratio is None:
+            mixing_ratio = min(0.5, 1 - self.fa_1sided)
+            writer.add_scalar("mixing_ratio", mixing_ratio, finetune_iteration)
+            if not mixing_ratio is None:
                 priority = (
-                    (1 / (1 - self.adaptor_config.mixing_ratio))
-                    * self.adaptor_config.mixing_ratio
+                    (1 / (1 - mixing_ratio))
+                    * mixing_ratio
                     * len(self.dataloader_mixer)
                     / len(dataloader.dataset)
                 )
@@ -886,7 +888,7 @@ class CounterfactualKnowledgeDistillation:
             assert (
                 abs(
                     self.dataloader_mixer.priorities[-1]
-                    - self.adaptor_config.mixing_ratio
+                    - mixing_ratio
                 )
                 < 0.01
             ), "priorities do not match! " + str(self.dataloader_mixer.priorities)
@@ -908,8 +910,8 @@ class CounterfactualKnowledgeDistillation:
                 model_name="finetuned_model",
                 base_dir=os.path.join(self.base_dir, str(finetune_iteration)),
                 val_dataloader_weights=[
-                    1 - self.adaptor_config.mixing_ratio,
-                    self.adaptor_config.mixing_ratio,
+                    1 - mixing_ratio,
+                    mixing_ratio,
                 ],
             )
             finetune_trainer.fit(continue_training=True)
@@ -1007,7 +1009,7 @@ class CounterfactualKnowledgeDistillation:
                     self.original_student,
                     "uncorrected",
                 ],
-                "CFKD\ncorrected": ["cf", self.teacher.model, "cfkd"],
+                "CFKD\ncorrected": ["cf", self.student, "cfkd"],
             },
             score_reference_idx=1,
             generator=self.generator,
@@ -1072,6 +1074,7 @@ class CounterfactualKnowledgeDistillation:
             self.finetune_student(
                 finetune_iteration=finetune_iteration,
                 dataset_path=dataset_path,
+                writer=writer,
             )
             validation_stats = self.retrieve_validation_stats(
                 finetune_iteration=finetune_iteration
@@ -1083,6 +1086,8 @@ class CounterfactualKnowledgeDistillation:
                         validation_stats[key],
                         finetune_iteration,
                     )
+
+            self.fa_1sided = validation_stats["fa_1sided"]
 
             test_accuracy = calculate_test_accuracy(
                 self.student, self.test_dataloader, self.device
