@@ -71,7 +71,7 @@ def calculate_test_accuracy(model, test_dataloader, device, calculate_group_accu
         test_dataloader.dataset.disable_groups()
         group_accuracies = []
         for idx in range(len(groups)):
-            group_accuracies.append(float(sum(groups[idx][0]) / sum(groups[idx][1])))
+            group_accuracies.append(float(groups[idx][0] / groups[idx][1]))
 
         worst_group_accuracy = min(group_accuracies)
         return correct / test_dataloader.dataset.__len__(), group_accuracies, worst_group_accuracy
