@@ -227,10 +227,10 @@ class CounterfactualExplainer(ExplainerInterface):
                 batch["y_target_end_confidence_list"],
                 batch["x_list"],
             ) = self.generator.edit(
-                x_in=batch["x_list"],
+                x_in=torch.tensor(batch["x_list"]),
                 target_confidence_goal=target_confidence_goal,
-                target_classes=batch["y_target_list"],
-                source_classes=batch["y_source_list"],
+                target_classes=torch.tensor(batch["y_target_list"]),
+                source_classes=torch.tensor(batch["y_source_list"]),
                 classifier=self.downstream_model,
                 pbar=pbar,
                 mode=mode,

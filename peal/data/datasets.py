@@ -25,13 +25,13 @@ class SequenceDataset(PealDataset):
     """Sequence dataset."""
 
     def __init__(
-            self,
-            data_dir,
-            mode,
-            config,
-            transform=ToTensor(),
-            task_config=None,
-            **args,
+        self,
+        data_dir,
+        mode,
+        config,
+        transform=ToTensor(),
+        task_config=None,
+        **args,
     ):
         """
         Initialize the dataset.
@@ -84,13 +84,13 @@ class SymbolicDataset(PealDataset):
     """Symbolic dataset."""
 
     def __init__(
-            self,
-            data_dir,
-            mode,
-            config,
-            transform=ToTensor(),
-            task_config=None,
-            **kwargs,
+        self,
+        data_dir,
+        mode,
+        config,
+        transform=ToTensor(),
+        task_config=None,
+        **kwargs,
     ):
         """
         Initialize the dataset.
@@ -132,9 +132,9 @@ class SymbolicDataset(PealDataset):
         data = self.data[name].clone().detach().to(torch.float32)
 
         if (
-                not self.task_config is None
-                and not self.task_config.x_selection is None
-                and not len(self.task_config.x_selection) == 0
+            not self.task_config is None
+            and not self.task_config.x_selection is None
+            and not len(self.task_config.x_selection) == 0
         ):
             x = torch.zeros([len(self.task_config.x_selection)], dtype=torch.float32)
             for idx, selection in enumerate(self.task_config.x_selection):
@@ -144,9 +144,9 @@ class SymbolicDataset(PealDataset):
             x = data[:-1].to(torch.float32)
 
         if (
-                not self.task_config is None
-                and not self.task_config.y_selection is None
-                and not self.task_config.y_selection is None
+            not self.task_config is None
+            and not self.task_config.y_selection is None
+            and not self.task_config.y_selection is None
         ):
             y = torch.zeros([len(self.task_config.y_selection)])
             for idx, selection in enumerate(self.task_config.y_selection):
@@ -167,16 +167,16 @@ class SymbolicDataset(PealDataset):
         return x, y
 
     def generate_contrastive_collage(
-            self,
-            x_list,
-            x_counterfactual_list,
-            y_target_list,
-            y_source_list,
-            target_confidence_goal,
-            base_path,
-            start_idx,
-            classifier=None,
-            **args,
+        self,
+        x_list,
+        x_counterfactual_list,
+        y_target_list,
+        y_source_list,
+        target_confidence_goal,
+        base_path,
+        start_idx,
+        classifier=None,
+        **args,
     ):
         # TODO
         collage_paths = [
@@ -195,9 +195,9 @@ class SymbolicDataset(PealDataset):
         y = torch.stack([torch.tensor([y]) for y in y_list], dim=0)
         data = torch.cat([x, y], dim=1)
         if (
-                not self.task_config is None
-                and not self.task_config.x_selection is None
-                and not len(self.task_config.x_selection) == 0
+            not self.task_config is None
+            and not self.task_config.x_selection is None
+            and not len(self.task_config.x_selection) == 0
         ):
             features = copy.deepcopy(self.task_config.x_selection)
 
@@ -205,9 +205,9 @@ class SymbolicDataset(PealDataset):
             features = copy.deepcopy(self.attributes[:-1])
 
         if (
-                not self.task_config is None
-                and not self.task_config.y_selection is None
-                and not self.task_config.y_selection is None
+            not self.task_config is None
+            and not self.task_config.y_selection is None
+            and not self.task_config.y_selection is None
         ):
             targets = copy.deepcopy(self.task_config.y_selection)
 
@@ -225,20 +225,20 @@ class SymbolicDataset(PealDataset):
 
 class ImageDataset(PealDataset):
     def generate_contrastive_collage(
-            self,
-            x_list: list,
-            x_counterfactual_list: list,
-            y_target_list: list,
-            y_source_list: list,
-            y_list: list,
-            y_target_start_confidence_list: list,
-            y_target_end_confidence_list: list,
-            base_path: str,
-            start_idx: int = 0,
-            y_original_teacher_list=None,
-            y_counterfactual_teacher_list=None,
-            feedback_list=None,
-            **kwargs: dict,
+        self,
+        x_list: list,
+        x_counterfactual_list: list,
+        y_target_list: list,
+        y_source_list: list,
+        y_list: list,
+        y_target_start_confidence_list: list,
+        y_target_end_confidence_list: list,
+        base_path: str,
+        start_idx: int = 0,
+        y_original_teacher_list=None,
+        y_counterfactual_teacher_list=None,
+        feedback_list=None,
+        **kwargs: dict,
     ) -> tuple:
         Path(base_path).mkdir(parents=True, exist_ok=True)
         collage_paths = []
@@ -250,28 +250,28 @@ class ImageDataset(PealDataset):
                 print(f"x: [{x.min()}, {x.max()}], {x.shape}")
                 print(f"x: [{x.min()}, {x.max()}]")
                 print(f"x: [{x.min()}, {x.max()}]")
-                print(f"counterfactual: [{counterfactual.min()}, {counterfactual.max()}], {counterfactual.shape}")
-                print(f"counterfactual: [{counterfactual.min()}, {counterfactual.max()}]")
-                print(f"counterfactual: [{counterfactual.min()}, {counterfactual.max()}]")
+                print(
+                    f"counterfactual: [{counterfactual.min()}, {counterfactual.max()}], {counterfactual.shape}"
+                )
+                print(
+                    f"counterfactual: [{counterfactual.min()}, {counterfactual.max()}]"
+                )
+                print(
+                    f"counterfactual: [{counterfactual.min()}, {counterfactual.max()}]"
+                )
 
             heatmap_red = torch.maximum(
                 torch.tensor(0.0),
-                torch.sum(x, dim=0)
-                - torch.sum(counterfactual, dim=0),
+                torch.sum(x, dim=0) - torch.sum(counterfactual, dim=0),
             )
             heatmap_blue = torch.maximum(
                 torch.tensor(0.0),
-                torch.sum(counterfactual, dim=0)
-                - torch.sum(x, dim=0),
+                torch.sum(counterfactual, dim=0) - torch.sum(x, dim=0),
             )
             if counterfactual.shape[0] == 3:
                 heatmap_green = torch.abs(x[0] - counterfactual[0])
-                heatmap_green = heatmap_green + torch.abs(
-                    x[1] - counterfactual[1]
-                )
-                heatmap_green = heatmap_green + torch.abs(
-                    x[2] - counterfactual[2]
-                )
+                heatmap_green = heatmap_green + torch.abs(x[1] - counterfactual[1])
+                heatmap_green = heatmap_green + torch.abs(x[2] - counterfactual[2])
                 heatmap_green = heatmap_green - heatmap_red - heatmap_blue
                 x_in = torch.clone(x)
                 counterfactual_rgb = torch.clone(counterfactual)
@@ -279,18 +279,10 @@ class ImageDataset(PealDataset):
             else:
                 heatmap_green = torch.zeros_like(heatmap_red)
                 x_in = torch.tile(x, [3, 1, 1])
-                counterfactual_rgb = torch.tile(
-                    torch.clone(counterfactual), [3, 1, 1]
-                )
+                counterfactual_rgb = torch.tile(torch.clone(counterfactual), [3, 1, 1])
 
             heatmap = torch.stack([heatmap_red, heatmap_green, heatmap_blue], dim=0)
-            if (
-                    torch.abs(
-                        heatmap.sum()
-                        - torch.abs(x - counterfactual).sum()
-                    )
-                    > 0.1
-            ):
+            if torch.abs(heatmap.sum() - torch.abs(x - counterfactual).sum()) > 0.1:
                 print(
                     "Error: Heatmap does not add up to absolute counterfactual difference."
                 )
@@ -303,31 +295,31 @@ class ImageDataset(PealDataset):
             plt.gcf()
             plt.imshow(current_collage.permute(1, 2, 0))
             title_string = (
-                    str(int(y_list[i]))
-                    + " -> "
-                    + str(int(y_source_list[i]))
-                    + " -> "
-                    + str(int(y_target_list[i]))
+                str(int(y_list[i]))
+                + " -> "
+                + str(int(y_source_list[i]))
+                + " -> "
+                + str(int(y_target_list[i]))
             )
             title_string += (
-                    ", Target: "
-                    + str(
-                round(
-                    float(y_target_start_confidence_list[i]),
-                    2,
+                ", Target: "
+                + str(
+                    round(
+                        float(y_target_start_confidence_list[i]),
+                        2,
+                    )
                 )
-            )
-                    + " -> "
+                + " -> "
             )
             title_string += str(round(float(y_target_end_confidence_list[i]), 2))
             if not feedback_list is None:
                 title_string += (
-                        ", Teacher: "
-                        + str(int(y_original_teacher_list[i]))
-                        + " -> "
-                        + str(int(y_counterfactual_teacher_list[i]))
-                        + " -> "
-                        + str(feedback_list[i])
+                    ", Teacher: "
+                    + str(int(y_original_teacher_list[i]))
+                    + " -> "
+                    + str(int(y_counterfactual_teacher_list[i]))
+                    + " -> "
+                    + str(feedback_list[i])
                 )
 
             plt.title(title_string)
@@ -371,7 +363,10 @@ class ImageDataset(PealDataset):
             f.write(data)
 
     def track_generator_performance(
-            self, generator: Union[Generator, torch.Tensor], batch_size=None, num_samples=None
+        self,
+        generator: Union[Generator, torch.Tensor],
+        batch_size=None,
+        num_samples=None,
     ):
         """
         This function tracks the performance of the generator
@@ -416,13 +411,17 @@ class ImageDataset(PealDataset):
 
             real_images = torch.stack(real_images, dim=0).to(generated_images.device)
             if hasattr(generator, "config"):
-                real_images = torchvision.transforms.Resize(generator.config.data.input_size[1:])(real_images)
+                real_images = torchvision.transforms.Resize(
+                    generator.config.data.input_size[1:]
+                )(real_images)
 
             self.fid.update(
                 torch.tensor(255 * real_images, dtype=torch.uint8), real=True
             )
 
-        self.fid.update(torch.tensor(255 * generated_images, dtype=torch.uint8), real=False)
+        self.fid.update(
+            torch.tensor(255 * generated_images, dtype=torch.uint8), real=False
+        )
         fid_score = float(self.fid.compute())
 
         return {"fid": fid_score}
@@ -437,13 +436,13 @@ class Image2MixedDataset(ImageDataset):
     """
 
     def __init__(
-            self,
-            root_dir,
-            mode,
-            config,
-            transform=ToTensor(),
-            task_config=None,
-            return_dict=False,
+        self,
+        root_dir,
+        mode,
+        config,
+        transform=ToTensor(),
+        task_config=None,
+        return_dict=False,
     ):
         """
         This class is used to load a dataset with images and other data.
@@ -525,69 +524,98 @@ class Image2MixedDataset(ImageDataset):
 
         if not self.task_config is None and "ce" in self.task_config.criterions:
             assert (
-                    target.shape[0] == 1
+                target.shape[0] == 1
             ), "output shape inacceptable for singleclass classification"
             target = target[0].to(torch.int64)
 
-        return_dict = {'x': img_tensor, 'target': target}
+        return_dict = {"x": img_tensor, "y": target}
 
         if self.hints_enabled:
             mask = Image.open(os.path.join(self.root_dir, "masks", name))
             torch.set_rng_state(state)
             mask_tensor = self.transform(mask)
-            return_dict['hint'] = mask_tensor
+            return_dict["hint"] = mask_tensor
 
         if self.groups_enabled:
-            has_confounder = targets[self.attributes.index(self.config.confounding_factors[-1])]
-            return_dict['has_confounder'] = has_confounder
+            has_confounder = targets[
+                self.attributes.index(self.config.confounding_factors[-1])
+            ]
+            return_dict["has_confounder"] = has_confounder
 
         if self.idx_enabled:
-            return_dict['idx'] = idx
+            return_dict["idx"] = idx
 
         if self.return_dict:
             return return_dict
 
         else:
             return_list = list(return_dict.values())
-            return return_list[0], return_list[1:] if len(return_list) > 2 else return_list[1]
+            return (
+                return_list[0],
+                return_list[1:] if len(return_list) > 2 else return_list[1],
+            )
 
     def _initialize_performance_metrics(self):
-        #self.lpips = torchmetrics.image.lpips.LPIPS(net="vgg", spatial=False).to('cuda')
-        self.lpips = torchmetrics.image.lpip.LearnedPerceptualImagePatchSimilarity(net_type="vgg").to('cuda')
+        # self.lpips = torchmetrics.image.lpips.LPIPS(net="vgg", spatial=False).to('cuda')
+        self.lpips = torchmetrics.image.lpip.LearnedPerceptualImagePatchSimilarity(
+            net_type="vgg"
+        ).to("cuda")
         self.fid = torchmetrics.image.fid.FrechetInceptionDistance(
             feature=192, reset_real_features=False
         )
         real_images = [self[i][0] for i in range(100)]
-        self.fid = self.fid.to('cuda')
+        self.fid = self.fid.to("cuda")
         self.fid.update(
-            torch.tensor(255 * torch.stack(real_images, dim=0), dtype=torch.uint8).to('cuda'), real=True
+            torch.tensor(255 * torch.stack(real_images, dim=0), dtype=torch.uint8).to(
+                "cuda"
+            ),
+            real=True,
         )
 
     def distribution_distance(self, x_list):
-
         fids = []
         for i in range(len(x_list)):
-            self.fid.update(torch.tensor(255 * torch.stack(x_list[i], dim=0).to('cuda'), dtype=torch.uint8), real=False)
+            self.fid.update(
+                torch.tensor(
+                    255 * torch.stack(x_list[i], dim=0).to("cuda"), dtype=torch.uint8
+                ),
+                real=False,
+            )
             fid_score = float(self.fid.compute())
             fids.append(fid_score)
 
         return np.mean(fids)
 
     def pair_wise_distance(self, x1, x2):
-
+        """
+        # TODO how does this actually work?
         distances = []
         for i in range(len(x1)):
-            distance = self.lpips.forward(torch.stack(x1[i], dim=0).to('cuda'),
-                                          torch.stack(x2[i], dim=0).to('cuda')).squeeze(1, 2,
-                                                                                        3).detach().cpu().numpy().mean()
+            distance = (
+                self.lpips.forward(
+                    torch.stack(x1[i], dim=0).to("cuda"),
+                    torch.stack(x2[i], dim=0).to("cuda"),
+                )
+                .squeeze(1, 2, 3)
+                .detach()
+                .cpu()
+                .numpy()
+                .mean()
+            )
             distances.append(distance)
 
-        return np.mean(distances)
+        return np.mean(distances)"""
+        return 0.0
 
     def variance(self, x_list):
         variances = []
         for i in range(len(x_list[0])):
-            variance = torch.mean(torch.var(torch.stack([x_list[j][i] for j in range(len(x_list))], dim=0), dim=0))
+            variance = torch.mean(
+                torch.var(
+                    torch.stack([x_list[j][i] for j in range(len(x_list))], dim=0),
+                    dim=0,
+                )
+            )
             variances.append(variance)
 
         return np.mean(variances)
@@ -610,13 +638,13 @@ class Image2ClassDataset(ImageDataset):
     """
 
     def __init__(
-            self,
-            root_dir,
-            mode,
-            config,
-            transform=ToTensor(),
-            task_config=None,
-            return_dict=False,
+        self,
+        root_dir,
+        mode,
+        config,
+        transform=ToTensor(),
+        task_config=None,
+        return_dict=False,
     ):
         """
         This method initializes the dataset.
@@ -657,13 +685,13 @@ class Image2ClassDataset(ImageDataset):
 
         elif mode == "val":
             self.urls = self.urls[
-                        int(config.split[0] * len(self.urls)): int(
-                            config.split[1] * len(self.urls)
-                        )
-                        ]
+                int(config.split[0] * len(self.urls)) : int(
+                    config.split[1] * len(self.urls)
+                )
+            ]
 
         elif mode == "test":
-            self.urls = self.urls[int(config.split[1] * len(self.urls)):]
+            self.urls = self.urls[int(config.split[1] * len(self.urls)) :]
 
         if self.config.has_hints:
             self.all_urls = copy.deepcopy(self.urls)

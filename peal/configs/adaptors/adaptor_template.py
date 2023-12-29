@@ -97,25 +97,21 @@ class AdaptorConfig:
     """
     replacement_strategy: str = "delayed"
     """
-    Defines whether the created counterfactuals are oversampled in relation to their number
-    while finetuning.
-    The mixing ratio defines how often is sampled from the base data distribution and how often
-    from the counterfactual data distribution, e.g. with 0.5 both would be sampled equally often.
+    The attribution threshold.
     """
-    mixing_ratio: float = None
+    attribution_threshold: float = 2.0
     """
     What batch_size is used for creating the counterfactuals?
     """
     batch_size: PositiveInt = None
     """
-    The number of batches per iteration used for training.
-    Can be calculated automatical from batch_size and the number of samples per iteration
+    The number validation runs used for evaluating CFKD.
     """
-    num_batches: PositiveInt = None
+    validation_runs: PositiveInt = 3
     """
     The reference batch size when automatically adapting the batch_size to the vram
     """
-    base_batch_size: PositiveInt = None
+    calculate_group_accuracies: bool = True
     """
     The reference vram of the gpu when using adaptive batch_size.
     """
@@ -153,13 +149,13 @@ class AdaptorConfig:
         generator: str = None,
         base_dir: str = None,
         batch_size: PositiveInt = None,
-        num_batches: PositiveInt = None,
-        base_batch_size: PositiveInt = None,
+        validation_runs: PositiveInt = None,
+        calculate_group_accuracies: bool = None,
         gigabyte_vram: float = None,
         assumed_input_size: list[PositiveInt] = None,
         replace_model: bool = True,
         continuous_learning: bool = False,
-        mixing_ratio: float = None,
+        attribution_threshold: float = None,
         min_start_target_percentile: float = 0.0,
         use_confusion_matrix: bool = False,
         replacement_strategy: str = "delayed",
@@ -184,13 +180,13 @@ class AdaptorConfig:
             generator: The type of generator used.
             base_dir: The base directory where the run of CFKD is stored.
             batch_size: What batch_size is used for creating the counterfactuals?
-            num_batches:    The number of batches per iteration used for training.
-            base_batch_size: The reference batch size when automatically adapting the batch_size to the vram
+            validation_runs:    The number of batches per iteration used for training.
+            calculate_group_accuracies: The reference batch size when automatically adapting the batch_size to the vram
             gigabyte_vram: The reference vram of the gpu when using adaptive batch_size.
             assumed_input_size: The reference input size when using adaptive batch_size.
             replace_model: Whether to replace the model every iteration or not.
             continuous_learning: Whether to continue training from the current student model or start training from scratch
-            mixing_ratio: Defines whether the created counterfactuals are oversampled in relation to their number
+            attribution_threshold: Defines whether the created counterfactuals are oversampled in relation to their number
             min_start_target_percentile: Whether to select sample for counterfactual creation the model is not that confident about.
             use_confusion_matrix: Whether to draw samples for counterfactual creation according to the error matrix or not.
             replacement_strategy: Whether to directly replace the model or wait one iteration.
@@ -233,9 +229,9 @@ class AdaptorConfig:
         self.generator = generator if not generator is None else self.generator
         self.base_dir = base_dir if not base_dir is None else self.base_dir
         self.batch_size = batch_size if not batch_size is None else self.batch_size
-        self.num_batches = num_batches if not num_batches is None else self.num_batches
-        self.base_batch_size = (
-            base_batch_size if not base_batch_size is None else self.base_batch_size
+        self.validation_runs = validation_runs if not validation_runs is None else self.validation_runs
+        self.calculate_group_accuracies = (
+            calculate_group_accuracies if not calculate_group_accuracies is None else self.calculate_group_accuracies
         )
         self.gigabyte_vram = (
             gigabyte_vram if not gigabyte_vram is None else self.gigabyte_vram
@@ -253,8 +249,8 @@ class AdaptorConfig:
             if not continuous_learning is None
             else self.continuous_learning
         )
-        self.mixing_ratio = (
-            mixing_ratio if not mixing_ratio is None else self.mixing_ratio
+        self.attribution_threshold = (
+            attribution_threshold if not attribution_threshold is None else self.attribution_threshold
         )
         self.min_start_target_percentile = (
             min_start_target_percentile

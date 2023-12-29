@@ -7,13 +7,13 @@ class SegmentationMaskTeacher(TeacherInterface):
     def __init__(self, attribution_threshold):
         self.attribution_threshold = attribution_threshold
 
-    def get_feedback(self, heatmaps, hints, **args):
+    def get_feedback(self, x_attribution_list, hint_list, **args):
         feedback = []
-        for idx, heatmap in enumerate(heatmaps):
+        for idx, heatmap in enumerate(x_attribution_list):
             #
-            attribution_relative = (heatmap * hints[idx]).sum() / heatmap.sum()
-            masked_pixels_relative = hints[idx].sum() / torch.prod(
-                torch.tensor(list(hints[idx].shape))
+            attribution_relative = (heatmap * hint_list[idx]).sum() / heatmap.sum()
+            masked_pixels_relative = hint_list[idx].sum() / torch.prod(
+                torch.tensor(list(hint_list[idx].shape))
             )
             attribution_relative = attribution_relative / masked_pixels_relative
             #

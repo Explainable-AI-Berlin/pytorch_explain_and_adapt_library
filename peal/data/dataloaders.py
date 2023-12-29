@@ -269,7 +269,6 @@ def create_dataloaders_from_datasource(
     config,
     datasource=None,
     enable_hints=False,
-    gigabyte_vram=None,
     test_config=None,
 ):
     """
@@ -331,9 +330,9 @@ def create_dataloaders_from_datasource(
             )
         
         # TODO reintegrate hints
-        elif enable_hints:
-            dataset_train.enable_hints()
         """
+        if enable_hints:
+            dataset_train.enable_hints()
 
         train_dataloader = get_dataloader(
             dataset=dataset_train,

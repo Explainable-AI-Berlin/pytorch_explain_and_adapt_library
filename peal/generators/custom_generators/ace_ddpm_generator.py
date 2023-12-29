@@ -371,7 +371,6 @@ class AceDDPMAdaptorAligned(EditCapableGenerator):
         args.batch_size = x_in.shape[0]
         x_counterfactuals = ace_main(args=args)
         x_counterfactuals = torch.cat(x_counterfactuals, dim=0)
-        print(x_counterfactuals.shape)
 
         device = [p for p in classifier.parameters()][0].device
         preds = torch.nn.Softmax(dim=-1)(

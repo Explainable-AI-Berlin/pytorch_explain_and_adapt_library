@@ -30,24 +30,54 @@ from peal.configs.architectures.architecture_template import ArchitectureConfig
 from peal.configs.generators.generator_template import VAEConfig
 
 
-def calculate_test_accuracy(model, test_dataloader, device):
+def calculate_test_accuracy(model, test_dataloader, device, calculate_group_accuracies=False):
     # determine the test accuracy of the student
     correct = 0
     num_samples = 0
     pbar = tqdm(total=test_dataloader.dataset.__len__())
-    for it, (X, y) in enumerate(test_dataloader):
-        y_pred = model(X.to(device)).argmax(-1).detach().to("cpu")
+    if calculate_group_accuracies:
+        test_dataloader.dataset.enable_groups()
+        return_dict_buffer = bool(test_dataloader.dataset.return_dict)
+        test_dataloader.dataset.return_dict = True
+        groups = 2 * test_dataloader.dataset.output_size * [[0, 0]]
+
+    for it, sample in enumerate(test_dataloader):
+        if calculate_group_accuracies:
+            x = sample["x"]
+            y = sample["y"]
+            has_confounder = sample["has_confounder"]
+            group = y + test_dataloader.dataset.output_size * has_confounder
+
+        else:
+            x, y = sample
+
+        y_pred = model(x.to(device)).argmax(-1).detach().to("cpu")
         correct += float(torch.sum(y_pred == y))
-        num_samples += X.shape[0]
+        num_samples += x.shape[0]
         pbar.set_description(
             "test_correct: "
             + str(correct / num_samples)
             + ", it: "
-            + str(it * X.shape[0])
+            + str(it * x.shape[0])
         )
         pbar.update(1)
+        if calculate_group_accuracies:
+            for idx in range(x.shape[0]):
+                groups[int(group[idx])][0] += int(y_pred[idx] == y[idx])
+                groups[int(group[idx])][1] += 1
 
-    return correct / test_dataloader.dataset.__len__()
+    if calculate_group_accuracies:
+        test_dataloader.dataset.return_dict = return_dict_buffer
+        test_dataloader.dataset.disable_groups()
+        group_accuracies = []
+        for idx in range(len(groups)):
+            group_accuracies.append(float(sum(groups[idx][0]) / sum(groups[idx][1])))
+
+        worst_group_accuracy = min(group_accuracies)
+        return correct / test_dataloader.dataset.__len__(), group_accuracies, worst_group_accuracy
+
+    else:
+        return correct / test_dataloader.dataset.__len__()
 
 
 class ModelTrainer:

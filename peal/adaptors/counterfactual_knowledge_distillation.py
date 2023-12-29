@@ -106,6 +106,7 @@ class CounterfactualKnowledgeDistillation:
         self.adaptor_config.overwrite = False
         self.student = copy.deepcopy(student)
         self.student.eval()
+        teacher = teacher if not teacher is None else self.adaptor_config.teacher
 
         """self.output_size = integrate_data_config_into_adaptor_config(
             self.adaptor_config, datasource, output_size
@@ -116,11 +117,6 @@ class CounterfactualKnowledgeDistillation:
         )"""
 
         #
-        """
-        TODO reintegrate this
-        self.enable_hints = bool(teacher == "SegmentationMask")
-        self.adaptor_config.data.has_hint = self.enable_hints
-        """
         # kind of dirty, but also very confusing if not done this way since validation batches are fed directly
         # into the explainer and thereby potentially causing VRAM overflows otherwise
         self.adaptor_config.training.val_batch_size = self.adaptor_config.batch_size
@@ -135,9 +131,8 @@ class CounterfactualKnowledgeDistillation:
         ) = create_dataloaders_from_datasource(
             datasource=datasource,
             config=self.adaptor_config,
-            gigabyte_vram=gigabyte_vram,
             test_config=self.adaptor_config.test_data,
-            # enable_hints=self.enable_hints,
+            enable_hints=bool(teacher == "SegmentationMask"),
         )
         self.dataloaders_val = [self.val_dataloader, None]
         self.adaptor_config.data = self.train_dataloader.dataset.config
@@ -163,7 +158,7 @@ class CounterfactualKnowledgeDistillation:
 
         #
         self.teacher = get_teacher(
-            teacher=teacher if not teacher is None else self.adaptor_config.teacher,
+            teacher=teacher,
             output_size=self.output_size,
             adaptor_config=self.adaptor_config,
             dataset=self.val_dataloader.dataset,
@@ -194,8 +189,10 @@ class CounterfactualKnowledgeDistillation:
             "y_target_end_confidence_list",
             "z_difference_list",
             "collage_path_list",
-            # "hint_list",
         ]
+        if teacher == "SegmentationMask":
+            self.tracked_keys.append("hint_list")
+
         self.data_config = copy.deepcopy(self.adaptor_config)
         self.data_config.data.split = [1.0, 1.0]
         self.data_config.data.confounding_factors = []
@@ -249,6 +246,7 @@ class CounterfactualKnowledgeDistillation:
                 y_target_start_confidence_batch.append(y_target_start_confidence)
                 hint_batch.append(torch.zeros_like(x))
                 sample_idx += 1
+
         print(f"y_batch: {y_batch}")
         print(f"count 1: {torch.sum(torch.tensor(y_batch) == 1)}")
         # import pdb; pdb.set_trace()
@@ -273,9 +271,9 @@ class CounterfactualKnowledgeDistillation:
         tracked_keys,
     ):
         # TODO this should be done with a context manager
-        """if isinstance(self.teacher, SegmentationMaskTeacher):
-        for dataloader in self.datastack.datasource.dataloaders:
-            dataloader.dataset.enable_hints()"""
+        if isinstance(self.teacher, SegmentationMaskTeacher):
+            for dataloader in self.datastack.datasource.dataloaders:
+                dataloader.dataset.enable_hints()
 
         self.datastack.reset()
 
@@ -360,11 +358,12 @@ class CounterfactualKnowledgeDistillation:
             else:
                 continue_collecting = False
 
-        """if isinstance(self.teacher, SegmentationMaskTeacher):
+        if isinstance(self.teacher, SegmentationMaskTeacher):
             for dataloader in self.datastack.datasource.dataloaders:
                 dataloader.dataset.disable_hint()
 
-            self.datastack.datasource.reset()"""
+            self.datastack.datasource.reset()
+
         pbar.close()
         return tracked_values
 
@@ -392,7 +391,7 @@ class CounterfactualKnowledgeDistillation:
             x_list_collection = []
             x_counterfactual_collection = []
             y_confidence_list = []
-            for i in range(3):
+            for i in range(self.adaptor_config.validation_runs):
                 (
                     validation_tracked_values,
                     validation_stats,
@@ -430,9 +429,11 @@ class CounterfactualKnowledgeDistillation:
             ] = self.datastack.dataset.pair_wise_distance(
                 x_list_collection, x_counterfactual_collection
             )
-            validation_stats["diversity"] = self.datastack.dataset.variance(
-                x_counterfactual_collection
-            )
+            if self.adaptor_config.validation_runs > 1:
+                validation_stats["diversity"] = self.datastack.dataset.variance(
+                    x_counterfactual_collection
+                )
+
             validation_stats["validity"] = self.datastack.dataset.flip_rate(
                 y_confidence_list
             )
@@ -445,17 +446,21 @@ class CounterfactualKnowledgeDistillation:
             ) as f:
                 tracked_values_file = {}
                 for key in self.tracked_keys:
-                    if isinstance(validation_tracked_values[key][0], torch.Tensor):
-                        tracked_values_file[key] = torch.stack(
-                            validation_tracked_values[key], dim=0
-                        ).numpy()
+                    try:
+                        if isinstance(validation_tracked_values[key][0], torch.Tensor):
+                            tracked_values_file[key] = torch.stack(
+                                validation_tracked_values[key], dim=0
+                            ).numpy()
 
-                    elif isinstance(
-                        validation_tracked_values[key][0], int
-                    ) or isinstance(validation_tracked_values[key][0], float):
-                        tracked_values_file[key] = np.array(
-                            validation_tracked_values[key]
-                        )
+                        elif isinstance(
+                            validation_tracked_values[key][0], int
+                        ) or isinstance(validation_tracked_values[key][0], float):
+                            tracked_values_file[key] = np.array(
+                                validation_tracked_values[key]
+                            )
+
+                    except Exception:
+                        import pdb; pdb.set_trace()
 
                 np.savez(f, **tracked_values_file)
 
@@ -559,10 +564,6 @@ class CounterfactualKnowledgeDistillation:
 
             if self.output_size == 2 and self.adaptor_config.use_visualization:
                 print("visualize progress!!!")
-                print("visualize progress!!!")
-                print("visualize progress!!!")
-                print("visualize progress!!!")
-                print("visualize progress!!!")
                 self.visualize_progress(
                     [os.path.join(self.base_dir, "visualization.png")]
                 )
@@ -608,8 +609,23 @@ class CounterfactualKnowledgeDistillation:
                     )
 
             test_accuracy = calculate_test_accuracy(
-                self.student, self.test_dataloader, self.device
+                self.student, self.test_dataloader, self.device, self.adaptor_config.calculate_group_accuracies
             )
+            if self.adaptor_config.calculate_group_accuracies:
+                test_accuracy, group_accuracies, worst_group_accuracy = test_accuracy
+                for idx in range(len(group_accuracies)):
+                    writer.add_scalar(
+                        "test_group_accuracy_" + str(idx),
+                        group_accuracies[idx],
+                        self.adaptor_config.current_iteration,
+                    )
+
+                writer.add_scalar(
+                    "test_worst_group_accuracy",
+                    worst_group_accuracy,
+                    self.adaptor_config.current_iteration,
+                )
+
             writer.add_scalar(
                 "test_accuracy", test_accuracy, self.adaptor_config.current_iteration
             )
@@ -1090,8 +1106,23 @@ class CounterfactualKnowledgeDistillation:
             self.fa_1sided = validation_stats["fa_1sided"]
 
             test_accuracy = calculate_test_accuracy(
-                self.student, self.test_dataloader, self.device
+                self.student, self.test_dataloader, self.device, self.adaptor_config.calculate_group_accuracies
             )
+            if self.adaptor_config.calculate_group_accuracies:
+                test_accuracy, group_accuracies, worst_group_accuracy = test_accuracy
+                for idx in range(len(group_accuracies)):
+                    writer.add_scalar(
+                        "test_group_accuracy_" + str(idx),
+                        group_accuracies[idx],
+                        finetune_iteration,
+                    )
+
+                writer.add_scalar(
+                    "test_worst_group_accuracy",
+                    worst_group_accuracy,
+                    finetune_iteration,
+                )
+
             writer.add_scalar("test_accuracy", test_accuracy, finetune_iteration)
 
             if self.output_size == 2 and self.adaptor_config.use_visualization:
