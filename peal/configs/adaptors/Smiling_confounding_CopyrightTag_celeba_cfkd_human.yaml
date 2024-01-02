@@ -1,0 +1,28 @@
+# python run_cfkd.py --adaptor_config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba_cfkd_hints.yaml"
+'batch_size'                           :  1
+'min_train_samples'                    :  2
+'finetune_iterations'                  :  5
+'max_validation_samples'               :  2
+'validation_runs'                      :  1
+'continuous_learning'                  :  False
+'replace_model'                        :  True
+'use_visualization'                    :  False
+'calculate_group_accuracies'           :  True
+'attribution_threshold'                :  2.0
+'explainer'                            :  '<PEAL_BASE>/configs/explainers/counterfactual_default.yaml'
+'training'                             :  '<PEAL_BASE>/configs/training/img_classifier.yaml'
+'data'                                 :  '<PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba_poisened.yaml'
+'test_data'                            :  '<PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba.yaml'
+'student'                              :  'peal_runs/Smiling_confounding_copyrighttag_celeba_classifier_poisened/model.cpl'
+'teacher'                              :  'human@8000'
+#'generator'                            :  'peal_runs/ddpm_copyrighttag_celeba_new/config.yaml'
+'generator'                            :  '<PEAL_BASE>/configs/generators/ace_aligned_generator_CopyrightTag_celeba.yaml'
+'base_dir'                             :  'peal_runs/Smiling_confounding_copyrighttag_celeba_classifier_poisened/cfkd_human'
+'task':
+  'criterions':
+    'ce'     : 1.0
+    'l1'     : 10000.0
+    'l2'     : 1.0
+  'output_type'             : 'singleclass'
+  'output_channels'         : 2
+  'y_selection'             : ['Smiling']

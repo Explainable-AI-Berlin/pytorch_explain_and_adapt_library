@@ -483,8 +483,6 @@ class GaussianDiffusion:
             progress=progress,
         ):
             final = sample
-            print(i)
-            print(final["sample"].shape)
             i += 1
         return final["sample"]
 

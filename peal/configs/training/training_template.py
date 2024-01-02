@@ -24,10 +24,6 @@ class TrainingConfig(BaseModel):
     """
     epoch: int = -1
     """
-    The reference batch size when automatically adapting the batch_size to the vram
-    """
-    base_batch_size: PositiveInt = None
-    """
     A dict containing all variables that could not be given with the current config structure
     """
     kwargs: dict = {}
@@ -35,14 +31,6 @@ class TrainingConfig(BaseModel):
     The optimizer used for training the model.
     """
     optimizer: str = "Adam"
-    """
-    The reference vram of the gpu when using adaptive batch_size.
-    """
-    gigabyte_vram: float = None
-    """
-    The reference input size when using adaptive batch_size.
-    """
-    assumed_input_size: list[PositiveInt] = None
     """
     The train batch size. Can either be set manually or be left empty and calulated by adaptive batch_size.
     """

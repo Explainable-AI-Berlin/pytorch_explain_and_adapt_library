@@ -1,5 +1,6 @@
 from datetime import datetime
 from pydantic import BaseModel, PositiveInt
+from typing import Union
 
 
 class DataConfig(BaseModel):
@@ -34,17 +35,17 @@ class DataConfig(BaseModel):
     """
     The path to the dataset.
     """
-    dataset_path: str = None
+    dataset_path: Union[type(None), str] = None
     """
     The number of samples in the dataset.
     Sometimes important when executing specific experiments.
     """
-    num_samples: int = None
+    num_samples: Union[type(None), int] = None
     """
     The name of the dataset.
     Only necessary to tell dataset factory which customized dataset class to use
     """
-    dataset_class: str = None
+    dataset_class: Union[type(None), str] = None
     """
     The split between train, validation and test set.
     """
@@ -52,12 +53,12 @@ class DataConfig(BaseModel):
     """
     Whether the dataset contains spatial annotations where the true feature is.
     """
-    has_hints: bool = False
+    has_hints: Union[type(None), bool] = False
     """
     The applied normalization.
     Options: ['mean0std1']
     """
-    normalization: list = None
+    normalization: Union[type(None), list] = None
     """
     A list of the invariances exploited for data augmentation:
     Options: ['hflipping', 'vflipping', 'rotation', 'circlecut']
@@ -67,12 +68,12 @@ class DataConfig(BaseModel):
     The number of binary multiclass variables in the mixed setting.
     Has to be smaller than output_size.
     """
-    output_split: int = None
+    output_split: Union[type(None), int] = None
     """
     The way how to downsize an sample if required.
     Options: ['Downsample', 'RandomCrop', 'CenterCrop']
     """
-    downsize: str = None
+    downsize: Union[type(None), str] = None
     """
     A pair of known confounding factors, one usually being the target.
     This knowledge helps for controlled sampling of confounders for experiments.
@@ -81,17 +82,17 @@ class DataConfig(BaseModel):
     """
     The correlation strength of the target and the confounding variable.
     """
-    confounder_probability: float = None
+    confounder_probability: Union[type(None), float] = None
     """
     The seed the dataset was generated with.
     Only relevant for generated datasets!
     """
-    seed: int = None
+    seed: Union[type(None), int] = None
     """
     The label noise of a generated dataset.
     Necessary to mimic real dataset behauviour and avoid trivial non-robust solutions.
     """
-    label_noise: float = None
+    label_noise: Union[type(None), float] = None
     """
     Whether to set negative values to zero.
     """
@@ -99,19 +100,19 @@ class DataConfig(BaseModel):
     """
     The delimiter used for the csv file.
     """
-    delimiter: str = None
+    delimiter: Union[type(None), str] = None
     """
     The number of classes in the dataset.
     """
-    crop_size: int = None
+    crop_size: Union[type(None), int] = None
     """
     The type of confounder present in the dataset.
     """
-    confounding: str = None
+    confounding: Union[type(None), str] = None
     """
     The path of the original dataset.
     """
-    dataset_origin_path: str = None
+    dataset_origin_path: Union[type(None), str] = None
     """
     The name of the class.
     """

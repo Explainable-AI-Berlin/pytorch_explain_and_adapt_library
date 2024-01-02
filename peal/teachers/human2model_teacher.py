@@ -95,10 +95,10 @@ class Human2ModelTeacher(TeacherInterface):
         self.thread.start()
         print("Feedback GUI is active on localhost:" + str(self.port))
 
-    def get_feedback(self, collage_paths, base_dir, **kwargs):
+    def get_feedback(self, collage_path_list, base_dir, **kwargs):
         """ """
         collage_paths_static = []
-        for path in collage_paths:
+        for path in collage_path_list:
             collage_path_static = os.path.join("static", path.split("/")[-1])
             shutil.copy(path, collage_path_static)
             collage_paths_static.append(collage_path_static)

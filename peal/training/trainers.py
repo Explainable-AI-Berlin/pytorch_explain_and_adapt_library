@@ -39,7 +39,7 @@ def calculate_test_accuracy(model, test_dataloader, device, calculate_group_accu
         test_dataloader.dataset.enable_groups()
         return_dict_buffer = bool(test_dataloader.dataset.return_dict)
         test_dataloader.dataset.return_dict = True
-        groups = 2 * test_dataloader.dataset.output_size * [[0, 0]]
+        groups = np.zeros([2 * test_dataloader.dataset.output_size, 2])
 
     for it, sample in enumerate(test_dataloader):
         if calculate_group_accuracies:
@@ -148,7 +148,7 @@ class ModelTrainer:
             self.val_dataloaders,
             _,
         ) = create_dataloaders_from_datasource(
-            config=self.config, datasource=datasource, gigabyte_vram=gigabyte_vram
+            config=self.config, datasource=datasource
         )
 
         if isinstance(self.val_dataloaders, tuple):

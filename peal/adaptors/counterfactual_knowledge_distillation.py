@@ -227,11 +227,9 @@ class CounterfactualKnowledgeDistillation:
             y_source = int(cm_idx / self.output_size)
             y_target = int(cm_idx % self.output_size)
             x, y = self.datastack.pop(int(y_source))
-            """
-            TODO should be done with context manager
+            # TODO should be done with context manager
             if isinstance(self.teacher, SegmentationMaskTeacher):
                 y, hint = y
-            """
 
             logits = (
                 self.student(x.to(self.device).unsqueeze(0)).squeeze(0).detach().cpu()
@@ -247,13 +245,8 @@ class CounterfactualKnowledgeDistillation:
                 hint_batch.append(torch.zeros_like(x))
                 sample_idx += 1
 
-        print(f"y_batch: {y_batch}")
-        print(f"count 1: {torch.sum(torch.tensor(y_batch) == 1)}")
-        # import pdb; pdb.set_trace()
         x_batch = torch.stack(x_batch)
         y_target_batch = torch.stack(y_target_batch)
-        # if np.random.rand() < 0.3:
-        #    import pdb; pdb.set_trace()
         return {
             "x_list": x_batch,
             "y_list": y_batch,
@@ -360,7 +353,7 @@ class CounterfactualKnowledgeDistillation:
 
         if isinstance(self.teacher, SegmentationMaskTeacher):
             for dataloader in self.datastack.datasource.dataloaders:
-                dataloader.dataset.disable_hint()
+                dataloader.dataset.disable_hints()
 
             self.datastack.datasource.reset()
 
@@ -495,12 +488,12 @@ class CounterfactualKnowledgeDistillation:
                         torch.tensor(validation_tracked_value_file[key])
                     )
 
-            collage_path_lists = os.listdir(
+            collage_path_list = os.listdir(
                 os.path.join(
                     self.base_dir, str(finetune_iteration), "validation_collages"
                 )
             )
-            validation_tracked_values["collage_path_lists"] = list(
+            validation_tracked_values["collage_path_list"] = list(
                 map(
                     lambda x: os.path.join(
                         self.base_dir,
@@ -508,7 +501,7 @@ class CounterfactualKnowledgeDistillation:
                         "validation_collages",
                         x,
                     ),
-                    collage_path_lists,
+                    collage_path_list,
                 )
             )
 
@@ -562,6 +555,10 @@ class CounterfactualKnowledgeDistillation:
             log_images_to_writer(self.val_dataloader, writer, "validation")
             log_images_to_writer(self.test_dataloader, writer, "test")
 
+            test_accuracy = calculate_test_accuracy(
+                self.student, self.test_dataloader, self.device, self.adaptor_config.calculate_group_accuracies
+            )
+
             if self.output_size == 2 and self.adaptor_config.use_visualization:
                 print("visualize progress!!!")
                 self.visualize_progress(
@@ -608,9 +605,6 @@ class CounterfactualKnowledgeDistillation:
                         self.adaptor_config.current_iteration,
                     )
 
-            test_accuracy = calculate_test_accuracy(
-                self.student, self.test_dataloader, self.device, self.adaptor_config.calculate_group_accuracies
-            )
             if self.adaptor_config.calculate_group_accuracies:
                 test_accuracy, group_accuracies, worst_group_accuracy = test_accuracy
                 for idx in range(len(group_accuracies)):
@@ -686,17 +680,17 @@ class CounterfactualKnowledgeDistillation:
                 for key in tracked_values_file.keys():
                     tracked_values[key] = list(torch.tensor(tracked_values_file[key]))
 
-                collage_path_lists = os.listdir(
-                    os.path.join(self.base_dir, str(finetune_iteration), "collages")
-                )
-                tracked_values["collage_path_lists"] = list(
-                    map(
-                        lambda x: os.path.join(
-                            self.base_dir, str(finetune_iteration), "collages", x
-                        ),
-                        collage_path_lists,
-                    )
-                )
+        collage_path_list = os.listdir(
+            os.path.join(self.base_dir, str(finetune_iteration), "collages")
+        )
+        tracked_values["collage_path_list"] = list(
+            map(
+                lambda x: os.path.join(
+                    self.base_dir, str(finetune_iteration), "collages", x
+                ),
+                collage_path_list,
+            )
+        )
 
         return tracked_values
 
@@ -1046,6 +1040,7 @@ class CounterfactualKnowledgeDistillation:
         """
         print("Adaptor Config: " + str(self.adaptor_config))
         validation_stats, writer = self.initialize_run()
+        self.fa_1sided = validation_stats["fa_1sided"]
 
         # iterate over the finetune iterations
         for finetune_iteration in range(
