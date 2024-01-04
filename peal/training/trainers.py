@@ -216,7 +216,11 @@ class ModelTrainer:
 
     def run_epoch(self, dataloader, mode="train", pbar=None):
         """ """
-        for batch_idx, (X, y) in enumerate(dataloader):
+        for batch_idx, sample in enumerate(dataloader):
+            if hasattr(dataloader, "return_src") and dataloader.return_src:
+                sample, source = sample
+
+            X, y = sample
             #
             if self.unit_test_train_loop and batch_idx >= 2:
                 break

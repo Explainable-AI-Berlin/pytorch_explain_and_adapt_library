@@ -20,6 +20,6 @@ outputs
 *.pth
 .idea
 dime2/outputs
-ace/outputs
+peal/dependencies/ace/outputs
 environment.yaml
 dive/*

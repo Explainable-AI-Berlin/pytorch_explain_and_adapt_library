@@ -6,7 +6,6 @@ import torch.multiprocessing
 
 torch.multiprocessing.set_sharing_strategy("file_system")
 
-from peal.data.dataset_wrappers import GlowDatasetWrapper
 from peal.data.dataset_factory import get_datasets
 from peal.data.dataset_wrappers import VAEDatasetWrapper
 from peal.configs.generators.generator_template import VAEConfig
@@ -143,7 +142,7 @@ class DataloaderMixer(DataLoader):
         DataLoader (_type_): _description_
     """
 
-    def __init__(self, train_config, initial_dataloader):
+    def __init__(self, train_config, initial_dataloader, return_src=False):
         """
         _summary_
 
@@ -157,6 +156,7 @@ class DataloaderMixer(DataLoader):
         self.priorities = None
         self.dataset = initial_dataloader.dataset  # TODO kind of hacky
         self.iterators = [iter(self.dataloaders[0])]
+        self.return_src = return_src
 
     def append(self, dataloader, priority=1):
         """
@@ -189,6 +189,9 @@ class DataloaderMixer(DataLoader):
         if isinstance(item, str) and item == "STOP":
             self.iterators[idx] = iter(self.dataloaders[idx])
             item = next(self.iterators[idx])
+
+        if self.return_src:
+            item = (item, idx)
 
         return item
 

@@ -5,16 +5,17 @@ Train a diffusion model on images.
 import argparse
 import os
 
-from ace.guided_diffusion import dist_util, logger
-from ace.guided_diffusion.image_datasets import load_data_celeba
-from ace.guided_diffusion.resample import create_named_schedule_sampler
-from ace.guided_diffusion.script_util import (
+from peal.dependencies.ace.guided_diffusion import logger
+from peal.dependencies.ace.guided_diffusion import dist_util
+from peal.dependencies.ace.guided_diffusion.image_datasets import load_data_celeba
+from peal.dependencies.ace.guided_diffusion.resample import create_named_schedule_sampler
+from peal.dependencies.ace.guided_diffusion.script_util import (
     model_and_diffusion_defaults,
     create_model_and_diffusion,
     args_to_dict,
     add_dict_to_argparser,
 )
-from ace.guided_diffusion.train_util import TrainLoop
+from peal.dependencies.ace.guided_diffusion.train_util import TrainLoop
 
 from peal.data.dataset_factory import get_datasets
 from peal.data.dataloaders import get_dataloader

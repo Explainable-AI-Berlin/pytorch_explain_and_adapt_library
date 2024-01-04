@@ -28,13 +28,13 @@ from torch.nn import functional as F
 from torchvision import transforms
 from torchvision import datasets
 
-module_path = os.path.abspath(os.path.join(".."))
+module_path = os.path.abspath(os.path.join("../../../.."))
 if module_path not in sys.path:
     sys.path.append(module_path)
 
 # Diffusion Model imports
-from ace.guided_diffusion import dist_util
-from ace.guided_diffusion.script_util import (
+from peal.dependencies.ace.guided_diffusion import dist_util
+from peal.dependencies.ace.guided_diffusion.script_util import (
     model_and_diffusion_defaults,
     diffusion_defaults,
     create_model_and_diffusion,
@@ -43,7 +43,7 @@ from ace.guided_diffusion.script_util import (
     args_to_dict,
     add_dict_to_argparser,
 )
-from ace.guided_diffusion.sample_utils import (
+from peal.dependencies.ace.guided_diffusion.sample_utils import (
     get_DiME_iterative_sampling,
     clean_class_cond_fn,
     dist_cond_fn,
@@ -52,20 +52,20 @@ from ace.guided_diffusion.sample_utils import (
     load_from_DDP_model,
     ChunkedDataset,
 )
-from ace.guided_diffusion.gaussian_diffusion import _extract_into_tensor
-from ace.guided_diffusion.image_datasets import (
+from peal.dependencies.ace.guided_diffusion.gaussian_diffusion import _extract_into_tensor
+from peal.dependencies.ace.guided_diffusion.image_datasets import (
     get_dataset,
     BINARYDATASET,
     MULTICLASSDATASETS,
 )
 
 # core imports
-from ace.core.utils import print_dict, merge_all_chunks, generate_mask
-from ace.core.metrics import accuracy, get_prediction
-from ace.core.attacks_and_models import JointClassifierDDPM, get_attack
+from peal.dependencies.ace.core.utils import print_dict, merge_all_chunks, generate_mask
+from peal.dependencies.ace.core.metrics import accuracy, get_prediction
+from peal.dependencies.ace.core.attacks_and_models import JointClassifierDDPM, get_attack
 
 # model imports
-from ace.models import get_classifier
+from peal.dependencies.ace.models import get_classifier
 
 from peal.data.dataset_interfaces import PealDataset
 from peal.architectures.downstream_models import SequentialModel
@@ -275,7 +275,7 @@ def main(args=None):
 
     elif args.classifier_path[-4:] == ".cpl":
         print("Loading Classifier")
-        module_path = os.path.abspath(os.path.join(".."))
+        module_path = os.path.abspath(os.path.join("../../../.."))
         if module_path not in sys.path:
             sys.path.append(module_path)
         classifier = torch.load(args.classifier_path, map_location=dist_util.dev()).to(

@@ -186,7 +186,6 @@ class CounterfactualExplainer(ExplainerInterface):
             pbar=None,
             mode="",
             model: nn.Module = None,
-            dataloader=None,
     ) -> dict:
         """
         This function generates a counterfactual for a given batch of inputs.
@@ -258,7 +257,6 @@ class CounterfactualExplainer(ExplainerInterface):
             base_path=base_path,
             classifier=model,
             start_idx=start_idx,
-            dataloader=dataloader,
             **batch_out,
         )
         return batch_out

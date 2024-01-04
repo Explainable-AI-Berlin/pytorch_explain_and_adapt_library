@@ -30,19 +30,19 @@ class Model2ModelTeacher(TeacherInterface):
             teacher_original.append(pred_original)
             teacher_counterfactual.append(pred_counterfactual)
 
-        # if 'validation' in base_dir:
-        #     self.dataset.generate_contrastive_collage(
-        #         y_counterfactual_teacher_list=teacher_counterfactual,
-        #         y_original_teacher_list=teacher_original,
-        #         feedback_list=feedback,
-        #         x_counterfactual_list=x_counterfactual_list,
-        #         y_source_list=y_source_list,
-        #         y_target_list=y_target_list,
-        #         x_list=x_list,
-        #         y_list=y_list,
-        #         base_path=base_dir,
-        #         **kwargs,
-        #     )
+        if 'validation' in base_dir:
+            self.dataset.generate_contrastive_collage(
+                y_counterfactual_teacher_list=teacher_counterfactual,
+                y_original_teacher_list=teacher_original,
+                feedback_list=feedback,
+                x_counterfactual_list=x_counterfactual_list,
+                y_source_list=y_source_list,
+                y_target_list=y_target_list,
+                x_list=x_list,
+                y_list=y_list,
+                base_path=base_dir,
+                **kwargs,
+            )
 
         if is_train:
             self.model.train()

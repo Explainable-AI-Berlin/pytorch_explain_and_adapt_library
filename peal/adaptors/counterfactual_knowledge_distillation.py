@@ -313,7 +313,6 @@ class CounterfactualKnowledgeDistillation:
                     pbar=pbar,
                     mode="Training",
                     model=self.student,
-                    dataloader=self.dataloader_mixer,
                 )
                 for key in tracked_keys:
                     tracked_values[key].extend(values[key])

@@ -12,15 +12,15 @@ from PIL import Image
 from torchvision.transforms import ToTensor
 
 from peal.generators.interfaces import EditCapableGenerator
-from peal.data.datasets import Image2ClassDataset
 from peal.global_utils import load_yaml_config, embed_numberstring
-from run_ace import main as ace_main
-from ace.guided_diffusion import dist_util, logger
-from ace.guided_diffusion.resample import create_named_schedule_sampler
-from ace.guided_diffusion.script_util import (
+from peal.dependencies.ace.run_ace import main as ace_main
+from peal.dependencies.ace.guided_diffusion import logger
+from peal.dependencies.ace.guided_diffusion import dist_util
+from peal.dependencies.ace.guided_diffusion.resample import create_named_schedule_sampler
+from peal.dependencies.ace.guided_diffusion.script_util import (
     create_model_and_diffusion,
 )
-from ace.guided_diffusion.train_util import TrainLoop
+from peal.dependencies.ace.guided_diffusion.train_util import TrainLoop
 from peal.data.dataset_factory import get_datasets
 from peal.data.dataloaders import get_dataloader
 
