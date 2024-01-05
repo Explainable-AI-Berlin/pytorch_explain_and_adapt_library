@@ -1,4 +1,4 @@
-'dataset_path'            : 'datasets/celeba_copyrighttag'
+'dataset_path'            : '/home/space/datasets/peal/datasets/celeba_copyrighttag'
 'num_samples'             : 14000
 'input_type'              : 'image'
 'input_size'              : [3, 128, 128]

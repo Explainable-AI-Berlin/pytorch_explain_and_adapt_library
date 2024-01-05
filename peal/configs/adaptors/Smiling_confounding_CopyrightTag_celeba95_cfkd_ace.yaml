@@ -1,7 +1,7 @@
 # python run_cfkd.py --adaptor_config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba95_cfkd_ace.yaml"
 'batch_size'                           :  5
 'min_train_samples'                    :  5000
-'finetune_iterations'                  :  5
+'finetune_iterations'                  :  1
 'max_validation_samples'               :  100
 'continuous_learning'                  :  False
 'replace_model'                        :  True
@@ -11,10 +11,10 @@
 'training'                             :  '<PEAL_BASE>/configs/training/img_classifier.yaml'
 'data'                                 :  '<PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba_poisened95.yaml'
 'test_data'                            :  '<PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba.yaml'
-'student'                              :  'peal_runs/Smiling_confounding_copyrighttag_celeba_classifier_poisened95/model.cpl'
-'teacher'                              :  'peal_runs/Smiling_confounding_copyrighttag_celeba_classifier/model.cpl'
+'student'                              :  '/home/space/datasets/peal/peal_runs/Smiling_confounding_copyrighttag_celeba_classifier_poisened95/model.cpl'
+'teacher'                              :  '/home/space/datasets/peal/peal_runs/Smiling_confounding_copyrighttag_celeba_classifier/model.cpl'
 'generator'                            :  '<PEAL_BASE>/configs/generators/ace_aligned_generator_CopyrightTag_celeba.yaml'
-'base_dir'                             :  'peal_runs/Smiling_confounding_copyrighttag_celeba_classifier_poisened95/cfkd_ace5000'
+'base_dir'                             :  '/home/space/datasets/peal/peal_runs/Smiling_confounding_copyrighttag_celeba_classifier_poisened95/cfkd_ace5000'
 'task':
   'criterions':
     'ce'     : 1.0

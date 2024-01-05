@@ -12,10 +12,10 @@
 'training'                             :  '<PEAL_BASE>/configs/training/img_classifier.yaml'
 'data'                                 :  '<PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba_poisened.yaml'
 'test_data'                            :  '<PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba.yaml'
-'student'                              :  'peal_runs/Smiling_confounding_copyrighttag_celeba_classifier_poisened/model.cpl'
+'student'                              :  '/home/space/datasets/peal/peal_runs/Smiling_confounding_copyrighttag_celeba_classifier_poisened/model.cpl'
 'teacher'                              :  'SegmentationMask'
 'generator'                            :  '<PEAL_BASE>/configs/generators/ace_aligned_generator_CopyrightTag_celeba.yaml'
-'base_dir'                             :  'peal_runs/Smiling_confounding_copyrighttag_celeba_classifier_poisened/cfkd_hints'
+'base_dir'                             :  '/home/space/datasets/peal/peal_runs/Smiling_confounding_copyrighttag_celeba_classifier_poisened/cfkd_hints'
 'task':
   'criterions':
     'ce'     : 1.0

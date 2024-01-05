@@ -1,4 +1,4 @@
-'dataset_path'            : 'datasets/celeba'
+'dataset_path'            : '/home/space/datasets/peal/datasets/celeba'
 'num_samples'             : 202599
 'input_type'              : 'image'
 'input_size'              : [3, 128, 128]

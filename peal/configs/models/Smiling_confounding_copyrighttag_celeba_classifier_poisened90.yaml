@@ -1,0 +1,12 @@
+#
+'model_name'        : 'Smiling_confounding_copyrighttag_celeba_classifier_poisened90'
+'data'              : '<PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba_poisened90.yaml'
+'training'          : '<PEAL_BASE>/configs/training/img_classifier.yaml'
+'architecture'      : '<PEAL_BASE>/configs/architectures/resnet18.yaml'
+'task':
+  'criterions':
+    'ce'     : 1.0
+    'l1'     : 1000.0
+  'output_type'             : 'singleclass'
+  'output_channels'         : 2
+  'y_selection'             : ['Smiling']

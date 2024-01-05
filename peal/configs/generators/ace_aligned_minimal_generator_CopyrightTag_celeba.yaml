@@ -1,32 +1,35 @@
 # important parameters for creating counterfactuals:
-'dist_l1' : 0.0 #0.1 #0.0001 #0.0  # l1 scaling factor
-'dist_l2' : 0.0 #0.2 #1.0 #0.01 #1.0  # l2 scaling factor schedule for the distance loss. We did not used any for our results
-'sampling_inpaint' : 0.2 #0.15  # Inpainting threshold
-'sampling_time_fraction' : 0.3 #0.3 # 0.1 #
+'attack_iterations' : 50  # Attack iterations updates
+'sampling_time_fraction' : 0.15 #0.35 # 0.1 #
+'dist_l1' : 0.00000001 #0.1 #0.0001 #0.0  # l1 scaling factor
+'dist_l2' : 0.0 #1.0 #0.01 #1.0  # l2 scaling factor schedule for the distance loss. We did not use any for our results
+'sampling_inpaint' : 0.15 #0.15  # Inpainting threshold
+'sampling_dilation' : 17
 'timestep_respacing' : '50'
-'base_path' : 'peal_runs/celeba_ddpm' # 'peal_runs/celeba_ddpm_downloaded' #
-'data' : '<PEAL_BASE>/configs/data/celeba.yaml'
-'attack_iterations' : 1 #100 #50  # Attack iterations updates
+'base_path' : '/home/space/datasets/peal/peal_runs/ddpm_CopyrightTag_celeba_1000' # 'peal_runs/celeba_ddpm' # 'peal_runs/celeba_ddpm_downloaded' #
+'sampling_stochastic' : True  # Set to False to remove the noise when sampling  # Dilation size for the mask generation
+'learn_sigma' : True
+'data' : '<PEAL_BASE>/configs/data/copyrighttag_celeba.yaml'
+architecture: {}
 # Other parameters - careful might not have any effect since they are ported from DiME!!!
 'start_step' : 60
 'attention_resolutions' : '32,16,8'
-'batch_size' : 10 #50
+'batch_size' : 32 #50
 'channel_mult' : ''
 'chunk' : 0
 'class_cond' : False
 'classifier_scales' : '8,10,15'
 'clip_denoised' : True
-'diffusion_steps' : 500
+'diffusion_steps' : 1000
 'dropout' : 0.0
 'exp_name' : 'example_name'
 'gpu' : '0'
-'guided_iterations' : 9999999
+'guided_iterations' : 1000
 'image_size' : 128
 'l1_loss' : 0.05
 'l2_loss' : 0.0
 'l_perc' : 30.0
 'l_perc_layer' : 18
-'learn_sigma' : True
 'merge_and_eval' : False
 'noise_schedule' : 'linear'
 'num_batches' : 1
@@ -42,7 +45,7 @@
 'rescale_learned_sigmas' : False
 'rescale_timesteps' : False
 'sampling_scale' : 1.0
-'save_images' : True
+'save_images' : False
 'save_x_t' : True
 'save_z_t' : True
 'seed' : 4
@@ -58,7 +61,7 @@
 'use_train' : False
 'method' : 'ace'
 'num_samples' : 500000000000  # useful to sample few examples
-'attack_method' : "PGD"  # Attack method (currently 'PGD', 'C&W', 'GD' and 'None' supported)
+'attack_method' : 'PGD'  # Attack method (currently 'PGD', 'C&W', 'GD' and 'None' supported)
 'attack_epsilon' : 255  # L inf epsilon bound (will be devided by 255)
 'attack_step' : 1.0  # Attack update step (will be devided by 255)
 'attack_joint' : True  # Set to false to generate adversarial attacks generation!
@@ -66,8 +69,6 @@
 'attack_checkpoint_backward_steps' : 1 # Use dime2 shortcut to transfer gradients. We do not recommend it.
 'attack_joint_shortcut' : False
 'dist_schedule' : "none" # filtering args fraction of noise steps (e.g. 0.1 for 1000 smpling steps would be 100 out of 1000)
-'sampling_stochastic' : True  # Set to False to remove the noise when sampling
-'sampling_dilation' : 15  # Dilation size for the mask generation
 'label_query' : -1  # Query label to target
 'label_target' : -1  # Target label, useful for MultiClass datasets
 'chunks' : 1 # Chunking for spliting the CE generation into multiple gpus
@@ -77,7 +78,7 @@
 'max_train_steps' : 1000000
 'current_fid' : 100000000000000.0'
 'best_fid' : 100000000000000.0'
-'generator_type' : 'AceDDPMAdaptor'
+'generator_type' : 'AceDDPMAdaptorAligned'
 # from argparsing
 'gpus' : ''
 'schedule_sampler' : "uniform"

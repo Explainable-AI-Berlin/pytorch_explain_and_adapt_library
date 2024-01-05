@@ -6,7 +6,7 @@
 'sampling_inpaint' : 0.15 #0.15  # Inpainting threshold
 'sampling_dilation' : 17
 'timestep_respacing' : '50'
-'base_path' : 'peal_runs/ddpm_CopyrightTag_celeba_1000' # 'peal_runs/celeba_ddpm' # 'peal_runs/celeba_ddpm_downloaded' #
+'base_path' : '/home/space/datasets/peal/peal_runs/ddpm_CopyrightTag_celeba_1000' # 'peal_runs/celeba_ddpm' # 'peal_runs/celeba_ddpm_downloaded' #
 'sampling_stochastic' : True  # Set to False to remove the noise when sampling  # Dilation size for the mask generation
 'learn_sigma' : True
 'data' : '<PEAL_BASE>/configs/data/copyrighttag_celeba.yaml'

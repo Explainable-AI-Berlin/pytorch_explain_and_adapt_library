@@ -4,5 +4,5 @@
 'input_size'              : [3, 128, 128]
 'output_type'             : 'multiclass'
 'output_size'             : [41]
-'confounder_probability'  : 0.95
+'confounder_probability'  : 0.9
 'confounding_factors'     : ['Smiling', 'Confounder']

@@ -554,15 +554,15 @@ class CounterfactualKnowledgeDistillation:
             log_images_to_writer(self.val_dataloader, writer, "validation")
             log_images_to_writer(self.test_dataloader, writer, "test")
 
-            test_accuracy = calculate_test_accuracy(
-                self.student, self.test_dataloader, self.device, self.adaptor_config.calculate_group_accuracies
-            )
-
             if self.output_size == 2 and self.adaptor_config.use_visualization:
                 print("visualize progress!!!")
                 self.visualize_progress(
                     [os.path.join(self.base_dir, "visualization.png")]
                 )
+
+            test_accuracy = calculate_test_accuracy(
+                self.student, self.test_dataloader, self.device, self.adaptor_config.calculate_group_accuracies
+            )
 
             if isinstance(self.val_dataloader.dataset, ImageDataset):
                 generator_sample = self.generator.sample_x(
@@ -1008,6 +1008,7 @@ class CounterfactualKnowledgeDistillation:
         )
         for path in paths:
             img_success.save(path.replace(".png", "_success.png"))
+            print("Saved: " + path.replace(".png", "_success.png"))
 
         img = create_comparison(
             dataset=self.test_dataloader.dataset,
@@ -1029,6 +1030,7 @@ class CounterfactualKnowledgeDistillation:
 
         for path in paths:
             img.save(path)
+            print("Saved: " + path)
 
         self.test_dataloader.dataset.task_config = task_config_buffer
         return img

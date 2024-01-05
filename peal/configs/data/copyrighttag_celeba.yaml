@@ -1,6 +1,6 @@
 'dataset_class'           : 'celeba'
-'dataset_origin_path'     : 'datasets/celeba'
-'dataset_path'            : 'datasets/celeba_copyrighttag'
+'dataset_origin_path'     : '/home/space/datasets/peal/datasets/celeba'
+'dataset_path'            : '/home/space/datasets/peal/datasets/celeba_copyrighttag'
 'num_samples'             : 202599
 'input_type'              : 'image'
 'input_size'              : [3, 128, 128]
