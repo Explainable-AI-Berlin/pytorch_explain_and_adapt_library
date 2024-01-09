@@ -91,7 +91,6 @@ def parse_csv(
         return key, instances_tensor
 
     if len(config.confounding_factors) == 2:
-
         def extract_instances_tensor_confounder(idx, line):
             selection_idx1 = attributes.index(config.confounding_factors[0])
             selection_idx2 = attributes.index(config.confounding_factors[1])

@@ -462,6 +462,8 @@ class Image2MixedDataset(ImageDataset):
         self.groups_enabled = False
         self.idx_enabled = False
         self.return_dict = return_dict
+        # TODO
+        #self.config.class_ratios = None
         data_dir = os.path.join(root_dir, "data.csv")
         if not config.delimiter is None:
             delimiter = config.delimiter
@@ -472,6 +474,7 @@ class Image2MixedDataset(ImageDataset):
         self.attributes, self.data, self.keys = parse_csv(
             data_dir, config, mode, key_type="name", delimiter=delimiter
         )
+        self.task_specific_keys = None
 
     @property
     def output_size(self):
@@ -482,6 +485,9 @@ class Image2MixedDataset(ImageDataset):
             return len(self.attributes)
 
     def __len__(self):
+        '''if not self.task_config is None and not self.config.class_ratios is None and self.task_specific_keys is None:
+            self.set_task_specific_keys()'''
+
         return len(self.keys)
 
     def enable_hints(self):
@@ -502,7 +508,19 @@ class Image2MixedDataset(ImageDataset):
     def disable_idx(self):
         self.idx_enabled = False
 
+    def set_task_specific_keys(self):
+        self.task_specific_keys = []
+        for key in self.keys:
+            if self.data[key][self.attributes.index(self.task_config.y_selection[0])] == 1:
+                self.task_specific_keys.append(key)
+
+        self.keys_backup = copy.deepcopy(self.keys)
+        self.keys = self.task_specific_keys
+
     def __getitem__(self, idx):
+        '''if not self.task_config is None and not self.config.class_ratios is None and self.task_specific_keys is None:
+            self.set_task_specific_keys()'''
+
         name = self.keys[idx]
 
         img = Image.open(os.path.join(self.root_dir, "imgs", name))

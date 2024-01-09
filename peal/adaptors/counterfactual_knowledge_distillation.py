@@ -452,7 +452,9 @@ class CounterfactualKnowledgeDistillation:
                             )
 
                     except Exception:
-                        import pdb; pdb.set_trace()
+                        import pdb
+
+                        pdb.set_trace()
 
                 np.savez(f, **tracked_values_file)
 
@@ -561,7 +563,10 @@ class CounterfactualKnowledgeDistillation:
                 )
 
             test_accuracy = calculate_test_accuracy(
-                self.student, self.test_dataloader, self.device, self.adaptor_config.calculate_group_accuracies
+                self.student,
+                self.test_dataloader,
+                self.device,
+                self.adaptor_config.calculate_group_accuracies,
             )
 
             if isinstance(self.val_dataloader.dataset, ImageDataset):
@@ -594,16 +599,6 @@ class CounterfactualKnowledgeDistillation:
             with open(os.path.join(self.base_dir, "platform.txt"), "w") as f:
                 f.write(platform.node())
 
-            validation_stats = self.retrieve_validation_stats(finetune_iteration=0)
-
-            for key in validation_stats.keys():
-                if isinstance(validation_stats[key], float):
-                    writer.add_scalar(
-                        "validation_" + key,
-                        validation_stats[key],
-                        self.adaptor_config.current_iteration,
-                    )
-
             if self.adaptor_config.calculate_group_accuracies:
                 test_accuracy, group_accuracies, worst_group_accuracy = test_accuracy
                 for idx in range(len(group_accuracies)):
@@ -622,6 +617,15 @@ class CounterfactualKnowledgeDistillation:
             writer.add_scalar(
                 "test_accuracy", test_accuracy, self.adaptor_config.current_iteration
             )
+            validation_stats = self.retrieve_validation_stats(finetune_iteration=0)
+            for key in validation_stats.keys():
+                if isinstance(validation_stats[key], float):
+                    writer.add_scalar(
+                        "validation_" + key,
+                        validation_stats[key],
+                        self.adaptor_config.current_iteration,
+                    )
+
             self.adaptor_config.test_accuracies = [test_accuracy]
 
         else:
@@ -895,13 +899,20 @@ class CounterfactualKnowledgeDistillation:
             self.dataloader_mixer.append(dataloader, priority=priority)
 
             assert (
-                abs(
-                    self.dataloader_mixer.priorities[-1]
-                    - mixing_ratio
-                )
-                < 0.01
+                abs(self.dataloader_mixer.priorities[-1] - mixing_ratio) < 0.01
             ), "priorities do not match! " + str(self.dataloader_mixer.priorities)
             self.dataloaders_val[1] = dataloader_val
+            y_list_dataset = [
+                self.dataloader_mixer.dataloaders[-1].dataset[idx][1]
+                for idx in range(len(self.dataloader_mixer.dataloaders[-1].dataset))
+            ]
+            for c in range(self.output_size):
+                writer.add_scalar(
+                    "class_ratio_" + str(c),
+                    np.sum((torch.tensor(y_list_dataset) == c).numpy())
+                    / len(y_list_dataset),
+                    finetune_iteration,
+                )
 
             if not self.adaptor_config.continuous_learning:
 
@@ -1102,7 +1113,10 @@ class CounterfactualKnowledgeDistillation:
             self.fa_1sided = validation_stats["fa_1sided"]
 
             test_accuracy = calculate_test_accuracy(
-                self.student, self.test_dataloader, self.device, self.adaptor_config.calculate_group_accuracies
+                self.student,
+                self.test_dataloader,
+                self.device,
+                self.adaptor_config.calculate_group_accuracies,
             )
             if self.adaptor_config.calculate_group_accuracies:
                 test_accuracy, group_accuracies, worst_group_accuracy = test_accuracy
