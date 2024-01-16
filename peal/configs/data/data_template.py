@@ -84,6 +84,10 @@ class DataConfig(BaseModel):
     """
     confounder_probability: Union[type(None), float] = None
     """
+    The ratio of the classes in the dataset.
+    """
+    class_ratios: Union[type(None), list] = None
+    """
     The seed the dataset was generated with.
     Only relevant for generated datasets!
     """

@@ -878,14 +878,21 @@ class CounterfactualKnowledgeDistillation:
             )
 
             #
-            self.dataloader_mixer = DataloaderMixer(
-                self.adaptor_config.training, self.train_dataloader
-            )
+            if hasattr(self, "dataloader_mixer"):
+                self.dataloader_mixer = DataloaderMixer(
+                    self.adaptor_config.training, self.dataloader_mixer
+                )
+
+            else:
+                # TODO introduce special case when not starting in iteration 0
+                self.dataloader_mixer = DataloaderMixer(
+                    self.adaptor_config.training, self.train_dataloader
+                )
 
             #
             mixing_ratio = min(0.5, 1 - self.fa_1sided)
             writer.add_scalar("mixing_ratio", mixing_ratio, finetune_iteration)
-            if not mixing_ratio is None:
+            '''if not mixing_ratio is None:
                 priority = (
                     (1 / (1 - mixing_ratio))
                     * mixing_ratio
@@ -896,7 +903,8 @@ class CounterfactualKnowledgeDistillation:
             else:
                 priority = 1
 
-            self.dataloader_mixer.append(dataloader, priority=priority)
+            self.dataloader_mixer.append(dataloader, priority=priority)'''
+            self.dataloader_mixer.append(dataloader, mixing_ratio=mixing_ratio)
 
             assert (
                 abs(self.dataloader_mixer.priorities[-1] - mixing_ratio) < 0.01
@@ -915,7 +923,6 @@ class CounterfactualKnowledgeDistillation:
                 )
 
             if not self.adaptor_config.continuous_learning:
-
                 def weight_reset(m):
                     reset_parameters = getattr(m, "reset_parameters", None)
                     if callable(reset_parameters):
