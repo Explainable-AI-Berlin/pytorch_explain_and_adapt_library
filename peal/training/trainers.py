@@ -216,9 +216,27 @@ class ModelTrainer:
 
     def run_epoch(self, dataloader, mode="train", pbar=None):
         """ """
+        sources = {}
         for batch_idx, sample in enumerate(dataloader):
             if hasattr(dataloader, "return_src") and dataloader.return_src:
                 sample, source = sample
+                source = str(source)
+                while isinstance(sample[0], tuple) or isinstance(sample[0], list):
+                    sample, inner_source = sample
+                    source = str(source) + str(inner_source)
+
+                if not source in sources.keys():
+                    sources[source] = 1
+
+                else:
+                    sources[source] += 1
+
+                source_distibution = ""
+                for key in sources.keys():
+                    source_distibution += key + ": " + str(sources[key] / (batch_idx + 1)) + ", "
+
+            else:
+                source_distibution = ""
 
             X, y = sample
             #
@@ -258,6 +276,7 @@ class ModelTrainer:
                 + str(batch_idx)
                 + ", loss: "
                 + str(loss.detach().item())
+                + ", source_distibution: " + source_distibution if not source_distibution == "" else ""
             )
             pbar.write(
                 ", ".join(

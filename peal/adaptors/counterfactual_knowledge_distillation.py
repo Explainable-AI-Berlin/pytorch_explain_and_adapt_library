@@ -207,6 +207,118 @@ class CounterfactualKnowledgeDistillation:
         )
         self.validation_data_config.data.split = [0.0, 1.0]
 
+    def initialize_run(self):
+        if self.overwrite or not os.path.exists(
+            os.path.join(self.base_dir, "0", "validation_tracked_values.npz")
+        ):
+            assert self.adaptor_config.current_iteration == 0
+            print("Create base_dir in: " + str(self.base_dir))
+            shutil.rmtree(self.base_dir, ignore_errors=True)
+            Path(self.base_dir).mkdir(parents=True, exist_ok=True)
+            writer = SummaryWriter(os.path.join(self.base_dir, "logs"))
+            log_images_to_writer(self.train_dataloader, writer, "train")
+            log_images_to_writer(self.val_dataloader, writer, "validation")
+            log_images_to_writer(self.test_dataloader, writer, "test")
+
+            if self.output_size == 2 and self.adaptor_config.use_visualization:
+                print("visualize progress!!!")
+                self.visualize_progress(
+                    [os.path.join(self.base_dir, "visualization.png")]
+                )
+
+            test_accuracy = calculate_test_accuracy(
+                self.student,
+                self.test_dataloader,
+                self.device,
+                self.adaptor_config.calculate_group_accuracies,
+            )
+
+            if isinstance(self.val_dataloader.dataset, ImageDataset):
+                generator_sample = self.generator.sample_x(
+                    batch_size=self.adaptor_config.batch_size
+                )
+                if not generator_sample is None and hasattr(
+                    self.generator.config, "training"
+                ):
+                    torchvision.utils.save_image(
+                        generator_sample,
+                        os.path.join(self.base_dir, "generator_sample.png"),
+                        normalize=True,
+                    )
+
+                    # TODO move this back!!!
+                    generator_performance = (
+                        self.val_dataloader.dataset.track_generator_performance(
+                            self.generator
+                        )
+                    )
+                    print("Generator performance: " + str(generator_performance))
+
+                    self.adaptor_config.generator_performance = generator_performance
+
+            save_yaml_config(
+                self.adaptor_config, os.path.join(self.base_dir, "config.yaml")
+            )
+
+            with open(os.path.join(self.base_dir, "platform.txt"), "w") as f:
+                f.write(platform.node())
+
+            if self.adaptor_config.calculate_group_accuracies:
+                test_accuracy, group_accuracies, worst_group_accuracy = test_accuracy
+                for idx in range(len(group_accuracies)):
+                    writer.add_scalar(
+                        "test_group_accuracy_" + str(idx),
+                        group_accuracies[idx],
+                        self.adaptor_config.current_iteration,
+                    )
+
+                writer.add_scalar(
+                    "test_worst_group_accuracy",
+                    worst_group_accuracy,
+                    self.adaptor_config.current_iteration,
+                )
+
+            writer.add_scalar(
+                "test_accuracy", test_accuracy, self.adaptor_config.current_iteration
+            )
+            validation_stats = self.retrieve_validation_stats(finetune_iteration=0)
+            for key in validation_stats.keys():
+                if isinstance(validation_stats[key], float):
+                    writer.add_scalar(
+                        "validation_" + key,
+                        validation_stats[key],
+                        self.adaptor_config.current_iteration,
+                    )
+
+            self.adaptor_config.test_accuracies = [test_accuracy]
+
+        else:
+            with open(os.path.join(self.base_dir, "platform.txt"), "w") as f:
+                f.write(platform.node())
+
+            writer = SummaryWriter(os.path.join(self.base_dir, "logs"))
+            validation_stats = self.retrieve_validation_stats(
+                finetune_iteration=self.adaptor_config.current_iteration - 1
+            )
+            self.dataloader_mixer = DataloaderMixer(
+                self.adaptor_config.training, self.train_dataloader
+            )
+
+            for i in range(1, self.adaptor_config.current_iteration + 1):
+                dataset_dir = os.path.join(
+                    self.base_dir, str(i), "train_dataset"
+                )
+                # TODO how to recover mixing_ratio?
+                self.dataloader_mixer = self.add_dataset_to_dataloader_mixer(
+                    dataloader_old=self.dataloader_mixer,
+                    dataset_path=dataset_dir,
+                    mixing_ratio=0.5,
+                )
+
+            self.student = torch.load(os.path.join(self.adaptor_config.base_dir, 'model.cpl'), map_location=self.device)
+
+        return validation_stats, writer
+
     def get_batch(
         self,
         error_matrix: torch.Tensor,
@@ -358,6 +470,409 @@ class CounterfactualKnowledgeDistillation:
 
         pbar.close()
         return tracked_values
+
+    def retrieve_counterfactual_list(self, validation_stats, finetune_iteration):
+        tracked_values_path = os.path.join(
+            self.base_dir, str(finetune_iteration), "tracked_values.npz"
+        )
+        if not os.path.exists(tracked_values_path):
+            tracked_values = self.generate_x_counterfactual_list(
+                error_matrix=validation_stats["error_matrix"],
+                confidence_score_stats=validation_stats["confidence_score_stats"],
+                finetune_iteration=finetune_iteration,
+                tracked_keys=self.tracked_keys,
+            )
+
+            if len(list(tracked_values.values())[0]) == 0:
+                return tracked_values
+
+            with open(
+                tracked_values_path,
+                "wb",
+            ) as f:
+                tracked_values_file = {}
+                for key in self.tracked_keys:
+                    if isinstance(tracked_values[key][0], torch.Tensor):
+                        tracked_values_file[key] = torch.stack(
+                            tracked_values[key], dim=0
+                        ).numpy()
+
+                    elif isinstance(tracked_values[key][0], int) or isinstance(
+                        tracked_values[key][0], float
+                    ):
+                        tracked_values_file[key] = np.array(tracked_values[key])
+
+                np.savez(f, **tracked_values_file)
+
+        else:
+            with open(
+                tracked_values_path,
+                "rb",
+            ) as f:
+                tracked_values = {}
+                tracked_values_file = np.load(f, allow_pickle=True)
+                for key in tracked_values_file.keys():
+                    tracked_values[key] = list(torch.tensor(tracked_values_file[key]))
+
+        collage_path_list = os.listdir(
+            os.path.join(self.base_dir, str(finetune_iteration), "collages")
+        )
+        tracked_values["collage_path_list"] = list(
+            map(
+                lambda x: os.path.join(
+                    self.base_dir, str(finetune_iteration), "collages", x
+                ),
+                collage_path_list,
+            )
+        )
+
+        return tracked_values
+
+    def retrieve_feedback(self, tracked_values, finetune_iteration, mode):
+        if not os.path.exists(
+            os.path.join(self.base_dir, str(finetune_iteration), mode + "_feedback.txt")
+        ):
+            feedback = self.teacher.get_feedback(
+                base_dir=os.path.join(
+                    self.base_dir, str(finetune_iteration), mode + "_teacher"
+                ),
+                **tracked_values,
+            )
+
+            os.makedirs(
+                os.path.join(self.base_dir, str(finetune_iteration)), exist_ok=True
+            )
+            with open(
+                os.path.join(
+                    self.base_dir, str(finetune_iteration), mode + "_feedback.txt"
+                ),
+                "w",
+            ) as f:
+                f.write("\n".join(feedback))
+
+        else:
+            with open(
+                os.path.join(
+                    self.base_dir, str(finetune_iteration), mode + "_feedback.txt"
+                ),
+                "r",
+            ) as f:
+                feedback = f.read().split("\n")
+
+        # TODO this is not correct for calculating training stats.
+        if mode == "validation":
+            num_samples = min(
+                self.adaptor_config.max_validation_samples,
+                len(self.val_dataloader.dataset),
+            )
+
+        else:
+            num_samples = -1
+
+        counterfactual_rate = len(list(tracked_values.values())[0]) / num_samples
+        ood_rate = len(list(filter(lambda sample: sample == "ood", feedback))) / len(
+            feedback
+        )
+
+        num_true_2sided = len(list(filter(lambda sample: sample == "true", feedback)))
+        num_false_2sided = len(list(filter(lambda sample: sample == "false", feedback)))
+        fa_2sided = num_true_2sided / (num_true_2sided + num_false_2sided)
+
+        num_true_1sided = len(
+            list(
+                filter(
+                    lambda x: x[1] == "true"
+                    and tracked_values["y_list"][x[0]]
+                    == tracked_values["y_source_list"][x[0]],
+                    enumerate(feedback),
+                )
+            )
+        )
+        num_false_1sided = len(
+            list(
+                filter(
+                    lambda x: x[1] == "false"
+                    and tracked_values["y_list"][x[0]]
+                    == tracked_values["y_source_list"][x[0]],
+                    enumerate(feedback),
+                )
+            )
+        )
+        fa_1sided = num_true_1sided / (num_true_1sided + num_false_1sided)
+        fa_absolute = num_true_1sided / num_samples
+
+        feedback_stats = {
+            "counterfactual_rate": counterfactual_rate,
+            "ood_rate": ood_rate,
+            "fa_2sided": fa_2sided,
+            "fa_1sided": fa_1sided,
+            "fa_absolute": fa_absolute,
+        }
+
+        return feedback, feedback_stats
+
+    def create_dataset(
+        self,
+        x_counterfactual_list,
+        feedback,
+        y_source_list,
+        y_target_list,
+        finetune_iteration,
+        config,
+        mode="",
+        **args,
+    ):
+        assert (
+            len(x_counterfactual_list)
+            == len(feedback)
+            == len(y_source_list)
+            == len(y_target_list)
+        ), "missmatch in list lengths"
+
+        dataset_dir = os.path.join(
+            self.base_dir, str(finetune_iteration), mode + "_dataset"
+        )
+        if os.path.exists(dataset_dir):
+            return dataset_dir
+        #
+        x_list = []
+        y_list = []
+        sample_names = []
+        for sample_idx in range(len(feedback)):
+            if feedback[sample_idx] == "ood":
+                continue
+
+            elif feedback[sample_idx] == "true":
+                """sample_name = (
+                    "true_"
+                    + str(int(y_source_list[sample_idx]))
+                    + "_to_"
+                    + str(int(y_target_list[sample_idx]))
+                    + "_"
+                    + str(sample_idx)
+                )
+                x_list.append(x_counterfactual_list[sample_idx])
+                y_list.append(int(y_target_list[sample_idx]))
+                sample_names.append(sample_name)
+                sample_idx += 1"""
+                continue
+
+            elif feedback[sample_idx] == "false":
+                sample_name = (
+                    "false_"
+                    + str(int(y_source_list[sample_idx]))
+                    + "_to_"
+                    + str(int(y_target_list[sample_idx]))
+                    + "_"
+                    + str(sample_idx)
+                )
+                x_list.append(x_counterfactual_list[sample_idx])
+                y_list.append(int(y_source_list[sample_idx]))
+                sample_names.append(sample_name)
+                sample_idx += 1
+
+        self.train_dataloader.dataset.serialize_dataset(
+            output_dir=dataset_dir,
+            x_list=x_list,
+            y_list=y_list,
+            sample_names=sample_names,
+        )
+        return dataset_dir
+
+    def add_dataset_to_dataloader_mixer(self, dataloader_old, dataset_path, mixing_ratio):
+        #
+        dataloader, _, _ = create_dataloaders_from_datasource(
+            config=self.data_config,
+            datasource=dataset_path,
+        )
+        dataloader.append(dataloader_old, mixing_ratio=1-mixing_ratio)
+        return dataloader
+
+
+    def finetune_student(self, finetune_iteration, dataset_path, writer):
+        if not os.path.exists(
+            os.path.join(
+                self.base_dir,
+                str(finetune_iteration),
+                "finetuned_model",
+                "model.cpl",
+            )
+        ):
+            shutil.rmtree(
+                os.path.join(self.base_dir, str(finetune_iteration), "finetuned_model"),
+                ignore_errors=True,
+            )
+            Path(
+                os.path.join(self.base_dir, str(finetune_iteration), "finetuned_model")
+            ).mkdir(parents=True, exist_ok=True)
+
+            #
+            val_dataset_path = os.path.join(
+                self.base_dir, str(finetune_iteration), "validation_dataset"
+            )
+            _, dataloader_val, _ = create_dataloaders_from_datasource(
+                config=self.validation_data_config,
+                datasource=val_dataset_path,
+            )
+            self.dataloaders_val[1] = dataloader_val
+
+            #
+            mixing_ratio = min(0.5, 1 - self.fa_1sided)
+            writer.add_scalar("mixing_ratio", mixing_ratio, finetune_iteration)
+            if not hasattr(self, "dataloader_mixer"):
+                self.dataloader_mixer = DataloaderMixer(
+                    self.adaptor_config.training, self.train_dataloader
+                )
+
+            self.dataloader_mixer = self.add_dataset_to_dataloader_mixer(
+                dataloader_old=self.dataloader_mixer,
+                dataset_path=dataset_path,
+                mixing_ratio=mixing_ratio,
+            )
+
+            y_list_dataset = [
+                self.dataloader_mixer.dataloaders[0].dataset[idx][1]
+                for idx in range(len(self.dataloader_mixer.dataloaders[0].dataset))
+            ]
+            for c in range(self.output_size):
+                writer.add_scalar(
+                    "class_ratio_" + str(c),
+                    np.sum((torch.tensor(y_list_dataset) == c).numpy())
+                    / len(y_list_dataset),
+                    finetune_iteration,
+                )
+
+            if not self.adaptor_config.continuous_learning:
+
+                def weight_reset(m):
+                    reset_parameters = getattr(m, "reset_parameters", None)
+                    if callable(reset_parameters):
+                        m.reset_parameters()
+
+                self.student.apply(weight_reset)
+
+            finetune_trainer = ModelTrainer(
+                config=copy.deepcopy(self.adaptor_config),
+                model=self.student,
+                datasource=(self.dataloader_mixer, self.dataloaders_val),
+                model_name="finetuned_model",
+                base_dir=os.path.join(self.base_dir, str(finetune_iteration)),
+                val_dataloader_weights=[
+                    1 - mixing_ratio,
+                    mixing_ratio,
+                ],
+            )
+            finetune_trainer.fit(continue_training=True)
+
+        else:
+            self.student = torch.load(
+                os.path.join(
+                    self.base_dir,
+                    str(finetune_iteration),
+                    "finetuned_model",
+                    "model.cpl",
+                ),
+                map_location=self.device,
+            )
+
+    def visualize_progress(self, paths):
+        task_config_buffer = copy.deepcopy(self.test_dataloader.dataset.task_config)
+        criterions = {}
+        if (
+            isinstance(self.test_dataloader.dataset, Image2MixedDataset)
+            and "Confounder" in self.test_dataloader.dataset.attributes
+        ):
+            self.test_dataloader.dataset.task_config = SimpleNamespace(
+                **{
+                    "y_selection": None,
+                    "criterions": [],
+                }
+            )
+            criterions["class"] = lambda X, y: int(
+                y[
+                    self.test_dataloader.dataset.attributes.index(
+                        task_config_buffer.y_selection[0]
+                    )
+                ]
+            )
+            criterions["confounder"] = lambda X, y: int(
+                y[self.test_dataloader.dataset.attributes.index("Confounder")]
+            )
+            criterions["uncorrected"] = lambda X, y: int(
+                self.original_student(X.unsqueeze(0).to(self.device))
+                .squeeze(0)
+                .cpu()
+                .argmax()
+            )
+            criterions["cfkd"] = lambda X, y: int(
+                self.student(X.unsqueeze(0).to(self.device)).squeeze(0).cpu().argmax()
+            )
+
+        else:
+            criterions["class"] = lambda X, y: int(y)
+            criterions["uncorrected"] = lambda X, y: int(
+                self.original_student(X.unsqueeze(0).to(self.device))
+                .squeeze(0)
+                .cpu()
+                .argmax()
+            )
+            criterions["cfkd"] = lambda X, y: int(
+                self.student(X.unsqueeze(0).to(self.device)).squeeze(0).cpu().argmax()
+            )
+
+        checkbox_dict = {
+            "class": torch.tensor([0, 0, 0, 1, 1, 1]),
+            "confounder": torch.tensor([1, 1, 1, 0, 0, 0]),
+            "uncorrected": torch.tensor([1, 1, 1, 0, 0, 0]),
+            "cfkd": torch.tensor([0, 0, 0, 1, 1, 1]),
+        }
+        # TODO introduce column for teacher
+        img_success = create_comparison(
+            dataset=self.test_dataloader.dataset,
+            criterions=criterions,
+            columns={
+                "Counterfactual\nExplanation": [
+                    "cf",
+                    self.original_student,
+                    "uncorrected",
+                ],
+                "CFKD\ncorrected": ["cf", self.student, "cfkd"],
+            },
+            score_reference_idx=1,
+            generator=self.generator,
+            device=self.device,
+            explainer_config=self.adaptor_config.explainer,
+            checkbox_dict_in=checkbox_dict,
+            batch_size=self.adaptor_config.batch_size,
+        )
+        for path in paths:
+            img_success.save(path.replace(".png", "_success.png"))
+            print("Saved: " + path.replace(".png", "_success.png"))
+
+        img = create_comparison(
+            dataset=self.test_dataloader.dataset,
+            criterions=criterions,
+            columns={
+                "Counterfactual\nExplanation": [
+                    "cf",
+                    self.original_student,
+                    "uncorrected",
+                ],
+                "CFKD\ncorrected": ["cf", self.student, "cfkd"],
+            },
+            score_reference_idx=1,
+            generator=self.generator,
+            device=self.device,
+            explainer_config=self.adaptor_config.explainer,
+            batch_size=self.adaptor_config.batch_size,
+        )
+
+        for path in paths:
+            img.save(path)
+            print("Saved: " + path)
+
+        self.test_dataloader.dataset.task_config = task_config_buffer
+        return img
 
     def retrieve_validation_stats(self, finetune_iteration):
         if os.path.exists(
@@ -542,516 +1057,6 @@ class CounterfactualKnowledgeDistillation:
             np.savez(f, **validation_stats_file)
 
         return validation_stats
-
-    def initialize_run(self):
-        if self.overwrite or not os.path.exists(
-            os.path.join(self.base_dir, "0", "validation_tracked_values.npz")
-        ):
-            assert self.adaptor_config.current_iteration == 0
-            print("Create base_dir in: " + str(self.base_dir))
-            shutil.rmtree(self.base_dir, ignore_errors=True)
-            Path(self.base_dir).mkdir(parents=True, exist_ok=True)
-            writer = SummaryWriter(os.path.join(self.base_dir, "logs"))
-            log_images_to_writer(self.train_dataloader, writer, "train")
-            log_images_to_writer(self.val_dataloader, writer, "validation")
-            log_images_to_writer(self.test_dataloader, writer, "test")
-
-            if self.output_size == 2 and self.adaptor_config.use_visualization:
-                print("visualize progress!!!")
-                self.visualize_progress(
-                    [os.path.join(self.base_dir, "visualization.png")]
-                )
-
-            test_accuracy = calculate_test_accuracy(
-                self.student,
-                self.test_dataloader,
-                self.device,
-                self.adaptor_config.calculate_group_accuracies,
-            )
-
-            if isinstance(self.val_dataloader.dataset, ImageDataset):
-                generator_sample = self.generator.sample_x(
-                    batch_size=self.adaptor_config.batch_size
-                )
-                if not generator_sample is None and hasattr(
-                    self.generator.config, "training"
-                ):
-                    torchvision.utils.save_image(
-                        generator_sample,
-                        os.path.join(self.base_dir, "generator_sample.png"),
-                        normalize=True,
-                    )
-
-                    # TODO move this back!!!
-                    generator_performance = (
-                        self.val_dataloader.dataset.track_generator_performance(
-                            self.generator
-                        )
-                    )
-                    print("Generator performance: " + str(generator_performance))
-
-                    self.adaptor_config.generator_performance = generator_performance
-
-            save_yaml_config(
-                self.adaptor_config, os.path.join(self.base_dir, "config.yaml")
-            )
-
-            with open(os.path.join(self.base_dir, "platform.txt"), "w") as f:
-                f.write(platform.node())
-
-            if self.adaptor_config.calculate_group_accuracies:
-                test_accuracy, group_accuracies, worst_group_accuracy = test_accuracy
-                for idx in range(len(group_accuracies)):
-                    writer.add_scalar(
-                        "test_group_accuracy_" + str(idx),
-                        group_accuracies[idx],
-                        self.adaptor_config.current_iteration,
-                    )
-
-                writer.add_scalar(
-                    "test_worst_group_accuracy",
-                    worst_group_accuracy,
-                    self.adaptor_config.current_iteration,
-                )
-
-            writer.add_scalar(
-                "test_accuracy", test_accuracy, self.adaptor_config.current_iteration
-            )
-            validation_stats = self.retrieve_validation_stats(finetune_iteration=0)
-            for key in validation_stats.keys():
-                if isinstance(validation_stats[key], float):
-                    writer.add_scalar(
-                        "validation_" + key,
-                        validation_stats[key],
-                        self.adaptor_config.current_iteration,
-                    )
-
-            self.adaptor_config.test_accuracies = [test_accuracy]
-
-        else:
-            with open(os.path.join(self.base_dir, "platform.txt"), "w") as f:
-                f.write(platform.node())
-
-            writer = SummaryWriter(os.path.join(self.base_dir, "logs"))
-            validation_stats = self.retrieve_validation_stats(finetune_iteration=0)
-
-            # test_accuracy = self.adaptor_config.test_accuracies[-1]
-            test_accuracy = -1.0
-
-        return validation_stats, writer
-
-    def retrieve_counterfactual_list(self, validation_stats, finetune_iteration):
-        tracked_values_path = os.path.join(
-            self.base_dir, str(finetune_iteration), "tracked_values.npz"
-        )
-        if not os.path.exists(tracked_values_path):
-            tracked_values = self.generate_x_counterfactual_list(
-                error_matrix=validation_stats["error_matrix"],
-                confidence_score_stats=validation_stats["confidence_score_stats"],
-                finetune_iteration=finetune_iteration,
-                tracked_keys=self.tracked_keys,
-            )
-
-            if len(list(tracked_values.values())[0]) == 0:
-                return tracked_values
-
-            with open(
-                tracked_values_path,
-                "wb",
-            ) as f:
-                tracked_values_file = {}
-                for key in self.tracked_keys:
-                    if isinstance(tracked_values[key][0], torch.Tensor):
-                        tracked_values_file[key] = torch.stack(
-                            tracked_values[key], dim=0
-                        ).numpy()
-
-                    elif isinstance(tracked_values[key][0], int) or isinstance(
-                        tracked_values[key][0], float
-                    ):
-                        tracked_values_file[key] = np.array(tracked_values[key])
-
-                np.savez(f, **tracked_values_file)
-
-        else:
-            with open(
-                tracked_values_path,
-                "rb",
-            ) as f:
-                tracked_values = {}
-                tracked_values_file = np.load(f, allow_pickle=True)
-                for key in tracked_values_file.keys():
-                    tracked_values[key] = list(torch.tensor(tracked_values_file[key]))
-
-        collage_path_list = os.listdir(
-            os.path.join(self.base_dir, str(finetune_iteration), "collages")
-        )
-        tracked_values["collage_path_list"] = list(
-            map(
-                lambda x: os.path.join(
-                    self.base_dir, str(finetune_iteration), "collages", x
-                ),
-                collage_path_list,
-            )
-        )
-
-        return tracked_values
-
-    def retrieve_feedback(self, tracked_values, finetune_iteration, mode):
-        if not os.path.exists(
-            os.path.join(self.base_dir, str(finetune_iteration), mode + "_feedback.txt")
-        ):
-            feedback = self.teacher.get_feedback(
-                base_dir=os.path.join(
-                    self.base_dir, str(finetune_iteration), mode + "_teacher"
-                ),
-                **tracked_values,
-            )
-
-            os.makedirs(
-                os.path.join(self.base_dir, str(finetune_iteration)), exist_ok=True
-            )
-            with open(
-                os.path.join(
-                    self.base_dir, str(finetune_iteration), mode + "_feedback.txt"
-                ),
-                "w",
-            ) as f:
-                f.write("\n".join(feedback))
-
-        else:
-            with open(
-                os.path.join(
-                    self.base_dir, str(finetune_iteration), mode + "_feedback.txt"
-                ),
-                "r",
-            ) as f:
-                feedback = f.read().split("\n")
-
-        # TODO this is not correct for calculating training stats.
-        if mode == "validation":
-            num_samples = min(
-                self.adaptor_config.max_validation_samples,
-                len(self.val_dataloader.dataset),
-            )
-
-        else:
-            num_samples = -1
-
-        counterfactual_rate = len(list(tracked_values.values())[0]) / num_samples
-        ood_rate = len(list(filter(lambda sample: sample == "ood", feedback))) / len(
-            feedback
-        )
-
-        num_true_2sided = len(list(filter(lambda sample: sample == "true", feedback)))
-        num_false_2sided = len(list(filter(lambda sample: sample == "false", feedback)))
-        fa_2sided = num_true_2sided / (num_true_2sided + num_false_2sided)
-
-        num_true_1sided = len(
-            list(
-                filter(
-                    lambda x: x[1] == "true"
-                    and tracked_values["y_list"][x[0]]
-                    == tracked_values["y_source_list"][x[0]],
-                    enumerate(feedback),
-                )
-            )
-        )
-        num_false_1sided = len(
-            list(
-                filter(
-                    lambda x: x[1] == "false"
-                    and tracked_values["y_list"][x[0]]
-                    == tracked_values["y_source_list"][x[0]],
-                    enumerate(feedback),
-                )
-            )
-        )
-        fa_1sided = num_true_1sided / (num_true_1sided + num_false_1sided)
-        fa_absolute = num_true_1sided / num_samples
-
-        feedback_stats = {
-            "counterfactual_rate": counterfactual_rate,
-            "ood_rate": ood_rate,
-            "fa_2sided": fa_2sided,
-            "fa_1sided": fa_1sided,
-            "fa_absolute": fa_absolute,
-        }
-
-        return feedback, feedback_stats
-
-    def create_dataset(
-        self,
-        x_counterfactual_list,
-        feedback,
-        y_source_list,
-        y_target_list,
-        finetune_iteration,
-        config,
-        mode="",
-        **args,
-    ):
-        assert (
-            len(x_counterfactual_list)
-            == len(feedback)
-            == len(y_source_list)
-            == len(y_target_list)
-        ), "missmatch in list lengths"
-
-        dataset_dir = os.path.join(
-            self.base_dir, str(finetune_iteration), mode + "_dataset"
-        )
-        #
-        x_list = []
-        y_list = []
-        sample_names = []
-        for sample_idx in range(len(feedback)):
-            if feedback[sample_idx] == "ood":
-                continue
-
-            elif feedback[sample_idx] == "true":
-                """sample_name = (
-                    "true_"
-                    + str(int(y_source_list[sample_idx]))
-                    + "_to_"
-                    + str(int(y_target_list[sample_idx]))
-                    + "_"
-                    + str(sample_idx)
-                )
-                x_list.append(x_counterfactual_list[sample_idx])
-                y_list.append(int(y_target_list[sample_idx]))
-                sample_names.append(sample_name)
-                sample_idx += 1"""
-                continue
-
-            elif feedback[sample_idx] == "false":
-                sample_name = (
-                    "false_"
-                    + str(int(y_source_list[sample_idx]))
-                    + "_to_"
-                    + str(int(y_target_list[sample_idx]))
-                    + "_"
-                    + str(sample_idx)
-                )
-                x_list.append(x_counterfactual_list[sample_idx])
-                y_list.append(int(y_source_list[sample_idx]))
-                sample_names.append(sample_name)
-                sample_idx += 1
-
-        self.train_dataloader.dataset.serialize_dataset(
-            output_dir=dataset_dir,
-            x_list=x_list,
-            y_list=y_list,
-            sample_names=sample_names,
-        )
-        return dataset_dir
-
-    def finetune_student(self, finetune_iteration, dataset_path, writer):
-        if not os.path.exists(
-            os.path.join(
-                self.base_dir,
-                str(finetune_iteration),
-                "finetuned_model",
-                "model.cpl",
-            )
-        ):
-            shutil.rmtree(
-                os.path.join(self.base_dir, str(finetune_iteration), "finetuned_model"),
-                ignore_errors=True,
-            )
-            Path(
-                os.path.join(self.base_dir, str(finetune_iteration), "finetuned_model")
-            ).mkdir(parents=True, exist_ok=True)
-            #
-            dataloader, _, _ = create_dataloaders_from_datasource(
-                config=self.data_config,
-                datasource=dataset_path,
-            )
-
-            #
-            val_dataset_path = os.path.join(
-                self.base_dir, str(finetune_iteration), "validation_dataset"
-            )
-            _, dataloader_val, _ = create_dataloaders_from_datasource(
-                config=self.validation_data_config,
-                datasource=val_dataset_path,
-            )
-
-            #
-            if hasattr(self, "dataloader_mixer"):
-                self.dataloader_mixer = DataloaderMixer(
-                    self.adaptor_config.training, self.dataloader_mixer
-                )
-
-            else:
-                # TODO introduce special case when not starting in iteration 0
-                self.dataloader_mixer = DataloaderMixer(
-                    self.adaptor_config.training, self.train_dataloader
-                )
-
-            #
-            mixing_ratio = min(0.5, 1 - self.fa_1sided)
-            writer.add_scalar("mixing_ratio", mixing_ratio, finetune_iteration)
-            '''if not mixing_ratio is None:
-                priority = (
-                    (1 / (1 - mixing_ratio))
-                    * mixing_ratio
-                    * len(self.dataloader_mixer)
-                    / len(dataloader.dataset)
-                )
-
-            else:
-                priority = 1
-
-            self.dataloader_mixer.append(dataloader, priority=priority)'''
-            self.dataloader_mixer.append(dataloader, mixing_ratio=mixing_ratio)
-
-            assert (
-                abs(self.dataloader_mixer.priorities[-1] - mixing_ratio) < 0.01
-            ), "priorities do not match! " + str(self.dataloader_mixer.priorities)
-            self.dataloaders_val[1] = dataloader_val
-            y_list_dataset = [
-                self.dataloader_mixer.dataloaders[-1].dataset[idx][1]
-                for idx in range(len(self.dataloader_mixer.dataloaders[-1].dataset))
-            ]
-            for c in range(self.output_size):
-                writer.add_scalar(
-                    "class_ratio_" + str(c),
-                    np.sum((torch.tensor(y_list_dataset) == c).numpy())
-                    / len(y_list_dataset),
-                    finetune_iteration,
-                )
-
-            if not self.adaptor_config.continuous_learning:
-                def weight_reset(m):
-                    reset_parameters = getattr(m, "reset_parameters", None)
-                    if callable(reset_parameters):
-                        m.reset_parameters()
-
-                self.student.apply(weight_reset)
-
-            finetune_trainer = ModelTrainer(
-                config=copy.deepcopy(self.adaptor_config),
-                model=self.student,
-                datasource=(self.dataloader_mixer, self.dataloaders_val),
-                model_name="finetuned_model",
-                base_dir=os.path.join(self.base_dir, str(finetune_iteration)),
-                val_dataloader_weights=[
-                    1 - mixing_ratio,
-                    mixing_ratio,
-                ],
-            )
-            finetune_trainer.fit(continue_training=True)
-
-        else:
-            self.student = torch.load(
-                os.path.join(
-                    self.base_dir,
-                    str(finetune_iteration),
-                    "finetuned_model",
-                    "model.cpl",
-                ),
-                map_location=self.device,
-            )
-
-    def visualize_progress(self, paths):
-        task_config_buffer = copy.deepcopy(self.test_dataloader.dataset.task_config)
-        criterions = {}
-        if (
-            isinstance(self.test_dataloader.dataset, Image2MixedDataset)
-            and "Confounder" in self.test_dataloader.dataset.attributes
-        ):
-            self.test_dataloader.dataset.task_config = SimpleNamespace(
-                **{
-                    "y_selection": None,
-                    "criterions": [],
-                }
-            )
-            criterions["class"] = lambda X, y: int(
-                y[
-                    self.test_dataloader.dataset.attributes.index(
-                        task_config_buffer.y_selection[0]
-                    )
-                ]
-            )
-            criterions["confounder"] = lambda X, y: int(
-                y[self.test_dataloader.dataset.attributes.index("Confounder")]
-            )
-            criterions["uncorrected"] = lambda X, y: int(
-                self.original_student(X.unsqueeze(0).to(self.device))
-                .squeeze(0)
-                .cpu()
-                .argmax()
-            )
-            criterions["cfkd"] = lambda X, y: int(
-                self.student(X.unsqueeze(0).to(self.device)).squeeze(0).cpu().argmax()
-            )
-
-        else:
-            criterions["class"] = lambda X, y: int(y)
-            criterions["uncorrected"] = lambda X, y: int(
-                self.original_student(X.unsqueeze(0).to(self.device))
-                .squeeze(0)
-                .cpu()
-                .argmax()
-            )
-            criterions["cfkd"] = lambda X, y: int(
-                self.student(X.unsqueeze(0).to(self.device)).squeeze(0).cpu().argmax()
-            )
-
-        checkbox_dict = {
-            "class": torch.tensor([0, 0, 0, 1, 1, 1]),
-            "confounder": torch.tensor([1, 1, 1, 0, 0, 0]),
-            "uncorrected": torch.tensor([1, 1, 1, 0, 0, 0]),
-            "cfkd": torch.tensor([0, 0, 0, 1, 1, 1]),
-        }
-        # TODO introduce column for teacher
-        img_success = create_comparison(
-            dataset=self.test_dataloader.dataset,
-            criterions=criterions,
-            columns={
-                "Counterfactual\nExplanation": [
-                    "cf",
-                    self.original_student,
-                    "uncorrected",
-                ],
-                "CFKD\ncorrected": ["cf", self.student, "cfkd"],
-            },
-            score_reference_idx=1,
-            generator=self.generator,
-            device=self.device,
-            explainer_config=self.adaptor_config.explainer,
-            checkbox_dict_in=checkbox_dict,
-            batch_size=self.adaptor_config.batch_size,
-        )
-        for path in paths:
-            img_success.save(path.replace(".png", "_success.png"))
-            print("Saved: " + path.replace(".png", "_success.png"))
-
-        img = create_comparison(
-            dataset=self.test_dataloader.dataset,
-            criterions=criterions,
-            columns={
-                "Counterfactual\nExplanation": [
-                    "cf",
-                    self.original_student,
-                    "uncorrected",
-                ],
-                "CFKD\ncorrected": ["cf", self.student, "cfkd"],
-            },
-            score_reference_idx=1,
-            generator=self.generator,
-            device=self.device,
-            explainer_config=self.adaptor_config.explainer,
-            batch_size=self.adaptor_config.batch_size,
-        )
-
-        for path in paths:
-            img.save(path)
-            print("Saved: " + path)
-
-        self.test_dataloader.dataset.task_config = task_config_buffer
-        return img
 
     def run(self):
         """
