@@ -1,11 +1,4 @@
 # important parameters for creating counterfactuals:
-'attack_iterations' : 50  # Attack iterations updates
-'sampling_time_fraction' : 0.15 #0.35 # 0.1 #
-'dist_l1' : 0.00000001 #0.1 #0.0001 #0.0  # l1 scaling factor
-'dist_l2' : 0.0 #1.0 #0.01 #1.0  # l2 scaling factor schedule for the distance loss. We did not use any for our results
-'sampling_inpaint' : 0.15 #0.15  # Inpainting threshold
-'sampling_dilation' : 17
-'timestep_respacing' : '50'
 'base_path' : '/home/space/datasets/peal/peal_runs/ddpm_CopyrightTag_celeba_1000' # 'peal_runs/celeba_ddpm' # 'peal_runs/celeba_ddpm_downloaded' #
 'sampling_stochastic' : True  # Set to False to remove the noise when sampling  # Dilation size for the mask generation
 'learn_sigma' : True

@@ -907,7 +907,7 @@ class CounterfactualKnowledgeDistillation:
                     dataloader=self.dataloaders_val[0],
                     tracked_keys=self.tracked_keys,
                     base_path=os.path.join(
-                        self.base_dir, str(finetune_iteration), "validation_collages"
+                        self.base_dir, str(finetune_iteration), "validation_collages" + str(i)
                     ),
                     output_size=self.output_size,
                     explainer=self.explainer,

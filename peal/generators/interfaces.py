@@ -3,6 +3,8 @@ import torch
 from torch import nn
 from typing import Tuple
 
+from peal.configs.explainers.explainer_template import ExplainerConfig
+
 
 class Generator(nn.Module):
     def sample_x(self, batch_size=1):
@@ -80,6 +82,7 @@ class EditCapableGenerator(Generator):
         source_classes: torch.Tensor,
         target_classes: torch.Tensor,
         classifier: nn.Module,
+        explainer_config: ExplainerConfig,
         pbar=None,
         mode="",
     ) -> Tuple[

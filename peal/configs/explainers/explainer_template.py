@@ -1,13 +1,42 @@
 from pydantic import BaseModel, PositiveInt
+from typing import Union
 
 
-class ExplainerConfig(BaseModel):
+class ExplainerConfig:
     """
     The type of explanation that shall be used.
     Options: ['counterfactual', 'lrp']
     """
+    explanation_type: str
 
-    explanation_style: str
+class ACEConfig(ExplainerConfig):
+    """
+    This class defines the config of a ACEConfig.
+    """
+
+    """
+    The type of explanation that shall be used.
+    Options: ['counterfactual', 'lrp']
+    """
+    explanation_type: str = "DiffeoCFConfig"
+    attack_iterations: Union[list, int]
+    sampling_time_fraction: Union[list, float]
+    dist_l1: Union[list, float]
+    dist_l2: Union[list, float]
+    sampling_inpaint: Union[list, float]
+    sampling_dilation: Union[list, float]
+    timestep_respacing: Union[list, int]
+
+class DiffeoCFConfig(ExplainerConfig):
+    """
+    This class defines the config of a DiffeoCF.
+    """
+
+    """
+    The type of explanation that shall be used.
+    Options: ['counterfactual', 'lrp']
+    """
+    explanation_type: str = "DiffeoCFConfig"
     """
     The maximum number of gradients step done for explaining the network
     """
