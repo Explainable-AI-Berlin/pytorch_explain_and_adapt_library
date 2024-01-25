@@ -685,6 +685,7 @@ class CounterfactualKnowledgeDistillation:
             config=self.data_config,
             datasource=dataset_path,
         )
+        dataloader = DataloaderMixer(dataloader_old.config, dataloader)
         dataloader.append(dataloader_old, mixing_ratio=1-mixing_ratio)
         return dataloader
 
