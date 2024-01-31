@@ -24,10 +24,10 @@ from peal.training.criterions import get_criterions
 from peal.data.dataloaders import create_dataloaders_from_datasource
 from peal.generators.interfaces import Generator
 from peal.architectures.downstream_models import SequentialModel
-from peal.generators.variational_autoencoders import VAE
+#from peal.generators.variational_autoencoders import VAE
 from peal.generators.normalizing_flows import Glow
 from peal.configs.architectures.architecture_template import ArchitectureConfig
-from peal.configs.generators.generator_template import VAEConfig
+#from peal.configs.generators.generator_config import VAEConfig
 
 
 def calculate_test_accuracy(model, test_dataloader, device, calculate_group_accuracies=False):
@@ -130,11 +130,11 @@ class ModelTrainer:
                     self.config.architecture, input_channels, output_channels
                 )
 
-            elif isinstance(self.config.architecture, VAEConfig):
+            '''elif isinstance(self.config.architecture, VAEConfig):
                 self.model = VAE(self.config.architecture, input_channels)
 
             elif hasattr(self.config.architecture, "n_flow"):
-                self.model = Glow(self.config)
+                self.model = Glow(self.config)'''
 
 
         else:

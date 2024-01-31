@@ -42,8 +42,8 @@ from peal.adaptors.adaptor_utils import integrate_data_config_into_adaptor_confi
 from peal.training.training_utils import (
     calculate_validation_statistics,
 )
-from peal.configs.adaptors.adaptor_template import AdaptorConfig
-from peal.configs.models.model_template import TaskConfig
+from peal.configs.adaptors.adaptor_config import AdaptorConfig
+from peal.configs.models.model_config import TaskConfig
 
 
 class CounterfactualKnowledgeDistillation:
@@ -305,9 +305,7 @@ class CounterfactualKnowledgeDistillation:
             )
 
             for i in range(1, self.adaptor_config.current_iteration + 1):
-                dataset_dir = os.path.join(
-                    self.base_dir, str(i), "train_dataset"
-                )
+                dataset_dir = os.path.join(self.base_dir, str(i), "train_dataset")
                 # TODO how to recover mixing_ratio?
                 self.dataloader_mixer = self.add_dataset_to_dataloader_mixer(
                     dataloader_old=self.dataloader_mixer,
@@ -315,7 +313,10 @@ class CounterfactualKnowledgeDistillation:
                     mixing_ratio=0.5,
                 )
 
-            self.student = torch.load(os.path.join(self.adaptor_config.base_dir, 'model.cpl'), map_location=self.device)
+            self.student = torch.load(
+                os.path.join(self.adaptor_config.base_dir, "model.cpl"),
+                map_location=self.device,
+            )
 
         return validation_stats, writer
 
@@ -679,16 +680,17 @@ class CounterfactualKnowledgeDistillation:
         )
         return dataset_dir
 
-    def add_dataset_to_dataloader_mixer(self, dataloader_old, dataset_path, mixing_ratio):
+    def add_dataset_to_dataloader_mixer(
+        self, dataloader_old, dataset_path, mixing_ratio
+    ):
         #
         dataloader, _, _ = create_dataloaders_from_datasource(
             config=self.data_config,
             datasource=dataset_path,
         )
         dataloader = DataloaderMixer(dataloader_old.config, dataloader)
-        dataloader.append(dataloader_old, mixing_ratio=1-mixing_ratio)
+        dataloader.append(dataloader_old, mixing_ratio=1 - mixing_ratio)
         return dataloader
-
 
     def finetune_student(self, finetune_iteration, dataset_path, writer):
         if not os.path.exists(
@@ -899,7 +901,22 @@ class CounterfactualKnowledgeDistillation:
             x_list_collection = []
             x_counterfactual_collection = []
             y_confidence_list = []
+            original_explainer_config = copy.deepcopy(self.explainer.explainer_config)
             for i in range(self.adaptor_config.validation_runs):
+                self.explainer.explainer_config = copy.deepcopy(
+                    original_explainer_config
+                )
+                for attribute in self.explainer.explainer_config.__dict__.items():
+                    if isinstance(attribute[1], list) and len(attribute[1]) == 2:
+                        setattr(
+                            self.explainer.explainer_config,
+                            attribute[0],
+                            attribute[1][0]
+                            + i
+                            / (self.adaptor_config.validation_runs - 1)
+                            * (attribute[1][1] - attribute[1][0]),
+                        )
+
                 (
                     validation_tracked_values,
                     validation_stats,
@@ -908,7 +925,9 @@ class CounterfactualKnowledgeDistillation:
                     dataloader=self.dataloaders_val[0],
                     tracked_keys=self.tracked_keys,
                     base_path=os.path.join(
-                        self.base_dir, str(finetune_iteration), "validation_collages" + str(i)
+                        self.base_dir,
+                        str(finetune_iteration),
+                        "validation_collages" + str(i),
                     ),
                     output_size=self.output_size,
                     explainer=self.explainer,
@@ -926,7 +945,9 @@ class CounterfactualKnowledgeDistillation:
                     validation_tracked_values["y_target_end_confidence_list"]
                 )
 
+            self.explainer.explainer_config = original_explainer_config
             self.datastack.dataset._initialize_performance_metrics()
+            assert isinstance(validation_stats, dict)
             validation_stats[
                 "distance_to_manifold"
             ] = self.datastack.dataset.distribution_distance(

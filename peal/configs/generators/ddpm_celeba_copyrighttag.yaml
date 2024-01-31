@@ -1,0 +1,5 @@
+generator_type : DDPM
+category : generator
+base_path : /home/space/datasets/peal/peal_runs/ddpm_CopyrightTag_celeba_1000
+data: <PEAL_BASE>/configs/data/copyrighttag_celeba.yaml
+image_size: 128

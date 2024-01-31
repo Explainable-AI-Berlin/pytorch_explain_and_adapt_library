@@ -8,7 +8,7 @@ from peal.global_utils import load_yaml_config
 from peal.generators.interfaces import InvertibleGenerator, EditCapableGenerator
 from peal.data.dataset_interfaces import PealDataset
 from peal.explainers.explainer_interface import ExplainerInterface
-from peal.configs.explainers.explainer_template import ExplainerConfig
+from peal.configs.explainers.explainer_config import ExplainerConfig
 
 
 class CounterfactualExplainer(ExplainerInterface):
@@ -231,6 +231,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 target_classes=torch.tensor(batch["y_target_list"]),
                 source_classes=torch.tensor(batch["y_source_list"]),
                 classifier=self.downstream_model,
+                explainer_config=self.explainer_config,
                 pbar=pbar,
                 mode=mode,
             )

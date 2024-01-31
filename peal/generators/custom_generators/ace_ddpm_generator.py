@@ -23,7 +23,7 @@ from peal.dependencies.ace.guided_diffusion.script_util import (
 )
 from peal.dependencies.ace.guided_diffusion.train_util import TrainLoop
 from peal.data.dataloaders import get_dataloader
-from peal.configs.explainers.explainer_template import ACEConfig
+from peal.configs.explainers.ace_config import ACEConfig
 
 
 def load_state_dict(path, **kwargs):
@@ -49,10 +49,11 @@ def load_state_dict(path, **kwargs):
     return torch.load(io.BytesIO(data), **kwargs)
 
 
-class AceDDPMAdaptorAligned(EditCapableGenerator):
+class DDPM(EditCapableGenerator):
     def __init__(self, config, dataset=None, model_dir=None, device="cpu"):
         super().__init__()
         self.config = load_yaml_config(config)
+        #self.config.image_size = self.config.data.input_size[1]
         self.classifier_dataset = dataset
 
         if not model_dir is None:
@@ -150,7 +151,7 @@ class AceDDPMAdaptorAligned(EditCapableGenerator):
         args.output_path = self.counterfactual_path
         args.batch_size = x_in.shape[0]
         #
-        args.attack_iterations = (
+        args.attack_iterations = int(
             explainer_config.attack_iterations
             if not isinstance(args.attack_iterations, list)
             else random.randint(
@@ -158,7 +159,7 @@ class AceDDPMAdaptorAligned(EditCapableGenerator):
                 explainer_config.attack_iterations[1],
             )
         )
-        args.sampling_time_fraction = (
+        args.sampling_time_fraction = float(
             explainer_config.sampling_time_fraction
             if not isinstance(args.sampling_time_fraction, list)
             else random.uniform(
@@ -166,7 +167,7 @@ class AceDDPMAdaptorAligned(EditCapableGenerator):
                 explainer_config.sampling_time_fraction[1],
             )
         )
-        args.sampling_time_fraction = (
+        args.sampling_time_fraction = float(
             explainer_config.dist_l1
             if not isinstance(args.dist_l1, list)
             else random.uniform(
@@ -174,7 +175,7 @@ class AceDDPMAdaptorAligned(EditCapableGenerator):
                 explainer_config.dist_l1[1],
             )
         )
-        args.dist_l2 = (
+        args.dist_l2 = float(
             explainer_config.dist_l2
             if not isinstance(args.dist_l2, list)
             else random.uniform(
@@ -182,7 +183,7 @@ class AceDDPMAdaptorAligned(EditCapableGenerator):
                 explainer_config.dist_l2[1],
             )
         )
-        args.sampling_inpaint = (
+        args.sampling_inpaint = float(
             explainer_config.sampling_inpaint
             if not isinstance(args.sampling_inpaint, list)
             else random.uniform(
@@ -190,7 +191,7 @@ class AceDDPMAdaptorAligned(EditCapableGenerator):
                 explainer_config.sampling_inpaint[1],
             )
         )
-        args.sampling_dilation = (
+        args.sampling_dilation = float(
             explainer_config.sampling_dilation
             if not isinstance(args.sampling_dilation, list)
             else random.uniform(
@@ -206,6 +207,7 @@ class AceDDPMAdaptorAligned(EditCapableGenerator):
                 explainer_config.timestep_respacing[1],
             )
         )
+        args.__dict__.update({k: v for k, v in explainer_config.__dict__.items() if k not in args.__dict__})
         #
         x_counterfactuals = ace_main(args=args)
         x_counterfactuals = torch.cat(x_counterfactuals, dim=0)

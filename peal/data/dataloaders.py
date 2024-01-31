@@ -8,7 +8,7 @@ torch.multiprocessing.set_sharing_strategy("file_system")
 
 from peal.data.dataset_factory import get_datasets
 from peal.data.dataset_wrappers import VAEDatasetWrapper
-from peal.configs.generators.generator_template import VAEConfig
+#from peal.configs.generators.generator_config import VAEConfig
 
 
 class DataStack:
@@ -316,6 +316,7 @@ def create_dataloaders_from_datasource(
             print("datasource is not a valid input!")
             quit()
 
+        """
         if hasattr(config, "architecture") and isinstance(
             config.architecture, VAEConfig
         ):
@@ -323,7 +324,6 @@ def create_dataloaders_from_datasource(
             dataset_val = VAEDatasetWrapper(dataset_val)
             dataset_test = VAEDatasetWrapper(dataset_test)
 
-        """
         # TODO reintegrate normalizing flows
         if "n_bits" in config.architecture.keys():
             dataset_train = GlowDatasetWrapper(

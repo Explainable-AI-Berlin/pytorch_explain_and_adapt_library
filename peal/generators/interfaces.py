@@ -3,7 +3,7 @@ import torch
 from torch import nn
 from typing import Tuple
 
-from peal.configs.explainers.explainer_template import ExplainerConfig
+from peal.configs.explainers.explainer_config import ExplainerConfig
 
 
 class Generator(nn.Module):

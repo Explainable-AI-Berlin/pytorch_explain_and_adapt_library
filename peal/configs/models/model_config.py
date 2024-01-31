@@ -4,10 +4,9 @@ import os
 from pydantic import BaseModel, PositiveInt
 from typing import Union
 
-from peal.configs.data.data_template import DataConfig
+from peal.configs.data.data_config import DataConfig
 from peal.configs.training.training_template import TrainingConfig
 from peal.configs.architectures.architecture_template import ArchitectureConfig
-from peal.configs.generators.generator_template import VAEConfig
 
 
 class TaskConfig:
@@ -17,19 +16,19 @@ class TaskConfig:
     Like this the loss function can be post_hoc attached without changing the code.
     """
 
-    criterions: dict
+    criterions: dict = {'ce' : 1.0, 'l1' : 10000.0, 'l2' : 1.0}
     """
     The output_type that either can just be the output_type of the dataset or could be some
     possible subtype.
     E.g. when having a binary multiclass dataset one could use as task binary single class
     classification for one of the output variables.
     """
-    output_type: str = None
+    output_type: str = "singleclass"
     """
     The output_channels that can be at most the output_channels of the dataset, but if a subtask is chosen
     the output_channels has also be adapted accordingly
     """
-    output_channels: PositiveInt = None
+    output_channels: PositiveInt = 2
     """
     Gives the option to select a subset of the input variables. Only works for symbolic data.
     """
@@ -51,18 +50,18 @@ class TaskConfig:
 
     def __init__(
         self,
-        criterions: dict,
+        criterions: dict = None,
         output_type: str = None,
         output_channels: PositiveInt = None,
         x_selection: list[str] = None,
         y_selection: list[str] = None,
         **kwargs
     ):
-        self.criterions = criterions
-        self.output_type = output_type
-        self.output_channels = output_channels
-        self.x_selection = x_selection
-        self.y_selection = y_selection
+        self.criterions = criterions if criterions is not None else self.criterions
+        self.output_type = output_type if output_type is not None else self.output_type
+        self.output_channels = output_channels if output_channels is not None else self.output_channels
+        self.x_selection = x_selection if x_selection is not None else self.x_selection
+        self.y_selection = y_selection if y_selection is not None else self.y_selection
         self.kwargs = kwargs
 
 
@@ -74,7 +73,7 @@ class ModelConfig:
     """
     The config of the architecture of the model.
     """
-    architecture: Union[ArchitectureConfig, VAEConfig, types.SimpleNamespace]
+    architecture: Union[ArchitectureConfig, types.SimpleNamespace]
     """
     The config of the training of the model.
     """
@@ -114,7 +113,7 @@ class ModelConfig:
 
     def __init__(
         self,
-        architecture: Union[dict, ArchitectureConfig, VAEConfig],
+        architecture: Union[dict, ArchitectureConfig],
         training: Union[dict, TrainingConfig],
         task: Union[dict, TaskConfig],
         data: Union[dict, DataConfig] = None,
@@ -124,16 +123,11 @@ class ModelConfig:
         **kwargs
     ):
         self.model_type = model_type
-        if isinstance(architecture, ArchitectureConfig) or isinstance(
-            architecture, VAEConfig
-        ):
+        if isinstance(architecture, ArchitectureConfig):
             self.architecture = architecture
 
         if model_type == "discriminator":
             self.architecture = ArchitectureConfig(**architecture)
-
-        elif "encoder" in architecture.keys():
-            self.architecture = VAEConfig(**architecture)
 
         else:
             self.architecture = types.SimpleNamespace(**architecture)

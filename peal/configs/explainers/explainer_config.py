@@ -1,33 +1,23 @@
-from pydantic import BaseModel, PositiveInt
-from typing import Union
+from pydantic import BaseModel
 
 
-class ExplainerConfig:
+class ExplainerConfig(BaseModel):
+    """
+    This class defines the config of a ExplainerConfig.
+    """
     """
     The type of explanation that shall be used.
     Options: ['counterfactual', 'lrp']
     """
-    explanation_type: str
+    explainer_type: str
+    """
+    The category of the config.
+    """
+    category: str = 'explainer'
 
-class ACEConfig(ExplainerConfig):
-    """
-    This class defines the config of a ACEConfig.
-    """
 
-    """
-    The type of explanation that shall be used.
-    Options: ['counterfactual', 'lrp']
-    """
-    explanation_type: str = "DiffeoCFConfig"
-    attack_iterations: Union[list, int]
-    sampling_time_fraction: Union[list, float]
-    dist_l1: Union[list, float]
-    dist_l2: Union[list, float]
-    sampling_inpaint: Union[list, float]
-    sampling_dilation: Union[list, float]
-    timestep_respacing: Union[list, int]
 
-class DiffeoCFConfig(ExplainerConfig):
+'''class DiffeoCFConfig(ExplainerConfig):
     """
     This class defines the config of a DiffeoCF.
     """
@@ -84,4 +74,4 @@ class DiffeoCFConfig(ExplainerConfig):
     """
     The name of the class.
     """
-    __name__: str = "peal.ExplainerConfig"
+    __name__: str = "peal.ExplainerConfig"'''

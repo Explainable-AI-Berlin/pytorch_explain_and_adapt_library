@@ -15,7 +15,6 @@ from peal.global_utils import (
     get_project_resource_dir,
 )
 from peal.training.trainers import ModelTrainer
-from peal.configs.models.model_template import ModelConfig
 
 
 def get_generator(
@@ -49,7 +48,7 @@ def get_generator(
         isinstance(generator, InvertibleGenerator)
         or isinstance(generator, EditCapableGenerator)
     ):
-        generator_config = load_yaml_config(generator, ModelConfig)
+        generator_config = load_yaml_config(generator)
         generator_config.batch_size = train_dataloader.batch_size
         generator_class_list = find_subclasses(
             Generator,
@@ -66,7 +65,7 @@ def get_generator(
                 device=device,
             )
 
-        elif hasattr(generator_config.architecture, "n_flow"):
+        """elif hasattr(generator_config.architecture, "n_flow"):
             # TODO this should be moved into the glow class
             #generator_config.data = data_config
             if os.path.exists(os.path.join(generator_config.base_path, "model.cpl")):
@@ -87,7 +86,7 @@ def get_generator(
                     gigabyte_vram=gigabyte_vram,
                 )
                 print("Train generator model!")
-                generator_trainer.fit()
+                generator_trainer.fit()"""
 
     else:
         generator_out = generator

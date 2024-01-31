@@ -1,44 +1,49 @@
 from pydantic import BaseModel, PositiveInt
 from typing import Union
 
-from peal.configs.data.data_template import DataConfig
+from peal.configs.data.data_config import DataConfig
 from peal.configs.training.training_template import TrainingConfig
-from peal.configs.architectures.architecture_template import ArchitectureConfig
-from peal.configs.models.model_template import TaskConfig
-from peal.configs.explainers.explainer_template import ExplainerConfig
+from peal.configs.models.model_config import TaskConfig
+from peal.configs.explainers.explainer_config import ExplainerConfig
+from peal.configs.explainers.ace_config import ACEConfig
+from peal.configs.adaptors.adaptor_config import AdaptorConfig
+from peal.global_utils import get_config_model
 
+class CFKDConfig(AdaptorConfig):
+    """
+    The config template for an running the CFKD adaptor.
+    """
 
-class AdaptorConfig:
     """
     The config template for an adaptor.
     """
-
+    adaptor_type: str = "CFKD"
     """
     The minimum number of samples used for finetuning in every iteration.
     The actual number could be higher since not for every sample a counterfactual can be found
     and processing is done in batches.
     """
-    min_train_samples: PositiveInt
+    min_train_samples: PositiveInt = 500
     """
     The maximum number of validation samples that are used for tracking stats every iteration.
     """
-    max_validation_samples: PositiveInt
+    max_validation_samples: PositiveInt = 100
     """
     The number of finetune iterations when executing the adaptor.
     """
-    finetune_iterations: PositiveInt
+    finetune_iterations: PositiveInt = 2
     """
     The config of the task the student model shall solve.
     """
-    task: TaskConfig
+    task: TaskConfig = TaskConfig()
     """
     The config of the counterfactual explainer that is used.
     """
-    explainer: ExplainerConfig
+    explainer: ExplainerConfig = ACEConfig()
     """
     The config of the trainer used for finetuning the student model.
     """
-    training: TrainingConfig
+    training: TrainingConfig = TrainingConfig()
     """
     The config of the data used to create the counterfactuals from.
     """
@@ -139,9 +144,9 @@ class AdaptorConfig:
 
     def __init__(
         self,
-        training: Union[dict, TrainingConfig],
-        task: Union[dict, TaskConfig],
-        explainer: Union[dict, ExplainerConfig],
+        training: Union[dict, TrainingConfig] = None,
+        task: Union[dict, TaskConfig] = None,
+        explainer: Union[dict, ExplainerConfig] = None,
         data: Union[dict, DataConfig] = None,
         test_data: Union[dict, DataConfig] = None,
         student: str = None,
@@ -153,12 +158,12 @@ class AdaptorConfig:
         calculate_group_accuracies: bool = None,
         gigabyte_vram: float = None,
         assumed_input_size: list[PositiveInt] = None,
-        replace_model: bool = True,
-        continuous_learning: bool = False,
+        replace_model: bool = None,
+        continuous_learning: bool = None,
         attribution_threshold: float = None,
-        min_start_target_percentile: float = 0.0,
-        use_confusion_matrix: bool = False,
-        replacement_strategy: str = "delayed",
+        min_start_target_percentile: float = None,
+        use_confusion_matrix: bool = None,
+        replacement_strategy: str = None,
         min_train_samples: PositiveInt = None,
         max_validation_samples: PositiveInt = None,
         finetune_iterations: PositiveInt = None,
@@ -198,12 +203,16 @@ class AdaptorConfig:
             use_visualization: Whether to visualize the results.
             **kwargs: A dict containing all variables that could not be given with the current config structure
         """
-        self.training = (
-            training
-            if isinstance(training, TrainingConfig)
-            else TrainingConfig(**training)
-        )
-        self.task = task if isinstance(task, TaskConfig) else TaskConfig(**task)
+        if not training is None:
+            self.training = (
+                training
+                if isinstance(training, TrainingConfig)
+                else TrainingConfig(**training)
+            )
+
+        if not task is None:
+            self.task = task if isinstance(task, TaskConfig) else TaskConfig(**task)
+
         if not data is None:
             if isinstance(data, DataConfig):
                 self.data = data
@@ -222,7 +231,8 @@ class AdaptorConfig:
             self.explainer = explainer
 
         else:
-            self.explainer = ExplainerConfig(**explainer)
+            explainer_config_model = get_config_model(explainer)
+            self.explainer = explainer_config_model(**explainer)
 
         self.student = student if not student is None else self.student
         self.teacher = teacher if not teacher is None else self.teacher

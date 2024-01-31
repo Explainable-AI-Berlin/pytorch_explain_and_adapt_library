@@ -20,8 +20,8 @@ from peal.data.datasets import (
     SymbolicDataset,
 )
 from peal.data.dataset_interfaces import PealDataset
-from peal.configs.data.data_template import DataConfig
-from peal.configs.models.model_template import TaskConfig
+from peal.configs.data.data_config import DataConfig
+from peal.configs.models.model_config import TaskConfig
 from peal.global_utils import find_subclasses
 
 

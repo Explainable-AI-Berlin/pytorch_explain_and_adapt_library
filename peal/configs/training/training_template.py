@@ -6,7 +6,10 @@ class TrainingConfig(BaseModel):
     The maxmimum number of epochs that the model is trained.
     """
 
-    max_epochs: PositiveInt
+    """
+    The learning rate the model is trained with.
+    """
+    max_epochs: PositiveInt = 15
     """
     The learning rate the model is trained with.
     """
@@ -23,10 +26,6 @@ class TrainingConfig(BaseModel):
     The current epoch of the model training.
     """
     epoch: int = -1
-    """
-    A dict containing all variables that could not be given with the current config structure
-    """
-    kwargs: dict = {}
     """
     The optimizer used for training the model.
     """
@@ -49,3 +48,7 @@ class TrainingConfig(BaseModel):
     dataset_size / batch_size
     """
     steps_per_epoch: PositiveInt = None
+    """
+    A dict containing all variables that could not be given with the current config structure
+    """
+    kwargs: dict = {}

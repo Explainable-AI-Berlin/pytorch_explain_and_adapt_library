@@ -11,6 +11,7 @@ import torchvision
 import inspect
 import pkgutil
 import importlib
+import importlib.util
 
 from pkg_resources import resource_filename
 
@@ -21,7 +22,6 @@ def find_subclasses(base_class, directory):
     def check_module(module_name):
         try:
             module = importlib.import_module(module_name)
-            name_obj_list = [(name, obj) for name, obj in inspect.getmembers(module)]
             for name, obj in inspect.getmembers(module):
                 if inspect.isclass(obj) and issubclass(obj, base_class):
                     subclasses.append(obj)
@@ -194,19 +194,59 @@ def _load_yaml_config(config_path):
     else:
         raise Exception(config_path + " has no valid ending!")
 
+def get_config_model(config_data):
+    config_class_str = config_data[config_data["category"] + "_type"] + "Config"
+
+    superclass_dir = os.path.join(
+        get_project_resource_dir(),
+        "configs",
+        config_data["category"] + "s",
+    )
+    module_path = os.path.join("peal", "configs", config_data["category"] + "s", config_data["category"] + "_config")
+    module_name = module_path.replace("/", ".")
+    module = importlib.import_module(module_name)
+    superclass = None
+    for name, obj in inspect.getmembers(module):
+        if inspect.isclass(obj):
+            superclass = obj
+
+    class_list = find_subclasses(
+        superclass,
+        superclass_dir,
+    )
+    class_dict = {
+        generator_class.__name__: generator_class for generator_class in class_list
+    }
+    try:
+        config_model = class_dict[config_class_str]
+
+    except Exception as e:
+        import pdb; pdb.set_trace()
+
+    return config_model
 
 def load_yaml_config(config_path, config_model=None):
     config_data = _load_yaml_config(config_path)
+    if (
+        config_model is None
+        and isinstance(config_data, dict)
+        and "category" in config_data.keys()
+        and config_data["category"] + "_type" in config_data.keys()
+    ):
+        config_model = get_config_model(config_data)
+
     if config_model is None and isinstance(config_data, dict):
         return types.SimpleNamespace(**config_data)
 
     elif isinstance(config_data, dict):
+        """
         # TODO this is very very bad style!
         try:
             return config_model(**config_data)
-
         except Exception:
             return types.SimpleNamespace(**config_data)
+        """
+        return config_model(**config_data)
 
     else:
         return config_data

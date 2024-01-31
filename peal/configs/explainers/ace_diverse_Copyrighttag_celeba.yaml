@@ -1,3 +1,5 @@
+'explainer_type' : 'ACE'
+'category' : 'explainer'
 'attack_iterations' : [30,70]
 'sampling_time_fraction' : [0.2,0.4]
 'dist_l1' : 0.00000001

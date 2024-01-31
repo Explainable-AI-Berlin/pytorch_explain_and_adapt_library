@@ -20,7 +20,7 @@ from peal.dependencies.ace.guided_diffusion.train_util import TrainLoop
 from peal.data.dataset_factory import get_datasets
 from peal.data.dataloaders import get_dataloader
 from peal.global_utils import load_yaml_config
-from peal.configs.data.data_template import DataConfig
+from peal.configs.data.data_config import DataConfig
 
 
 def main():

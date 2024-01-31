@@ -5,25 +5,28 @@ from typing import Union
 
 class DataConfig(BaseModel):
     """
+    This class defines the config of a dataset.
+    """
+
+    """
     The input type of the data:
     Options: ['image', 'sequence', 'symbolic']
     """
-
-    input_type: str  # TODO give options?
+    input_type: str = 'image'
     """
     The output type of the data.
     Options: ['singleclass', 'multiclass', 'continuous', 'mixed']
     'mixed' is a hybrid between binary multiclass classification and continuous and
     requires 'output_split' to be set
     """
-    output_type: str
+    output_type: str = 'singleclass'
     """
     The input size of data.
     For images: [Channels, Height, Width]
     For sequences: [MaxLength, NumTokens]
     For symbolic: [NumVariables]
     """
-    input_size: list[PositiveInt]
+    input_size: list[PositiveInt] = [3, 128, 128]
     """
     The output size of the model.
     For singleclass: [NumClasses]
@@ -31,7 +34,7 @@ class DataConfig(BaseModel):
     For continuous: [NumVariables]
     For mixed: [NumBinaryClasses + NumVariables]
     """
-    output_size: list[PositiveInt]
+    output_size: list[PositiveInt] = 2
     """
     The path to the dataset.
     """
@@ -117,7 +120,3 @@ class DataConfig(BaseModel):
     The path of the original dataset.
     """
     dataset_origin_path: Union[type(None), str] = None
-    """
-    The name of the class.
-    """
-    __name__: str = "peal.DataConfig"
