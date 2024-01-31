@@ -19,12 +19,12 @@ class ACEConfig(ExplainerConfig):
     dist_l1: Union[list, float] = 0.00000001
     dist_l2: Union[list, float] = 0.0
     sampling_inpaint: Union[list, float] = [0.3, 0.1]
-    sampling_dilation: Union[list, float] = 17
+    sampling_dilation: Union[list, int] = 17
     timestep_respacing: Union[list, int] = 50
     clip_denoised: bool = True  # Clipping noise
     batch_size: int = 16  # Batch size
     gpu: str = "0"  # GPU index, should only be 1 gpu
-    save_images: bool = True  # Saving all images
+    save_images: bool = False  # Saving all images
     num_samples: int = 500000000000  # useful to sample few examples
     # setting this to true will slow the computation time but will have identic results
     # hwhen using the checkpoint backwards
@@ -59,3 +59,4 @@ class ACEConfig(ExplainerConfig):
     chunks: int = 1  # Chunking for spliting the CE generation into multiple gpus
     chunk: int = 0  # current chunk (between 0 and chunks - 1)
     merge_chunks: bool = False  # to merge all chunked results
+    y_target_goal_confidence: float = 0.5  # to merge all chunked results
