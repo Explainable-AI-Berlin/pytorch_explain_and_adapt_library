@@ -142,11 +142,6 @@ class CounterfactualKnowledgeDistillation:
             generator=generator
             if not generator is None
             else self.adaptor_config.generator,
-            data_config=self.adaptor_config.data,
-            train_dataloader=self.train_dataloader,
-            dataloaders_val=self.dataloaders_val,
-            base_dir=base_dir,
-            gigabyte_vram=gigabyte_vram,
             device=self.device,
         ).to(self.device)
 
@@ -694,6 +689,7 @@ class CounterfactualKnowledgeDistillation:
         )
         dataloader = DataloaderMixer(self.adaptor_config.training, dataloader)
         dataloader.append(dataloader_old, mixing_ratio=1 - mixing_ratio)
+        dataloader.return_src = True
         return dataloader
 
     def finetune_student(self, finetune_iteration, dataset_path, writer):
@@ -835,6 +831,17 @@ class CounterfactualKnowledgeDistillation:
             "cfkd": torch.tensor([0, 0, 0, 1, 1, 1]),
         }
         # TODO introduce column for teacher
+        explainer_config = copy.deepcopy(
+            self.explainer.explainer_config
+        )
+        for attribute in self.explainer.explainer_config.__dict__.items():
+            if isinstance(attribute[1], list) and len(attribute[1]) == 2:
+                setattr(
+                    explainer_config,
+                    attribute[0],
+                    0.5 * (attribute[1][1] + attribute[1][0]),
+                )
+
         img_success = create_comparison(
             dataset=self.test_dataloader.dataset,
             criterions=criterions,
@@ -849,7 +856,7 @@ class CounterfactualKnowledgeDistillation:
             score_reference_idx=1,
             generator=self.generator,
             device=self.device,
-            explainer_config=self.adaptor_config.explainer,
+            explainer_config=explainer_config,
             checkbox_dict_in=checkbox_dict,
             batch_size=self.adaptor_config.batch_size,
         )
@@ -907,6 +914,8 @@ class CounterfactualKnowledgeDistillation:
             x_counterfactual_collection = []
             y_confidence_list = []
             original_explainer_config = copy.deepcopy(self.explainer.explainer_config)
+            validation_tracked_values = None
+            validation_stats = []
             for i in range(self.adaptor_config.validation_runs):
                 self.explainer.explainer_config = copy.deepcopy(
                     original_explainer_config
@@ -923,8 +932,8 @@ class CounterfactualKnowledgeDistillation:
                         )
 
                 (
-                    validation_tracked_values,
-                    validation_stats,
+                    validation_tracked_values_current,
+                    validation_stats_current,
                 ) = calculate_validation_statistics(
                     model=self.student,
                     dataloader=self.dataloaders_val[0],
@@ -942,14 +951,39 @@ class CounterfactualKnowledgeDistillation:
                     max_validation_samples=self.adaptor_config.max_validation_samples,
                     min_start_target_percentile=self.adaptor_config.min_start_target_percentile,
                 )
-                x_list_collection.append(validation_tracked_values["x_list"])
+                x_list_collection.append(
+                    copy.deepcopy(validation_tracked_values_current["x_list"])
+                )
                 x_counterfactual_collection.append(
-                    validation_tracked_values["x_counterfactual_list"]
+                    copy.deepcopy(validation_tracked_values_current["x_counterfactual_list"])
                 )
                 y_confidence_list.append(
-                    validation_tracked_values["y_target_end_confidence_list"]
+                    copy.deepcopy(validation_tracked_values_current[
+                        "y_target_end_confidence_list"
+                    ])
                 )
+                validation_stats.append(validation_stats_current)
+                if validation_tracked_values is None:
+                    validation_tracked_values = validation_tracked_values_current
 
+                else:
+                    for key in validation_tracked_values.keys():
+                        validation_tracked_values[key].extend(
+                            validation_tracked_values_current[key]
+                        )
+
+            validation_stats = {
+                key: torch.mean(
+                    torch.stack(
+                        [
+                            torch.tensor(validation_stats_current[key])
+                            for validation_stats_current in validation_stats
+                        ]
+                    ),
+                    dim=0,
+                )
+                for key in validation_stats[0].keys()
+            }
             self.explainer.explainer_config = original_explainer_config
             self.datastack.dataset._initialize_performance_metrics()
             assert isinstance(validation_stats, dict)

@@ -49,6 +49,7 @@ class DDPMConfig(GeneratorConfig):
     ema_rate: str = "0.9999"  # comma-separated list of EMA values
     log_interval: int = 10
     save_interval: int = 10000
+    max_steps: int = 100000
     resume_checkpoint: str = ""
     fp16_scale_growth: float = 1e-3
     output_path: str = "peal_runs/ddpm/outputs"

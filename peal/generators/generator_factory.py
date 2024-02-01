@@ -19,12 +19,7 @@ from peal.training.trainers import ModelTrainer
 
 def get_generator(
     generator: Union[InvertibleGenerator, str, dict],
-    data_config: Union[str, dict],
-    train_dataloader: torch.utils.data.DataLoader,
-    dataloaders_val: torch.utils.data.DataLoader,
-    base_dir: str,
-    gigabyte_vram: float,
-    device: Union[str, torch.device],
+    device: Union[str, torch.device] = "cuda",
 ) -> InvertibleGenerator:
     """
     This function returns a generator.
@@ -32,7 +27,7 @@ def get_generator(
     Args:
         generator (Union[InvertibleGenerator, str, dict]): The generator to use.
         data_config (Union[str, dict]): The data config.
-        train_dataloader (torch.utils.data.DataLoader): The train dataloader.
+        classifier_train_dataloader (torch.utils.data.DataLoader): The train dataloader of the classifier.
         dataloaders_val (torch.utils.data.DataLoader): The validation dataloader.
         base_dir (str): The base directory.
         gigabyte_vram (float): The amount of VRAM to use.
@@ -49,7 +44,6 @@ def get_generator(
         or isinstance(generator, EditCapableGenerator)
     ):
         generator_config = load_yaml_config(generator)
-        generator_config.batch_size = train_dataloader.batch_size
         generator_class_list = find_subclasses(
             Generator,
             os.path.join(get_project_resource_dir(), "generators", "custom_generators"),
@@ -61,7 +55,6 @@ def get_generator(
         if hasattr(generator_config, "generator_type") and generator_config.generator_type in generator_class_dict.keys():
             generator_out = generator_class_dict[generator_config.generator_type](
                 config=generator_config,
-                dataset=train_dataloader.dataset,
                 device=device,
             )
 

@@ -1,9 +1,9 @@
 'explainer_type' : 'ACE'
 'category' : 'explainer'
-'attack_iterations' : [30,70]
-'sampling_time_fraction' : [0.2,0.4]
+'attack_iterations' : 50 #[30,70]
+'sampling_time_fraction' : 0.3 #[0.2,0.4]
 'dist_l1' : 0.00000001
 'dist_l2' : 0.0
-'sampling_inpaint' : [0.3, 0.1]
+'sampling_inpaint' : 0.2 #[0.3, 0.1]
 'sampling_dilation' : 17
 'timestep_respacing' : 50

@@ -24,6 +24,7 @@ from peal.dependencies.ace.guided_diffusion.script_util import (
 )
 from peal.dependencies.ace.guided_diffusion.train_util import TrainLoop
 from peal.data.dataloaders import get_dataloader
+from peal.data.dataset_factory import get_datasets
 from peal.configs.explainers.ace_config import ACEConfig
 
 
@@ -51,11 +52,9 @@ def load_state_dict(path, **kwargs):
 
 
 class DDPM(EditCapableGenerator):
-    def __init__(self, config, dataset=None, model_dir=None, device="cpu"):
+    def __init__(self, config, model_dir=None, device="cpu"):
         super().__init__()
         self.config = load_yaml_config(config)
-        #self.config.image_size = self.config.data.input_size[1]
-        self.classifier_dataset = dataset
 
         if not model_dir is None:
             self.model_dir = model_dir
@@ -74,23 +73,22 @@ class DDPM(EditCapableGenerator):
 
     def sample_x(self, batch_size=1):
         return self.diffusion.p_sample_loop(
-            self.model, [batch_size] + self.classifier_dataset.config.input_size
+            self.model, [batch_size] + self.config.data.input_size
         )
 
     def train_model(
         self,
-        dataset_train,
-        training_config="<PEAL_BASE>/configs/training/train_ddpm.yaml",
+        dataset_train = None,
     ):
-        training_config = load_yaml_config(training_config)
-        args = types.SimpleNamespace(**training_config)
         shutil.rmtree(self.model_dir, ignore_errors=True)
+        if dataset_train is None:
+            dataset_train = get_datasets(self.config.data)[0]
 
-        dist_util.setup_dist(args.gpus)
+        dist_util.setup_dist(self.config.gpus)
         logger.configure(dir=self.model_dir)
 
         schedule_sampler = create_named_schedule_sampler(
-            args.schedule_sampler, self.diffusion
+            self.config.schedule_sampler, self.diffusion
         )
 
         logger.log("creating data loader...")
@@ -98,8 +96,8 @@ class DDPM(EditCapableGenerator):
             get_dataloader(
                 dataset_train,
                 mode="train",
-                batch_size=args.batch_size,
-                training_config={"steps_per_epoch": training_config.max_steps},
+                batch_size=self.config.batch_size,
+                training_config={"steps_per_epoch": self.config.max_steps},
             )
         )
 
@@ -108,18 +106,18 @@ class DDPM(EditCapableGenerator):
             model=self.model,
             diffusion=self.diffusion,
             data=data,
-            batch_size=args.batch_size,
-            microbatch=args.microbatch,
-            lr=args.lr,
-            ema_rate=args.ema_rate,
-            log_interval=args.log_interval,
-            save_interval=args.save_interval,
-            resume_checkpoint=args.resume_checkpoint,
-            use_fp16=args.use_fp16,
-            fp16_scale_growth=args.fp16_scale_growth,
+            batch_size=self.config.batch_size,
+            microbatch=self.config.microbatch,
+            lr=self.config.lr,
+            ema_rate=self.config.ema_rate,
+            log_interval=self.config.log_interval,
+            save_interval=self.config.save_interval,
+            resume_checkpoint=self.config.resume_checkpoint,
+            use_fp16=self.config.use_fp16,
+            fp16_scale_growth=self.config.fp16_scale_growth,
             schedule_sampler=schedule_sampler,
-            weight_decay=args.weight_decay,
-            lr_anneal_steps=args.lr_anneal_steps,
+            weight_decay=self.config.weight_decay,
+            lr_anneal_steps=self.config.lr_anneal_steps,
             model_dir=self.model_dir,
         ).run_loop()
 

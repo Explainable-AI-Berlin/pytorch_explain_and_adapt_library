@@ -1,10 +1,10 @@
-# python run_cfkd.py --adaptor_config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba_cfkd_ace_diverse.yaml"
+# python run_cfkd.py --adaptor_config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba_cfkd_ace_diverse_mask.yaml"
 'adaptor_type'                         :  "CFKD"
 'category'                             :  "adaptor"
-'batch_size'                           :  1 #5
-'min_train_samples'                    :  2 #500
+'batch_size'                           :  5
+'min_train_samples'                    :  500
 'finetune_iterations'                  :  3
-'max_validation_samples'               :  2 #100
+'max_validation_samples'               :  10 #100
 'continuous_learning'                  :  False
 'replace_model'                        :  True
 'use_visualization'                    :  False #True
@@ -13,10 +13,10 @@
 'training'                             :  '<PEAL_BASE>/configs/training/img_classifier.yaml'
 'data'                                 :  '<PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba_poisened.yaml'
 'test_data'                            :  '<PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba.yaml'
-'student'                              :  '/home/space/datasets/peal/peal_runs/Smiling_confounding_copyrighttag_celeba_classifier_poisened/model.cpl'
-'teacher'                              :  '/home/space/datasets/peal/peal_runs/Smiling_confounding_copyrighttag_celeba_classifier/model.cpl'
+'student'                              :  '/home/space/datasets/peal/peal_runs/Smiling_confounding_copyrighttag_celeba_classifier/model.cpl'
+'teacher'                              :  'SegmentationMask'
 'generator'                            :  '<PEAL_BASE>/configs/generators/ddpm_celeba_copyrighttag.yaml'
-'base_dir'                             :  '/home/space/datasets/peal/peal_runs/Smiling_confounding_copyrighttag_celeba_classifier_poisened/cfkd_ace_diverse'
+'base_dir'                             :  '/home/space/datasets/peal/peal_runs/Smiling_confounding_copyrighttag_celeba_classifier/cfkd_ace_diverse_mask'
 'task':
   'criterions':
     'ce'     : 1.0

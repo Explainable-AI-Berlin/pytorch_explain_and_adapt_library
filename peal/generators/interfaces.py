@@ -9,9 +9,17 @@ from peal.configs.explainers.explainer_config import ExplainerConfig
 class Generator(nn.Module):
     def sample_x(self, batch_size=1):
         """
-        This function samples a batch of data samples from the generator
+        This function samples a batch of data samples from the generator.
+        If not implemented, it will throw a NotImplementedError.
         """
-        pass
+        raise NotImplementedError
+
+    def train_model(self):
+        """
+        This function trains the generator.
+        If not implemented, it will throw a NotImplementedError.
+        """
+        raise NotImplementedError
 
 
 class InvertibleGenerator(Generator):
@@ -23,8 +31,9 @@ class InvertibleGenerator(Generator):
 
         Returns:
             A batch of latent vectors
+        If not implemented, it will throw a NotImplementedError.
         """
-        pass
+        raise NotImplementedError
 
     def decode(self, z):
         """
@@ -34,14 +43,16 @@ class InvertibleGenerator(Generator):
 
         Returns:
             A batch of data samples
+        If not implemented, it will throw a NotImplementedError.
         """
-        pass
+        raise NotImplementedError
 
     def sample_z(self, batch_size=1):
         """
         This function samples a batch of latent vectors from the prior
+        If not implemented, it will throw a NotImplementedError.
         """
-        pass
+        raise NotImplementedError
 
     def log_prob_z(self, z):
         """
@@ -51,8 +62,9 @@ class InvertibleGenerator(Generator):
 
         Returns:
             The log probability of the batch of latent vectors
+        If not implemented, it will throw a NotImplementedError.
         """
-        pass
+        raise NotImplementedError
 
     def sample_x(self, batch_size=1):
         """
@@ -104,5 +116,6 @@ class EditCapableGenerator(Generator):
             list[torch.Tensor]: List of the differences in latent codes. In the simplest case just x_in - x_counterfactual
             list[torch.Tensor]: List of the achieved target confidences of the counterfactuals
             list[torch.Tensor]: List of x_in. This is necessary since the counterfactuals might be in a different order
+        If not implemented, it will throw a NotImplementedError.
         """
-        pass
+        raise NotImplementedError
