@@ -784,6 +784,7 @@ class CounterfactualKnowledgeDistillation:
 
     def visualize_progress(self, paths):
         task_config_buffer = copy.deepcopy(self.test_dataloader.dataset.task_config)
+        # TODO use canonic explainer config!!
         criterions = {}
         if (
             isinstance(self.test_dataloader.dataset, Image2MixedDataset)

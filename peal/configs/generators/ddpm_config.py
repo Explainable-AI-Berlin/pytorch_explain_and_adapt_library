@@ -37,7 +37,7 @@ class DDPMConfig(GeneratorConfig):
     class_cond: bool = False
     use_checkpoint: bool = False
     use_scale_shift_norm: bool = True
-    resblock_updown: bool = False
+    resblock_updown: bool = True
     use_fp16: bool = False
     use_new_attention_order: bool = False
     schedule_sampler: str = "uniform"

@@ -9,6 +9,7 @@ import blobfile as bf
 
 from mpi4py import MPI
 from torch import nn
+from types import SimpleNamespace
 
 from peal.generators.interfaces import EditCapableGenerator
 from peal.global_utils import load_yaml_config
@@ -69,9 +70,7 @@ class DDPM(EditCapableGenerator):
         self.model.to(device)
         self.model_path = os.path.join(self.model_dir, "final.pt")
         if os.path.exists(self.model_path):
-            self.model.load_state_dict(
-                load_state_dict(self.model_path, map_location=device)
-            )
+            self.model.load_state_dict(load_state_dict(self.model_path, map_location=device))
 
     def sample_x(self, batch_size=1):
         return self.diffusion.p_sample_loop(
@@ -142,7 +141,8 @@ class DDPM(EditCapableGenerator):
                 [source_classes, target_classes],
             )
         ]
-        args = copy.deepcopy(self.config)
+        args = copy.deepcopy(self.config).dict()
+        args = SimpleNamespace(**args)
         args.dataset = dataset
         args.model_path = os.path.join(self.model_dir, "final.pt")
         args.classifier = classifier
@@ -153,7 +153,7 @@ class DDPM(EditCapableGenerator):
         #
         args.attack_iterations = int(
             explainer_config.attack_iterations
-            if not isinstance(args.attack_iterations, list)
+            if not isinstance(explainer_config.attack_iterations, list)
             else random.randint(
                 explainer_config.attack_iterations[0],
                 explainer_config.attack_iterations[1],
@@ -161,15 +161,15 @@ class DDPM(EditCapableGenerator):
         )
         args.sampling_time_fraction = float(
             explainer_config.sampling_time_fraction
-            if not isinstance(args.sampling_time_fraction, list)
+            if not isinstance(explainer_config.sampling_time_fraction, list)
             else random.uniform(
                 explainer_config.sampling_time_fraction[0],
                 explainer_config.sampling_time_fraction[1],
             )
         )
-        args.sampling_time_fraction = float(
+        args.dist_l1 = float(
             explainer_config.dist_l1
-            if not isinstance(args.dist_l1, list)
+            if not isinstance(explainer_config.dist_l1, list)
             else random.uniform(
                 explainer_config.dist_l1[0],
                 explainer_config.dist_l1[1],
@@ -177,7 +177,7 @@ class DDPM(EditCapableGenerator):
         )
         args.dist_l2 = float(
             explainer_config.dist_l2
-            if not isinstance(args.dist_l2, list)
+            if not isinstance(explainer_config.dist_l2, list)
             else random.uniform(
                 explainer_config.dist_l2[0],
                 explainer_config.dist_l2[1],
@@ -185,23 +185,23 @@ class DDPM(EditCapableGenerator):
         )
         args.sampling_inpaint = float(
             explainer_config.sampling_inpaint
-            if not isinstance(args.sampling_inpaint, list)
+            if not isinstance(explainer_config.sampling_inpaint, list)
             else random.uniform(
                 explainer_config.sampling_inpaint[0],
                 explainer_config.sampling_inpaint[1],
             )
         )
-        args.sampling_dilation = float(
+        args.sampling_dilation = int(
             explainer_config.sampling_dilation
-            if not isinstance(args.sampling_dilation, list)
-            else random.uniform(
+            if not isinstance(explainer_config.sampling_dilation, list)
+            else random.randint(
                 explainer_config.sampling_dilation[0],
                 explainer_config.sampling_dilation[1],
             )
         )
         args.timestep_respacing = str(
             explainer_config.timestep_respacing
-            if not isinstance(args.timestep_respacing, list)
+            if not isinstance(explainer_config.timestep_respacing, list)
             else random.uniform(
                 explainer_config.timestep_respacing[0],
                 explainer_config.timestep_respacing[1],
