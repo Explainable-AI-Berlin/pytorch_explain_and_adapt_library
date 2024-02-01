@@ -2,9 +2,9 @@
 'adaptor_type'                         :  "CFKD"
 'category'                             :  "adaptor"
 'batch_size'                           :  5
-'min_train_samples'                    :  5 #500
-'finetune_iterations'                  :  1
-'max_validation_samples'               :  2 #100
+'min_train_samples'                    :  500
+'finetune_iterations'                  :  3
+'max_validation_samples'               :  100
 'continuous_learning'                  :  False
 'replace_model'                        :  True
 'use_visualization'                    :  True

@@ -54,7 +54,11 @@ def calculate_validation_statistics(
             min(max_validation_samples, len(dataloader.dataset)) / dataloader.batch_size
             + 0.9999
         )
-        * explainer.explainer_config.gradient_steps,
+        * (
+            explainer.explainer_config.gradient_steps
+            if hasattr(explainer.explainer_config, "gradient_steps")
+            else 1
+        ),
     )
     pbar.stored_values = {}
     if "hint_list" in tracked_keys:
@@ -94,7 +98,7 @@ def calculate_validation_statistics(
         batch["y_target_start_confidence_list"] = torch.stack(
             batch_target_start_confidences, 0
         )
-        #try:
+        # try:
         results = explainer.explain_batch(
             batch=batch,
             base_path=base_path,
@@ -103,9 +107,9 @@ def calculate_validation_statistics(
             mode="Validation",
             start_idx=it * dataloader.batch_size,
             model=model,
-            #dataloader=dataloader,
+            # dataloader=dataloader,
         )
-        #except TypeError:
+        # except TypeError:
         #    import pdb; pdb.set_trace()
         for key in set(results.keys()).intersection(set(tracked_values.keys())):
             tracked_values[key].extend(results[key])

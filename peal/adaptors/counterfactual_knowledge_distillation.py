@@ -402,7 +402,11 @@ class CounterfactualKnowledgeDistillation:
                 self.adaptor_config.min_train_samples / self.adaptor_config.batch_size
                 + 0.99
             )
-            * self.adaptor_config.explainer.gradient_steps,
+            * (
+                self.adaptor_config.explainer.gradient_steps
+                if hasattr(self.adaptor_config.explainer, "gradient_steps")
+                else 1
+            )
         )
         pbar.stored_values = {}
         pbar.stored_values["n_total"] = 0
@@ -688,7 +692,7 @@ class CounterfactualKnowledgeDistillation:
             config=self.data_config,
             datasource=dataset_path,
         )
-        dataloader = DataloaderMixer(dataloader_old.config, dataloader)
+        dataloader = DataloaderMixer(self.adaptor_config.training, dataloader)
         dataloader.append(dataloader_old, mixing_ratio=1 - mixing_ratio)
         return dataloader
 
