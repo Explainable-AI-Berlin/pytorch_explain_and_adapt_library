@@ -52,7 +52,9 @@ from peal.dependencies.ace.guided_diffusion.sample_utils import (
     load_from_DDP_model,
     ChunkedDataset,
 )
-from peal.dependencies.ace.guided_diffusion.gaussian_diffusion import _extract_into_tensor
+from peal.dependencies.ace.guided_diffusion.gaussian_diffusion import (
+    _extract_into_tensor,
+)
 from peal.dependencies.ace.guided_diffusion.image_datasets import (
     get_dataset,
     BINARYDATASET,
@@ -62,7 +64,10 @@ from peal.dependencies.ace.guided_diffusion.image_datasets import (
 # core imports
 from peal.dependencies.ace.core.utils import print_dict, merge_all_chunks, generate_mask
 from peal.dependencies.ace.core.metrics import accuracy, get_prediction
-from peal.dependencies.ace.core.attacks_and_models import JointClassifierDDPM, get_attack
+from peal.dependencies.ace.core.attacks_and_models import (
+    JointClassifierDDPM,
+    get_attack,
+)
 
 # model imports
 from peal.dependencies.ace.models import get_classifier
@@ -80,6 +85,7 @@ matplotlib.use("Agg")  # to disable display
 # Functions
 # =======================================================
 # =======================================================
+
 
 def load_state_dict(path, **kwargs):
     """
@@ -187,8 +193,13 @@ def filter_fn(
     inpaint,
     dilation,
     ispeal=False,
+    classifier_dataset=None,
+    generator_dataset=None,
 ):
     indices = list(range(steps))[::-1]
+
+    print('x in')
+    print([x.min(), x.max()])
 
     # Generate pre-explanation
     with torch.enable_grad():
@@ -205,8 +216,23 @@ def filter_fn(
     mask, dil_mask = generate_mask(x, pe, dilation)
     boolmask = (dil_mask < inpaint).float()
 
-    ce = (pe.detach() - 0.5) / 0.5
-    orig = (x.detach() - 0.5) / 0.5
+    if not generator_dataset is None and not classifier_dataset is None:
+        ce = generator_dataset.project_from_pytorch_default(
+            classifier_dataset.project_to_pytorch_default(pe.detach())
+        )
+        orig = generator_dataset.project_from_pytorch_default(
+            classifier_dataset.project_to_pytorch_default(x.detach())
+        )
+
+    else:
+        ce = (pe.detach() - 0.5) / 0.5
+        orig = (x.detach() - 0.5) / 0.5
+
+    print('orig in')
+    print([orig.min(), orig.max()])
+    print('ce in')
+    print([ce.min(), ce.max()])
+
     noises = None
     noise_fn = torch.randn_like if stochastic else torch.zeros_like
 
@@ -232,10 +258,20 @@ def filter_fn(
             ce += torch.exp(0.5 * out["log_variance"]) * noise
 
     ce = ce * (1 - boolmask) + boolmask * orig
-    ce = (ce * 0.5) + 0.5
-    ce = ce.clamp(0, 1)
-    noise_x = ((noise_x * 0.5) + 0.5).clamp(0, 1)
+    if not generator_dataset is None and not classifier_dataset is None:
+        ce = classifier_dataset.project_from_pytorch_default(
+            generator_dataset.project_to_pytorch_default(ce.detach())
+        ).clamp(0, 1)
+        noise_x = classifier_dataset.project_from_pytorch_default(
+            generator_dataset.project_to_pytorch_default(noise_x.detach())
+        ).clamp(0, 1)
 
+    else:
+        ce = ((ce * 0.5) + 0.5).clamp(0, 1)
+        noise_x = ((noise_x * 0.5) + 0.5).clamp(0, 1)
+
+    print('ce out')
+    print([ce.min(), ce.max()])
     return ce, pe, noise_x, mask
 
 
@@ -287,7 +323,6 @@ def main(args=None):
 
     classifier.to(dist_util.dev()).eval()
 
-
     if isinstance(args.dataset, list):
         loader = args.dataset
 
@@ -310,7 +345,9 @@ def main(args=None):
                 else args.label_query
             )
         dataset = SlowSingleLabel(target, dataset, args.num_samples)
-        dataset = ChunkedDataset(dataset=dataset, chunk=args.chunk, num_chunks=args.chunks)
+        dataset = ChunkedDataset(
+            dataset=dataset, chunk=args.chunk, num_chunks=args.chunks
+        )
         print("Images on the dataset:", len(dataset))
         loader = data.DataLoader(
             dataset,
@@ -472,13 +509,15 @@ def main(args=None):
             lab = lab.to(
                 dist_util.dev(),
                 dtype=torch.float
-                if args.dataset in BINARYDATASET or isinstance(args.dataset, PealDataset)
+                if args.dataset in BINARYDATASET
+                or isinstance(args.dataset, PealDataset)
                 else torch.long,
             )
             target = target.to(
                 dist_util.dev(),
                 dtype=torch.float
-                if args.dataset in BINARYDATASET or isinstance(args.dataset, PealDataset)
+                if args.dataset in BINARYDATASET
+                or isinstance(args.dataset, PealDataset)
                 else torch.long,
             )
 
@@ -486,7 +525,8 @@ def main(args=None):
             lab = lab.to(
                 dist_util.dev(),
                 dtype=torch.float
-                if args.dataset in BINARYDATASET or isinstance(args.dataset, PealDataset)
+                if args.dataset in BINARYDATASET
+                or isinstance(args.dataset, PealDataset)
                 else torch.long,
             )
 
@@ -539,11 +579,14 @@ def main(args=None):
             inpaint=args.sampling_inpaint,
             dilation=args.sampling_dilation,
             ispeal=isinstance(classifier, SequentialModel),
+            classifier_dataset=args.classifier_dataset if hasattr(args, "classifier_dataset") else None,
+            generator_dataset=args.generator_dataset if hasattr(args, "generator_dataset") else None,
         )
         counterfactuals.append(ce.detach().cpu())
         if args.save_images:
             noise = (noise * 255).to(dtype=torch.uint8).detach().cpu()
             import torchvision
+
             torchvision.utils.save_image(img, "img.png", normalize=False)
             torchvision.utils.save_image(pe_mask, "pe_mask.png", normalize=False)
             torchvision.utils.save_image(pe, "pe.png", normalize=False)
@@ -552,9 +595,7 @@ def main(args=None):
             ce_mask = generate_mask(img, ce, 1)[0]
             torchvision.utils.save_image(ce_mask, "ce_mask.png", normalize=False)
             torchvision.utils.save_image(ce, "ce.png", normalize=False)
-            ce_mask = (
-                (ce_mask * 255).to(dtype=torch.uint8).detach().cpu()
-            )
+            ce_mask = (ce_mask * 255).to(dtype=torch.uint8).detach().cpu()
 
             # evaluate the cf and check whether the model flipped the prediction
             with torch.no_grad():
@@ -623,7 +664,6 @@ def main(args=None):
                             masks=data_mask.permute(0, 2, 3, 1).squeeze(-1).numpy(),
                         )
 
-
             if ((idx + 1) % 50) == 0:
                 print("=" * 50)
                 print("\nCurrent Stats at iteration", idx + 1, ":")
@@ -652,7 +692,9 @@ def main(args=None):
             print("=" * 50)
         prefix = "" if args.chunks == 1 else f"c-{args.chunk}_{args.chunks}-"
         with open(
-            osp.join(args.output_path, "Results", args.exp_name, prefix + "summary.yaml"),
+            osp.join(
+                args.output_path, "Results", args.exp_name, prefix + "summary.yaml"
+            ),
             "w",
         ) as f:
             f.write(str(stats))

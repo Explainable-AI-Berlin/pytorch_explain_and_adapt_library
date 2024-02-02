@@ -234,6 +234,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 explainer_config=self.explainer_config,
                 pbar=pbar,
                 mode=mode,
+                classifier_dataset=self.dataset,
             )
 
         batch_out = {}

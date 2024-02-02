@@ -177,6 +177,7 @@ def _load_yaml_config(config_path):
             config = open_config(config_path)
 
         except Exception as e:
+            # TODO this seems like a rather odd error handling
             error, _, _ = sys.exc_info()
             if error.__name__ == "OSError" or error.__name__ == "FileNotFoundError":
                 config_path = os.path.abspath(os.path.join("..", *split_path))
@@ -187,7 +188,9 @@ def _load_yaml_config(config_path):
 
         for key in config.keys():
             if isinstance(config[key], str) and config[key][-5:] == ".yaml":
-                config[key] = _load_yaml_config(os.path.join(*config[key].split("/")))
+                # TODO can this be made interoperable with windows again?
+                #config[key] = _load_yaml_config(os.path.join(*config[key].split("/")))
+                config[key] = _load_yaml_config(config[key])
 
         return config
 

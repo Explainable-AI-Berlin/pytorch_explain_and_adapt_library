@@ -25,6 +25,7 @@ from peal.dependencies.ace.guided_diffusion.script_util import (
 from peal.dependencies.ace.guided_diffusion.train_util import TrainLoop
 from peal.data.dataloaders import get_dataloader
 from peal.data.dataset_factory import get_datasets
+from peal.data.dataset_interfaces import PealDataset
 from peal.configs.explainers.ace_config import ACEConfig
 
 
@@ -56,6 +57,8 @@ class DDPM(EditCapableGenerator):
         super().__init__()
         self.config = load_yaml_config(config)
 
+        self.dataset = get_datasets(self.config.data)[0]
+
         if not model_dir is None:
             self.model_dir = model_dir
 
@@ -78,11 +81,8 @@ class DDPM(EditCapableGenerator):
 
     def train_model(
         self,
-        dataset_train = None,
     ):
         shutil.rmtree(self.model_dir, ignore_errors=True)
-        if dataset_train is None:
-            dataset_train = get_datasets(self.config.data)[0]
 
         dist_util.setup_dist(self.config.gpus)
         logger.configure(dir=self.model_dir)
@@ -94,7 +94,7 @@ class DDPM(EditCapableGenerator):
         logger.log("creating data loader...")
         data = iter(
             get_dataloader(
-                dataset_train,
+                self.dataset,
                 mode="train",
                 batch_size=self.config.batch_size,
                 training_config={"steps_per_epoch": self.config.max_steps},
@@ -129,6 +129,7 @@ class DDPM(EditCapableGenerator):
         target_classes: torch.Tensor,
         classifier: nn.Module,
         explainer_config: ACEConfig,
+        classifier_dataset: PealDataset,
         pbar=None,
         mode="",
     ):
@@ -142,6 +143,8 @@ class DDPM(EditCapableGenerator):
         args = copy.deepcopy(self.config).dict()
         args = SimpleNamespace(**args)
         args.dataset = dataset
+        args.classifier_dataset = classifier_dataset
+        args.generator_dataset = self.dataset
         args.model_path = os.path.join(self.model_dir, "final.pt")
         args.classifier = classifier
         args.diffusion = self.diffusion

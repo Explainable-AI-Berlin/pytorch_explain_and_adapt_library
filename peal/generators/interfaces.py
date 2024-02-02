@@ -4,6 +4,7 @@ from torch import nn
 from typing import Tuple
 
 from peal.configs.explainers.explainer_config import ExplainerConfig
+from peal.data.dataset_interfaces import PealDataset
 
 
 class Generator(nn.Module):
@@ -95,6 +96,7 @@ class EditCapableGenerator(Generator):
         target_classes: torch.Tensor,
         classifier: nn.Module,
         explainer_config: ExplainerConfig,
+        classifier_dataset: PealDataset,
         pbar=None,
         mode="",
     ) -> Tuple[
