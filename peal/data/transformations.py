@@ -26,8 +26,8 @@ class CircularCut(object):
             "RGB", (width, height), pygame.image.tostring(screen, "RGB")
         )
         overlay_np = np.array(overlay)
-        img_follicle = np.minimum(overlay_np, sample_np)
-        return Image.fromarray(img_follicle)
+        img_cut = np.minimum(overlay_np, sample_np)
+        return Image.fromarray(img_cut)
 
 
 class Padding(object):
