@@ -228,13 +228,11 @@ class CounterfactualKnowledgeDistillation:
                 self.adaptor_config.calculate_group_accuracies,
             )
 
-            if isinstance(self.val_dataloader.dataset, ImageDataset):
+            if isinstance(self.val_dataloader.dataset, ImageDataset) and self.adaptor_config.use_visualization:
                 generator_sample = self.generator.sample_x(
                     batch_size=self.adaptor_config.batch_size
                 )
-                if not generator_sample is None and hasattr(
-                    self.generator.config, "training"
-                ):
+                if not generator_sample is None:
                     torchvision.utils.save_image(
                         generator_sample,
                         os.path.join(self.base_dir, "generator_sample.png"),
@@ -244,7 +242,7 @@ class CounterfactualKnowledgeDistillation:
                     # TODO move this back!!!
                     generator_performance = (
                         self.val_dataloader.dataset.track_generator_performance(
-                            self.generator
+                            self.generator, batch_size=self.adaptor_config.batch_size
                         )
                     )
                     print("Generator performance: " + str(generator_performance))

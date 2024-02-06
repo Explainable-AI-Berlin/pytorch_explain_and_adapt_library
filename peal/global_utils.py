@@ -239,7 +239,7 @@ def load_yaml_config(config_path, config_model=None):
         config_model = get_config_model(config_data)
 
     if config_model is None and isinstance(config_data, dict):
-        return types.SimpleNamespace(**config_data)
+        config = types.SimpleNamespace(**config_data)
 
     elif isinstance(config_data, dict):
         """
@@ -249,10 +249,12 @@ def load_yaml_config(config_path, config_model=None):
         except Exception:
             return types.SimpleNamespace(**config_data)
         """
-        return config_model(**config_data)
+        config = config_model(**config_data)
 
     else:
-        return config_data
+        config = config_data
+
+    return config
 
 
 def save_yaml_config(config, config_path):

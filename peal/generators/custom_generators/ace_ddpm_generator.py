@@ -74,10 +74,14 @@ class DDPM(EditCapableGenerator):
         if os.path.exists(self.model_path):
             self.model.load_state_dict(load_state_dict(self.model_path, map_location=device))
 
-    def sample_x(self, batch_size=1):
-        return self.diffusion.p_sample_loop(
+    def sample_x(self, batch_size=1, renormalize=True):
+        sample = self.diffusion.p_sample_loop(
             self.model, [batch_size] + self.config.data.input_size
         )
+        if renormalize:
+            sample = self.dataset.project_to_pytorch_default(sample)
+
+        return sample
 
     def train_model(
         self,
@@ -142,13 +146,6 @@ class DDPM(EditCapableGenerator):
         ]
         args = copy.deepcopy(self.config).dict()
         args = SimpleNamespace(**args)
-        args.dataset = dataset
-        args.classifier_dataset = classifier_dataset
-        args.generator_dataset = self.dataset
-        args.model_path = os.path.join(self.model_dir, "final.pt")
-        args.classifier = classifier
-        args.diffusion = self.diffusion
-        args.model = self.model
         args.output_path = self.counterfactual_path
         args.batch_size = x_in.shape[0]
         #
@@ -209,6 +206,15 @@ class DDPM(EditCapableGenerator):
             )
         )
         args.__dict__.update({k: v for k, v in explainer_config.__dict__.items() if k not in args.__dict__})
+        print("args.sampling_inpaint")
+        print(args.sampling_inpaint)
+        args.dataset = dataset
+        args.classifier_dataset = classifier_dataset
+        args.generator_dataset = self.dataset
+        args.model_path = os.path.join(self.model_dir, "final.pt")
+        args.classifier = classifier
+        args.diffusion = self.diffusion
+        args.model = self.model
         #
         x_counterfactuals = ace_main(args=args)
         x_counterfactuals = torch.cat(x_counterfactuals, dim=0)

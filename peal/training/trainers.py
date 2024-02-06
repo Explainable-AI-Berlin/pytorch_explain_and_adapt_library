@@ -235,8 +235,10 @@ class ModelTrainer:
                 for key in sources.keys():
                     source_distibution += key + ": " + str(sources[key] / (batch_idx + 1)) + ", "
 
+                print("source_distibution: " + source_distibution)
+
             else:
-                source_distibution = ""
+                source_distibution = None
 
             X, y = sample
             #
@@ -276,7 +278,7 @@ class ModelTrainer:
                 + str(batch_idx)
                 + ", loss: "
                 + str(loss.detach().item())
-                + ", source_distibution: " + source_distibution if not source_distibution == "" else ""
+                + ", source_distibution: " + source_distibution if not source_distibution is None else ""
             )
             pbar.write(
                 ", ".join(
