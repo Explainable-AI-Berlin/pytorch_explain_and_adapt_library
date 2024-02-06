@@ -235,8 +235,6 @@ class ModelTrainer:
                 for key in sources.keys():
                     source_distibution += key + ": " + str(sources[key] / (batch_idx + 1)) + ", "
 
-                print("source_distibution: " + source_distibution)
-
             else:
                 source_distibution = None
 

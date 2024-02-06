@@ -120,10 +120,6 @@ class CounterfactualKnowledgeDistillation:
         # kind of dirty, but also very confusing if not done this way since validation batches are fed directly
         # into the explainer and thereby potentially causing VRAM overflows otherwise
         self.adaptor_config.training.val_batch_size = self.adaptor_config.batch_size
-        # TODO this does not sound like the best solution
-        self.adaptor_config.training.steps_per_epoch = (
-            10 * self.adaptor_config.min_train_samples / self.adaptor_config.batch_size
-        )
         (
             self.train_dataloader,
             self.val_dataloader,
@@ -201,6 +197,8 @@ class CounterfactualKnowledgeDistillation:
             self.adaptor_config.max_validation_samples
         )
         self.validation_data_config.data.split = [0.0, 1.0]
+        print("adaptor_config.training")
+        print(adaptor_config.training)
 
     def initialize_run(self):
         if self.overwrite or not os.path.exists(
@@ -1012,23 +1010,17 @@ class CounterfactualKnowledgeDistillation:
             ) as f:
                 tracked_values_file = {}
                 for key in self.tracked_keys:
-                    try:
-                        if isinstance(validation_tracked_values[key][0], torch.Tensor):
-                            tracked_values_file[key] = torch.stack(
-                                validation_tracked_values[key], dim=0
-                            ).numpy()
+                    if isinstance(validation_tracked_values[key][0], torch.Tensor):
+                        tracked_values_file[key] = torch.stack(
+                            validation_tracked_values[key], dim=0
+                        ).numpy()
 
-                        elif isinstance(
-                            validation_tracked_values[key][0], int
-                        ) or isinstance(validation_tracked_values[key][0], float):
-                            tracked_values_file[key] = np.array(
-                                validation_tracked_values[key]
-                            )
-
-                    except Exception:
-                        import pdb
-
-                        pdb.set_trace()
+                    elif isinstance(
+                        validation_tracked_values[key][0], int
+                    ) or isinstance(validation_tracked_values[key][0], float):
+                        tracked_values_file[key] = np.array(
+                            validation_tracked_values[key]
+                        )
 
                 np.savez(f, **tracked_values_file)
 
