@@ -463,7 +463,7 @@ class Image2MixedDataset(ImageDataset):
         self.idx_enabled = False
         self.return_dict = return_dict
         # TODO
-        #self.config.class_ratios = None
+        # self.config.class_ratios = None
         data_dir = os.path.join(root_dir, "data.csv")
         if not config.delimiter is None:
             delimiter = config.delimiter
@@ -475,7 +475,11 @@ class Image2MixedDataset(ImageDataset):
             data_dir, config, mode, key_type="name", delimiter=delimiter
         )
         self.task_specific_keys = None
-        if not self.task_config is None and not self.config.class_ratios is None and self.task_specific_keys is None:
+        if (
+            not self.task_config is None
+            and not self.config.class_ratios is None
+            and self.task_specific_keys is None
+        ):
             self.set_task_specific_keys()
 
     @property
@@ -487,7 +491,11 @@ class Image2MixedDataset(ImageDataset):
             return len(self.attributes)
 
     def __len__(self):
-        if not self.task_config is None and not self.config.class_ratios is None and self.task_specific_keys is None:
+        if (
+            not self.task_config is None
+            and not self.config.class_ratios is None
+            and self.task_specific_keys is None
+        ):
             self.set_task_specific_keys()
 
         return len(self.keys)
@@ -514,15 +522,26 @@ class Image2MixedDataset(ImageDataset):
         self.task_specific_keys = []
         num_samples_per_class = np.zeros([self.output_size])
         for key in self.keys:
-            num_samples_per_class[int(self.data[key][self.attributes.index(self.task_config.y_selection[0])])] += 1
+            num_samples_per_class[
+                int(
+                    self.data[key][
+                        self.attributes.index(self.task_config.y_selection[0])
+                    ]
+                )
+            ] += 1
 
         num_units = num_samples_per_class / np.array(self.config.class_ratios)
         min_units = int(np.min(num_units))
         num_samples_per_class_balanced = min_units * np.array(self.config.class_ratios)
         current_num_samples_per_class = np.zeros([self.output_size])
         for key in self.keys:
-            class_idx = int(self.data[key][self.attributes.index(self.task_config.y_selection[0])])
-            if current_num_samples_per_class[class_idx] < num_samples_per_class_balanced[class_idx]:
+            class_idx = int(
+                self.data[key][self.attributes.index(self.task_config.y_selection[0])]
+            )
+            if (
+                current_num_samples_per_class[class_idx]
+                < num_samples_per_class_balanced[class_idx]
+            ):
                 self.task_specific_keys.append(key)
                 current_num_samples_per_class[class_idx] += 1
 
@@ -530,12 +549,26 @@ class Image2MixedDataset(ImageDataset):
         self.keys = self.task_specific_keys
 
     def __getitem__(self, idx):
-        if not self.task_config is None and not self.config.class_ratios is None and self.task_specific_keys is None:
+        if (
+            not self.task_config is None
+            and not self.config.class_ratios is None
+            and self.task_specific_keys is None
+        ):
             self.set_task_specific_keys()
 
         name = self.keys[idx]
 
-        img = Image.open(os.path.join(self.root_dir, "imgs", name))
+        if (
+            not self.task_config is None
+            and not self.task_config.x_selection is None
+            and not len(self.task_config.x_selection) == 0
+        ):
+            x_selection = self.task_config.x_selection[0]
+
+        else:
+            x_selection = "imgs"
+
+        img = Image.open(os.path.join(self.root_dir, x_selection, name))
         # code.interact(local=dict(globals(), **locals()))
         state = torch.get_rng_state()
         img_tensor = self.transform(img)
@@ -730,7 +763,11 @@ class Image2ClassDataset(ImageDataset):
                     self.urls_with_hints.append((target_str, file))
 
         self.task_specific_urls = None
-        if not self.task_config is None and not self.config.class_ratios is None and self.task_specific_urls is None:
+        if (
+            not self.task_config is None
+            and not self.config.class_ratios is None
+            and self.task_specific_urls is None
+        ):
             self.set_task_specific_urls()
 
     def class_idx_to_name(self, class_idx):
@@ -763,7 +800,10 @@ class Image2ClassDataset(ImageDataset):
         for idx in range(len(self.urls)):
             target_str, file = self.urls[idx]
             class_idx = int(torch.tensor(self.idx_to_name.index(target_str)))
-            if current_num_samples_per_class[class_idx] < num_samples_per_class_balanced[class_idx]:
+            if (
+                current_num_samples_per_class[class_idx]
+                < num_samples_per_class_balanced[class_idx]
+            ):
                 self.task_specific_urls.append((target_str, file))
                 current_num_samples_per_class[class_idx] += 1
 
@@ -771,13 +811,21 @@ class Image2ClassDataset(ImageDataset):
         self.urls = self.task_specific_urls
 
     def __len__(self):
-        if not self.task_config is None and not self.config.class_ratios is None and self.task_specific_urls is None:
+        if (
+            not self.task_config is None
+            and not self.config.class_ratios is None
+            and self.task_specific_urls is None
+        ):
             self.set_task_specific_urls()
 
         return len(self.urls)
 
     def __getitem__(self, idx):
-        if not self.task_config is None and not self.config.class_ratios is None and self.task_specific_urls is None:
+        if (
+            not self.task_config is None
+            and not self.config.class_ratios is None
+            and self.task_specific_urls is None
+        ):
             self.set_task_specific_urls()
 
         target_str, file = self.urls[idx]

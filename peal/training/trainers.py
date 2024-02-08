@@ -113,7 +113,7 @@ class ModelTrainer:
             self.model_name = self.config.model_name
 
         if model is None:
-            if not self.config.task.x_selection is None:
+            if not self.config.task.x_selection is None and not self.config.data.input_type == "image":
                 input_channels = len(self.config.task.x_selection)
 
             else:

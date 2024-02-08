@@ -19,7 +19,11 @@ def parse_json(data_dir, config, mode, set_negative_to_zero=True):
     with open(data_dir, "r") as f:
         raw_data = json.load(f)
 
-    if not len(config.confounding_factors) == 0:
+    if (
+        not config.confounding_factors is None
+        and len(config.confounding_factors) == 2
+        and not config.confounder_probability is None
+    ):
 
         def extract_instances_tensor_confounder(idx, line):
             key = str(idx)
@@ -83,14 +87,18 @@ def parse_csv(
 
         instance_attributes_int = list(
             map(
-                lambda x: float(x),
+                lambda x: float(x) if x.isnumeric() else -1.0,
                 instance_attributes,
             )
         )
         instances_tensor = torch.tensor(instance_attributes_int)
         return key, instances_tensor
 
-    if len(config.confounding_factors) == 2:
+    if (
+        not config.confounding_factors is None
+        and len(config.confounding_factors) == 2
+        and not config.confounder_probability is None
+    ):
         def extract_instances_tensor_confounder(idx, line):
             selection_idx1 = attributes.index(config.confounding_factors[0])
             selection_idx2 = attributes.index(config.confounding_factors[1])
