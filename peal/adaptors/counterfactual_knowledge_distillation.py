@@ -19,8 +19,8 @@ from peal.global_utils import (
     load_yaml_config,
     set_adaptive_batch_size,
     save_yaml_config,
-    log_images_to_writer,
 )
+from peal.training.loggers import log_images_to_writer
 from peal.data.dataloaders import (
     DataStack,
     DataloaderMixer,

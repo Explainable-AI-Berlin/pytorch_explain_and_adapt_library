@@ -11,7 +11,7 @@ from peal.data.transformations import (
     RandomRotation,
     Normalization,
     IdentityNormalization,
-    SetChannels,
+    SetChannels, RandomResizeCropPad,
 )
 from peal.data.datasets import (
     Image2MixedDataset,
@@ -88,6 +88,9 @@ def get_datasets(
 
         if "vflipping" in config.invariances:
             transform_list_train.append(transforms.RandomVerticalFlip(p=0.5))
+
+        if "random_resize" in config.invariances:
+            transform_list_train.append(RandomResizeCropPad())
 
         #
         if not config.crop_size is None:

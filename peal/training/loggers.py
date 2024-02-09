@@ -4,6 +4,7 @@ import math
 import torchvision
 import torch.nn as nn
 
+from peal.data.dataloaders import DataloaderMixer
 from peal.generators.interfaces import InvertibleGenerator
 
 
@@ -267,3 +268,55 @@ class Logger:
         self.losses = []
 
         return accuracy
+
+
+def log_images_to_writer(dataloader, writer, tag="train"):
+    if isinstance(dataloader, DataloaderMixer):
+        iterator = iter(dataloader.dataloaders[0])
+
+    else:
+        iterator = iter(dataloader)
+
+    for i in range(3):
+        print(i)
+        print(i)
+        print(i)
+        if i == 1:
+            if isinstance(dataloader, DataloaderMixer):
+                iterator = iter(dataloader.dataloaders[0])
+
+            else:
+                iterator = iter(dataloader)
+
+        if i == 2 and isinstance(dataloader, DataloaderMixer) and len(dataloader.dataloaders) > 1:
+            iterator = iter(dataloader.dataloaders[1])
+
+        sample_train_imgs, sample_train_y = next(iterator)
+
+        if hasattr(dataloader.dataset, "project_to_pytorch_default"):
+            sample_train_imgs = dataloader.dataset.project_to_pytorch_default(
+                sample_train_imgs
+            )
+
+        else:
+            print(
+                "Warning! If your dataloader uses another normalization than the PyTorch default [0,1] range data might be visualized incorrect!"
+                + "In that case add function project_to_pytorch_default() to your underlying dataset to correct visualization!"
+            )
+
+        sample_batch_label_str = "sample_" + tag + "_batch" + str(i) + "_"
+        if len(sample_train_y.shape) == 1:
+            sample_batch_label_str += "_" + str(
+                list(map(lambda x: int(x), list(sample_train_y)))
+            )
+
+        print(sample_batch_label_str)
+        print(sample_batch_label_str)
+        print(sample_batch_label_str)
+
+        writer.add_image(
+            sample_batch_label_str,
+            torchvision.utils.make_grid(
+                sample_train_imgs, sample_train_imgs.shape[0]
+            ),
+        )

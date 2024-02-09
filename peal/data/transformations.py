@@ -4,7 +4,7 @@ import pygame
 import random
 import math
 
-# import imgaug.augmenters as iaa
+#import imgaug.augmenters as iaa
 import torchvision.transforms as transforms
 import numpy as np
 
@@ -63,11 +63,13 @@ class RandomRotation(object):
 
     def __call__(self, sample):
         # TODO: fix this
-        """theta = random.randint(self.min_rotation, self.max_rotation)
-        rotation = iaa.Rotate(theta)
-        sample = rotation.augment_image(sample.numpy().transpose([1, 2, 0]))
-        self.last_theta = theta / 180 * math.pi
-        return torch.tensor(sample.transpose([2, 0, 1]))"""
+        theta = random.randint(self.min_rotation, self.max_rotation)
+        self.last_theta = theta
+        sample = torchvision.transforms.functional.rotate(sample, theta)
+        #rotation = iaa.Rotate(theta)
+        #sample = rotation.augment_image(sample.numpy().transpose([1, 2, 0]))
+        #self.last_theta = theta / 180 * math.pi
+        #return torch.tensor(sample.transpose([2, 0, 1]))
         return sample
 
 
@@ -117,3 +119,35 @@ class IdentityNormalization(object):
     def invert(self, batch):
         """ """
         return batch
+
+class RandomResizeCropPad(object):
+    def __init__(self, scale_range=(0.8, 1.2)):
+        self.scale_range = scale_range
+
+    def __call__(self, img):
+        # TODO this has to be applicable also for the masks later!
+        # Randomly select scale factor
+        output_size = img.shape[-2:]
+        scale_factor = torch.FloatTensor(1).uniform_(*self.scale_range).item()
+
+        # Determine resized dimensions
+        resized_height = int(output_size[0] * scale_factor)
+        resized_width = int(output_size[1] * scale_factor)
+        new_size = (resized_width, resized_height)
+
+        # Resize image
+        img = transforms.functional.resize(img, new_size)
+
+        # Determine cropping/padding parameters
+        pad_left = max(0, (output_size[0] - resized_width) // 2)
+        pad_top = max(0, (output_size[1] - resized_height) // 2)
+        pad_right = max(0, output_size[0] - resized_width - pad_left)
+        pad_bottom = max(0, output_size[1] - resized_height - pad_top)
+
+        # Apply crop/pad
+        img = transforms.functional.pad(img, (pad_left, pad_top, pad_right, pad_bottom))
+
+        # Perform center crop
+        img = transforms.functional.center_crop(img, output_size)
+
+        return img

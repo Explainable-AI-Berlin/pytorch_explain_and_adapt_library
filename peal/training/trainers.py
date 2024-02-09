@@ -17,20 +17,24 @@ from peal.global_utils import (
     move_to_device,
     load_yaml_config,
     save_yaml_config,
-    log_images_to_writer,
 )
+from peal.training.loggers import log_images_to_writer
 from peal.training.loggers import Logger
 from peal.training.criterions import get_criterions
 from peal.data.dataloaders import create_dataloaders_from_datasource
 from peal.generators.interfaces import Generator
 from peal.architectures.downstream_models import SequentialModel
-#from peal.generators.variational_autoencoders import VAE
+
+# from peal.generators.variational_autoencoders import VAE
 from peal.generators.normalizing_flows import Glow
 from peal.configs.architectures.architecture_template import ArchitectureConfig
-#from peal.configs.generators.generator_config import VAEConfig
+
+# from peal.configs.generators.generator_config import VAEConfig
 
 
-def calculate_test_accuracy(model, test_dataloader, device, calculate_group_accuracies=False):
+def calculate_test_accuracy(
+    model, test_dataloader, device, calculate_group_accuracies=False
+):
     # determine the test accuracy of the student
     correct = 0
     num_samples = 0
@@ -74,7 +78,11 @@ def calculate_test_accuracy(model, test_dataloader, device, calculate_group_accu
             group_accuracies.append(float(groups[idx][0] / groups[idx][1]))
 
         worst_group_accuracy = min(group_accuracies)
-        return correct / test_dataloader.dataset.__len__(), group_accuracies, worst_group_accuracy
+        return (
+            correct / test_dataloader.dataset.__len__(),
+            group_accuracies,
+            worst_group_accuracy,
+        )
 
     else:
         return correct / test_dataloader.dataset.__len__()
@@ -113,7 +121,10 @@ class ModelTrainer:
             self.model_name = self.config.model_name
 
         if model is None:
-            if not self.config.task.x_selection is None and not self.config.data.input_type == "image":
+            if (
+                not self.config.task.x_selection is None
+                and not self.config.data.input_type == "image"
+            ):
                 input_channels = len(self.config.task.x_selection)
 
             else:
@@ -130,12 +141,11 @@ class ModelTrainer:
                     self.config.architecture, input_channels, output_channels
                 )
 
-            '''elif isinstance(self.config.architecture, VAEConfig):
+            """elif isinstance(self.config.architecture, VAEConfig):
                 self.model = VAE(self.config.architecture, input_channels)
 
             elif hasattr(self.config.architecture, "n_flow"):
-                self.model = Glow(self.config)'''
-
+                self.model = Glow(self.config)"""
 
         else:
             self.model = model
@@ -162,6 +172,10 @@ class ModelTrainer:
             if self.config.training.optimizer == "sgd":
                 self.optimizer = torch.optim.SGD(
                     self.model.parameters(), lr=self.config.training.learning_rate
+                )
+                lambda1 = lambda epoch: 0.95**epoch
+                self.scheduler = torch.optim.lr_scheduler.LambdaLR(
+                    self.optimizer, lr_lambda=lambda1
                 )
 
             elif self.config.training.optimizer == "adam":
@@ -233,7 +247,9 @@ class ModelTrainer:
 
                 source_distibution = ""
                 for key in sources.keys():
-                    source_distibution += key + ": " + str(sources[key] / (batch_idx + 1)) + ", "
+                    source_distibution += (
+                        key + ": " + str(sources[key] / (batch_idx + 1)) + ", "
+                    )
 
             else:
                 source_distibution = None
@@ -268,24 +284,22 @@ class ModelTrainer:
 
             # Backpropagation
             loss.backward()
+            current_state = "Model Training: " + mode + "_it: " + str(batch_idx)
+            current_state += ", loss: " + str(loss.detach().item())
+            current_state += ", lr: " + str(
+                self.scheduler.get_last_lr()
+                if hasattr(self, "scheduler")
+                else self.optimizer.param_groups[0]["lr"]
+            )
+            current_state += ", source_distibution: " + source_distibution if not source_distibution is None else ""
+            current_state += ", ".join(
+                [
+                    key + ": " + str(pbar.stored_values[key])
+                    for key in pbar.stored_values
+                ]
+            )
 
-            pbar.set_description(
-                "Model Training: "
-                + mode
-                + "_it: "
-                + str(batch_idx)
-                + ", loss: "
-                + str(loss.detach().item())
-                + ", source_distibution: " + source_distibution if not source_distibution is None else ""
-            )
-            pbar.write(
-                ", ".join(
-                    [
-                        key + ": " + str(pbar.stored_values[key])
-                        for key in pbar.stored_values
-                    ]
-                )
-            )
+            pbar.write(current_state)
             pbar.update(1)
 
             #
@@ -374,7 +388,9 @@ class ModelTrainer:
                     val_loss, val_accuracy_current = self.run_epoch(
                         val_dataloader, mode="validation_" + str(idx), pbar=pbar
                     )
-                    val_accuracy += self.val_dataloader_weights[idx] * val_accuracy_current
+                    val_accuracy += (
+                        self.val_dataloader_weights[idx] * val_accuracy_current
+                    )
 
             self.logger.writer.add_scalar(
                 "epoch_validation_accuracy", val_accuracy, self.config.training.epoch
@@ -414,7 +430,10 @@ class ModelTrainer:
                 self.model.to(self.device)
 
             # increase regularization and reset checkpoint if overfitting occurs
-            if train_accuracy >= train_accuracy_previous and val_accuracy < val_accuracy_previous:
+            if (
+                train_accuracy >= train_accuracy_previous
+                and val_accuracy < val_accuracy_previous
+            ):
                 if self.regularization_level == 0:
                     self.regularization_level = 1
 
@@ -434,6 +453,8 @@ class ModelTrainer:
             else:
                 train_accuracy_previous = train_accuracy
                 val_accuracy_previous = val_accuracy
+                if hasattr(self, "scheduler"):
+                    self.scheduler.step()
 
             save_yaml_config(self.config, os.path.join(self.base_dir, "config.yaml"))
 

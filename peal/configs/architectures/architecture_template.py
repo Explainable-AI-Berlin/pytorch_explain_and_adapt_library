@@ -117,6 +117,7 @@ class ResnetConfig:
         num_blocks: PositiveInt,
         use_batchnorm: bool = True,
         tensor_dim: PositiveInt = 2,
+        **kwargs,
     ):
         super().__init__()
         self.num_neurons = num_neurons
@@ -125,6 +126,7 @@ class ResnetConfig:
         self.tensor_dim = tensor_dim
 
     def dict(self):
+        # TODO this does not seem to work...
         return [
             "resnet",
             self.num_neurons,
