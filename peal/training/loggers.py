@@ -278,9 +278,6 @@ def log_images_to_writer(dataloader, writer, tag="train"):
         iterator = iter(dataloader)
 
     for i in range(3):
-        print(i)
-        print(i)
-        print(i)
         if i == 1:
             if isinstance(dataloader, DataloaderMixer):
                 iterator = iter(dataloader.dataloaders[0])
@@ -309,10 +306,6 @@ def log_images_to_writer(dataloader, writer, tag="train"):
             sample_batch_label_str += "_" + str(
                 list(map(lambda x: int(x), list(sample_train_y)))
             )
-
-        print(sample_batch_label_str)
-        print(sample_batch_label_str)
-        print(sample_batch_label_str)
 
         writer.add_image(
             sample_batch_label_str,

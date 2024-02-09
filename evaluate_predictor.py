@@ -31,11 +31,12 @@ def main():
     model = torch.load(model_path, map_location=device)
     model.eval()
     test_dataloader = create_dataloaders_from_datasource(model_config)[-1]
-    correct, group_accuracies, worst_group_accuracy = calculate_test_accuracy(
+    correct, group_accuracies, group_distribution, worst_group_accuracy = calculate_test_accuracy(
         model, test_dataloader, device, True
     )
     print("Test accuracy: ", correct)
     print("Group accuracies: ", group_accuracies)
+    print("Group distribution: ", group_distribution)
     print("Worst group accuracy: ", worst_group_accuracy)
 
 main()

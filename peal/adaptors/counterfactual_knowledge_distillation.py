@@ -255,11 +255,16 @@ class CounterfactualKnowledgeDistillation:
                 f.write(platform.node())
 
             if self.adaptor_config.calculate_group_accuracies:
-                test_accuracy, group_accuracies, worst_group_accuracy = test_accuracy
+                test_accuracy, group_accuracies, group_distribution, worst_group_accuracy = test_accuracy
                 for idx in range(len(group_accuracies)):
                     writer.add_scalar(
                         "test_group_accuracy_" + str(idx),
                         group_accuracies[idx],
+                        self.adaptor_config.current_iteration,
+                    )
+                    writer.add_scalar(
+                        "test_group_distribution_" + str(idx),
+                        group_distribution[idx],
                         self.adaptor_config.current_iteration,
                     )
 
@@ -289,7 +294,7 @@ class CounterfactualKnowledgeDistillation:
 
             writer = SummaryWriter(os.path.join(self.base_dir, "logs"))
             validation_stats = self.retrieve_validation_stats(
-                finetune_iteration=self.adaptor_config.current_iteration - 1
+                finetune_iteration=self.adaptor_config.current_iteration
             )
             self.dataloader_mixer = DataloaderMixer(
                 self.adaptor_config.training, self.train_dataloader
@@ -742,13 +747,25 @@ class CounterfactualKnowledgeDistillation:
                 )
 
             if not self.adaptor_config.continuous_learning:
-
                 def weight_reset(m):
                     reset_parameters = getattr(m, "reset_parameters", None)
                     if callable(reset_parameters):
                         m.reset_parameters()
 
                 self.student.apply(weight_reset)
+
+            else:
+                param_list = [param for param in self.student.parameters()]
+                if len(param_list[-1].shape) == 1:
+                    num_unfrozen = 2
+
+                else:
+                    num_unfrozen = 1
+
+                assert len(param_list[-num_unfrozen].shape) == 2, "Wrong layer was chosen!"
+                for param in param_list[:-num_unfrozen]:
+                    if hasattr(param, "requires_grad") and param.requires_grad:
+                        param.requires_grad = False
 
             finetune_trainer = ModelTrainer(
                 config=copy.deepcopy(self.adaptor_config),
@@ -1162,6 +1179,37 @@ class CounterfactualKnowledgeDistillation:
                 dataset_path=dataset_path,
                 writer=writer,
             )
+
+
+            test_accuracy = calculate_test_accuracy(
+                self.student,
+                self.test_dataloader,
+                self.device,
+                self.adaptor_config.calculate_group_accuracies,
+            )
+            if self.adaptor_config.calculate_group_accuracies:
+                test_accuracy, group_accuracies, group_distribution, worst_group_accuracy = test_accuracy
+                for idx in range(len(group_accuracies)):
+                    writer.add_scalar(
+                        "test_group_accuracy_" + str(idx),
+                        group_accuracies[idx],
+                        finetune_iteration,
+                    )
+                    writer.add_scalar(
+                        "test_group_distribution_" + str(idx),
+                        group_distribution[idx],
+                        finetune_iteration,
+                    )
+
+                writer.add_scalar(
+                    "test_worst_group_accuracy",
+                    worst_group_accuracy,
+                    finetune_iteration,
+                )
+                print("group_accuracies: " + str(group_accuracies))
+
+            writer.add_scalar("test_accuracy", test_accuracy, finetune_iteration)
+            print("test_accuracy: " + str(test_accuracy))
             validation_stats = self.retrieve_validation_stats(
                 finetune_iteration=finetune_iteration
             )
@@ -1174,29 +1222,6 @@ class CounterfactualKnowledgeDistillation:
                     )
 
             self.fa_1sided = validation_stats["fa_1sided"]
-
-            test_accuracy = calculate_test_accuracy(
-                self.student,
-                self.test_dataloader,
-                self.device,
-                self.adaptor_config.calculate_group_accuracies,
-            )
-            if self.adaptor_config.calculate_group_accuracies:
-                test_accuracy, group_accuracies, worst_group_accuracy = test_accuracy
-                for idx in range(len(group_accuracies)):
-                    writer.add_scalar(
-                        "test_group_accuracy_" + str(idx),
-                        group_accuracies[idx],
-                        finetune_iteration,
-                    )
-
-                writer.add_scalar(
-                    "test_worst_group_accuracy",
-                    worst_group_accuracy,
-                    finetune_iteration,
-                )
-
-            writer.add_scalar("test_accuracy", test_accuracy, finetune_iteration)
 
             if self.output_size == 2 and self.adaptor_config.use_visualization:
                 self.visualize_progress(

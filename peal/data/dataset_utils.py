@@ -85,9 +85,16 @@ def parse_csv(
         while "" in instance_attributes:
             instance_attributes.remove("")
 
+        def is_valid_float(s):
+            try:
+                float(s)
+                return True
+            except ValueError:
+                return False
+
         instance_attributes_int = list(
             map(
-                lambda x: float(x) if x.isnumeric() else -1.0,
+                lambda x: float(x) if is_valid_float(x) else -1.0,
                 instance_attributes,
             )
         )
