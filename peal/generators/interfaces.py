@@ -4,24 +4,9 @@ from torch import nn
 from typing import Tuple
 
 from peal.configs.explainers.explainer_config import ExplainerConfig
+
 from peal.data.dataset_interfaces import PealDataset
-
-
-class Generator(nn.Module):
-    def sample_x(self, batch_size=1):
-        """
-        This function samples a batch of data samples from the generator.
-        If not implemented, it will throw a NotImplementedError.
-        """
-        raise NotImplementedError
-
-    def train_model(self):
-        """
-        This function trains the generator.
-        If not implemented, it will throw a NotImplementedError.
-        """
-        raise NotImplementedError
-
+from peal.generators.abstract_interface import Generator
 
 class InvertibleGenerator(Generator):
     def encode(self, x):

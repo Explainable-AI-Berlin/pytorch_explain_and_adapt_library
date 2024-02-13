@@ -2,7 +2,7 @@ import torch
 
 from torchvision import transforms
 
-from peal.generators.interfaces import Generator
+from peal.generators.abstract_interface import Generator
 
 
 class PealDataset(torch.utils.data.Dataset):
