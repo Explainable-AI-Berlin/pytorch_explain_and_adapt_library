@@ -688,6 +688,12 @@ class CounterfactualKnowledgeDistillation:
                     + "_"
                     + str(sample_idx)
                 )
+                assert (
+                    self.student(
+                        x_counterfactual_list[sample_idx].unsqueeze(0).to(self.device)
+                    ).argmax()
+                    == int(y_source_list[sample_idx]), "This can not be a false counterfactual!"
+                )
                 x_list.append(x_counterfactual_list[sample_idx])
                 y_list.append(int(y_source_list[sample_idx]))
                 sample_names.append(sample_name)
@@ -1057,7 +1063,7 @@ class CounterfactualKnowledgeDistillation:
 
             with open(
                 os.path.join(
-                    self.base_dir, str(finetune_iteration), "validation_stats.npz"
+                    self.base_dir, str(finetune_iteration), "validation_prestats.npz"
                 ),
                 "wb",
             ) as f:
@@ -1086,11 +1092,26 @@ class CounterfactualKnowledgeDistillation:
                         torch.tensor(validation_tracked_value_file[key])
                     )
 
-            collage_path_list = os.listdir(
+            with open(
                 os.path.join(
-                    self.base_dir, str(finetune_iteration), "validation_collages"
-                )
+                    self.base_dir, str(finetune_iteration), "validation_prestats.npz"
+                ),
+                "rb",
+            ) as f:
+                validation_stats = {}
+                validation_tracked_file = np.load(f, allow_pickle=True)
+                for key in validation_tracked_file.keys():
+                    validation_stats[key] = torch.tensor(validation_tracked_file[key])
+
+            get_collage_path = lambda x: os.path.join(
+                self.base_dir, str(finetune_iteration), "validation_collages" + str(x)
             )
+            idx = 0
+            collage_path_list = []
+            while os.path.exists(get_collage_path(idx)):
+                collage_path_list.extend(os.listdir(get_collage_path(idx)))
+                idx += 1
+
             validation_tracked_values["collage_path_list"] = list(
                 map(
                     lambda x: os.path.join(
