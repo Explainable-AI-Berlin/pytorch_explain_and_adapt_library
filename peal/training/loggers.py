@@ -302,7 +302,7 @@ def log_images_to_writer(dataloader, writer, tag="train"):
             )
 
         sample_batch_label_str = "sample_" + tag + "_batch" + str(i) + "_"
-        if len(sample_train_y.shape) == 1:
+        if isinstance(sample_train_y, torch.Tensor) and len(sample_train_y.shape) == 1:
             sample_batch_label_str += "_" + str(
                 list(map(lambda x: int(x), list(sample_train_y)))
             )

@@ -38,7 +38,7 @@ def calculate_test_accuracy(
     # determine the test accuracy of the student
     correct = 0
     num_samples = 0
-    pbar = tqdm(total=test_dataloader.dataset.__len__())
+    pbar = tqdm(total=int(test_dataloader.dataset.__len__() / test_dataloader.batch_size))
     if calculate_group_accuracies:
         test_dataloader.dataset.enable_groups()
         return_dict_buffer = bool(test_dataloader.dataset.return_dict)
@@ -46,6 +46,8 @@ def calculate_test_accuracy(
         groups = np.zeros([2 * test_dataloader.dataset.output_size, 2])
 
     for it, sample in enumerate(test_dataloader):
+        if it > 5:
+            break
         if calculate_group_accuracies:
             x = sample["x"]
             y = sample["y"]
@@ -97,13 +99,13 @@ class ModelTrainer:
     def __init__(
         self,
         config,
-        model_name=None,
+        model_path=None,
         model=None,
         datasource=None,
         optimizer=None,
-        base_dir="peal_runs",
         criterions=None,
         logger=None,
+        only_last_layer=False,
         unit_test_train_loop=False,
         unit_test_single_sample=False,
         log_frequency=1000,
@@ -117,11 +119,11 @@ class ModelTrainer:
         self.val_dataloader_weights = val_dataloader_weights
 
         #
-        if model_name is not None:
-            self.model_name = model_name
+        if model_path is not None:
+            self.model_path = model_path
 
         else:
-            self.model_name = self.config.model_name
+            self.model_path = self.config.model_path
 
         if model is None:
             if (
@@ -172,9 +174,27 @@ class ModelTrainer:
 
         #
         if optimizer is None:
+            param_list = [param for param in self.model.parameters()]
+            if only_last_layer:
+                param_list_trained = []
+                if len(param_list[-1].shape) == 1:
+                    num_unfrozen = 2
+
+                else:
+                    num_unfrozen = 1
+
+                assert (
+                    len(param_list[-num_unfrozen].shape) == 2
+                ), "Wrong layer was chosen!"
+                for param in param_list[-num_unfrozen:]:
+                    param_list_trained.append(param)
+
+                param_list = param_list_trained
+
+            print('trainable parameters: ', len(param_list))
             if self.config.training.optimizer == "sgd":
                 self.optimizer = torch.optim.SGD(
-                    self.model.parameters(), lr=self.config.training.learning_rate
+                    param_list, lr=self.config.training.learning_rate
                 )
                 lambda1 = lambda epoch: 0.95**epoch
                 self.scheduler = torch.optim.lr_scheduler.LambdaLR(
@@ -183,7 +203,7 @@ class ModelTrainer:
 
             elif self.config.training.optimizer == "adam":
                 self.optimizer = torch.optim.Adam(
-                    self.model.parameters(), lr=self.config.training.learning_rate
+                    param_list, lr=self.config.training.learning_rate
                 )
 
             else:
@@ -192,10 +212,9 @@ class ModelTrainer:
         else:
             self.optimizer = optimizer
 
-        if not model_name is None:
-            self.config.model_name = model_name
+        if not model_path is None:
+            self.config.model_path = model_path
 
-        self.base_dir = os.path.join(base_dir, self.model_name)
         if criterions is None:
             criterions = get_criterions(config)
             self.criterions = {}
@@ -217,7 +236,7 @@ class ModelTrainer:
                 config=self.config,
                 model=self.model,
                 optimizer=self.optimizer,
-                base_dir=self.base_dir,
+                base_dir=self.model_path,
                 criterions=self.criterions,
                 val_dataloader=self.val_dataloaders[0],
                 writer=None,
@@ -294,7 +313,11 @@ class ModelTrainer:
                 if hasattr(self, "scheduler")
                 else self.optimizer.param_groups[0]["lr"]
             )
-            current_state += ", source_distibution: " + source_distibution if not source_distibution is None else ""
+            current_state += (
+                ", source_distibution: " + source_distibution
+                if not source_distibution is None
+                else ""
+            )
             current_state += ", ".join(
                 [
                     key + ": " + str(pbar.stored_values[key])
@@ -324,13 +347,16 @@ class ModelTrainer:
             orthogonal_initialization(self.model)
 
         if not is_initialized:
-            shutil.rmtree(self.base_dir, ignore_errors=True)
-            Path(os.path.join(self.base_dir, "logs")).mkdir(parents=True, exist_ok=True)
-            writer = SummaryWriter(os.path.join(self.base_dir, "logs"))
+            shutil.rmtree(self.model_path, ignore_errors=True)
+            Path(os.path.join(self.model_path, "logs")).mkdir(parents=True, exist_ok=True)
+            print(os.path.join(self.model_path, "logs"))
+            print(os.path.join(self.model_path, "logs"))
+            print(os.path.join(self.model_path, "logs"))
+            writer = SummaryWriter(os.path.join(self.model_path, "logs"))
             self.logger.writer = writer
-            os.makedirs(os.path.join(self.base_dir, "outputs"))
-            os.makedirs(os.path.join(self.base_dir, "checkpoints"))
-            open(os.path.join(self.base_dir, "platform.txt"), "w").write(
+            os.makedirs(os.path.join(self.model_path, "outputs"))
+            os.makedirs(os.path.join(self.model_path, "checkpoints"))
+            open(os.path.join(self.model_path, "platform.txt"), "w").write(
                 platform.node()
             )
 
@@ -340,10 +366,10 @@ class ModelTrainer:
             )
 
             self.config.is_loaded = True
-            save_yaml_config(self.config, os.path.join(self.base_dir, "config.yaml"))
+            save_yaml_config(self.config, os.path.join(self.model_path, "config.yaml"))
 
         else:
-            writer = SummaryWriter(os.path.join(self.base_dir, "logs"))
+            writer = SummaryWriter(os.path.join(self.model_path, "logs"))
             self.logger.writer = writer
 
         pbar = tqdm(
@@ -357,6 +383,18 @@ class ModelTrainer:
         val_accuracy_max = 0.0
         val_accuracy_previous = 0.0
         train_accuracy_previous = 0.0
+        self.model.eval()
+        val_accuracy = 0.0
+        self.config.training.epoch = -1
+        for idx, val_dataloader in enumerate(self.val_dataloaders):
+            if len(val_dataloader) >= 1:
+                val_loss, val_accuracy_current = self.run_epoch(
+                    val_dataloader, mode="validation_" + str(idx), pbar=pbar
+                )
+                val_accuracy += self.val_dataloader_weights[idx] * val_accuracy_current
+
+        self.logger.writer.add_scalar("epoch_validation_accuracy", val_accuracy, -1)
+
         self.config.training.epoch = 0
         while self.config.training.epoch < self.config.training.max_epochs:
             pbar.stored_values["Epoch"] = self.config.training.epoch
@@ -415,7 +453,7 @@ class ModelTrainer:
             torch.save(
                 self.model.state_dict(),
                 os.path.join(
-                    self.base_dir,
+                    self.model_path,
                     "checkpoints",
                     str(self.config.training.epoch) + ".cpl",
                 ),
@@ -424,10 +462,10 @@ class ModelTrainer:
             if val_accuracy > val_accuracy_max:
                 torch.save(
                     self.model.to("cpu").state_dict(),
-                    os.path.join(self.base_dir, "checkpoints", "final.cpl"),
+                    os.path.join(self.model_path, "checkpoints", "final.cpl"),
                 )
                 torch.save(
-                    self.model.to("cpu"), os.path.join(self.base_dir, "model.cpl")
+                    self.model.to("cpu"), os.path.join(self.model_path, "model.cpl")
                 )
                 val_accuracy_max = val_accuracy
                 self.model.to(self.device)
@@ -445,7 +483,7 @@ class ModelTrainer:
 
                 checkpoint = torch.load(
                     os.path.join(
-                        self.base_dir,
+                        self.model_path,
                         "checkpoints",
                         str(self.config.training.epoch - 1) + ".cpl",
                     ),
@@ -459,6 +497,6 @@ class ModelTrainer:
                 if hasattr(self, "scheduler"):
                     self.scheduler.step()
 
-            save_yaml_config(self.config, os.path.join(self.base_dir, "config.yaml"))
+            save_yaml_config(self.config, os.path.join(self.model_path, "config.yaml"))
 
             self.config.training.epoch += 1

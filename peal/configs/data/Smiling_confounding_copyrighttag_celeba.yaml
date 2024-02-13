@@ -1,5 +1,6 @@
 'dataset_path'            : '/home/space/datasets/peal/datasets/celeba_copyrighttag'
-'num_samples'             : 14000
+'num_samples'             : 194000
+'split'                   : [0.8,0.9]
 'input_type'              : 'image'
 'input_size'              : [3, 128, 128]
 'output_type'             : 'multiclass'

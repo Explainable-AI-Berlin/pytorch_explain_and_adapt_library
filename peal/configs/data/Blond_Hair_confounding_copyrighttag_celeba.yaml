@@ -1,9 +1,0 @@
-'dataset_class'           : 'celeba'
-'dataset_path'            : '/home/space/datasets/peal/datasets/celeba_copyrighttag'
-'num_samples'             : 40000
-'input_type'              : 'image'
-'input_size'              : [3, 128, 128]
-'output_type'             : 'multiclass'
-'output_size'             : [41]
-'confounder_probability'  : 0.5
-'confounding_factors'     : ['Blond_Hair', 'Confounder']

@@ -1,5 +1,6 @@
 from pydantic import BaseModel, PositiveInt
 
+from typing import Union
 
 class TrainingConfig(BaseModel):
     """
@@ -33,21 +34,21 @@ class TrainingConfig(BaseModel):
     """
     The train batch size. Can either be set manually or be left empty and calulated by adaptive batch_size.
     """
-    train_batch_size: PositiveInt = None
+    train_batch_size: PositiveInt = 1
     """
     The val batch size. Can either be set manually or be left empty and calulated by adaptive batch_size.
     """
-    val_batch_size: PositiveInt = None
+    val_batch_size: PositiveInt = 1
     """
     The test batch size. Can either be set manually or be left empty and calulated by adaptive batch_size.
     """
-    test_batch_size: PositiveInt = None
+    test_batch_size: PositiveInt = 1
     """
     The number of iterations per episode when using DataloaderMixer.
     If it is not set, the DataloaderMixer is not used and the value implicitly becomes
     dataset_size / batch_size
     """
-    steps_per_epoch: PositiveInt = None
+    steps_per_epoch: Union[type(None), PositiveInt] = None
     """
     A dict containing all variables that could not be given with the current config structure
     """

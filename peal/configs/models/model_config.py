@@ -89,7 +89,7 @@ class ModelConfig:
     """
     The name of the model.
     """
-    model_name: str = "model_run1"
+    model_path: str = "peal_runs/predictor1"
     """
     A dict containing all variables that could not be given with the current config structure
     """
@@ -117,20 +117,14 @@ class ModelConfig:
         training: Union[dict, TrainingConfig],
         task: Union[dict, TaskConfig],
         data: Union[dict, DataConfig] = None,
-        model_name: str = "model_run1",
-        model_type: str = "discriminator",
-        base_path: str = None,
+        model_path: str = None,
+        model_type: str = None,
         **kwargs
     ):
-        self.model_type = model_type
         if isinstance(architecture, ArchitectureConfig):
             self.architecture = architecture
 
-        if model_type == "discriminator":
-            self.architecture = ArchitectureConfig(**architecture)
-
-        else:
-            self.architecture = types.SimpleNamespace(**architecture)
+        self.architecture = ArchitectureConfig(**architecture)
 
         self.training = (
             training
@@ -147,14 +141,10 @@ class ModelConfig:
         else:
             self.data = DataConfig(**data)
 
-        self.model_name = model_name
+        if not model_path is None:
+            self.model_path = model_path
 
-        if base_path is None:
-            self.base_path = os.path.join(
-                "peal_runs", self.model_name
-            )
-
-        else:
-            self.base_path = base_path
+        if not model_type is None:
+            self.model_type = model_type
 
         self.kwargs = kwargs

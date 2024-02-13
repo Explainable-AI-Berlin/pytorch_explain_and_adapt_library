@@ -8,7 +8,6 @@ from peal.teachers.teacher_interface import TeacherInterface
 from peal.teachers.model2model_teacher import Model2ModelTeacher
 from peal.teachers.human2model_teacher import Human2ModelTeacher
 from peal.teachers.segmentation_mask_teacher import SegmentationMaskTeacher
-from peal.teachers.virelay_teacher import VirelayTeacher
 from peal.data.dataset_interfaces import PealDataset
 
 
@@ -50,9 +49,6 @@ def get_teacher(
 
     elif teacher == "SegmentationMask":
         teacher = SegmentationMaskTeacher(adaptor_config.attribution_threshold, dataset)
-
-    elif teacher[:7] == "virelay":
-        teacher = VirelayTeacher(num_classes=output_size, port=int(teacher[-4:]))
 
     elif teacher[-4:] == ".cpl":
         teacher = Model2ModelTeacher(torch.load(teacher, map_location=device), dataset)

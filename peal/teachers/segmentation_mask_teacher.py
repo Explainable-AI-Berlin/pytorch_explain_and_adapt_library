@@ -35,23 +35,22 @@ class SegmentationMaskTeacher(TeacherInterface):
             else:
                 feedback.append("false")
 
-        if "validation" in base_dir:
-            self.dataset.generate_contrastive_collage(
-                y_counterfactual_teacher_list=y_list,
-                y_original_teacher_list=list(
-                    map(
-                        lambda x: x[0] if x[1] == "true" else abs(1 - x[0]),
-                        zip(y_list, feedback),
-                    )
-                ),
-                feedback_list=feedback,
-                x_counterfactual_list=x_counterfactual_list,
-                y_source_list=y_source_list,
-                y_target_list=y_target_list,
-                x_list=x_list,
-                y_list=y_list,
-                base_path=base_dir,
-                **kwargs,
-            )
+        self.dataset.generate_contrastive_collage(
+            y_counterfactual_teacher_list=y_list,
+            y_original_teacher_list=list(
+                map(
+                    lambda x: x[0] if x[1] == "true" else abs(1 - x[0]),
+                    zip(y_list, feedback),
+                )
+            ),
+            feedback_list=feedback,
+            x_counterfactual_list=x_counterfactual_list,
+            y_source_list=y_source_list,
+            y_target_list=y_target_list,
+            x_list=x_list,
+            y_list=y_list,
+            base_path=base_dir,
+            **kwargs,
+        )
 
         return feedback

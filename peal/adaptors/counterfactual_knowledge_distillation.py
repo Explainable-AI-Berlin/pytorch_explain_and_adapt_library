@@ -155,6 +155,11 @@ class CounterfactualKnowledgeDistillation:
             dataset=self.val_dataloader.dataset,
             device=self.device,
         )
+        if self.adaptor_config.training.steps_per_epoch is None:
+            self.adaptor_config.training.steps_per_epoch = (
+                len(self.train_dataloader.dataset)
+                // self.adaptor_config.training.train_batch_size
+            )
 
         self.dataloader_mixer = DataloaderMixer(
             self.adaptor_config.training, self.train_dataloader
@@ -226,7 +231,10 @@ class CounterfactualKnowledgeDistillation:
                 self.adaptor_config.calculate_group_accuracies,
             )
 
-            if isinstance(self.val_dataloader.dataset, ImageDataset) and self.adaptor_config.use_visualization:
+            if (
+                isinstance(self.val_dataloader.dataset, ImageDataset)
+                and self.adaptor_config.use_visualization
+            ):
                 generator_sample = self.generator.sample_x(
                     batch_size=self.adaptor_config.batch_size
                 )
@@ -255,7 +263,12 @@ class CounterfactualKnowledgeDistillation:
                 f.write(platform.node())
 
             if self.adaptor_config.calculate_group_accuracies:
-                test_accuracy, group_accuracies, group_distribution, worst_group_accuracy = test_accuracy
+                (
+                    test_accuracy,
+                    group_accuracies,
+                    group_distribution,
+                    worst_group_accuracy,
+                ) = test_accuracy
                 for idx in range(len(group_accuracies)):
                     writer.add_scalar(
                         "test_group_accuracy_" + str(idx),
@@ -309,17 +322,17 @@ class CounterfactualKnowledgeDistillation:
                     mixing_ratio=0.5,
                 )
 
-            self.student = torch.load(
-                os.path.join(self.adaptor_config.base_dir, "model.cpl"),
-                map_location=self.device,
-            )
+            if self.adaptor_config.current_iteration > 0:
+                self.student = torch.load(
+                    os.path.join(self.adaptor_config.base_dir, "model.cpl"),
+                    map_location=self.device,
+                )
 
         return validation_stats, writer
 
     def get_batch(
         self,
         error_matrix: torch.Tensor,
-        confidence_score_stats: torch.tensor,
     ):
         x_batch = []
         y_source_batch = []
@@ -374,8 +387,12 @@ class CounterfactualKnowledgeDistillation:
     ):
         # TODO this should be done with a context manager
         if isinstance(self.teacher, SegmentationMaskTeacher):
-            for dataloader in self.datastack.datasource.dataloaders:
-                dataloader.dataset.enable_hints()
+            if hasattr(self.datastack.datasource, "dataloaders"):
+                for dataloader in self.datastack.datasource.dataloaders:
+                    dataloader.dataset.dataset.enable_hints()
+
+            else:
+                self.datastack.datasource.dataset.enable_hints()
 
         self.datastack.reset()
 
@@ -416,7 +433,7 @@ class CounterfactualKnowledgeDistillation:
                 / self.adaptor_config.batch_size
             )
             for i in range(num_batches_per_iteration):
-                batch = self.get_batch(error_matrix, confidence_score_stats)
+                batch = self.get_batch(error_matrix)
                 values = self.explainer.explain_batch(
                     batch=batch,
                     base_path=collage_base_path,
@@ -464,10 +481,14 @@ class CounterfactualKnowledgeDistillation:
                 continue_collecting = False
 
         if isinstance(self.teacher, SegmentationMaskTeacher):
-            for dataloader in self.datastack.datasource.dataloaders:
-                dataloader.dataset.disable_hints()
+            if hasattr(self.datastack.datasource, "dataloaders"):
+                for dataloader in self.datastack.datasource.dataloaders:
+                    dataloader.dataset.disable_hints()
 
-            self.datastack.datasource.reset()
+                self.datastack.datasource.reset()
+
+            else:
+                self.datastack.datasource.dataset.disable_hints()
 
         pbar.close()
         return tracked_values
@@ -746,7 +767,8 @@ class CounterfactualKnowledgeDistillation:
                     finetune_iteration,
                 )
 
-            if not self.adaptor_config.continuous_learning:
+            if self.adaptor_config.continuous_learning == "retrain":
+
                 def weight_reset(m):
                     reset_parameters = getattr(m, "reset_parameters", None)
                     if callable(reset_parameters):
@@ -754,29 +776,19 @@ class CounterfactualKnowledgeDistillation:
 
                 self.student.apply(weight_reset)
 
-            else:
-                param_list = [param for param in self.student.parameters()]
-                if len(param_list[-1].shape) == 1:
-                    num_unfrozen = 2
-
-                else:
-                    num_unfrozen = 1
-
-                assert len(param_list[-num_unfrozen].shape) == 2, "Wrong layer was chosen!"
-                for param in param_list[:-num_unfrozen]:
-                    if hasattr(param, "requires_grad") and param.requires_grad:
-                        param.requires_grad = False
-
             finetune_trainer = ModelTrainer(
                 config=copy.deepcopy(self.adaptor_config),
                 model=self.student,
                 datasource=(self.dataloader_mixer, self.dataloaders_val),
-                model_name="finetuned_model",
-                base_dir=os.path.join(self.base_dir, str(finetune_iteration)),
+                model_path=os.path.join(
+                    self.base_dir, str(finetune_iteration), "finetuned_model"
+                ),
                 val_dataloader_weights=[
                     1 - mixing_ratio,
                     mixing_ratio,
                 ],
+                only_last_layer=self.adaptor_config.continuous_learning
+                == "deep_feature_reweighting",
             )
             finetune_trainer.fit(continue_training=True)
 
@@ -844,9 +856,7 @@ class CounterfactualKnowledgeDistillation:
             "cfkd": torch.tensor([0, 0, 0, 1, 1, 1]),
         }
         # TODO introduce column for teacher
-        explainer_config = copy.deepcopy(
-            self.explainer.explainer_config
-        )
+        explainer_config = copy.deepcopy(self.explainer.explainer_config)
         for attribute in self.explainer.explainer_config.__dict__.items():
             if isinstance(attribute[1], list) and len(attribute[1]) == 2:
                 setattr(
@@ -968,12 +978,16 @@ class CounterfactualKnowledgeDistillation:
                     copy.deepcopy(validation_tracked_values_current["x_list"])
                 )
                 x_counterfactual_collection.append(
-                    copy.deepcopy(validation_tracked_values_current["x_counterfactual_list"])
+                    copy.deepcopy(
+                        validation_tracked_values_current["x_counterfactual_list"]
+                    )
                 )
                 y_confidence_list.append(
-                    copy.deepcopy(validation_tracked_values_current[
-                        "y_target_end_confidence_list"
-                    ])
+                    copy.deepcopy(
+                        validation_tracked_values_current[
+                            "y_target_end_confidence_list"
+                        ]
+                    )
                 )
                 validation_stats.append(validation_stats_current)
                 if validation_tracked_values is None:
@@ -1180,7 +1194,6 @@ class CounterfactualKnowledgeDistillation:
                 writer=writer,
             )
 
-
             test_accuracy = calculate_test_accuracy(
                 self.student,
                 self.test_dataloader,
@@ -1188,7 +1201,12 @@ class CounterfactualKnowledgeDistillation:
                 self.adaptor_config.calculate_group_accuracies,
             )
             if self.adaptor_config.calculate_group_accuracies:
-                test_accuracy, group_accuracies, group_distribution, worst_group_accuracy = test_accuracy
+                (
+                    test_accuracy,
+                    group_accuracies,
+                    group_distribution,
+                    worst_group_accuracy,
+                ) = test_accuracy
                 for idx in range(len(group_accuracies)):
                     writer.add_scalar(
                         "test_group_accuracy_" + str(idx),

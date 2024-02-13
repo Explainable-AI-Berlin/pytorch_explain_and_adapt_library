@@ -76,7 +76,7 @@ class CFKDConfig(AdaptorConfig):
     Whether to continue training from the current student model or start training from scratch
     again.
     """
-    continuous_learning: bool = False
+    continuous_learning: str = "deep_feature_reweighting"
     """
     Whether to select sample for counterfactual creation the model is not that confident about.
     """
