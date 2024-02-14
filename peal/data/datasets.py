@@ -560,6 +560,7 @@ class Image2MixedDataset(ImageDataset):
 
         if (
             not self.task_config is None
+            and hasattr(self.task_config, "x_selection")
             and not self.task_config.x_selection is None
             and not len(self.task_config.x_selection) == 0
         ):

@@ -2,5 +2,6 @@
 'val_batch_size'          : 32
 'test_batch_size'         : 32
 'max_epochs'              : 1
+'steps_per_epoch'         : 5
 'learning_rate'           : 0.00001
 'optimizer'               : 'adam'
