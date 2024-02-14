@@ -207,8 +207,6 @@ class DDPM(EditCapableGenerator):
             )
         )
         args.__dict__.update({k: v for k, v in explainer_config.__dict__.items() if k not in args.__dict__})"""
-        print("args.sampling_inpaint")
-        print(args.sampling_inpaint)
         args.dataset = dataset
         args.classifier_dataset = classifier_dataset
         args.generator_dataset = self.dataset
