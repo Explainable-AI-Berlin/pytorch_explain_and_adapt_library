@@ -63,3 +63,4 @@ class DDPMConfig(GeneratorConfig):
     predict_xstart : bool = False
     rescale_timesteps : bool = False
     rescale_learned_sigmas : bool = False
+    full_args: dict = {}

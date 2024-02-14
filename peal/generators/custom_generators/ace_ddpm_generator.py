@@ -144,12 +144,13 @@ class DDPM(EditCapableGenerator):
                 [source_classes, target_classes],
             )
         ]
-        args = copy.deepcopy(self.config).dict()
+        #args = copy.deepcopy(self.config).dict()
+        args = copy.deepcopy(self.config.full_args)
         args = SimpleNamespace(**args)
         args.output_path = self.counterfactual_path
         args.batch_size = x_in.shape[0]
         #
-        args.attack_iterations = int(
+        """args.attack_iterations = int(
             explainer_config.attack_iterations
             if not isinstance(explainer_config.attack_iterations, list)
             else random.randint(
@@ -205,7 +206,7 @@ class DDPM(EditCapableGenerator):
                 explainer_config.timestep_respacing[1],
             )
         )
-        args.__dict__.update({k: v for k, v in explainer_config.__dict__.items() if k not in args.__dict__})
+        args.__dict__.update({k: v for k, v in explainer_config.__dict__.items() if k not in args.__dict__})"""
         print("args.sampling_inpaint")
         print(args.sampling_inpaint)
         args.dataset = dataset

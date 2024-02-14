@@ -243,6 +243,7 @@ def filter_fn(
 
     print('ce out')
     print([ce.min(), ce.max()])
+    import pdb; pdb.set_trace()
     return ce, pe, noise_x, mask
 
 

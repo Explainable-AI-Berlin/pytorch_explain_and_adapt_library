@@ -1,7 +1,10 @@
+from types import SimpleNamespace
+
 from pydantic import BaseModel, PositiveInt
 from typing import Union
 
 from peal.configs.data.data_config import DataConfig
+from peal.configs.generators.generator_config import GeneratorConfig
 from peal.configs.training.training_template import TrainingConfig
 from peal.configs.models.model_config import TaskConfig
 from peal.configs.explainers.explainer_config import ExplainerConfig
@@ -149,9 +152,9 @@ class CFKDConfig(AdaptorConfig):
         explainer: Union[dict, ExplainerConfig] = None,
         data: Union[dict, DataConfig] = None,
         test_data: Union[dict, DataConfig] = None,
+        generator: Union[dict, GeneratorConfig] = None,
         student: str = None,
         teacher: str = None,
-        generator: str = None,
         base_dir: str = None,
         batch_size: PositiveInt = None,
         validation_runs: PositiveInt = None,
@@ -230,13 +233,20 @@ class CFKDConfig(AdaptorConfig):
         if isinstance(explainer, ExplainerConfig):
             self.explainer = explainer
 
-        else:
+        elif isinstance(explainer, dict):
             explainer_config_model = get_config_model(explainer)
             self.explainer = explainer_config_model(**explainer)
 
+        if isinstance(generator, GeneratorConfig):
+            self.generator = generator
+
+        elif isinstance(generator, dict):
+            generator_config_model = get_config_model(generator)
+            self.generator = generator_config_model(**generator)
+            self.generator.full_args = generator
+
         self.student = student if not student is None else self.student
         self.teacher = teacher if not teacher is None else self.teacher
-        self.generator = generator if not generator is None else self.generator
         self.base_dir = base_dir if not base_dir is None else self.base_dir
         self.batch_size = batch_size if not batch_size is None else self.batch_size
         self.validation_runs = validation_runs if not validation_runs is None else self.validation_runs
