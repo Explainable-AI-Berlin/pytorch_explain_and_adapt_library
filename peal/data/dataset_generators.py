@@ -1,5 +1,6 @@
 import random
 import os
+import csv
 import json
 import shutil
 import random
@@ -272,18 +273,12 @@ class ConfounderDatasetGenerator:
         confounding="intensity",
         num_samples=None,
         attribute=None,
+        data_config=None,
         **kwargs,
     ):
         """ """
         self.dataset_origin_path = dataset_origin_path
         self.confounding = confounding
-        if dataset_name is None:
-            self.dataset_name = (
-                os.path.split(dataset_origin_path)[-1] + "_" + self.confounding
-            )
-
-        else:
-            self.dataset_name = dataset_name
 
         if label_dir is None:
             self.label_dir = os.path.join(dataset_origin_path, "data.csv")
@@ -292,9 +287,29 @@ class ConfounderDatasetGenerator:
             self.label_dir = label_dir
 
         self.delimiter = delimiter
-        self.dataset_dir = os.path.join("datasets", self.dataset_name)
+        self.dataset_dir = data_config.dataset_path
         self.num_samples = num_samples
         self.attribute = attribute
+
+        if not data_config is None and not data_config.inverse is None:
+            with open(os.path.join(data_config.inverse, "data.csv"), "r") as f:
+                inverse_data = f.readlines()
+                self.inverse_head = list(
+                    map(lambda x: x.strip(), inverse_data[0].split(","))
+                )
+                self.cs_idx = self.inverse_head.index("ConfounderStrength")
+                self.inverse_body = []
+                for idx in range(1, len(inverse_data)):
+                    self.inverse_body.append(
+                        list(
+                            map(
+                                lambda x: x.strip(), inverse_data[idx].split(",")
+                            )
+                        )
+                    )
+
+        else:
+            self.inverse_head = None
 
     def generate_dataset(self):
         """ """
@@ -388,6 +403,9 @@ class ConfounderDatasetGenerator:
 
             else:
                 confounder_intensity = 1.0
+
+            if not self.inverse_head is None:
+                confounder_intensity = -1 * float(self.inverse_body[sample_idx][self.cs_idx])
 
             if self.confounding == "intensity":
                 intensity_change = (

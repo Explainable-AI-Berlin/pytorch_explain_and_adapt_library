@@ -15,6 +15,9 @@ from typing import Union
 from torch import nn
 from types import SimpleNamespace
 
+from peal.configs.explainers.perfect_false_counterfactual_config import (
+    PerfectFalseCounterfactualConfig,
+)
 from peal.global_utils import (
     load_yaml_config,
     set_adaptive_batch_size,
@@ -188,6 +191,16 @@ class CounterfactualKnowledgeDistillation:
         ]
         if teacher == "SegmentationMask":
             self.tracked_keys.append("hint_list")
+            self.train_dataloader.dataset.enable_hints()
+            self.val_dataloader.dataset.enable_hints()
+
+        if isinstance(
+            self.explainer.explainer_config, PerfectFalseCounterfactualConfig
+        ):
+            self.tracked_keys.append("idx_list")
+            self.train_dataloader.dataset.enable_idx()
+            self.val_dataloader.dataset.enable_idx()
+            self.test_dataloader.dataset.enable_idx()
 
         self.data_config = copy.deepcopy(self.adaptor_config)
         self.data_config.data.split = [1.0, 1.0]
@@ -202,8 +215,6 @@ class CounterfactualKnowledgeDistillation:
             self.adaptor_config.max_validation_samples
         )
         self.validation_data_config.data.split = [0.0, 1.0]
-        print("adaptor_config.training")
-        print(adaptor_config.training)
 
     def initialize_run(self):
         if self.overwrite or not os.path.exists(
@@ -229,6 +240,7 @@ class CounterfactualKnowledgeDistillation:
                 self.test_dataloader,
                 self.device,
                 self.adaptor_config.calculate_group_accuracies,
+                self.adaptor_config.max_test_batches,
             )
 
             if (
@@ -340,6 +352,7 @@ class CounterfactualKnowledgeDistillation:
         y_batch = []
         y_target_start_confidence_batch = []
         hint_batch = []
+        idx_batch = []
         sample_idx = 0
         torch.manual_seed(torch.seed())
         error_distribution = torch.distributions.Categorical(error_matrix)
@@ -350,8 +363,18 @@ class CounterfactualKnowledgeDistillation:
             y_target = int(cm_idx % self.output_size)
             x, y = self.datastack.pop(int(y_source))
             # TODO should be done with context manager
-            if isinstance(self.teacher, SegmentationMaskTeacher):
-                y, hint = y
+            if isinstance(self.teacher, SegmentationMaskTeacher) or isinstance(
+                self.explainer.explainer_config, PerfectFalseCounterfactualConfig
+            ):
+                y_res = y[1:]
+                y = y[0]
+                if isinstance(self.teacher, SegmentationMaskTeacher):
+                    hint = y_res[0]
+
+                if isinstance(
+                    self.explainer.explainer_config, PerfectFalseCounterfactualConfig
+                ):
+                    idx = y_res[-1]
 
             logits = (
                 self.student(x.to(self.device).unsqueeze(0)).squeeze(0).detach().cpu()
@@ -364,7 +387,20 @@ class CounterfactualKnowledgeDistillation:
                 y_target_batch.append(torch.tensor(y_target))
                 y_batch.append(y)
                 y_target_start_confidence_batch.append(y_target_start_confidence)
-                hint_batch.append(torch.zeros_like(x))
+                if isinstance(self.teacher, SegmentationMaskTeacher):
+                    hint_batch.append(hint)
+
+                else:
+                    hint_batch.append(torch.zeros_like(x))
+
+                if isinstance(
+                    self.explainer.explainer_config, PerfectFalseCounterfactualConfig
+                ):
+                    idx_batch.append(idx)
+
+                else:
+                    idx_batch.append(0)
+
                 sample_idx += 1
 
         x_batch = torch.stack(x_batch)
@@ -376,6 +412,7 @@ class CounterfactualKnowledgeDistillation:
             "y_source_list": y_source_batch,
             "y_target_start_confidence_list": y_target_start_confidence_batch,
             "hint_list": hint_batch,
+            "idx_list": idx_batch,
         }
 
     def generate_x_counterfactual_list(
@@ -385,15 +422,6 @@ class CounterfactualKnowledgeDistillation:
         finetune_iteration,
         tracked_keys,
     ):
-        # TODO this should be done with a context manager
-        if isinstance(self.teacher, SegmentationMaskTeacher):
-            if hasattr(self.datastack.datasource, "dataloaders"):
-                for dataloader in self.datastack.datasource.dataloaders:
-                    dataloader.dataset.dataset.enable_hints()
-
-            else:
-                self.datastack.datasource.dataset.enable_hints()
-
         self.datastack.reset()
 
         collage_base_path = os.path.join(
@@ -408,7 +436,13 @@ class CounterfactualKnowledgeDistillation:
         tracked_values = {key: [] for key in tracked_keys}
 
         continue_collecting = True
-        acceptance_threshold = self.adaptor_config.explainer.y_target_goal_confidence
+        if hasattr(self.adaptor_config.explainer, "y_target_goal_confidence"):
+            acceptance_threshold = (
+                self.adaptor_config.explainer.y_target_goal_confidence
+            )
+
+        else:
+            acceptance_threshold = 0.51
 
         pbar = tqdm(
             total=int(
@@ -479,16 +513,6 @@ class CounterfactualKnowledgeDistillation:
 
             else:
                 continue_collecting = False
-
-        if isinstance(self.teacher, SegmentationMaskTeacher):
-            if hasattr(self.datastack.datasource, "dataloaders"):
-                for dataloader in self.datastack.datasource.dataloaders:
-                    dataloader.dataset.disable_hints()
-
-                self.datastack.datasource.reset()
-
-            else:
-                self.datastack.datasource.dataset.disable_hints()
 
         pbar.close()
         return tracked_values
@@ -692,7 +716,8 @@ class CounterfactualKnowledgeDistillation:
                     self.student(
                         x_counterfactual_list[sample_idx].unsqueeze(0).to(self.device)
                     ).argmax()
-                    == int(y_source_list[sample_idx]), "This can not be a false counterfactual!"
+                    == int(y_source_list[sample_idx]),
+                    "This can not be a false counterfactual!",
                 )
                 x_list.append(x_counterfactual_list[sample_idx])
                 y_list.append(int(y_source_list[sample_idx]))
@@ -796,7 +821,27 @@ class CounterfactualKnowledgeDistillation:
                 only_last_layer=self.adaptor_config.continuous_learning
                 == "deep_feature_reweighting",
             )
+            if isinstance(self.teacher, SegmentationMaskTeacher):
+                self.train_dataloader.dataset.disable_hints()
+                self.val_dataloader.dataset.disable_hints()
+
+            if isinstance(
+                self.explainer.explainer_config, PerfectFalseCounterfactualConfig
+            ):
+                self.train_dataloader.dataset.disable_idx()
+                self.val_dataloader.dataset.disable_idx()
+
             finetune_trainer.fit(continue_training=True)
+
+            if isinstance(self.teacher, SegmentationMaskTeacher):
+                self.train_dataloader.dataset.enable_hints()
+                self.val_dataloader.dataset.enable_hints()
+
+            if isinstance(
+                self.explainer.explainer_config, PerfectFalseCounterfactualConfig
+            ):
+                self.train_dataloader.dataset.enable_idx()
+                self.val_dataloader.dataset.enable_idx()
 
         else:
             self.student = torch.load(
@@ -1220,6 +1265,7 @@ class CounterfactualKnowledgeDistillation:
                 self.test_dataloader,
                 self.device,
                 self.adaptor_config.calculate_group_accuracies,
+                self.adaptor_config.max_test_batches,
             )
             if self.adaptor_config.calculate_group_accuracies:
                 (

@@ -48,7 +48,7 @@ class DataStack:
                 X, y = self.dataset.__getitem__(self.current_idx)
                 if (
                     hasattr(self.dataset, "hints_enabled")
-                    and self.dataset.hints_enabled
+                    and self.dataset.hints_enabled or self.dataset.idx_enabled
                 ):
                     y_index = y[0]
 
@@ -62,7 +62,7 @@ class DataStack:
                 X, y = next(iter(self.datasource))
                 if (
                     hasattr(self.dataset, "hints_enabled")
-                    and self.dataset.hints_enabled
+                    and self.dataset.hints_enabled or self.dataset.idx_enabled
                 ):
                     for i in range(X.shape[0]):
                         self.data[int(y[0][i])].append([X[i], (y[0][i], y[1][i])])

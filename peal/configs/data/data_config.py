@@ -120,3 +120,7 @@ class DataConfig(BaseModel):
     The path of the original dataset.
     """
     dataset_origin_path: Union[type(None), str] = None
+    """
+    The path of the original dataset.
+    """
+    inverse: Union[type(None), str] = None

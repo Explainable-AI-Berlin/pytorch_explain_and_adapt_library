@@ -32,6 +32,10 @@ class CFKDConfig(AdaptorConfig):
     """
     max_validation_samples: PositiveInt = 100
     """
+    The maximum number of test batches.
+    """
+    max_test_batches: Union[type(None), PositiveInt] = None
+    """
     The number of finetune iterations when executing the adaptor.
     """
     finetune_iterations: PositiveInt = 2
@@ -173,6 +177,7 @@ class CFKDConfig(AdaptorConfig):
         current_iteration: PositiveInt = None,
         overwrite: bool = None,
         use_visualization: bool = None,
+        max_test_batches: Union[type(None), PositiveInt] = None,
         **kwargs,
     ):
         """
@@ -309,4 +314,5 @@ class CFKDConfig(AdaptorConfig):
         )
         self.overwrite = overwrite if not overwrite is None else self.overwrite
         self.use_visualization = use_visualization if not use_visualization is None else self.use_visualization
+        self.max_test_batches = max_test_batches if not max_test_batches is None else self.max_test_batches
         self.kwargs = kwargs

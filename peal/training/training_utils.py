@@ -61,14 +61,18 @@ def calculate_validation_statistics(
         ),
     )
     pbar.stored_values = {}
-    if "hint_list" in tracked_keys:
-        dataloader.dataset.enable_hints()
 
     for it, (x, y) in enumerate(dataloader):
         pred_confidences = torch.nn.Softmax(dim=-1)(model(x.to(device))).detach().cpu()
         y_pred = logits_to_prediction(pred_confidences)
-        if "hint_list" in tracked_keys:
-            y, hints = y
+        if "hint_list" in tracked_keys or "idx_list" in tracked_keys:
+            y_res = y[1:]
+            y = y[0]
+            if "hint_list" in tracked_keys:
+                hints = y_res[0]
+
+            if "idx_list" in tracked_keys:
+                idxs = y_res[-1]
 
         for i in range(y.shape[0]):
             if y_pred[i] == y[i]:
@@ -92,6 +96,10 @@ def calculate_validation_statistics(
         batch["y_list"] = y
         if "hint_list" in tracked_keys:
             batch["hint_list"] = hints
+
+        if "idx_list" in tracked_keys:
+            print(idxs)
+            batch["idx_list"] = idxs
 
         batch["y_source_list"] = y_pred
         batch["y_target_list"] = batch_targets
@@ -118,8 +126,6 @@ def calculate_validation_statistics(
             break
 
     pbar.close()
-    if "hint_list" in tracked_keys:
-        dataloader.dataset.disable_hints()
 
     confidence_score_stats = []
     for i in range(output_size):

@@ -1,5 +1,4 @@
 from typing import Union
-from pydantic import BaseModel
 
 from peal.configs.explainers.explainer_config import ExplainerConfig
 

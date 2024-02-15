@@ -15,7 +15,7 @@ def main():
     integrate_arguments(args, data_config, exclude=["data_config"])
 
     if data_config.dataset_class == "celeba":
-        cdg = ConfounderDatasetGenerator(**data_config.__dict__)
+        cdg = ConfounderDatasetGenerator(**data_config.__dict__, data_config=data_config)
         cdg.generate_dataset()
 
 

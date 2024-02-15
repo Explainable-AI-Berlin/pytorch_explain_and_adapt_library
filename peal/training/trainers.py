@@ -33,7 +33,7 @@ from peal.configs.architectures.architecture_template import ArchitectureConfig
 
 
 def calculate_test_accuracy(
-    model, test_dataloader, device, calculate_group_accuracies=False
+    model, test_dataloader, device, calculate_group_accuracies=False, max_test_batches=None
 ):
     # determine the test accuracy of the student
     correct = 0
@@ -46,8 +46,9 @@ def calculate_test_accuracy(
         groups = np.zeros([2 * test_dataloader.dataset.output_size, 2])
 
     for it, sample in enumerate(test_dataloader):
-        if it > 5:
+        if not max_test_batches is None and it >= max_test_batches:
             break
+
         if calculate_group_accuracies:
             x = sample["x"]
             y = sample["y"]
@@ -56,6 +57,8 @@ def calculate_test_accuracy(
 
         else:
             x, y = sample
+            if test_dataloader.dataset.idx_enabled:
+                y = y[0]
 
         y_pred = model(x.to(device)).argmax(-1).detach().to("cpu")
         correct += float(torch.sum(y_pred == y))

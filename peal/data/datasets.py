@@ -578,8 +578,8 @@ class Image2MixedDataset(ImageDataset):
 
         if not self.task_config is None and not self.task_config.y_selection is None:
             target = torch.zeros([len(self.task_config.y_selection)])
-            for idx, selection in enumerate(self.task_config.y_selection):
-                target[idx] = targets[self.attributes.index(selection)]
+            for i, selection in enumerate(self.task_config.y_selection):
+                target[i] = targets[self.attributes.index(selection)]
 
         else:
             target = torch.tensor(

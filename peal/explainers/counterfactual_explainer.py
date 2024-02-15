@@ -4,6 +4,10 @@ import torchvision
 from torch import nn
 from typing import Union
 
+from peal.configs.explainers.perfect_false_counterfactual_config import (
+    PerfectFalseCounterfactualConfig,
+)
+from peal.data.dataset_factory import get_datasets
 from peal.global_utils import load_yaml_config
 from peal.generators.interfaces import InvertibleGenerator, EditCapableGenerator
 from peal.data.dataset_interfaces import PealDataset
@@ -17,14 +21,14 @@ class CounterfactualExplainer(ExplainerInterface):
     """
 
     def __init__(
-            self,
-            downstream_model: nn.Module,
-            generator: InvertibleGenerator,
-            input_type: str,
-            dataset: PealDataset,
-            explainer_config: Union[
-                dict, str, ExplainerConfig
-            ] = "<PEAL_BASE>/configs/explainers/counterfactual_default.yaml",
+        self,
+        downstream_model: nn.Module,
+        generator: InvertibleGenerator,
+        input_type: str,
+        dataset: PealDataset,
+        explainer_config: Union[
+            dict, str, ExplainerConfig
+        ] = "<PEAL_BASE>/configs/explainers/counterfactual_default.yaml",
     ):
         """
         This class implements the counterfactual explanation method
@@ -46,8 +50,19 @@ class CounterfactualExplainer(ExplainerInterface):
         self.input_type = input_type
         self.loss = torch.nn.CrossEntropyLoss()
 
+        if isinstance(self.explainer_config, PerfectFalseCounterfactualConfig):
+            inverse_datasets = get_datasets(self.explainer_config.data)
+            self.inverse_datasets = {}
+            self.inverse_datasets["Training"] = inverse_datasets[0]
+            self.inverse_datasets["Validation"] = inverse_datasets[1]
+            if len(list(inverse_datasets)) == 3:
+                self.inverse_datasets["test"] = inverse_datasets[2]
+
+            if not self.explainer_config.test_data is None:
+                self.inverse_datasets["test"] = get_datasets(self.explainer_config.test_data)[-1]
+
     def gradient_based_counterfactual(
-            self, x_in, target_confidence_goal, target_classes, pbar=None, mode=""
+        self, x_in, target_confidence_goal, target_classes, pbar=None, mode=""
     ):
         """
         This function generates a counterfactual for a given batch of inputs.
@@ -85,8 +100,8 @@ class CounterfactualExplainer(ExplainerInterface):
         for i in range(self.explainer_config.gradient_steps):
             if self.explainer_config.use_masking:
                 mask = (
-                        torch.tensor(target_confidences).to(self.device)
-                        < target_confidence_goal
+                    torch.tensor(target_confidences).to(self.device)
+                    < target_confidence_goal
                 )
                 if torch.sum(mask) == 0.0:
                     break
@@ -161,7 +176,9 @@ class CounterfactualExplainer(ExplainerInterface):
 
         latent_code = [v_elem.to(self.device) for v_elem in v]
         counterfactual = self.generator.decode(latent_code).detach().cpu()
-        counterfactual = torchvision.transforms.Resize(self.dataset.config.input_size[1:])(counterfactual)
+        counterfactual = torchvision.transforms.Resize(
+            self.dataset.config.input_size[1:]
+        )(counterfactual)
         counterfactual = self.dataset.project_to_pytorch_default(counterfactual)
 
         attributions = []
@@ -176,16 +193,40 @@ class CounterfactualExplainer(ExplainerInterface):
 
         return counterfactual, attributions, target_confidences
 
+    def perfect_false_counterfactuals(self, x_in, target_classes, idx_list, mode):
+        """
+        This function generates a counterfactual for a given batch of inputs.
+
+        Args:
+            batch (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        x_counterfactual_list = []
+        z_difference_list = []
+        y_target_end_confidence_list = []
+        for i, idx in enumerate(idx_list):
+            x_counterfactual = self.inverse_datasets[mode][idx][0]
+            x_counterfactual_list.append(x_counterfactual)
+            preds = torch.nn.Softmax()(
+                self.downstream_model(x_counterfactual.unsqueeze(0).to(self.device)).detach().cpu()
+            )
+            y_target_end_confidence_list.append(preds[0][target_classes[i]])
+            z_difference_list.append(x_in[i] - x_counterfactual)
+
+        return x_counterfactual_list, z_difference_list, y_target_end_confidence_list
+
     def explain_batch(
-            self,
-            batch: dict,
-            base_path: str = "collages",
-            start_idx: int = 0,
-            y_target_goal_confidence_in: int = None,
-            remove_below_threshold: bool = True,
-            pbar=None,
-            mode="",
-            model: nn.Module = None,
+        self,
+        batch: dict,
+        base_path: str = "collages",
+        start_idx: int = 0,
+        y_target_goal_confidence_in: int = None,
+        remove_below_threshold: bool = True,
+        pbar=None,
+        mode="",
+        model: nn.Module = None,
     ) -> dict:
         """
         This function generates a counterfactual for a given batch of inputs.
@@ -201,12 +242,28 @@ class CounterfactualExplainer(ExplainerInterface):
             dict: The batch with the counterfactuals added.
         """
         if y_target_goal_confidence_in is None:
-            target_confidence_goal = self.explainer_config.y_target_goal_confidence
+            if hasattr(self.explainer_config, "y_target_goal_confidence"):
+                target_confidence_goal = self.explainer_config.y_target_goal_confidence
+
+            else:
+                target_confidence_goal = 0.51
 
         else:
             target_confidence_goal = y_target_goal_confidence_in
 
-        if isinstance(self.generator, InvertibleGenerator):
+        if isinstance(self.explainer_config, PerfectFalseCounterfactualConfig):
+            (
+                batch["x_counterfactual_list"],
+                batch["z_difference_list"],
+                batch["y_target_end_confidence_list"],
+            ) = self.perfect_false_counterfactuals(
+                x_in=batch["x_list"],
+                target_classes=batch["y_target_list"],
+                idx_list=batch["idx_list"],
+                mode=mode,
+            )
+
+        elif isinstance(self.generator, InvertibleGenerator):
             (
                 batch["x_counterfactual_list"],
                 batch["z_difference_list"],
@@ -243,8 +300,8 @@ class CounterfactualExplainer(ExplainerInterface):
                 batch_out[key] = []
                 for sample_idx in range(len(batch[key])):
                     if (
-                            batch["y_target_end_confidence_list"][sample_idx]
-                            >= target_confidence_goal
+                        batch["y_target_end_confidence_list"][sample_idx]
+                        >= target_confidence_goal
                     ):
                         batch_out[key].append(batch[key][sample_idx])
 
