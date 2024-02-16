@@ -207,7 +207,10 @@ class CounterfactualExplainer(ExplainerInterface):
         z_difference_list = []
         y_target_end_confidence_list = []
         for i, idx in enumerate(idx_list):
-            x_counterfactual = self.inverse_datasets[mode][idx][0]
+            try:
+                x_counterfactual = self.inverse_datasets[mode][idx][0]
+            except Exception as e:
+                import pdb; pdb.set_trace()
             x_counterfactual_list.append(x_counterfactual)
             preds = torch.nn.Softmax()(
                 self.downstream_model(x_counterfactual.unsqueeze(0).to(self.device)).detach().cpu()

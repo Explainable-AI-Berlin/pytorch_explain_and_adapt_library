@@ -280,6 +280,10 @@ class ModelTrainer:
                 source_distibution = None
 
             X, y = sample
+            # TODO this is a dirty fix!!!
+            if isinstance(y, list) or isinstance(y, tuple):
+                y = y[0]
+
             #
             if self.unit_test_train_loop and batch_idx >= 2:
                 break
@@ -297,6 +301,7 @@ class ModelTrainer:
                 criterion_loss = self.config.task.criterions[
                     criterion
                 ] * self.criterions[criterion](self.model, pred, y.to(self.device))
+
                 if criterion in ["l1", "l2", "orthogonality"]:
                     criterion_loss *= self.regularization_level
 

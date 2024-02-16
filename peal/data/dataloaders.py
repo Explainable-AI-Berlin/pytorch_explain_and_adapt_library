@@ -65,7 +65,8 @@ class DataStack:
                     and self.dataset.hints_enabled or self.dataset.idx_enabled
                 ):
                     for i in range(X.shape[0]):
-                        self.data[int(y[0][i])].append([X[i], (y[0][i], y[1][i])])
+                        y_out = tuple([y_elem[i] for y_elem in y])
+                        self.data[int(y[0][i])].append([X[i], y_out])
 
                 else:
                     for i in range(X.shape[0]):
