@@ -157,6 +157,7 @@ class CounterfactualKnowledgeDistillation:
             adaptor_config=self.adaptor_config,
             dataset=self.val_dataloader.dataset,
             device=self.device,
+            tracking_level=self.adaptor_config.tracking_level,
         )
         if self.adaptor_config.training.steps_per_epoch is None:
             self.adaptor_config.training.steps_per_epoch = (
@@ -167,7 +168,14 @@ class CounterfactualKnowledgeDistillation:
         self.dataloader_mixer = DataloaderMixer(
             self.adaptor_config.training, self.train_dataloader
         )
-        self.datastack = DataStack(self.train_dataloader, self.output_size)
+        self.datastack = DataStack(
+            self.train_dataloader,
+            self.output_size,
+            transform=self.val_dataloader.dataset.transform,
+        )
+
+        if teacher[:5] == "human" or teacher == "SegmentationMask":
+            assert self.adaptor_config.tracking_level > 0, "Tracking level too low!"
 
         self.explainer = CounterfactualExplainer(
             downstream_model=self.student,
@@ -175,20 +183,28 @@ class CounterfactualKnowledgeDistillation:
             input_type=self.adaptor_config.data.input_type,
             explainer_config=self.adaptor_config.explainer,
             dataset=self.val_dataloader.dataset,
+            tracking_level=self.adaptor_config.tracking_level,
         )
         self.logits_to_prediction = lambda logits: logits.argmax(-1)
         self.tracked_keys = [
-            "x_list",
             "x_counterfactual_list",
-            "x_attribution_list",
-            "y_list",
             "y_source_list",
             "y_target_list",
-            "y_target_start_confidence_list",
             "y_target_end_confidence_list",
-            "z_difference_list",
-            "collage_path_list",
+            "x_list",
+            "y_list",
         ]
+
+        if self.adaptor_config.tracking_level > 0:
+            self.tracked_keys.extend(
+                [
+                    "x_attribution_list",
+                    "y_target_start_confidence_list",
+                    "z_difference_list",
+                    "collage_path_list",
+                ]
+            )
+
         if teacher == "SegmentationMask":
             self.tracked_keys.append("hint_list")
             self.train_dataloader.dataset.enable_hints()
@@ -532,23 +548,24 @@ class CounterfactualKnowledgeDistillation:
             if len(list(tracked_values.values())[0]) == 0:
                 return tracked_values
 
-            with open(
-                tracked_values_path,
-                "wb",
-            ) as f:
-                tracked_values_file = {}
-                for key in self.tracked_keys:
-                    if isinstance(tracked_values[key][0], torch.Tensor):
-                        tracked_values_file[key] = torch.stack(
-                            tracked_values[key], dim=0
-                        ).numpy()
+            if self.adaptor_config.tracking_level > 0:
+                with open(
+                    tracked_values_path,
+                    "wb",
+                ) as f:
+                    tracked_values_file = {}
+                    for key in self.tracked_keys:
+                        if isinstance(tracked_values[key][0], torch.Tensor):
+                            tracked_values_file[key] = torch.stack(
+                                tracked_values[key], dim=0
+                            ).numpy()
 
-                    elif isinstance(tracked_values[key][0], int) or isinstance(
-                        tracked_values[key][0], float
-                    ):
-                        tracked_values_file[key] = np.array(tracked_values[key])
+                        elif isinstance(tracked_values[key][0], int) or isinstance(
+                            tracked_values[key][0], float
+                        ):
+                            tracked_values_file[key] = np.array(tracked_values[key])
 
-                np.savez(f, **tracked_values_file)
+                    np.savez(f, **tracked_values_file)
 
         else:
             with open(
@@ -741,7 +758,8 @@ class CounterfactualKnowledgeDistillation:
             datasource=dataset_path,
         )
         dataloader = DataloaderMixer(self.adaptor_config.training, dataloader)
-        dataloader.append(dataloader_old, mixing_ratio=1 - mixing_ratio)
+        # dataloader.append(dataloader_old, mixing_ratio=1 - mixing_ratio)
+        dataloader.append(dataloader_old, mixing_ratio=0.0)
         dataloader.return_src = True
         return dataloader
 
@@ -1025,22 +1043,6 @@ class CounterfactualKnowledgeDistillation:
                     max_validation_samples=self.adaptor_config.max_validation_samples,
                     min_start_target_percentile=self.adaptor_config.min_start_target_percentile,
                 )
-                x_list_collection.append(
-                    copy.deepcopy(validation_tracked_values_current["x_list"])
-                )
-                x_counterfactual_collection.append(
-                    copy.deepcopy(
-                        validation_tracked_values_current["x_counterfactual_list"]
-                    )
-                )
-                y_confidence_list.append(
-                    copy.deepcopy(
-                        validation_tracked_values_current[
-                            "y_target_end_confidence_list"
-                        ]
-                    )
-                )
-                validation_stats.append(validation_stats_current)
                 if validation_tracked_values is None:
                     validation_tracked_values = validation_tracked_values_current
 
@@ -1049,6 +1051,25 @@ class CounterfactualKnowledgeDistillation:
                         validation_tracked_values[key].extend(
                             validation_tracked_values_current[key]
                         )
+
+                validation_stats.append(validation_stats_current)
+
+                if self.adaptor_config.validation_runs > 1:
+                    x_list_collection.append(
+                        copy.deepcopy(validation_tracked_values_current["x_list"])
+                    )
+                    x_counterfactual_collection.append(
+                        copy.deepcopy(
+                            validation_tracked_values_current["x_counterfactual_list"]
+                        )
+                    )
+                    y_confidence_list.append(
+                        copy.deepcopy(
+                            validation_tracked_values_current[
+                                "y_target_end_confidence_list"
+                            ]
+                        )
+                    )
 
             validation_stats = {
                 key: torch.mean(
@@ -1063,90 +1084,95 @@ class CounterfactualKnowledgeDistillation:
                 for key in validation_stats[0].keys()
             }
             self.explainer.explainer_config = original_explainer_config
-            self.datastack.dataset._initialize_performance_metrics()
-            assert isinstance(validation_stats, dict)
-            validation_stats[
-                "distance_to_manifold"
-            ] = self.datastack.dataset.distribution_distance(
-                x_counterfactual_collection
-            )
-            validation_stats[
-                "pairwise_distance"
-            ] = self.datastack.dataset.pair_wise_distance(
-                x_list_collection, x_counterfactual_collection
-            )
             if self.adaptor_config.validation_runs > 1:
+                self.datastack.dataset._initialize_performance_metrics()
+                validation_stats[
+                    "distance_to_manifold"
+                ] = self.datastack.dataset.distribution_distance(
+                    x_counterfactual_collection
+                )
+                validation_stats[
+                    "pairwise_distance"
+                ] = self.datastack.dataset.pair_wise_distance(
+                    x_list_collection, x_counterfactual_collection
+                )
                 validation_stats["diversity"] = self.datastack.dataset.variance(
                     x_counterfactual_collection
                 )
+                validation_stats["validity"] = self.datastack.dataset.flip_rate(
+                    y_confidence_list
+                )
 
-            validation_stats["validity"] = self.datastack.dataset.flip_rate(
-                y_confidence_list
-            )
-            os.makedirs(
-                os.path.join(self.base_dir, str(finetune_iteration)), exist_ok=True
-            )
-            with open(
-                validation_values_path,
-                "wb",
-            ) as f:
-                tracked_values_file = {}
-                for key in self.tracked_keys:
-                    if isinstance(validation_tracked_values[key][0], torch.Tensor):
-                        tracked_values_file[key] = torch.stack(
-                            validation_tracked_values[key], dim=0
-                        ).numpy()
+            if self.adaptor_config.tracking_level > 0:
+                os.makedirs(
+                    os.path.join(self.base_dir, str(finetune_iteration)), exist_ok=True
+                )
+                with open(
+                    validation_values_path,
+                    "wb",
+                ) as f:
+                    tracked_values_file = {}
+                    for key in self.tracked_keys:
+                        if isinstance(validation_tracked_values[key][0], torch.Tensor):
+                            tracked_values_file[key] = torch.stack(
+                                validation_tracked_values[key], dim=0
+                            ).numpy()
 
-                    elif isinstance(
-                        validation_tracked_values[key][0], int
-                    ) or isinstance(validation_tracked_values[key][0], float):
-                        tracked_values_file[key] = np.array(
-                            validation_tracked_values[key]
-                        )
+                        elif isinstance(
+                            validation_tracked_values[key][0], int
+                        ) or isinstance(validation_tracked_values[key][0], float):
+                            tracked_values_file[key] = np.array(
+                                validation_tracked_values[key]
+                            )
 
-                np.savez(f, **tracked_values_file)
+                    np.savez(f, **tracked_values_file)
 
-            with open(
-                os.path.join(
-                    self.base_dir, str(finetune_iteration), "validation_prestats.npz"
-                ),
-                "wb",
-            ) as f:
-                validation_stats_file = {}
-                for key in validation_stats.keys():
-                    if isinstance(validation_stats[key], torch.Tensor):
-                        validation_stats_file[key] = validation_stats[key].numpy()
+                with open(
+                    os.path.join(
+                        self.base_dir, str(finetune_iteration), "validation_prestats.npz"
+                    ),
+                    "wb",
+                ) as f:
+                    validation_stats_file = {}
+                    for key in validation_stats.keys():
+                        if isinstance(validation_stats[key], torch.Tensor):
+                            validation_stats_file[key] = validation_stats[key].numpy()
 
-                    elif isinstance(validation_stats[key], int) or isinstance(
-                        validation_stats[key], float
-                    ):
-                        validation_stats_file[key] = np.array(validation_stats[key])
+                        elif isinstance(validation_stats[key], int) or isinstance(
+                            validation_stats[key], float
+                        ):
+                            validation_stats_file[key] = np.array(validation_stats[key])
 
-                np.savez(f, **validation_stats_file)
+                    np.savez(f, **validation_stats_file)
 
         else:
             # TODO think about this again
-            with open(
-                validation_values_path,
-                "rb",
-            ) as f:
-                validation_tracked_values = {}
-                validation_tracked_value_file = np.load(f, allow_pickle=True)
-                for key in validation_tracked_value_file.keys():
-                    validation_tracked_values[key] = list(
-                        torch.tensor(validation_tracked_value_file[key])
-                    )
+            if self.adaptor_config.tracking_level > 0:
+                with open(
+                    validation_values_path,
+                    "rb",
+                ) as f:
+                    validation_tracked_values = {}
+                    validation_tracked_value_file = np.load(f, allow_pickle=True)
+                    for key in validation_tracked_value_file.keys():
+                        validation_tracked_values[key] = list(
+                            torch.tensor(validation_tracked_value_file[key])
+                        )
 
-            with open(
-                os.path.join(
-                    self.base_dir, str(finetune_iteration), "validation_prestats.npz"
-                ),
-                "rb",
-            ) as f:
-                validation_stats = {}
-                validation_tracked_file = np.load(f, allow_pickle=True)
-                for key in validation_tracked_file.keys():
-                    validation_stats[key] = torch.tensor(validation_tracked_file[key])
+                with open(
+                    os.path.join(
+                        self.base_dir,
+                        str(finetune_iteration),
+                        "validation_prestats.npz",
+                    ),
+                    "rb",
+                ) as f:
+                    validation_stats = {}
+                    validation_tracked_file = np.load(f, allow_pickle=True)
+                    for key in validation_tracked_file.keys():
+                        validation_stats[key] = torch.tensor(
+                            validation_tracked_file[key]
+                        )
 
             get_collage_path = lambda x: os.path.join(
                 self.base_dir, str(finetune_iteration), "validation_collages" + str(x)
@@ -1186,23 +1212,24 @@ class CounterfactualKnowledgeDistillation:
             **validation_tracked_values,
         )
 
-        with open(
-            os.path.join(
-                self.base_dir, str(finetune_iteration), "validation_stats.npz"
-            ),
-            "wb",
-        ) as f:
-            validation_stats_file = {}
-            for key in validation_stats.keys():
-                if isinstance(validation_stats[key], torch.Tensor):
-                    validation_stats_file[key] = validation_stats[key].numpy()
+        if self.adaptor_config.tracking_level > 0:
+            with open(
+                os.path.join(
+                    self.base_dir, str(finetune_iteration), "validation_stats.npz"
+                ),
+                "wb",
+            ) as f:
+                validation_stats_file = {}
+                for key in validation_stats.keys():
+                    if isinstance(validation_stats[key], torch.Tensor):
+                        validation_stats_file[key] = validation_stats[key].numpy()
 
-                elif isinstance(validation_stats[key], int) or isinstance(
-                    validation_stats[key], float
-                ):
-                    validation_stats_file[key] = np.array(validation_stats[key])
+                    elif isinstance(validation_stats[key], int) or isinstance(
+                        validation_stats[key], float
+                    ):
+                        validation_stats_file[key] = np.array(validation_stats[key])
 
-            np.savez(f, **validation_stats_file)
+                np.savez(f, **validation_stats_file)
 
         return validation_stats
 

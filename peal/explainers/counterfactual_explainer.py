@@ -26,6 +26,7 @@ class CounterfactualExplainer(ExplainerInterface):
         generator: InvertibleGenerator,
         input_type: str,
         dataset: PealDataset,
+        tracking_level: int = 0,
         explainer_config: Union[
             dict, str, ExplainerConfig
         ] = "<PEAL_BASE>/configs/explainers/counterfactual_default.yaml",
@@ -48,6 +49,7 @@ class CounterfactualExplainer(ExplainerInterface):
             "cuda" if next(self.downstream_model.parameters()).is_cuda else "cpu"
         )
         self.input_type = input_type
+        self.tracking_level = tracking_level
         self.loss = torch.nn.CrossEntropyLoss()
 
         if isinstance(self.explainer_config, PerfectFalseCounterfactualConfig):
@@ -311,14 +313,15 @@ class CounterfactualExplainer(ExplainerInterface):
         else:
             batch_out = batch
 
-        (
-            batch_out["x_attribution_list"],
-            batch_out["collage_path_list"],
-        ) = self.dataset.generate_contrastive_collage(
-            target_confidence_goal=target_confidence_goal,
-            base_path=base_path,
-            classifier=model,
-            start_idx=start_idx,
-            **batch_out,
-        )
+        if self.tracking_level > 0:
+            (
+                batch_out["x_attribution_list"],
+                batch_out["collage_path_list"],
+            ) = self.dataset.generate_contrastive_collage(
+                target_confidence_goal=target_confidence_goal,
+                base_path=base_path,
+                classifier=model,
+                start_idx=start_idx,
+                **batch_out,
+            )
         return batch_out

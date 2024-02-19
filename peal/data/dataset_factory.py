@@ -83,14 +83,31 @@ def get_datasets(
         if "rotation" in config.invariances:
             transform_list_train.append(RandomRotation())
 
+        if "rotation10" in config.invariances:
+            transform_list_train.append(RandomRotation(-10, 10))
+
         if "hflipping" in config.invariances:
             transform_list_train.append(transforms.RandomHorizontalFlip(p=0.5))
 
         if "vflipping" in config.invariances:
             transform_list_train.append(transforms.RandomVerticalFlip(p=0.5))
 
-        if "random_resize" in config.invariances:
-            transform_list_train.append(RandomResizeCropPad())
+        if "random_resize10" in config.invariances:
+            transform_list_train.append(RandomResizeCropPad((0.9, 1.1)))
+
+        if "random_resize20" in config.invariances:
+            transform_list_train.append(RandomResizeCropPad((0.9, 1.1)))
+
+        if "random_resize50" in config.invariances:
+            transform_list_train.append(RandomResizeCropPad((0.9, 1.1)))
+
+        if "color_jitter" in config.invariances:
+            transform_list_train.append(
+                transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1)
+            )
+
+        if "sharpness" in config.invariances:
+            transform_list_train.append(transforms.RandomAdjustSharpness(0.3))
 
         #
         if not config.crop_size is None:

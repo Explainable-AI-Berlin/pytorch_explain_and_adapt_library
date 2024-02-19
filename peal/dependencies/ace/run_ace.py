@@ -169,9 +169,6 @@ def filter_fn(
 ):
     indices = list(range(steps))[::-1]
 
-    print('x in')
-    print([x.min(), x.max()])
-
     # Generate pre-explanation
     with torch.enable_grad():
         """pe = attack.perturb(
@@ -198,11 +195,6 @@ def filter_fn(
     else:
         ce = (pe.detach() - 0.5) / 0.5
         orig = (x.detach() - 0.5) / 0.5
-
-    print('orig in')
-    print([orig.min(), orig.max()])
-    print('ce in')
-    print([ce.min(), ce.max()])
 
     noises = None
     noise_fn = torch.randn_like if stochastic else torch.zeros_like
@@ -241,8 +233,6 @@ def filter_fn(
         ce = ((ce * 0.5) + 0.5).clamp(0, 1)
         noise_x = ((noise_x * 0.5) + 0.5).clamp(0, 1)
 
-    print('ce out')
-    print([ce.min(), ce.max()])
     return ce, pe, noise_x, mask
 
 

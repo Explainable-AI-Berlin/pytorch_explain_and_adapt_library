@@ -209,6 +209,11 @@ class ModelTrainer:
                     param_list, lr=self.config.training.learning_rate
                 )
 
+            elif self.config.training.optimizer == "adamw":
+                self.optimizer = torch.optim.AdamW(
+                    param_list, lr=self.config.training.learning_rate
+                )
+
             else:
                 raise Exception("optimizer not available!")
 

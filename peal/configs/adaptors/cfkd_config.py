@@ -119,7 +119,7 @@ class CFKDConfig(AdaptorConfig):
     """
     The number validation runs used for evaluating CFKD.
     """
-    validation_runs: PositiveInt = 3
+    validation_runs: PositiveInt = 1
     """
     The reference batch size when automatically adapting the batch_size to the vram
     """
@@ -140,6 +140,10 @@ class CFKDConfig(AdaptorConfig):
     Whether to overwrite the logs and intermediate results.
     """
     use_visualization: bool = False
+    """
+    What level of tracking is used.
+    """
+    tracking_level: int = 0
     """
     A dict containing all variables that could not be given with the current config structure
     """
@@ -177,6 +181,7 @@ class CFKDConfig(AdaptorConfig):
         current_iteration: PositiveInt = None,
         overwrite: bool = None,
         use_visualization: bool = None,
+        tracking_level: int = None,
         max_test_batches: Union[type(None), PositiveInt] = None,
         **kwargs,
     ):
@@ -315,4 +320,5 @@ class CFKDConfig(AdaptorConfig):
         self.overwrite = overwrite if not overwrite is None else self.overwrite
         self.use_visualization = use_visualization if not use_visualization is None else self.use_visualization
         self.max_test_batches = max_test_batches if not max_test_batches is None else self.max_test_batches
+        self.tracking_level = tracking_level if not tracking_level is None else self.tracking_level
         self.kwargs = kwargs
