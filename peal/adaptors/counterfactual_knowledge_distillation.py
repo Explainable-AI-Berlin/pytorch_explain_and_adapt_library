@@ -20,7 +20,6 @@ from peal.configs.explainers.perfect_false_counterfactual_config import (
 )
 from peal.global_utils import (
     load_yaml_config,
-    set_adaptive_batch_size,
     save_yaml_config,
 )
 from peal.training.loggers import log_images_to_writer
@@ -31,7 +30,6 @@ from peal.data.dataloaders import (
 )
 from peal.training.trainers import ModelTrainer, calculate_test_accuracy
 from peal.explainers.counterfactual_explainer import CounterfactualExplainer
-from peal.data.dataset_interfaces import PealDataset
 from peal.visualization.model_comparison import (
     create_comparison,
 )
@@ -41,12 +39,10 @@ from peal.teachers.teacher_factory import get_teacher
 from peal.teachers.teacher_interface import TeacherInterface
 from peal.generators.interfaces import InvertibleGenerator
 from peal.generators.generator_factory import get_generator
-from peal.adaptors.adaptor_utils import integrate_data_config_into_adaptor_config
 from peal.training.training_utils import (
     calculate_validation_statistics,
 )
 from peal.configs.adaptors.adaptor_config import AdaptorConfig
-from peal.configs.models.model_config import TaskConfig
 
 
 class CounterfactualKnowledgeDistillation:
@@ -241,8 +237,8 @@ class CounterfactualKnowledgeDistillation:
             shutil.rmtree(self.base_dir, ignore_errors=True)
             Path(self.base_dir).mkdir(parents=True, exist_ok=True)
             writer = SummaryWriter(os.path.join(self.base_dir, "logs"))
-            log_images_to_writer(self.train_dataloader, writer, "train")
-            log_images_to_writer(self.val_dataloader, writer, "validation")
+            log_images_to_writer(self.train_dataloader, writer, "train0")
+            log_images_to_writer(self.val_dataloader, writer, "validation0")
             log_images_to_writer(self.test_dataloader, writer, "test")
 
             if self.output_size == 2 and self.adaptor_config.use_visualization:
@@ -348,6 +344,7 @@ class CounterfactualKnowledgeDistillation:
                     dataloader_old=self.dataloader_mixer,
                     dataset_path=dataset_dir,
                     mixing_ratio=0.5,
+                    writer=writer,
                 )
 
             if self.adaptor_config.current_iteration > 0:
@@ -750,7 +747,7 @@ class CounterfactualKnowledgeDistillation:
         return dataset_dir
 
     def add_dataset_to_dataloader_mixer(
-        self, dataloader_old, dataset_path, mixing_ratio
+        self, dataloader_old, dataset_path, mixing_ratio, writer, finetune_iteration
     ):
         #
         dataloader, _, _ = create_dataloaders_from_datasource(
@@ -758,8 +755,9 @@ class CounterfactualKnowledgeDistillation:
             datasource=dataset_path,
         )
         dataloader = DataloaderMixer(self.adaptor_config.training, dataloader)
+        log_images_to_writer(self.train_dataloader, writer, "train_" + str(finetune_iteration))
         # dataloader.append(dataloader_old, mixing_ratio=1 - mixing_ratio)
-        dataloader.append(dataloader_old, mixing_ratio=0.0)
+        dataloader.append(dataloader_old, mixing_ratio=1.0)
         dataloader.return_src = True
         return dataloader
 
@@ -789,6 +787,7 @@ class CounterfactualKnowledgeDistillation:
                 datasource=val_dataset_path,
             )
             self.dataloaders_val[1] = dataloader_val
+            log_images_to_writer(dataloader_val, writer, "validation_" + str(finetune_iteration))
 
             #
             mixing_ratio = min(0.5, 1 - self.fa_1sided)
@@ -802,6 +801,7 @@ class CounterfactualKnowledgeDistillation:
                 dataloader_old=self.dataloader_mixer,
                 dataset_path=dataset_path,
                 mixing_ratio=mixing_ratio,
+                writer=writer,
             )
 
             y_list_dataset = [
