@@ -754,10 +754,10 @@ class CounterfactualKnowledgeDistillation:
             config=self.data_config,
             datasource=dataset_path,
         )
+        log_images_to_writer(dataloader, writer, "train_" + str(finetune_iteration))
         dataloader = DataloaderMixer(self.adaptor_config.training, dataloader)
-        log_images_to_writer(self.train_dataloader, writer, "train_" + str(finetune_iteration))
         # dataloader.append(dataloader_old, mixing_ratio=1 - mixing_ratio)
-        dataloader.append(dataloader_old, mixing_ratio=1.0)
+        dataloader.append(dataloader_old, mixing_ratio=0.0)
         dataloader.return_src = True
         return dataloader
 
@@ -802,6 +802,7 @@ class CounterfactualKnowledgeDistillation:
                 dataset_path=dataset_path,
                 mixing_ratio=mixing_ratio,
                 writer=writer,
+                finetune_iteration=finetune_iteration,
             )
 
             y_list_dataset = [
