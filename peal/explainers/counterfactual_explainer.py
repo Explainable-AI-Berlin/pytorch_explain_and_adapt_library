@@ -1,3 +1,5 @@
+import copy
+
 import torch
 import torchvision
 
@@ -26,9 +28,11 @@ class CounterfactualExplainer(ExplainerInterface):
         generator: InvertibleGenerator,
         input_type: str,
         dataset: PealDataset,
+        tracking_level: int = 0,
         explainer_config: Union[
             dict, str, ExplainerConfig
         ] = "<PEAL_BASE>/configs/explainers/counterfactual_default.yaml",
+        test_data_config: str = None,
     ):
         """
         This class implements the counterfactual explanation method
@@ -48,18 +52,23 @@ class CounterfactualExplainer(ExplainerInterface):
             "cuda" if next(self.downstream_model.parameters()).is_cuda else "cpu"
         )
         self.input_type = input_type
+        self.tracking_level = tracking_level
         self.loss = torch.nn.CrossEntropyLoss()
 
         if isinstance(self.explainer_config, PerfectFalseCounterfactualConfig):
-            inverse_datasets = get_datasets(self.explainer_config.data)
+            inverse_config = copy.deepcopy(self.dataset.config)
+            inverse_config.dataset_path += '_inverse'
+            inverse_datasets = get_datasets(inverse_config)
             self.inverse_datasets = {}
             self.inverse_datasets["Training"] = inverse_datasets[0]
             self.inverse_datasets["Validation"] = inverse_datasets[1]
             if len(list(inverse_datasets)) == 3:
                 self.inverse_datasets["test"] = inverse_datasets[2]
 
-            if not self.explainer_config.test_data is None:
-                self.inverse_datasets["test"] = get_datasets(self.explainer_config.test_data)[-1]
+            if not test_data_config is None:
+                inverse_test_config = copy.deepcopy(self.dataset.config)
+                inverse_test_config.dataset_path += '_inverse'
+                self.inverse_datasets["test"] = get_datasets(inverse_test_config)[-1]
 
     def gradient_based_counterfactual(
         self, x_in, target_confidence_goal, target_classes, pbar=None, mode=""
@@ -308,14 +317,15 @@ class CounterfactualExplainer(ExplainerInterface):
         else:
             batch_out = batch
 
-        (
-            batch_out["x_attribution_list"],
-            batch_out["collage_path_list"],
-        ) = self.dataset.generate_contrastive_collage(
-            target_confidence_goal=target_confidence_goal,
-            base_path=base_path,
-            classifier=model,
-            start_idx=start_idx,
-            **batch_out,
-        )
+        if self.tracking_level > 0:
+            (
+                batch_out["x_attribution_list"],
+                batch_out["collage_path_list"],
+            ) = self.dataset.generate_contrastive_collage(
+                target_confidence_goal=target_confidence_goal,
+                base_path=base_path,
+                classifier=model,
+                start_idx=start_idx,
+                **batch_out,
+            )
         return batch_out

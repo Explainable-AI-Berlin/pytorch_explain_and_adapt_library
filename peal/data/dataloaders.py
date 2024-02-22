@@ -16,7 +16,7 @@ class DataStack:
     This class is used to create a stack of data for each class.
     """
 
-    def __init__(self, datasource, num_classes):
+    def __init__(self, datasource, num_classes, transform=None):
         """
         This function is used to initialize the DataStack class.
 
@@ -37,12 +37,17 @@ class DataStack:
         for idx in range(num_classes):
             self.data.append([])
 
+        self.transform = transform
         self.fill_stack()
 
     def fill_stack(self):
         """
         This function is used to fill the stack with data.
         """
+        if not self.transform is None:
+            data_transform = self.dataset.transform
+            self.dataset.transform = self.transform
+
         while np.min(list(map(lambda x: len(x), self.data))) == 0:
             if isinstance(self.datasource, torch.utils.data.Dataset):
                 X, y = self.dataset.__getitem__(self.current_idx)
@@ -65,11 +70,16 @@ class DataStack:
                     and self.dataset.hints_enabled or self.dataset.idx_enabled
                 ):
                     for i in range(X.shape[0]):
-                        self.data[int(y[0][i])].append([X[i], (y[0][i], y[1][i])])
+                        y_out = tuple([y_elem[i] for y_elem in y])
+                        self.data[int(y[0][i])].append([X[i], y_out])
 
                 else:
                     for i in range(X.shape[0]):
                         self.data[int(y[i])].append([X[i], int(y[i])])
+
+
+        if not self.transform is None:
+            self.dataset.transform = data_transform
 
     def pop(self, class_idx):
         """

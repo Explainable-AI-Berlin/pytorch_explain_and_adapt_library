@@ -13,21 +13,27 @@ from peal.training.trainers import calculate_test_accuracy
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_config", type=str, required=True)
+    parser.add_argument("--model_path", type=str, default=None)
     parser.add_argument("--data_config", type=str, default=None)
     args = parser.parse_args()
 
     # TODO this can't be done properly before bug is fixed...
     model_config = load_yaml_config(args.model_config) #, ModelConfig)
-    if args.data_config is None and not isinstance(model_config.data, DataConfig):
+    if not isinstance(model_config.data, DataConfig):
         model_config.data = DataConfig(**model_config.data)
         model_config.training = TrainingConfig(**model_config.training)
         model_config.task = TaskConfig(**model_config.task)
 
-    else:
+    if not args.data_config is None:
         model_config.data = load_yaml_config(args.data_config, DataConfig)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model_path = os.path.join(model_config.base_path, "model.cpl")
+    if not args.model_path is None:
+        model_path = args.model_path
+
+    else:
+        model_path = os.path.join(model_config.base_path, "model.cpl")
+
     model = torch.load(model_path, map_location=device)
     model.eval()
     test_dataloader = create_dataloaders_from_datasource(model_config)[-1]

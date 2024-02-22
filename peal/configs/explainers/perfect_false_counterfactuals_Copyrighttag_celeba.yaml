@@ -1,4 +1,0 @@
-explainer_type : PerfectFalseCounterfactual
-category : explainer
-data : <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba500inverse_poisened100.yaml
-test_data : <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba_inverse.yaml

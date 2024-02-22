@@ -2,20 +2,21 @@ from peal.teachers.teacher_interface import TeacherInterface
 
 
 class Model2ModelTeacher(TeacherInterface):
-    def __init__(self, model, dataset):
+    def __init__(self, model, dataset, tracking_level = 0):
         self.model = model
         self.dataset = dataset
+        self.tracking_level = tracking_level
         self.device = "cuda" if next(self.model.parameters()).is_cuda else "cpu"
 
     def get_feedback(
         self,
         x_counterfactual_list,
         y_source_list,
-        y_target_list,
         x_list,
-        base_dir,
         y_list,
         y_target_end_confidence_list,
+        base_dir=None,
+        y_target_list=None,
         **kwargs
     ):
         feedback = []
@@ -54,19 +55,20 @@ class Model2ModelTeacher(TeacherInterface):
             teacher_original.append(pred_original)
             teacher_counterfactual.append(pred_counterfactual)
 
-        self.dataset.generate_contrastive_collage(
-            y_counterfactual_teacher_list=teacher_counterfactual,
-            y_original_teacher_list=teacher_original,
-            feedback_list=feedback,
-            x_counterfactual_list=x_counterfactual_list,
-            y_source_list=y_source_list,
-            y_target_list=y_target_list,
-            x_list=x_list,
-            y_list=y_list,
-            y_target_end_confidence_list=y_target_end_confidence_list,
-            base_path=base_dir,
-            **kwargs,
-        )
+        if self.tracking_level > 1:
+            self.dataset.generate_contrastive_collage(
+                y_counterfactual_teacher_list=teacher_counterfactual,
+                y_original_teacher_list=teacher_original,
+                feedback_list=feedback,
+                x_counterfactual_list=x_counterfactual_list,
+                y_source_list=y_source_list,
+                y_target_list=y_target_list,
+                x_list=x_list,
+                y_list=y_list,
+                y_target_end_confidence_list=y_target_end_confidence_list,
+                base_path=base_dir,
+                **kwargs,
+            )
 
         if is_train:
             self.model.train()

@@ -209,6 +209,17 @@ class ModelTrainer:
                     param_list, lr=self.config.training.learning_rate
                 )
 
+            elif self.config.training.optimizer[:5] == "adamw":
+                if len(self.config.training.optimizer) > 5:
+                    weight_decay = float(self.config.training.optimizer[5:])
+
+                else:
+                    weight_decay = 0.01
+
+                self.optimizer = torch.optim.AdamW(
+                    param_list, lr=self.config.training.learning_rate, weight_decay=weight_decay
+                )
+
             else:
                 raise Exception("optimizer not available!")
 
@@ -280,6 +291,10 @@ class ModelTrainer:
                 source_distibution = None
 
             X, y = sample
+            # TODO this is a dirty fix!!!
+            if isinstance(y, list) or isinstance(y, tuple):
+                y = y[0]
+
             #
             if self.unit_test_train_loop and batch_idx >= 2:
                 break
@@ -297,6 +312,7 @@ class ModelTrainer:
                 criterion_loss = self.config.task.criterions[
                     criterion
                 ] * self.criterions[criterion](self.model, pred, y.to(self.device))
+
                 if criterion in ["l1", "l2", "orthogonality"]:
                     criterion_loss *= self.regularization_level
 

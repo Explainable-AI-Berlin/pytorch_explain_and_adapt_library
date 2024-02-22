@@ -1,9 +1,9 @@
-'dataset_path'            : '/home/space/datasets/peal/datasets/celeba_copyrighttag_inverse'
-'num_samples'             : 500
-'split'                   : [0.8,1.0]
+'dataset_path'            : '/home/space/datasets/peal/datasets/celeba_copyrighttag'
+'num_samples'             : 87000
+'split'                   : [0.9,1.0]
 'input_type'              : 'image'
 'input_size'              : [3, 128, 128]
 'output_type'             : 'multiclass'
 'output_size'             : [41]
-'confounder_probability'  : 1.0
+'confounder_probability'  : 0.5
 'confounding_factors'     : ['Smiling', 'Confounder']
