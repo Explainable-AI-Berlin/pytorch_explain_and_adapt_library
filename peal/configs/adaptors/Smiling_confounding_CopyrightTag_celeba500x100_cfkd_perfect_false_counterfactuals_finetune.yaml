@@ -10,9 +10,9 @@ continuous_learning                  :  "finetune"
 replace_model                        :  True
 use_visualization                    :  False #True
 calculate_group_accuracies           :  True
-explainer                            :  <PEAL_BASE>/configs/explainers/perfect_false_counterfactuals_Copyrighttag_celeba.yaml
+explainer                            :  <PEAL_BASE>/configs/explainers/perfect_false_counterfactuals.yaml
 #training                             :  <PEAL_BASE>/configs/training/img_classifier.yaml
-training                             :  <PEAL_BASE>/configs/training/img_classifier.yaml
+training                             :  <PEAL_BASE>/configs/training/img_small.yaml
 data                                 :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba500_poisened100.yaml
 test_data                            :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba.yaml
 student                              :  /home/space/datasets/peal/peal_runs/Smiling_confounding_copyrighttag_celeba/classifier_poisened100/model.cpl

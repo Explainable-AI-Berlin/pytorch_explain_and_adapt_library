@@ -165,7 +165,7 @@ class CounterfactualKnowledgeDistillation:
             self.adaptor_config.training, self.train_dataloader
         )
         self.datastack = DataStack(
-            self.train_dataloader,
+            self.train_dataloader.dataset,
             self.output_size,
             transform=self.val_dataloader.dataset.transform,
         )
@@ -357,7 +357,7 @@ class CounterfactualKnowledgeDistillation:
 
     def get_batch(
         self,
-        error_matrix: torch.Tensor,
+        error_matrix: torch.Tensor = None,
     ):
         x_batch = []
         y_source_batch = []
@@ -368,14 +368,27 @@ class CounterfactualKnowledgeDistillation:
         idx_batch = []
         sample_idx = 0
         torch.manual_seed(torch.seed())
-        error_distribution = torch.distributions.Categorical(error_matrix)
+        if self.adaptor_config.use_confusion_matrix:
+            error_distribution = torch.distributions.Categorical(error_matrix)
+
+        else:
+            cm_idx = 1
+
         while not sample_idx >= self.adaptor_config.batch_size:
-            cm_idx = error_distribution.sample()
+            if self.adaptor_config.use_confusion_matrix:
+                cm_idx = error_distribution.sample()
+
             # TODO verify that this is actually balancing itself!
             y_source = int(cm_idx / self.output_size)
             y_target = int(cm_idx % self.output_size)
+            if y_source == y_target:
+                cm_idx = (cm_idx + 1) % (self.output_size ** 2)
+                y_source = int(cm_idx / self.output_size)
+                y_target = int(cm_idx % self.output_size)
+
+            cm_idx = (cm_idx + 1) % (self.output_size ** 2)
+
             x, y = self.datastack.pop(int(y_source))
-            # TODO should be done with context manager
             if isinstance(self.teacher, SegmentationMaskTeacher) or isinstance(
                 self.explainer.explainer_config, PerfectFalseCounterfactualConfig
             ):
@@ -756,8 +769,7 @@ class CounterfactualKnowledgeDistillation:
         )
         log_images_to_writer(dataloader, writer, "train_" + str(finetune_iteration))
         dataloader = DataloaderMixer(self.adaptor_config.training, dataloader)
-        # dataloader.append(dataloader_old, mixing_ratio=1 - mixing_ratio)
-        dataloader.append(dataloader_old, mixing_ratio=0.0)
+        dataloader.append(dataloader_old, mixing_ratio=1 - mixing_ratio)
         dataloader.return_src = True
         return dataloader
 

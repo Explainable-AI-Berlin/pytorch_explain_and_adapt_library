@@ -209,9 +209,15 @@ class ModelTrainer:
                     param_list, lr=self.config.training.learning_rate
                 )
 
-            elif self.config.training.optimizer == "adamw":
+            elif self.config.training.optimizer[:5] == "adamw":
+                if len(self.config.training.optimizer) > 5:
+                    weight_decay = float(self.config.training.optimizer[5:])
+
+                else:
+                    weight_decay = 0.01
+
                 self.optimizer = torch.optim.AdamW(
-                    param_list, lr=self.config.training.learning_rate
+                    param_list, lr=self.config.training.learning_rate, weight_decay=weight_decay
                 )
 
             else:

@@ -1,3 +1,5 @@
+import copy
+
 import torch
 import torchvision
 
@@ -30,6 +32,7 @@ class CounterfactualExplainer(ExplainerInterface):
         explainer_config: Union[
             dict, str, ExplainerConfig
         ] = "<PEAL_BASE>/configs/explainers/counterfactual_default.yaml",
+        test_data_config: str = None,
     ):
         """
         This class implements the counterfactual explanation method
@@ -53,15 +56,19 @@ class CounterfactualExplainer(ExplainerInterface):
         self.loss = torch.nn.CrossEntropyLoss()
 
         if isinstance(self.explainer_config, PerfectFalseCounterfactualConfig):
-            inverse_datasets = get_datasets(self.explainer_config.data)
+            inverse_config = copy.deepcopy(self.dataset.config)
+            inverse_config.dataset_path += '_inverse'
+            inverse_datasets = get_datasets(inverse_config)
             self.inverse_datasets = {}
             self.inverse_datasets["Training"] = inverse_datasets[0]
             self.inverse_datasets["Validation"] = inverse_datasets[1]
             if len(list(inverse_datasets)) == 3:
                 self.inverse_datasets["test"] = inverse_datasets[2]
 
-            if not self.explainer_config.test_data is None:
-                self.inverse_datasets["test"] = get_datasets(self.explainer_config.test_data)[-1]
+            if not test_data_config is None:
+                inverse_test_config = copy.deepcopy(self.dataset.config)
+                inverse_test_config.dataset_path += '_inverse'
+                self.inverse_datasets["test"] = get_datasets(inverse_test_config)[-1]
 
     def gradient_based_counterfactual(
         self, x_in, target_confidence_goal, target_classes, pbar=None, mode=""
@@ -209,10 +216,7 @@ class CounterfactualExplainer(ExplainerInterface):
         z_difference_list = []
         y_target_end_confidence_list = []
         for i, idx in enumerate(idx_list):
-            try:
-                x_counterfactual = self.inverse_datasets[mode][idx][0]
-            except Exception as e:
-                import pdb; pdb.set_trace()
+            x_counterfactual = self.inverse_datasets[mode][idx][0]
             x_counterfactual_list.append(x_counterfactual)
             preds = torch.nn.Softmax()(
                 self.downstream_model(x_counterfactual.unsqueeze(0).to(self.device)).detach().cpu()

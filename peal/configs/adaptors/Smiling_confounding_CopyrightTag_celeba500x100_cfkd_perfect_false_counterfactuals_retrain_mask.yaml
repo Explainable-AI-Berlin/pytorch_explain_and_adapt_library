@@ -10,7 +10,7 @@ continuous_learning                  :  "retrain"
 replace_model                        :  True
 use_visualization                    :  False #True
 calculate_group_accuracies           :  True
-explainer                            :  <PEAL_BASE>/configs/explainers/perfect_false_counterfactuals_Copyrighttag_celeba.yaml
+explainer                            :  <PEAL_BASE>/configs/explainers/perfect_false_counterfactuals.yaml
 training                             :  <PEAL_BASE>/configs/training/img_classifier.yaml
 data                                 :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba500_poisened100.yaml
 test_data                            :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba.yaml
