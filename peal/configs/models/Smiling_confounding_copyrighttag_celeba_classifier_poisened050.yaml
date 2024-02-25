@@ -6,7 +6,6 @@
 'task':
   'criterions':
     'ce'     : 1.0
-    'l1'     : 1000.0
   'output_type'             : 'singleclass'
   'output_channels'         : 2
   'y_selection'             : ['Smiling']

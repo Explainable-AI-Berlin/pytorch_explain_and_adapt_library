@@ -101,7 +101,7 @@ class CFKDConfig(AdaptorConfig):
     """
     Logging of the Feedback Accuracy.
     """
-    fa_1sided_prime: float = 0.0
+    best_feedback_accuracy: float = 0.0
     """
     Whether to directly replace the model or wait one iteration.
     The latter sometimes makes sense if the model strategy at some point can't be detected anymore

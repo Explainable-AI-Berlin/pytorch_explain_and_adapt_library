@@ -42,7 +42,8 @@ class Model2ModelTeacher(TeacherInterface):
 
             # TODO here has to be somehing added for OOD e.g. with FID score
             # TODO this will be a problem for multiclass
-            if y_source_list[idx] == y_list[idx] and y_target_end_confidence_list[idx] > 0.5:
+            if y_target_end_confidence_list[idx] > 0.5:
+                #if y_source_list[idx] == y_list[idx]:
                 if pred_original != pred_counterfactual:
                     feedback.append("true")
 
