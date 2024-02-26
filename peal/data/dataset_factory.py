@@ -96,10 +96,10 @@ def get_datasets(
             transform_list_train.append(RandomResizeCropPad((0.9, 1.1)))
 
         if "random_resize20" in config.invariances:
-            transform_list_train.append(RandomResizeCropPad((0.9, 1.1)))
+            transform_list_train.append(RandomResizeCropPad((0.8, 1.2)))
 
         if "random_resize50" in config.invariances:
-            transform_list_train.append(RandomResizeCropPad((0.9, 1.1)))
+            transform_list_train.append(RandomResizeCropPad((0.2, 1.5)))
 
         if "color_jitter" in config.invariances:
             transform_list_train.append(

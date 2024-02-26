@@ -21,7 +21,7 @@ class ACEConfig(ExplainerConfig):
     sampling_dilation: Union[list, int] = 17
     timestep_respacing: Union[list, int] = 50
     clip_denoised: bool = True  # Clipping noise
-    batch_size: int = 16  # Batch size
+    batch_size: int = 32  # Batch size
     gpu: str = "0"  # GPU index, should only be 1 gpu
     save_images: bool = False  # Saving all images
     num_samples: int = 500000000000  # useful to sample few examples
@@ -29,11 +29,9 @@ class ACEConfig(ExplainerConfig):
     # hwhen using the checkpoint backwards
     cudnn_deterministic: bool = False
     # path args
-    model_path: str = ""  # DDPM weights path
-    classifier_path: str = ""  # Classifier weights path
-    output_path: str = "results"  # Output path
+    base_path: str = ""  # DDPM weights path
     # Experiment name (will store the results at Output/Results/exp_name)
-    exp_name: str = "exp"
+    exp_name: str = "example_name"
     # attack args
     seed: int = 4  # Random seed
     # Attack method (currently 'PGD', 'C&W', 'GD' and 'None' supported)

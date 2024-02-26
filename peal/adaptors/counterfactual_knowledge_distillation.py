@@ -1031,13 +1031,16 @@ class CounterfactualKnowledgeDistillation:
                 )
                 for attribute in self.explainer.explainer_config.__dict__.items():
                     if isinstance(attribute[1], list) and len(attribute[1]) == 2:
+                        if i == 0:
+                            effective_idx = 0
+
+                        else:
+                            effective_idx = i / (self.adaptor_config.validation_runs - 1) * (attribute[1][1] - attribute[1][0])
+
                         setattr(
                             self.explainer.explainer_config,
                             attribute[0],
-                            attribute[1][0]
-                            + i
-                            / (self.adaptor_config.validation_runs - 1)
-                            * (attribute[1][1] - attribute[1][0]),
+                            attribute[1][0] + effective_idx,
                         )
 
                 (

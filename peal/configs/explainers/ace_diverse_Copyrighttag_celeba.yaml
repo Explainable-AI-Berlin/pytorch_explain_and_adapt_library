@@ -1,9 +1,10 @@
-'explainer_type' : 'ACE'
-'category' : 'explainer'
-'attack_iterations' : 10 #50 #[30,70]
-'sampling_time_fraction' : 0.2 #[0.2,0.4]
-'dist_l1' : 0.00000001
-'dist_l2' : 0.0
-'sampling_inpaint' : [1.0,0.7] #[0.3, 0.1]
-'sampling_dilation' : 17
-'timestep_respacing' : 50
+explainer_type : ACE
+category : explainer
+attack_iterations : 10 #[30,70]
+sampling_time_fraction : 0.2 #[0.2,0.4]
+dist_l1 : 0.01
+dist_l2 : 0.0 #0.0001
+sampling_inpaint : 0.15 #[0.3, 0.1]
+sampling_dilation : 17
+timestep_respacing : 50
+#base_path : /home/space/datasets/peal/peal_runs/ddpm_CopyrightTag_celeba_1000
