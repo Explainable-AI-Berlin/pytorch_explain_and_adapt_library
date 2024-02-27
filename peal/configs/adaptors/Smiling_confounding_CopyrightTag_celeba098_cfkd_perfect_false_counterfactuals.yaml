@@ -10,18 +10,16 @@ replace_model                        :  True
 use_visualization                    :  False #True
 calculate_group_accuracies           :  True
 explainer                            :  <PEAL_BASE>/configs/explainers/perfect_false_counterfactuals.yaml
-training                             :  <PEAL_BASE>/configs/training/img_classifier.yaml
+training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba_poisened098.yaml
 test_data                            :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba.yaml
 student                              :  /home/space/datasets/peal/peal_runs/Smiling_confounding_copyrighttag_celeba/classifier_poisened098/model.cpl
 teacher                              :  /home/space/datasets/peal/peal_runs/Smiling_confounding_copyrighttag_celeba/classifier_unpoisened/model.cpl
 generator                            :  /home/space/datasets/peal/peal_runs/ddpm_CopyrightTag_celeba_1000/config.yaml
-base_dir                             :  /home/space/datasets/peal/peal_runs/Smiling_confounding_copyrighttag_celeba/classifier_poisened098/cfkd_perfect_false_counterfactuals
+base_dir                             :  /home/space/datasets/peal/peal_runs/Smiling_confounding_copyrighttag_celeba/classifier_poisened098/cfkd_perfect_false_counterfactuals2
 task:
   criterions:
     ce     : 1.0
-    l1     : 10000.0
-    l2     : 1.0
   output_type             : singleclass
   output_channels         : 2
   y_selection             : [Smiling]

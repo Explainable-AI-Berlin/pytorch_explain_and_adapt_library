@@ -1,8 +1,8 @@
 explainer_type : ACE
 category : explainer
-attack_iterations : 10 #[30,70]
-sampling_time_fraction : 0.2 #[0.2,0.4]
-dist_l1 : 0.01
+attack_iterations : [10,50] #[30,70]
+sampling_time_fraction : [0.1,0.4] #[0.1,0.15,0.2,0.25,0.3]
+dist_l1 : [1.0, 0.0001] #[1.0, 0.1, 0.01, 0.001, 0.0001]
 dist_l2 : 0.0 #0.0001
 sampling_inpaint : 0.15 #[0.3, 0.1]
 sampling_dilation : 17

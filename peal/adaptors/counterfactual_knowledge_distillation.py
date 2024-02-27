@@ -406,26 +406,26 @@ class CounterfactualKnowledgeDistillation:
                 self.student(x.to(self.device).unsqueeze(0)).squeeze(0).detach().cpu()
             )
             y_target_start_confidence = torch.nn.Softmax()(logits)[y_target]
-            #prediction = self.logits_to_prediction(logits)
-            #if prediction == y == y_source:
-            x_batch.append(x)
-            y_source_batch.append(y_source)
-            y_target_batch.append(torch.tensor(y_target))
-            y_batch.append(y)
-            y_target_start_confidence_batch.append(y_target_start_confidence)
-            if isinstance(self.teacher, SegmentationMaskTeacher):
-                hint_batch.append(hint)
+            prediction = self.logits_to_prediction(logits)
+            if not self.adaptor_config.counterfactual_type == '1sided' or prediction == y == y_source:
+                x_batch.append(x)
+                y_source_batch.append(y_source)
+                y_target_batch.append(torch.tensor(y_target))
+                y_batch.append(y)
+                y_target_start_confidence_batch.append(y_target_start_confidence)
+                if isinstance(self.teacher, SegmentationMaskTeacher):
+                    hint_batch.append(hint)
 
-            else:
-                hint_batch.append(torch.zeros_like(x))
+                else:
+                    hint_batch.append(torch.zeros_like(x))
 
-            if isinstance(
-                self.explainer.explainer_config, PerfectFalseCounterfactualConfig
-            ):
-                idx_batch.append(idx)
+                if isinstance(
+                    self.explainer.explainer_config, PerfectFalseCounterfactualConfig
+                ):
+                    idx_batch.append(idx)
 
-            else:
-                idx_batch.append(0)
+                else:
+                    idx_batch.append(0)
 
             sample_idx += 1
 
@@ -878,16 +878,15 @@ class CounterfactualKnowledgeDistillation:
                 self.train_dataloader.dataset.enable_idx()
                 self.val_dataloader.dataset.enable_idx()
 
-        else:
-            self.student = torch.load(
-                os.path.join(
-                    self.base_dir,
-                    str(finetune_iteration),
-                    "finetuned_model",
-                    "model.cpl",
-                ),
-                map_location=self.device,
-            )
+        self.student = torch.load(
+            os.path.join(
+                self.base_dir,
+                str(finetune_iteration),
+                "finetuned_model",
+                "model.cpl",
+            ),
+            map_location=self.device,
+        )
 
     def visualize_progress(self, paths):
         task_config_buffer = copy.deepcopy(self.test_dataloader.dataset.task_config)

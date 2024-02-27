@@ -2,11 +2,12 @@ from peal.teachers.teacher_interface import TeacherInterface
 
 
 class Model2ModelTeacher(TeacherInterface):
-    def __init__(self, model, dataset, tracking_level = 0):
+    def __init__(self, model, dataset, tracking_level = 0, counterfactual_type = '1sided'):
         self.model = model
         self.dataset = dataset
         self.tracking_level = tracking_level
         self.device = "cuda" if next(self.model.parameters()).is_cuda else "cpu"
+        self.counterfactual_type = counterfactual_type
 
     def get_feedback(
         self,
@@ -42,16 +43,21 @@ class Model2ModelTeacher(TeacherInterface):
 
             # TODO here has to be somehing added for OOD e.g. with FID score
             # TODO this will be a problem for multiclass
-            if y_target_end_confidence_list[idx] > 0.5:
-                #if y_source_list[idx] == y_list[idx]:
-                if pred_original != pred_counterfactual:
-                    feedback.append("true")
 
-                else:
-                    feedback.append("false")
+            if self.counterfactual_type == '1sided' and not y_list[idx] == y_source_list[idx]:
+                feedback.append("ood")
 
             else:
-                feedback.append("ood")
+                if y_target_end_confidence_list[idx] > 0.5:
+                    #if y_source_list[idx] == y_list[idx]:
+                    if pred_original != pred_counterfactual:
+                        feedback.append("true")
+
+                    else:
+                        feedback.append("false")
+
+                else:
+                    feedback.append("ood")
 
             teacher_original.append(pred_original)
             teacher_counterfactual.append(pred_counterfactual)

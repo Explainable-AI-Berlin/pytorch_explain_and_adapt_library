@@ -4,14 +4,15 @@ category                             :  "adaptor"
 batch_size                           :  5
 tracking_level                       :  2
 min_train_samples                    :  400
-finetune_iterations                  :  1
+finetune_iterations                  :  5
 max_validation_samples               :  100
+max_test_batches                     :  1
 continuous_learning                  :  "finetune"
 replace_model                        :  True
 use_visualization                    :  False #True
 calculate_group_accuracies           :  True
 explainer                            :  <PEAL_BASE>/configs/explainers/ace_diverse_Copyrighttag_celeba.yaml
-training                             :  <PEAL_BASE>/configs/training/img_classifier.yaml
+training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba500_poisened100.yaml
 test_data                            :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba.yaml
 student                              :  /home/space/datasets/peal/peal_runs/Smiling_confounding_copyrighttag_celeba/classifier_poisened100/model.cpl
@@ -21,8 +22,6 @@ base_dir                             :  /home/space/datasets/peal/peal_runs/Smil
 task:
   criterions:
     ce     : 1.0
-    l1     : 10000.0
-    l2     : 1.0
   output_type             : singleclass
   output_channels         : 2
   y_selection             : [Smiling]

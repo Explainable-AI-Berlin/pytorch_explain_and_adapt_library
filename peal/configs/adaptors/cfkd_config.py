@@ -145,6 +145,10 @@ class CFKDConfig(AdaptorConfig):
     """
     tracking_level: int = 0
     """
+    What level of tracking is used.
+    """
+    counterfactual_type: str = "1sided"
+    """
     A dict containing all variables that could not be given with the current config structure
     """
     kwargs: dict = {}
@@ -182,6 +186,7 @@ class CFKDConfig(AdaptorConfig):
         overwrite: bool = None,
         use_visualization: bool = None,
         tracking_level: int = None,
+        counterfactual_type: str = None,
         max_test_batches: Union[type(None), PositiveInt] = None,
         **kwargs,
     ):
@@ -321,4 +326,5 @@ class CFKDConfig(AdaptorConfig):
         self.use_visualization = use_visualization if not use_visualization is None else self.use_visualization
         self.max_test_batches = max_test_batches if not max_test_batches is None else self.max_test_batches
         self.tracking_level = tracking_level if not tracking_level is None else self.tracking_level
+        self.counterfactual_type = counterfactual_type if not counterfactual_type is None else self.counterfactual_type
         self.kwargs = kwargs

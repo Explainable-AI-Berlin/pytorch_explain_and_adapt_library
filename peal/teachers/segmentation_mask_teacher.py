@@ -4,9 +4,10 @@ from peal.teachers.teacher_interface import TeacherInterface
 
 
 class SegmentationMaskTeacher(TeacherInterface):
-    def __init__(self, attribution_threshold, dataset):
+    def __init__(self, attribution_threshold, dataset, counterfactual_type = '1sided'):
         self.attribution_threshold = attribution_threshold
         self.dataset = dataset
+        self.counterfactual_type = counterfactual_type
 
     def get_feedback(
         self,
@@ -18,25 +19,46 @@ class SegmentationMaskTeacher(TeacherInterface):
         y_target_list,
         x_list,
         y_list,
+        y_target_end_confidence_list,
         **kwargs
     ):
         feedback = []
         for idx, heatmap in enumerate(x_attribution_list):
             #
+            """
             attribution_relative = (heatmap * hint_list[idx]).sum() / heatmap.sum()
             masked_pixels_relative = hint_list[idx].sum() / torch.prod(
                 torch.tensor(list(hint_list[idx].shape))
             )
             attribution_relative = attribution_relative / masked_pixels_relative
-            #
             if attribution_relative > self.attribution_threshold:
                 feedback.append("true")
 
             else:
                 feedback.append("false")
+            """
+            #
+            if self.counterfactual_type == '1sided' and not y_list[idx] == y_source_list[idx]:
+                feedback.append("ood")
+
+            else:
+                if y_target_end_confidence_list[idx] > 0.5:
+                    hints = hint_list[idx].float()
+                    hints = hints - hints.mean()
+                    joint_map = heatmap * hints
+                    true_counterfactual_score = joint_map.sum()
+                    if true_counterfactual_score > 0:
+                        feedback.append("true")
+
+                    else:
+                        feedback.append("false")
+
+                else:
+                    feedback.append("ood")
 
         self.dataset.generate_contrastive_collage(
             y_counterfactual_teacher_list=y_list,
+            y_target_end_confidence_list=y_target_end_confidence_list,
             y_original_teacher_list=list(
                 map(
                     lambda x: x[0] if x[1] == "true" else abs(1 - x[0]),

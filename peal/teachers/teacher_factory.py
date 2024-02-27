@@ -18,6 +18,7 @@ def get_teacher(
     dataset: PealDataset,
     device: Union[torch.device, str] = torch.device("cpu"),
     tracking_level: int = 0,
+    counterfactual_type: str = "1sided",
 ) -> TeacherInterface:
     """
     This function returns a teacher. It can be a teacher that is already.
@@ -37,7 +38,12 @@ def get_teacher(
 
     elif isinstance(teacher, nn.Module):
         teacher.eval()
-        teacher = Model2ModelTeacher(teacher, dataset, tracking_level=tracking_level)
+        teacher = Model2ModelTeacher(
+            teacher,
+            dataset,
+            tracking_level=tracking_level,
+            counterfactual_type=counterfactual_type,
+        )
 
     elif teacher[:5] == "human":
         if len(teacher) == 10:
@@ -49,13 +55,18 @@ def get_teacher(
         teacher = Human2ModelTeacher(port)
 
     elif teacher == "SegmentationMask":
-        teacher = SegmentationMaskTeacher(adaptor_config.attribution_threshold, dataset)
+        teacher = SegmentationMaskTeacher(
+            adaptor_config.attribution_threshold,
+            dataset,
+            counterfactual_type=counterfactual_type,
+        )
 
     elif teacher[-4:] == ".cpl":
         teacher = Model2ModelTeacher(
             torch.load(teacher, map_location=device),
             dataset,
             tracking_level=tracking_level,
+            counterfactual_type=counterfactual_type,
         )
 
     else:
