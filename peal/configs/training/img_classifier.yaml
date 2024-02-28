@@ -4,5 +4,4 @@
 'max_epochs'              : 300
 #'steps_per_epoch'         : 1000
 'learning_rate'           : 0.00001
-'dropout'                 : 0.5
 'optimizer'               : 'adam'
