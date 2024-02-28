@@ -60,6 +60,7 @@ class SequentialModel(torch.nn.Sequential):
         architecture_config: ArchitectureConfig,
         input_channels: PositiveInt,
         output_channels: PositiveInt = None,
+        dropout: float = 0.0,
     ):
         """
         This function initializes the sequential model.
@@ -119,6 +120,9 @@ class SequentialModel(torch.nn.Sequential):
 
                 pdb.set_trace()
                 raise ValueError("Unknown layer config: {}".format(layer_config))
+
+        if not dropout == 0.0:
+            layers.append(torch.nn.Dropout(dropout))
 
         if not output_channels is None:
             last_layer_config = FCConfig(output_channels, tensor_dim=tensor_dim)

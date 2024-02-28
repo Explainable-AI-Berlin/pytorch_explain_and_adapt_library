@@ -146,7 +146,7 @@ class ModelTrainer:
 
             if isinstance(self.config.architecture, ArchitectureConfig):
                 self.model = SequentialModel(
-                    self.config.architecture, input_channels, output_channels
+                    self.config.architecture, input_channels, output_channels, self.config.training.dropout
                 )
 
             """elif isinstance(self.config.architecture, VAEConfig):

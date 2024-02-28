@@ -21,7 +21,11 @@ def main():
     model_config = load_yaml_config(args.model_config) #, ModelConfig)
     if not isinstance(model_config.data, DataConfig):
         model_config.data = DataConfig(**model_config.data)
+
+    if not isinstance(model_config.training, TrainingConfig):
         model_config.training = TrainingConfig(**model_config.training)
+
+    if not isinstance(model_config.task, TaskConfig):
         model_config.task = TaskConfig(**model_config.task)
 
     if not args.data_config is None:
@@ -32,7 +36,7 @@ def main():
         model_path = args.model_path
 
     else:
-        model_path = os.path.join(model_config.base_path, "model.cpl")
+        model_path = os.path.join(model_config.model_path, "model.cpl")
 
     model = torch.load(model_path, map_location=device)
     model.eval()

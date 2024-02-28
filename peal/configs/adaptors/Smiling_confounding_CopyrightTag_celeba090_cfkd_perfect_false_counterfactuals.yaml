@@ -1,25 +1,27 @@
-# python run_cfkd.py --adaptor_config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba500x100_cfkd_perfect_false_counterfactuals.yaml"
+# python run_cfkd.py --adaptor_config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba090_cfkd_perfect_false_counterfactuals.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  5
 finetune_iterations                  :  1
-min_train_samples                    :  400
-max_validation_samples               :  100
-continuous_learning                  :  "finetuning"
+min_train_samples                    :  78300
+max_validation_samples               :  8700
+continuous_learning                  :  "retrain"
 replace_model                        :  True
 use_visualization                    :  False #True
 calculate_group_accuracies           :  True
 explainer                            :  <PEAL_BASE>/configs/explainers/perfect_false_counterfactuals.yaml
-training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
-data                                 :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba500_poisened100.yaml
+training                             :  <PEAL_BASE>/configs/training/img_classifier.yaml
+data                                 :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba_poisened090.yaml
 test_data                            :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba.yaml
-student                              :  /home/space/datasets/peal/peal_runs/Smiling_confounding_copyrighttag_celeba/classifier_poisened100/model.cpl
+student                              :  /home/space/datasets/peal/peal_runs/Smiling_confounding_copyrighttag_celeba/classifier_poisened090/model.cpl
 teacher                              :  /home/space/datasets/peal/peal_runs/Smiling_confounding_copyrighttag_celeba/classifier_unpoisened/model.cpl
 generator                            :  /home/space/datasets/peal/peal_runs/ddpm_CopyrightTag_celeba_1000/config.yaml
-base_dir                             :  /home/space/datasets/peal/peal_runs/Smiling_confounding_copyrighttag_celeba/classifier_poisened100/cfkd_perfect_false_counterfactuals500
+base_dir                             :  /home/space/datasets/peal/peal_runs/Smiling_confounding_copyrighttag_celeba/classifier_poisened090/cfkd_perfect_false_counterfactuals
 task:
   criterions:
     ce     : 1.0
+    l1     : 10000.0
+    l2     : 1.0
   output_type             : singleclass
   output_channels         : 2
   y_selection             : [Smiling]

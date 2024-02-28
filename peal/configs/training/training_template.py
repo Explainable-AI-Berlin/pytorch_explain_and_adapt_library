@@ -16,6 +16,10 @@ class TrainingConfig(BaseModel):
     """
     learning_rate: float = 0.0001
     """
+    The dropout rate the model is trained with.
+    """
+    dropout: float = 0.0
+    """
     Logs how many steps the model was trained with already.
     """
     global_train_step: int = 0
