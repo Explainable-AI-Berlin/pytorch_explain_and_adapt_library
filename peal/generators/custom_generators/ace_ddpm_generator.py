@@ -72,7 +72,9 @@ class DDPM(EditCapableGenerator):
         self.model.to(device)
         self.model_path = os.path.join(self.model_dir, "final.pt")
         if os.path.exists(self.model_path):
-            self.model.load_state_dict(load_state_dict(self.model_path, map_location=device))
+            self.model.load_state_dict(
+                load_state_dict(self.model_path, map_location=device)
+            )
 
     def sample_x(self, batch_size=1, renormalize=True):
         sample = self.diffusion.p_sample_loop(
@@ -145,87 +147,122 @@ class DDPM(EditCapableGenerator):
             )
         ]
         args = copy.deepcopy(self.config).dict()
-        #args = copy.deepcopy(self.config.full_args)
+        # args = copy.deepcopy(self.config.full_args)
         args = SimpleNamespace(**args)
         args.output_path = self.counterfactual_path
         args.batch_size = x_in.shape[0]
         #
-        args.attack_iterations = int(
-            explainer_config.attack_iterations
-            if not isinstance(explainer_config.attack_iterations, list)
-            else random.randint(
-                explainer_config.attack_iterations[0],
-                explainer_config.attack_iterations[1],
+        x_counterfactuals = None
+        for idx in range(explainer_config.attempts):
+            # a0_0 = a_min + (a_max - a_min) / 2
+            # a1_0 = a_min + 0 * (a_max - a_min) / (explainer_config.attempts - 1)
+            # a1_1 = a_min + 1 * (a_max - a_min) / (explainer_config.attempts - 1)
+            # a2_0 = a_min + 0 * (a_max - a_min) / (explainer_config.attempts - 1)
+            # a2_0 = a_min + 1 * (a_max - a_min) / (explainer_config.attempts - 1)
+            # a2_0 = a_min + 2 * (a_max - a_min) / (explainer_config.attempts - 1)
+            multiplier = idx / (explainer_config.attempts - 1)
+            args.attack_iterations = int(
+                explainer_config.attack_iterations
+                if not isinstance(explainer_config.attack_iterations, list)
+                else int(
+                    explainer_config.attack_iterations[0]
+                    + (
+                        explainer_config.attack_iterations[1]
+                        - explainer_config.attack_iterations[0]
+                    )
+                    * multiplier
+                )
             )
-        )
-        args.sampling_time_fraction = float(
-            explainer_config.sampling_time_fraction
-            if not isinstance(explainer_config.sampling_time_fraction, list)
-            else random.uniform(
-                explainer_config.sampling_time_fraction[0],
-                explainer_config.sampling_time_fraction[1],
+            print("args.attack_iterations")
+            print(args.attack_iterations)
+            args.sampling_time_fraction = float(
+                explainer_config.sampling_time_fraction
+                if not isinstance(explainer_config.sampling_time_fraction, list)
+                else float(
+                    explainer_config.sampling_time_fraction[0]
+                    + (
+                        explainer_config.sampling_time_fraction[1]
+                        - explainer_config.sampling_time_fraction[0]
+                    )
+                    * multiplier
+                )
             )
-        )
-        args.dist_l1 = float(
-            explainer_config.dist_l1
-            if not isinstance(explainer_config.dist_l1, list)
-            else random.uniform(
-                explainer_config.dist_l1[0],
-                explainer_config.dist_l1[1],
+            args.dist_l1 = float(
+                explainer_config.dist_l1
+                if not isinstance(explainer_config.dist_l1, list)
+                else explainer_config.dist_l1[0]
+                * (
+                    (explainer_config.dist_l1[1] / explainer_config.dist_l1[0])
+                    ** (1 / (explainer_config.attempts - 1))
+                )
+                ** idx
             )
-        )
-        args.dist_l2 = float(
-            explainer_config.dist_l2
-            if not isinstance(explainer_config.dist_l2, list)
-            else random.uniform(
-                explainer_config.dist_l2[0],
-                explainer_config.dist_l2[1],
+            print("args.dist_l1")
+            print(args.dist_l1)
+            args.dist_l2 = float(
+                explainer_config.dist_l2
+                if not isinstance(explainer_config.dist_l2, list)
+                else explainer_config.dist_l1[0]
+                * (
+                    (explainer_config.dist_l2[1] / explainer_config.dist_l2[0])
+                    ** (1 / (explainer_config.attempts - 1))
+                )
+                ** idx
             )
-        )
-        args.sampling_inpaint = float(
-            explainer_config.sampling_inpaint
-            if not isinstance(explainer_config.sampling_inpaint, list)
-            else random.uniform(
-                explainer_config.sampling_inpaint[0],
-                explainer_config.sampling_inpaint[1],
+            args.sampling_inpaint = float(
+                explainer_config.sampling_inpaint
+                if not isinstance(explainer_config.sampling_inpaint, list)
+                else float(
+                    explainer_config.sampling_time_fraction[0]
+                    - (
+                        explainer_config.sampling_time_fraction[0]
+                        - explainer_config.sampling_time_fraction[1]
+                    )
+                    * multiplier
+                )
             )
-        )
-        args.sampling_dilation = int(
-            explainer_config.sampling_dilation
-            if not isinstance(explainer_config.sampling_dilation, list)
-            else random.randint(
-                explainer_config.sampling_dilation[0],
-                explainer_config.sampling_dilation[1],
+            args.__dict__.update(
+                {
+                    k: v
+                    for k, v in explainer_config.__dict__.items()
+                    if k not in args.__dict__
+                }
             )
-        )
-        args.timestep_respacing = str(
-            explainer_config.timestep_respacing
-            if not isinstance(explainer_config.timestep_respacing, list)
-            else random.uniform(
-                explainer_config.timestep_respacing[0],
-                explainer_config.timestep_respacing[1],
-            )
-        )
-        args.__dict__.update({k: v for k, v in explainer_config.__dict__.items() if k not in args.__dict__})
-        args.dataset = dataset
-        args.classifier_dataset = classifier_dataset
-        args.generator_dataset = self.dataset
-        args.model_path = os.path.join(self.model_dir, "final.pt")
-        args.classifier = classifier
-        args.diffusion = self.diffusion
-        args.model = self.model
-        #
-        x_counterfactuals = ace_main(args=args)
-        x_counterfactuals = torch.cat(x_counterfactuals, dim=0)
+            args.dataset = dataset
+            args.classifier_dataset = classifier_dataset
+            args.generator_dataset = self.dataset
+            args.model_path = os.path.join(self.model_dir, "final.pt")
+            args.classifier = classifier
+            args.diffusion = self.diffusion
+            args.model = self.model
+            #
+            x_counterfactuals_current = ace_main(args=args)
+            x_counterfactuals_current = torch.cat(x_counterfactuals_current, dim=0)
 
-        device = [p for p in classifier.parameters()][0].device
-        preds = torch.nn.Softmax(dim=-1)(
-            classifier(x_counterfactuals.to(device)).detach().cpu()
-        )
+            device = [p for p in classifier.parameters()][0].device
+            preds = torch.nn.Softmax(dim=-1)(
+                classifier(x_counterfactuals_current.to(device)).detach().cpu()
+            )
+            y_target_end_confidence_current = torch.zeros([x_in.shape[0]])
+            for i in range(x_in.shape[0]):
+                y_target_end_confidence_current[i] = preds[i, target_classes[i]]
 
-        y_target_end_confidence = torch.zeros([x_in.shape[0]])
-        for i in range(x_in.shape[0]):
-            y_target_end_confidence[i] = preds[i, target_classes[i]]
+            if x_counterfactuals is None:
+                x_counterfactuals = x_counterfactuals_current
+                y_target_end_confidence = y_target_end_confidence_current
+
+            else:
+                for i in range(x_in.shape[0]):
+                    if y_target_end_confidence[i] < 0.51 and y_target_end_confidence_current[i] >= 0.51:
+                        x_counterfactuals[i] = x_counterfactuals_current[i]
+                        y_target_end_confidence[i] = y_target_end_confidence_current[i]
+
+            num_successful = torch.sum(y_target_end_confidence >= 0.51).item()
+            print("num_successful")
+            print(num_successful)
+            print(y_target_end_confidence_current)
+            if num_successful == x_in.shape[0]:
+                break
 
         return (
             list(x_counterfactuals),
