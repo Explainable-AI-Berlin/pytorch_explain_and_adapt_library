@@ -103,7 +103,9 @@ class DDPM(EditCapableGenerator):
                 self.dataset,
                 mode="train",
                 batch_size=self.config.batch_size,
-                training_config={"steps_per_epoch": self.config.max_steps},
+                training_config=types.SimpleNamespace(
+                    **{"steps_per_epoch": self.config.max_steps}
+                ),
             )
         )
 
@@ -125,7 +127,7 @@ class DDPM(EditCapableGenerator):
             weight_decay=self.config.weight_decay,
             lr_anneal_steps=self.config.lr_anneal_steps,
             model_dir=self.model_dir,
-        ).run_loop()
+        ).run_loop(self.config)
 
     def edit(
         self,
@@ -246,6 +248,10 @@ class DDPM(EditCapableGenerator):
             y_target_end_confidence_current = torch.zeros([x_in.shape[0]])
             for i in range(x_in.shape[0]):
                 y_target_end_confidence_current[i] = preds[i, target_classes[i]]
+                print("preds[" + str(i) + "]")
+                print(preds[i])
+                print("target_classes[" + str(i) + "]")
+                print(int(target_classes[i]))
 
             if x_counterfactuals is None:
                 x_counterfactuals = x_counterfactuals_current
@@ -253,14 +259,13 @@ class DDPM(EditCapableGenerator):
 
             else:
                 for i in range(x_in.shape[0]):
-                    if y_target_end_confidence[i] < 0.51 and y_target_end_confidence_current[i] >= 0.51:
+                    if y_target_end_confidence[i] < 0.51:
                         x_counterfactuals[i] = x_counterfactuals_current[i]
                         y_target_end_confidence[i] = y_target_end_confidence_current[i]
 
             num_successful = torch.sum(y_target_end_confidence >= 0.51).item()
             print("num_successful")
             print(num_successful)
-            print(y_target_end_confidence_current)
             if num_successful == x_in.shape[0]:
                 break
 

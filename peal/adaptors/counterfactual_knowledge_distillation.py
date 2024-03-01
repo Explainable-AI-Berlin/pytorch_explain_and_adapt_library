@@ -387,8 +387,12 @@ class CounterfactualKnowledgeDistillation:
                 y_target = int(cm_idx % self.output_size)
 
             cm_idx = (cm_idx + 1) % (self.output_size**2)
+            try:
+                x, y = self.datastack.pop(int(y_source))
 
-            x, y = self.datastack.pop(int(y_source))
+            except Exception as e:
+                import pdb; pdb.set_trace()
+
             if isinstance(self.teacher, SegmentationMaskTeacher) or isinstance(
                 self.explainer.explainer_config, PerfectFalseCounterfactualConfig
             ):
@@ -430,7 +434,7 @@ class CounterfactualKnowledgeDistillation:
                 else:
                     idx_batch.append(0)
 
-            sample_idx += 1
+                sample_idx += 1
 
         x_batch = torch.stack(x_batch)
         y_target_batch = torch.stack(y_target_batch)

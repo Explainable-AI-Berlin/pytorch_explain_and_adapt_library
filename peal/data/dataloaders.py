@@ -7,8 +7,6 @@ import torch.multiprocessing
 torch.multiprocessing.set_sharing_strategy("file_system")
 
 from peal.data.dataset_factory import get_datasets
-from peal.data.dataset_wrappers import VAEDatasetWrapper
-#from peal.configs.generators.generator_config import VAEConfig
 
 
 class DataStack:

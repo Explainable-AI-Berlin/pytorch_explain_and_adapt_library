@@ -101,7 +101,8 @@ class TrainLoop:
                 for _ in range(len(self.ema_rate))
             ]
 
-        if th.cuda.is_available():
+        if False:
+            # th.cuda.is_available():
             self.use_ddp = True
             self.ddp_model = DDP(
                 self.model,
@@ -139,7 +140,8 @@ class TrainLoop:
                 )
                 print("done")
 
-        dist_util.sync_params(self.model.parameters())
+        # TODO what is this doing?
+        #dist_util.sync_params(self.model.parameters())
 
     def _load_ema_parameters(self, rate):
         ema_params = copy.deepcopy(self.mp_trainer.master_params)
@@ -158,7 +160,7 @@ class TrainLoop:
                 ema_params = self.mp_trainer.state_dict_to_master_params(state_dict)
                 print("done")
 
-        dist_util.sync_params(ema_params)
+        #dist_util.sync_params(ema_params)
         return ema_params
 
     def _load_optimizer_state(self):
