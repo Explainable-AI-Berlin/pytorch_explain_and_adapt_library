@@ -1,0 +1,24 @@
+model_id : "CompVis/stable-diffusion-v1-4"
+generator_type: DDPMInversionAdaptor
+base_path: peal_runs/ddpm_inversion
+num_diffusion_steps : 100
+cfg_scale_src : 3.5
+cfg_scale_tar : 15
+eta : 1.0
+mode : our_inv # modes: our_inv,p2pinv,p2pddim,ddim
+skip : 36
+xa : 0.6
+sa : 0.2
+src_prompt : "Not Smiling"
+target_prompt : "Smiling"
+architecture: {}
+training: {}
+data:
+  dataset_class           : celeba
+  dataset_path            : datasets/celeba_copyrighttag
+  num_samples             : 20000
+  input_type              : image
+  input_size              : [3, 256, 256]
+  output_type             : multiclass
+  output_size             : [41]
+  normalization           : [0.5,0.5]

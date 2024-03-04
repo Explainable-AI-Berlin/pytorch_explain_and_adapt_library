@@ -150,7 +150,9 @@ def parse_csv(
         else:
             keys_out = keys
 
-    #keys_out.sort()
+    keys_out.sort()
+    random.seed(0)
+    random.shuffle(keys_out)
     return attributes, data, keys_out
 
 

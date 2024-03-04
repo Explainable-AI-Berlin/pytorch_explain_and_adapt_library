@@ -1,6 +1,4 @@
-import random
 import os
-import csv
 import json
 import shutil
 import random
@@ -8,8 +6,14 @@ import numpy as np
 import pandas as pd
 
 from pathlib import Path
+
+import torch
+import torchvision
 from PIL import Image
+from torchvision.transforms import ToTensor
+
 from peal.global_utils import get_project_resource_dir, embed_numberstring
+from peal.dependencies.ddpm_inversion.ddpm_inversion import DDPMInversion
 
 
 class ArtificialConfounderTabularDatasetGenerator:
@@ -291,6 +295,9 @@ class ConfounderDatasetGenerator:
         self.num_samples = num_samples
         self.attribute = attribute
 
+        if self.confounding == "haircolor":
+            self.ddpm_inversion = DDPMInversion()
+
         if not data_config is None and not data_config.inverse is None:
             with open(os.path.join(data_config.inverse, "data.csv"), "r") as f:
                 inverse_data = f.readlines()
@@ -316,6 +323,7 @@ class ConfounderDatasetGenerator:
         shutil.rmtree(self.dataset_dir, ignore_errors=True)
         os.makedirs(self.dataset_dir)
         os.makedirs(os.path.join(self.dataset_dir, "imgs"))
+        os.makedirs(os.path.join(self.dataset_dir + "_inverse", "imgs"))
         if self.confounding == "copyrighttag":
             os.makedirs(os.path.join(self.dataset_dir, "masks"))
 
@@ -436,17 +444,36 @@ class ConfounderDatasetGenerator:
                 alpha = 0.5 + 0.5 * confounder_intensity * (2 * int(has_confounder) - 1)
                 img = alpha * img_copyrighttag + (1 - alpha) * np.array(img)
                 img_out = Image.fromarray(np.array(img, dtype=np.uint8))
-
-            img_out.save(os.path.join(self.dataset_dir, "imgs", name))
-            if self.confounding == "copyrighttag":
-                mask = Image.fromarray(
-                    np.array(
-                        np.abs(np.array(copyright_tag_bg, dtype=np.float32) / 255 - 1)
-                        * 255,
-                        dtype=np.uint8,
+                if self.confounding == "copyrighttag":
+                    mask = Image.fromarray(
+                        np.array(
+                            np.abs(np.array(copyright_tag_bg, dtype=np.float32) / 255 - 1)
+                            * 255,
+                            dtype=np.uint8,
+                        )
                     )
-                )
-                mask.save(os.path.join(self.dataset_dir, "masks", name))
+                    mask.save(os.path.join(self.dataset_dir, "masks", name))
+
+            if self.confounding == "haircolor":
+                img_th = ToTensor()(img.expand_dims(0))
+                if has_confounder:
+                    img_blond_hair = self.ddpm_inversion(img_th, ["blond hair"], ["not blond hair"])
+                    img_black_hair = self.ddpm_inversion(img_blond_hair, ["black hair"], ["blond hair"])
+                    torchvision.utils.save_image(img_blond_hair[0], os.path.join(self.dataset_dir + '_inverse', "imgs", name))
+                    torchvision.utils.save_image(img_black_hair[0], os.path.join(self.dataset_dir, "imgs", name))
+
+                else:
+                    img_black_hair = self.ddpm_inversion(img_th, ["black hair"], ["not black hair"])
+                    img_blond_hair = self.ddpm_inversion(img_black_hair, ["blond hair"], ["black hair"])
+                    torchvision.utils.save_image(img_black_hair[0], os.path.join(self.dataset_dir + '_inverse', "imgs", name))
+                    torchvision.utils.save_image(img_blond_hair[0], os.path.join(self.dataset_dir, "imgs", name))
+
+                abs_difference = torch.abs(img_black_hair[0] - img_black_hair[0])
+                mask = abs_difference > 0.2
+                torchvision.utils.save_image(mask, os.path.join(self.dataset_dir, "masks", name))
+
+            else:
+                img_out.save(os.path.join(self.dataset_dir, "imgs", name))
 
             sample.append(has_confounder)
             sample.append(confounder_intensity)
@@ -454,9 +481,10 @@ class ConfounderDatasetGenerator:
                 name + "," + ",".join(list(map(lambda x: str(float(x)), sample)))
             )
 
-        open(os.path.join(self.dataset_dir, "data.csv"), "w").write(
-            "\n".join(lines_out)
-        )
+            if sample_idx != 0 and sample_idx % 100 == 0:
+                open(os.path.join(self.dataset_dir, "data.csv"), "w").write(
+                    "\n".join(lines_out)
+                )
 
 
 class StainingConfounderGenerator:
