@@ -308,11 +308,7 @@ class ConfounderDatasetGenerator:
                 self.inverse_body = []
                 for idx in range(1, len(inverse_data)):
                     self.inverse_body.append(
-                        list(
-                            map(
-                                lambda x: x.strip(), inverse_data[idx].split(",")
-                            )
-                        )
+                        list(map(lambda x: x.strip(), inverse_data[idx].split(",")))
                     )
 
         else:
@@ -321,10 +317,11 @@ class ConfounderDatasetGenerator:
     def generate_dataset(self):
         """ """
         shutil.rmtree(self.dataset_dir, ignore_errors=True)
+        shutil.rmtree(self.dataset_dir + "_inverse", ignore_errors=True)
         os.makedirs(self.dataset_dir)
         os.makedirs(os.path.join(self.dataset_dir, "imgs"))
         os.makedirs(os.path.join(self.dataset_dir + "_inverse", "imgs"))
-        if self.confounding == "copyrighttag":
+        if self.confounding == "copyrighttag" or self.confounding == "haircolor":
             os.makedirs(os.path.join(self.dataset_dir, "masks"))
 
         raw_data = open(self.label_dir, "r").read().split("\n")
@@ -413,7 +410,9 @@ class ConfounderDatasetGenerator:
                 confounder_intensity = 1.0
 
             if not self.inverse_head is None:
-                confounder_intensity = -1 * float(self.inverse_body[sample_idx][self.cs_idx])
+                confounder_intensity = -1 * float(
+                    self.inverse_body[sample_idx][self.cs_idx]
+                )
 
             if self.confounding == "intensity":
                 intensity_change = (
@@ -447,7 +446,9 @@ class ConfounderDatasetGenerator:
                 if self.confounding == "copyrighttag":
                     mask = Image.fromarray(
                         np.array(
-                            np.abs(np.array(copyright_tag_bg, dtype=np.float32) / 255 - 1)
+                            np.abs(
+                                np.array(copyright_tag_bg, dtype=np.float32) / 255 - 1
+                            )
                             * 255,
                             dtype=np.uint8,
                         )
@@ -455,22 +456,43 @@ class ConfounderDatasetGenerator:
                     mask.save(os.path.join(self.dataset_dir, "masks", name))
 
             if self.confounding == "haircolor":
-                img_th = ToTensor()(img.expand_dims(0))
-                if has_confounder:
-                    img_blond_hair = self.ddpm_inversion(img_th, ["blond hair"], ["not blond hair"])
-                    img_black_hair = self.ddpm_inversion(img_blond_hair, ["black hair"], ["blond hair"])
-                    torchvision.utils.save_image(img_blond_hair[0], os.path.join(self.dataset_dir + '_inverse', "imgs", name))
-                    torchvision.utils.save_image(img_black_hair[0], os.path.join(self.dataset_dir, "imgs", name))
+                img_th = ToTensor()(img).unsqueeze(0)
+                if not has_confounder:
+                    img_blond_hair = self.ddpm_inversion.run(
+                        img_th, ["Smiling"], ["Not Smiling"]
+                    )
+                    img_black_hair = self.ddpm_inversion.run(
+                        img_blond_hair, ["Not Smiling"], ["Smiling"]
+                    )
+                    torchvision.utils.save_image(
+                        img_blond_hair[0],
+                        os.path.join(self.dataset_dir + "_inverse", "imgs", name),
+                    )
+                    torchvision.utils.save_image(
+                        img_black_hair[0], os.path.join(self.dataset_dir, "imgs", name)
+                    )
 
                 else:
-                    img_black_hair = self.ddpm_inversion(img_th, ["black hair"], ["not black hair"])
-                    img_blond_hair = self.ddpm_inversion(img_black_hair, ["blond hair"], ["black hair"])
-                    torchvision.utils.save_image(img_black_hair[0], os.path.join(self.dataset_dir + '_inverse', "imgs", name))
-                    torchvision.utils.save_image(img_blond_hair[0], os.path.join(self.dataset_dir, "imgs", name))
+                    img_black_hair = self.ddpm_inversion.run(
+                        img_th, ["Not Smiling"], ["Smiling"]
+                    )
+                    img_blond_hair = self.ddpm_inversion.run(
+                        img_black_hair, ["Smiling"], ["Not Smiling"]
+                    )
+                    torchvision.utils.save_image(
+                        img_black_hair[0],
+                        os.path.join(self.dataset_dir + "_inverse", "imgs", name),
+                    )
+                    torchvision.utils.save_image(
+                        img_blond_hair[0], os.path.join(self.dataset_dir, "imgs", name)
+                    )
 
-                abs_difference = torch.abs(img_black_hair[0] - img_black_hair[0])
-                mask = abs_difference > 0.2
-                torchvision.utils.save_image(mask, os.path.join(self.dataset_dir, "masks", name))
+                abs_difference = torch.abs(img_black_hair[0] - img_blond_hair[0])
+                #mask = abs_difference > 0.2
+                mask = abs_difference.mean(0)
+                torchvision.utils.save_image(
+                    mask.float(), os.path.join(self.dataset_dir, "masks", name)
+                )
 
             else:
                 img_out.save(os.path.join(self.dataset_dir, "imgs", name))
@@ -680,7 +702,8 @@ class CircleDatasetGenerator:
             dataset_name (str): Name of the dataset
             dataset_origin_path (Path): path to the directory where the dataset is stored
             num_samples (int, optional): Number of samples to generate. Default is 1024.
-            noise_scale (float, optional): The value with which to scale the variance (set to 1 initially) of the noise. Default is 0.0 (no noise).
+            noise_scale (float, optional): The value with which to scale the variance (set to 1 initially) of the noise.
+                Default is 0.0 (no noise).
             seed (int, optional): Seed for the random number generator. Defaults is 0.
         """
 

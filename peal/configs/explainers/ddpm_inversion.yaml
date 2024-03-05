@@ -9,8 +9,6 @@ mode : our_inv # modes: our_inv,p2pinv,p2pddim,ddim
 skip : 36
 xa : 0.6
 sa : 0.2
-src_prompt : "Not Smiling"
-target_prompt : "Smiling"
 architecture: {}
 training: {}
 data:

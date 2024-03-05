@@ -18,14 +18,22 @@ from peal.global_utils import load_yaml_config
 
 
 class DDPMInversion:
-    def __init__(
-        self, config="<PEAL_BASE>/peal/configs/explainers/ddpm_inversion.yaml"
-    ):
+    def __init__(self, config="<PEAL_BASE>/configs/explainers/ddpm_inversion.yaml"):
         self.config = load_yaml_config(config)
         self.config.data = DataConfig(**self.config.data)
-        self.generator_dataset = Image2MixedDataset(
-            "/home/space/datasets/peal/datasets/celeba", "validation", self.config.data
-        )
+        if not self.config.data.normalization is None:
+            self.project_to_pytorch_default = lambda x: (
+                x * torch.tensor(self.config.data.normalization[1])
+                + torch.tensor(self.config.data.normalization[0])
+            )
+            self.project_from_pytorch_default = lambda x: (
+                x - torch.tensor(self.config.data.normalization[0])
+            ) / torch.tensor(self.config.data.normalization[1])
+
+        else:
+            self.project_from_pytorch_default = lambda x: x
+            self.project_to_pytorch_default = lambda x: x
+
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
         self.pipe = StableDiffusionPipeline.from_pretrained(self.config.model_id).to(
             self.device
@@ -36,7 +44,7 @@ class DDPMInversion:
         self.pipe.scheduler.set_timesteps(self.config.num_diffusion_steps)
 
     def run(self, x, prompt_tar_list, prompt_src):
-        x = self.generator_dataset.from_pytorch_default(x)
+        x = self.project_from_pytorch_default(x)
         # TODO do i have to upsample here?
         x0 = torchvision.transforms.Resize([512, 512])(
             torch.clone(x).to(self.device)
@@ -82,7 +90,12 @@ class DDPMInversion:
             x0_dec = x0_dec[None, :, :, :]
 
         x_counterfactuals = torch.clone(x0_dec).detach().cpu()
-        x_counterfactuals = torchvision.transforms.Resize(x.size[1:])(x_counterfactuals)
-        x_counterfactuals = self.generator_dataset.to_pytorch_default(x_counterfactuals)
+        x_counterfactuals = torchvision.transforms.Resize(x.shape[2:])(
+            x_counterfactuals
+        )
+        x_counterfactuals = torch.clamp(self.project_to_pytorch_default(
+            x_counterfactuals
+        ), 0, 1)
+        print([x_counterfactuals.min(), x_counterfactuals.max()])
 
         return x_counterfactuals
