@@ -4,6 +4,8 @@ import os
 import glob
 import copy
 import shutil
+
+import torch
 import yaml
 
 import blobfile as bf
@@ -196,6 +198,10 @@ class TrainLoop:
         ):
             pbar.step = self.step
             batch, cond = next(self.data)
+            if isinstance(cond, torch.Tensor):
+                #cond = {"y": cond}
+                cond = {}
+
             self.run_step(batch, cond, pbar)
             if self.step % self.save_interval == 0:
                 # save intermediate images as outputs
@@ -264,7 +270,6 @@ class TrainLoop:
                 t,
                 model_kwargs=micro_cond,
             )
-
             if last_batch or not self.use_ddp:
                 losses = compute_losses()
             else:
