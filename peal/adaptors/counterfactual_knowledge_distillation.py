@@ -509,7 +509,6 @@ class CounterfactualKnowledgeDistillation:
                     remove_below_threshold=True,
                     pbar=pbar,
                     mode="Training",
-                    model=self.student,
                 )
                 for key in tracked_keys:
                     tracked_values[key].extend(values[key])

@@ -238,14 +238,16 @@ def get_dataloader(
         dataloader = DataLoader(
             dataset,
             batch_size=getattr(training_config, mode + "_batch_size"),
-            num_workers=1,
+            num_workers=8,
+            shuffle=True,
         )
 
     else:
         dataloader = DataLoader(
             dataset,
             batch_size=batch_size,
-            num_workers=1,
+            num_workers=8,
+            shuffle=True,
         )
 
     if mode == "train" and (

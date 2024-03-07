@@ -90,7 +90,7 @@ class DDPM(EditCapableGenerator):
     ):
         shutil.rmtree(self.model_dir, ignore_errors=True)
 
-        dist_util.setup_dist(self.config.gpus)
+        #dist_util.setup_dist(self.config.gpus)
         logger.configure(dir=self.model_dir)
 
         schedule_sampler = create_named_schedule_sampler(

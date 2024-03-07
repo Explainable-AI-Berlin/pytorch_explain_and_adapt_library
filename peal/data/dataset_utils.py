@@ -222,7 +222,7 @@ def process_confounder_data_controlled(
 
     assert (
         np.sum(n_attribute_confounding == max_attribute_confounding) == 4
-    ), "something went wrong with filling up the attributes"
+    ), "something went wrong with filling up the attributes: " + str(n_attribute_confounding)
     assert (
         np.sum(n_attribute_confounding) == config.num_samples
     ), "wrong number of samples!"

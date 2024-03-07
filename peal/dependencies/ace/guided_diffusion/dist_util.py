@@ -9,16 +9,13 @@ import socket
 import blobfile as bf
 from mpi4py import MPI
 import torch as th
-import torch.distributed as dist
+#import torch.distributed as dist
 
 # Change this to reflect your cluster layout.
 # The GPU for a given rank is (rank % GPUS_PER_NODE).
 
 
-def setup_dist(devices=""):
-    """
-    Setup a distributed process group.
-    """
+"""def setup_dist(devices=""):
     if dist.is_initialized():
         return
     if devices != "":
@@ -44,7 +41,7 @@ def setup_dist(devices=""):
 
     port = comm.bcast(_find_free_port(), root=0)
     os.environ["MASTER_PORT"] = str(port)
-    dist.init_process_group(backend=backend, init_method="env://")
+    dist.init_process_group(backend=backend, init_method="env://")"""
 
 
 def dev():
@@ -60,7 +57,7 @@ def load_state_dict(path, **kwargs):
     """
     Load a PyTorch file without redundant fetches across MPI ranks.
     """
-    chunk_size = 2**30  # MPI has a relatively small size limit
+    """chunk_size = 2**30  # MPI has a relatively small size limit
     if MPI.COMM_WORLD.Get_rank() == 0:
         with bf.BlobFile(path, "rb") as f:
             data = f.read()
@@ -74,12 +71,15 @@ def load_state_dict(path, **kwargs):
         num_chunks = MPI.COMM_WORLD.bcast(None)
         data = bytes()
         for _ in range(num_chunks):
-            data += MPI.COMM_WORLD.bcast(None)
+            data += MPI.COMM_WORLD.bcast(None)"""
+
+    with bf.BlobFile(path, "rb") as f:
+        data = f.read()
 
     return th.load(io.BytesIO(data), **kwargs)
 
 
-def sync_params(params):
+'''def sync_params(params):
     """
     Synchronize a sequence of Tensors across ranks from rank 0.
     """
@@ -96,4 +96,4 @@ def _find_free_port():
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         return s.getsockname()[1]
     finally:
-        s.close()
+        s.close()'''

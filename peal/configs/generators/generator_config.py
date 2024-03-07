@@ -12,6 +12,10 @@ class GeneratorConfig(BaseModel):
     The category of the config
     """
     category: str = 'generator'
+    """
+    The name of the class.
+    """
+    current_fid: float = float('inf')
 
 '''class VAEConfig(GeneratorConfig):
     """
