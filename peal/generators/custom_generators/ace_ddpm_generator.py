@@ -97,6 +97,9 @@ class DDPM(EditCapableGenerator):
             self.config.schedule_sampler, self.diffusion
         )
 
+        if not self.config.x_selection is None:
+            self.dataset.task_config = SimpleNamespace(**{"x_selection": self.config.x_selection})
+
         logger.log("creating data loader...")
         data = iter(
             get_dataloader(

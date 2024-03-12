@@ -64,3 +64,4 @@ class DDPMConfig(GeneratorConfig):
     rescale_timesteps : bool = False
     rescale_learned_sigmas : bool = False
     full_args: dict = {}
+    x_selection: Union[list, type(None)] = None
