@@ -551,13 +551,16 @@ class Image2MixedDataset(ImageDataset):
             x_selection = "imgs"
 
         img = Image.open(os.path.join(self.root_dir, x_selection, name))
-        # code.interact(local=dict(globals(), **locals()))
         state = torch.get_rng_state()
         img_tensor = self.transform(img)
 
         targets = self.data[name]
 
-        if not self.task_config is None and not self.task_config.y_selection is None:
+        if (
+            not self.task_config is None
+            and hasattr(self.task_config, "y_selection")
+            and not self.task_config.y_selection is None
+        ):
             target = torch.zeros([len(self.task_config.y_selection)])
             for i, selection in enumerate(self.task_config.y_selection):
                 target[i] = targets[self.attributes.index(selection)]
@@ -567,7 +570,11 @@ class Image2MixedDataset(ImageDataset):
                 targets[: self.config.output_size[0]], dtype=torch.float32
             )
 
-        if not self.task_config is None and "ce" in self.task_config.criterions:
+        if (
+            not self.task_config is None
+            and hasattr(self.task_config, "criterions")
+            and "ce" in self.task_config.criterions
+        ):
             assert (
                 target.shape[0] == 1
             ), "output shape inacceptable for singleclass classification"

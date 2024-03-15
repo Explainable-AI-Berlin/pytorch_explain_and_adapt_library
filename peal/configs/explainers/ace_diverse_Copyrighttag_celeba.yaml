@@ -1,10 +1,10 @@
 explainer_type : ACE
 category : explainer
-attack_iterations : [20,80] #[20, 50, 80]
-sampling_time_fraction : [0.2,0.4] #[0.2, 0.3, 0.4]
-dist_l1 : [0.1, 0.000000001] #[1e-1, 1e-5, 1e-9]
+attack_iterations : 100 #[20,80] #[20, 50, 80]
+sampling_time_fraction : [0.1,0.5] #[0.2, 0.3, 0.4]
+dist_l1 : 0.0 #[0.1, 0.000000001] #[1e-1, 1e-5, 1e-9]
 dist_l2 : 0.0 #0.0001
-sampling_inpaint : [0.3,0.0] #[0.3, 0.15, 0.0]
+sampling_inpaint : 0.0 #[0.3,0.0] #[0.3, 0.15, 0.0]
 sampling_dilation : 17
 timestep_respacing : 50
 attempts : 3

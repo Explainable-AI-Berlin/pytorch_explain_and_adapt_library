@@ -396,6 +396,8 @@ def main(args=None):
         "binary": args.dataset in BINARYDATASET
         and not isinstance(classifier, SequentialModel),
         "step": args.attack_step / 255,
+        "y_target_goal_confidence": args.y_target_goal_confidence,
+        "predictor": classifier,
     }
 
     attack = get_attack(

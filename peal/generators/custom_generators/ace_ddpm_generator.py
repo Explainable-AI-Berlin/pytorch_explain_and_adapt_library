@@ -100,6 +100,7 @@ class DDPM(EditCapableGenerator):
         if not self.config.x_selection is None:
             self.dataset.task_config = SimpleNamespace(**{"x_selection": self.config.x_selection})
 
+        X, y = self.dataset[0]
         logger.log("creating data loader...")
         data = iter(
             get_dataloader(

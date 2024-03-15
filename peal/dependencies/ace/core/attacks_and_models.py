@@ -77,6 +77,8 @@ class Attack:
         norm="linf",
         dist_schedule="none",
         binary=False,
+        y_target_goal_confidence=0.65,
+        predictor=None,
     ):
         """
         :param predict: classification model
@@ -101,6 +103,8 @@ class Attack:
         assert norm in ["linf", "l2"], 'PGD norm must by "linf" or "l2"'
         self.set_dist_schedule(dist_schedule)
         self.binary = binary
+        self.y_target_goal_confidence = y_target_goal_confidence
+        self.predictor = predictor
 
     def set_dist_schedule(self, schedule):
         """
@@ -415,6 +419,7 @@ def get_attack(attack, use_checkpoint, use_shortcut=False):
     if use_checkpoint and not use_shortcut:
         post_text = " with checkpoint method"
         BaseAttack = ClassifierDiffusionCheckpointGradients
+
     elif not use_checkpoint and use_shortcut:
         post_text = " with shortcut method"
         BaseAttack = ClassifierDiffusionShortcut
@@ -454,12 +459,24 @@ def get_attack(attack, use_checkpoint, use_shortcut=False):
                 self.linf_norm_proj if self.norm == "linf" else self.l2_norm_proj
             )
 
+            mask = torch.ones(x.shape[0]).to(x)
             for i in range(self.nb_iter):
                 grad = self.sign * self.extract_grads(
                     x_adv, y
                 ) + self.extract_dist_grads(i, x, x_adv.clone().detach())
-                x_adv -= grad.sign() * self.step
+                x_adv -= mask * grad.sign() * self.step
                 x_adv = projection_fn(x, x_adv)
+                pred = torch.nn.functional.softmax(self.predictor(x_adv), -1)
+                print(i)
+                print(list(pred))
+                print(y)
+                print(torch.sum(torch.abs(x - x_adv)))
+                for j in range(x_adv.shape[0]):
+                    if pred[j, int(y)] > self.y_target_goal_confidence:
+                        mask[j] = 0
+
+                if mask.sum() == 0:
+                    break
 
             return x_adv
 
