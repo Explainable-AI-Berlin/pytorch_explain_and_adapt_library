@@ -464,12 +464,12 @@ def get_attack(attack, use_checkpoint, use_shortcut=False):
                 grad = self.sign * self.extract_grads(
                     x_adv, y
                 ) + self.extract_dist_grads(i, x, x_adv.clone().detach())
-                x_adv -= mask * grad.sign() * self.step
+                x_adv -= mask.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1) * grad.sign() * self.step
                 x_adv = projection_fn(x, x_adv)
                 pred = torch.nn.functional.softmax(self.classifier.classifier(x_adv), -1)
                 print(str(i) + ": " + str(list(pred)))
                 for j in range(x_adv.shape[0]):
-                    if pred[j, int(y)] > self.y_target_goal_confidence:
+                    if pred[j, int(y[j])] > self.y_target_goal_confidence:
                         mask[j] = 0
 
                 if mask.sum() == 0:

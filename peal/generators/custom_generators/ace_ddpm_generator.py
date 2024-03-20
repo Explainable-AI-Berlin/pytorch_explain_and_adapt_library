@@ -11,6 +11,8 @@ from mpi4py import MPI
 from torch import nn
 from types import SimpleNamespace
 
+from torch.utils.tensorboard import SummaryWriter
+
 from peal.generators.interfaces import EditCapableGenerator
 from peal.global_utils import load_yaml_config
 from peal.dependencies.ace.run_ace import main as ace_main
@@ -27,6 +29,7 @@ from peal.data.dataloaders import get_dataloader
 from peal.data.dataset_factory import get_datasets
 from peal.data.dataset_interfaces import PealDataset
 from peal.configs.explainers.ace_config import ACEConfig
+from peal.training.loggers import log_images_to_writer
 
 
 def load_state_dict(path, **kwargs):
@@ -99,22 +102,40 @@ class DDPM(EditCapableGenerator):
 
         if not self.config.x_selection is None:
             self.dataset.task_config = SimpleNamespace(**{"x_selection": self.config.x_selection})
+            print("self.dataset.task_config1")
+            print("self.dataset.task_config1")
+            print("self.dataset.task_config1")
+            print("self.dataset.task_config1")
+            print("self.dataset.task_config1")
+            print(self.dataset.task_config)
 
-        X, y = self.dataset[0]
         logger.log("creating data loader...")
+        dataloader = get_dataloader(
+            self.dataset,
+            mode="train",
+            batch_size=self.config.batch_size,
+            training_config=types.SimpleNamespace(
+                **{"steps_per_epoch": self.config.max_steps}
+            ),
+        )
+
+        writer = SummaryWriter(os.path.join(self.model_dir, "logs"))
+        if not self.config.x_selection is None:
+            self.dataset.task_config = SimpleNamespace(**{"x_selection": self.config.x_selection})
+            print("self.dataset.task_config2")
+            print("self.dataset.task_config2")
+            print("self.dataset.task_config2")
+            print("self.dataset.task_config2")
+            print("self.dataset.task_config2")
+            print(self.dataset.task_config)
+
+        log_images_to_writer(dataloader, writer, "train")
         data = iter(
-            get_dataloader(
-                self.dataset,
-                mode="train",
-                batch_size=self.config.batch_size,
-                training_config=types.SimpleNamespace(
-                    **{"steps_per_epoch": self.config.max_steps}
-                ),
-            )
+            dataloader
         )
 
         logger.log("training...")
-        TrainLoop(
+        train_loop = TrainLoop(
             model=self.model,
             diffusion=self.diffusion,
             data=data,
@@ -131,7 +152,8 @@ class DDPM(EditCapableGenerator):
             weight_decay=self.config.weight_decay,
             lr_anneal_steps=self.config.lr_anneal_steps,
             model_dir=self.model_dir,
-        ).run_loop(self.config)
+        )
+        train_loop.run_loop(self.config, writer)
 
     def edit(
         self,

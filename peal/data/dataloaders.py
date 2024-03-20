@@ -51,7 +51,8 @@ class DataStack:
                 X, y = self.dataset.__getitem__(self.current_idx)
                 if (
                     hasattr(self.dataset, "hints_enabled")
-                    and self.dataset.hints_enabled or self.dataset.idx_enabled
+                    and self.dataset.hints_enabled
+                    or self.dataset.idx_enabled
                 ):
                     y_index = y[0]
 
@@ -65,7 +66,8 @@ class DataStack:
                 X, y = next(iter(self.datasource))
                 if (
                     hasattr(self.dataset, "hints_enabled")
-                    and self.dataset.hints_enabled or self.dataset.idx_enabled
+                    and self.dataset.hints_enabled
+                    or self.dataset.idx_enabled
                 ):
                     for i in range(X.shape[0]):
                         y_out = tuple([y_elem[i] for y_elem in y])
@@ -74,7 +76,6 @@ class DataStack:
                 else:
                     for i in range(X.shape[0]):
                         self.data[int(y[i])].append([X[i], int(y[i])])
-
 
         if not self.transform is None:
             self.dataset.transform = data_transform
@@ -351,28 +352,43 @@ def create_dataloaders_from_datasource(
         if enable_hints:
             dataset_train.enable_hints()
 
-        train_dataloader = get_dataloader(
-            dataset=dataset_train,
-            training_config=config.training,
-            mode="train",
-            task_config=config.task,
-        )
-        val_dataloader = get_dataloader(
-            dataset=dataset_val,
-            training_config=config.training,
-            mode="val",
-            task_config=config.task,
-        )
-        test_dataloader = get_dataloader(
-            dataset=dataset_test,
-            training_config=config.training,
-            mode="test",
-            task_config=config.task,
-        )
+        if len(dataset_train) > 0:
+            train_dataloader = get_dataloader(
+                dataset=dataset_train,
+                training_config=config.training,
+                mode="train",
+                task_config=config.task,
+            )
+
+        else:
+            train_dataloader = None
+
+        if len(dataset_val) > 0:
+            val_dataloader = get_dataloader(
+                dataset=dataset_val,
+                training_config=config.training,
+                mode="val",
+                task_config=config.task,
+            )
+
+        else:
+            val_dataloader = None
+
+        if len(dataset_test) > 0:
+            test_dataloader = get_dataloader(
+                dataset=dataset_test,
+                training_config=config.training,
+                mode="test",
+                task_config=config.task,
+            )
+
+        else:
+            test_dataloader = None
 
     # TODO this seems quite hacky and could cause problems when combining multiclass dataset with SegmentationMask teacher
     if (
-        "config" in train_dataloader.dataset.__dict__.keys()
+        not train_dataloader is None
+        and "config" in train_dataloader.dataset.__dict__.keys()
         and train_dataloader.dataset.config.output_type != "multiclass"
     ):
         # TODO sanity check or warning

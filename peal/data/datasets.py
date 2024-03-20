@@ -407,6 +407,79 @@ class ImageDataset(PealDataset):
 
         return {"fid": fid_score}
 
+    def _initialize_performance_metrics(self):
+        # self.lpips = torchmetrics.image.lpips.LPIPS(net="vgg", spatial=False).to('cuda')
+        self.lpips = torchmetrics.image.lpip.LearnedPerceptualImagePatchSimilarity(
+            net_type="vgg"
+        ).to("cuda")
+        self.fid = torchmetrics.image.fid.FrechetInceptionDistance(
+            feature=192, reset_real_features=False
+        )
+        real_images = [self[i][0] for i in range(100)]
+        self.fid = self.fid.to("cuda")
+        self.fid.update(
+            torch.tensor(255 * torch.stack(real_images, dim=0), dtype=torch.uint8).to(
+                "cuda"
+            ),
+            real=True,
+        )
+
+    def distribution_distance(self, x_list):
+        fids = []
+        for i in range(len(x_list)):
+            self.fid.update(
+                torch.tensor(
+                    255 * torch.stack(x_list[i], dim=0).to("cuda"), dtype=torch.uint8
+                ),
+                real=False,
+            )
+            fid_score = float(self.fid.compute())
+            fids.append(fid_score)
+
+        return np.mean(fids)
+
+    def pair_wise_distance(self, x1, x2):
+        """
+        # TODO how does this actually work?
+        distances = []
+        for i in range(len(x1)):
+            distance = (
+                self.lpips.forward(
+                    torch.stack(x1[i], dim=0).to("cuda"),
+                    torch.stack(x2[i], dim=0).to("cuda"),
+                )
+                .squeeze(1, 2, 3)
+                .detach()
+                .cpu()
+                .numpy()
+                .mean()
+            )
+            distances.append(distance)
+
+        return np.mean(distances)"""
+        return 0.0
+
+    def variance(self, x_list):
+        variances = []
+        for i in range(len(x_list[0])):
+            variance = torch.mean(
+                torch.var(
+                    torch.stack([x_list[j][i] for j in range(len(x_list))], dim=0),
+                    dim=0,
+                )
+            )
+            variances.append(variance)
+
+        return np.mean(variances)
+
+    def flip_rate(self, y_confidence_list):
+        flip_rates = []
+        for i in range(len(y_confidence_list)):
+            flip_rate = torch.mean((torch.stack(y_confidence_list[i]) > 0.5).float())
+            flip_rates.append(flip_rate)
+
+        return np.mean(flip_rates)
+
 
 class Image2MixedDataset(ImageDataset):
     """
@@ -418,9 +491,9 @@ class Image2MixedDataset(ImageDataset):
 
     def __init__(
         self,
-        root_dir,
-        mode,
         config,
+        mode,
+        root_dir=None,
         transform=ToTensor(),
         task_config=None,
         return_dict=False,
@@ -435,8 +508,13 @@ class Image2MixedDataset(ImageDataset):
             transform (_type_, optional): _description_. Defaults to ToTensor().
             task_config (_type_, optional): _description_. Defaults to None.
         """
-        self.root_dir = root_dir
         self.config = config
+        if root_dir is None:
+            self.root_dir = config.dataset_path
+
+        else:
+            self.root_dir = root_dir
+
         self.transform = transform
         self.task_config = task_config
         self.hints_enabled = False
@@ -445,7 +523,7 @@ class Image2MixedDataset(ImageDataset):
         self.return_dict = return_dict
         # TODO
         # self.config.class_ratios = None
-        data_dir = os.path.join(root_dir, "data.csv")
+        data_dir = os.path.join(self.root_dir, "data.csv")
         if not config.delimiter is None:
             delimiter = config.delimiter
 
@@ -607,79 +685,6 @@ class Image2MixedDataset(ImageDataset):
                 return_list[1:] if len(return_list) > 2 else return_list[1],
             )
 
-    def _initialize_performance_metrics(self):
-        # self.lpips = torchmetrics.image.lpips.LPIPS(net="vgg", spatial=False).to('cuda')
-        self.lpips = torchmetrics.image.lpip.LearnedPerceptualImagePatchSimilarity(
-            net_type="vgg"
-        ).to("cuda")
-        self.fid = torchmetrics.image.fid.FrechetInceptionDistance(
-            feature=192, reset_real_features=False
-        )
-        real_images = [self[i][0] for i in range(100)]
-        self.fid = self.fid.to("cuda")
-        self.fid.update(
-            torch.tensor(255 * torch.stack(real_images, dim=0), dtype=torch.uint8).to(
-                "cuda"
-            ),
-            real=True,
-        )
-
-    def distribution_distance(self, x_list):
-        fids = []
-        for i in range(len(x_list)):
-            self.fid.update(
-                torch.tensor(
-                    255 * torch.stack(x_list[i], dim=0).to("cuda"), dtype=torch.uint8
-                ),
-                real=False,
-            )
-            fid_score = float(self.fid.compute())
-            fids.append(fid_score)
-
-        return np.mean(fids)
-
-    def pair_wise_distance(self, x1, x2):
-        """
-        # TODO how does this actually work?
-        distances = []
-        for i in range(len(x1)):
-            distance = (
-                self.lpips.forward(
-                    torch.stack(x1[i], dim=0).to("cuda"),
-                    torch.stack(x2[i], dim=0).to("cuda"),
-                )
-                .squeeze(1, 2, 3)
-                .detach()
-                .cpu()
-                .numpy()
-                .mean()
-            )
-            distances.append(distance)
-
-        return np.mean(distances)"""
-        return 0.0
-
-    def variance(self, x_list):
-        variances = []
-        for i in range(len(x_list[0])):
-            variance = torch.mean(
-                torch.var(
-                    torch.stack([x_list[j][i] for j in range(len(x_list))], dim=0),
-                    dim=0,
-                )
-            )
-            variances.append(variance)
-
-        return np.mean(variances)
-
-    def flip_rate(self, y_confidence_list):
-        flip_rates = []
-        for i in range(len(y_confidence_list)):
-            flip_rate = torch.mean((torch.stack(y_confidence_list[i]) > 0.5).float())
-            flip_rates.append(flip_rate)
-
-        return np.mean(flip_rates)
-
 
 class Image2ClassDataset(ImageDataset):
     """
@@ -691,9 +696,9 @@ class Image2ClassDataset(ImageDataset):
 
     def __init__(
         self,
-        root_dir,
         mode,
         config,
+        root_dir=None,
         transform=ToTensor(),
         task_config=None,
         return_dict=False,
@@ -709,9 +714,14 @@ class Image2ClassDataset(ImageDataset):
             task_config (_type_, optional): _description_. Defaults to None.
         """
         self.config = config
-        self.root_dir = os.path.join(root_dir, "imgs")
+        if root_dir is None:
+            self.root_dir = os.path.join(config.dataset_path, "imgs")
+
+        else:
+            self.root_dir = os.path.join(root_dir, "imgs")
+
         if self.config.has_hints:
-            self.mask_dir = os.path.join(root_dir, "masks")
+            self.mask_dir = os.path.join(self.root_dir, "masks")
             self.all_urls = []
             self.urls_with_hints = []
 

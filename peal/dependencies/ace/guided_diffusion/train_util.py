@@ -178,7 +178,7 @@ class TrainLoop:
             )
             self.opt.load_state_dict(state_dict)
 
-    def run_loop(self, config):
+    def run_loop(self, config, writer=None):
         print("Running training loop")
         pbar = tqdm(
             total=self.data.dataloader.train_config.steps_per_epoch
@@ -192,7 +192,11 @@ class TrainLoop:
         os.makedirs(os.path.join(self.model_dir, "model"), exist_ok=True)
         os.makedirs(os.path.join(self.model_dir, "optimizer"), exist_ok=True)
         os.makedirs(os.path.join(self.model_dir, "outputs"), exist_ok=True)
-        pbar.writer = SummaryWriter(os.path.join(self.model_dir, "logs"))
+        if not writer is None:
+            pbar.writer = writer
+
+        else:
+            pbar.writer = SummaryWriter(os.path.join(self.model_dir, "logs"))
         while (
             not self.lr_anneal_steps
             or self.step + self.resume_step < self.lr_anneal_steps
