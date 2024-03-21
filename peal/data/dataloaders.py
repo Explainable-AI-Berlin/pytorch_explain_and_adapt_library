@@ -240,7 +240,7 @@ def get_dataloader(
             dataset,
             batch_size=getattr(training_config, mode + "_batch_size"),
             num_workers=8,
-            shuffle=True,
+            shuffle=bool(mode == "train"),
         )
 
     else:
@@ -248,7 +248,7 @@ def get_dataloader(
             dataset,
             batch_size=batch_size,
             num_workers=8,
-            shuffle=True,
+            shuffle=bool(mode == "train"),
         )
 
     if mode == "train" and (

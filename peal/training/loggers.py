@@ -288,7 +288,11 @@ def log_images_to_writer(dataloader, writer, tag="train"):
         if i == 2 and isinstance(dataloader, DataloaderMixer) and len(dataloader.dataloaders) > 1:
             iterator = iter(dataloader.dataloaders[1])
 
-        sample_train_imgs, sample_train_y = next(iterator)
+        try:
+            sample_train_imgs, sample_train_y = next(iterator)
+
+        except Exception:
+            import pdb; pdb.set_trace()
 
         if hasattr(dataloader.dataset, "project_to_pytorch_default"):
             sample_train_imgs = dataloader.dataset.project_to_pytorch_default(

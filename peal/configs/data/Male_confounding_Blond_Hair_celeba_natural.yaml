@@ -1,0 +1,7 @@
+dataset_path            : /home/space/datasets/peal/datasets/celeba
+split                   : [0.8,0.9]
+input_type              : image
+input_size              : [3, 128, 128]
+output_type             : multiclass
+output_size             : [41]
+confounding_factors     : [Male, Blond_Hair] #copyrighttag]
