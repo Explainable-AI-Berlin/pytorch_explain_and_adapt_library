@@ -114,7 +114,6 @@ def calculate_validation_statistics(
             pbar=pbar,
             mode="Validation",
             start_idx=it * dataloader.batch_size,
-            model=model,
             # dataloader=dataloader,
         )
         # except TypeError:

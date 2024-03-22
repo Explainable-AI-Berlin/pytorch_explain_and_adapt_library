@@ -49,7 +49,7 @@ class DDPMConfig(GeneratorConfig):
     ema_rate: str = "0.9999"  # comma-separated list of EMA values
     log_interval: int = 10
     save_interval: int = 10000
-    max_steps: int = 100000
+    max_steps: int = 1000000
     resume_checkpoint: str = ""
     fp16_scale_growth: float = 1e-3
     output_path: str = "peal_runs/ddpm/outputs"
@@ -64,3 +64,4 @@ class DDPMConfig(GeneratorConfig):
     rescale_timesteps : bool = False
     rescale_learned_sigmas : bool = False
     full_args: dict = {}
+    x_selection: Union[list, type(None)] = None

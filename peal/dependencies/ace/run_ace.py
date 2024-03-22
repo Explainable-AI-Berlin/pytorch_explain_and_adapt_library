@@ -233,6 +233,7 @@ def filter_fn(
         ce = ((ce * 0.5) + 0.5).clamp(0, 1)
         noise_x = ((noise_x * 0.5) + 0.5).clamp(0, 1)
 
+    #return ce, pe, noise_x, mask
     return ce, pe, noise_x, mask
 
 
@@ -396,12 +397,14 @@ def main(args=None):
         "binary": args.dataset in BINARYDATASET
         and not isinstance(classifier, SequentialModel),
         "step": args.attack_step / 255,
+        "y_target_goal_confidence": args.y_target_goal_confidence,
+        "predictor": classifier,
     }
 
     attack = get_attack(
-        args.attack_method,
-        args.attack_joint and args.attack_joint_checkpoint,
-        args.attack_joint and args.attack_joint_shortcut,
+        attack=args.attack_method,
+        use_checkpoint=args.attack_joint and args.attack_joint_checkpoint,
+        use_shortcut=args.attack_joint and args.attack_joint_shortcut,
     )
 
     if args.attack_joint and (
@@ -415,6 +418,7 @@ def main(args=None):
             backward_steps=args.attack_checkpoint_backward_steps,
             **main_args,
         )
+
     else:
         attack = attack(**main_args)
 

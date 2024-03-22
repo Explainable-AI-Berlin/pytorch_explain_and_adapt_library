@@ -14,7 +14,8 @@ def main():
     model_config = load_yaml_config(args.model_config, ModelConfig)
     integrate_arguments(args, model_config, exclude=["model_config"])
 
-    ModelTrainer(model_config).fit(
+    model_trainer = ModelTrainer(model_config)
+    model_trainer.fit(
         continue_training=model_config.is_loaded, is_initialized=model_config.is_loaded
     )
 

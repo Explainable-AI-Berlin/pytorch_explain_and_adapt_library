@@ -57,7 +57,7 @@ class CounterfactualExplainer(ExplainerInterface):
 
         if isinstance(self.explainer_config, PerfectFalseCounterfactualConfig):
             inverse_config = copy.deepcopy(self.dataset.config)
-            inverse_config.dataset_path += '_inverse'
+            inverse_config.dataset_path += "_inverse"
             inverse_datasets = get_datasets(inverse_config)
             self.inverse_datasets = {}
             self.inverse_datasets["Training"] = inverse_datasets[0]
@@ -67,7 +67,7 @@ class CounterfactualExplainer(ExplainerInterface):
 
             if not test_data_config is None:
                 inverse_test_config = copy.deepcopy(self.dataset.config)
-                inverse_test_config.dataset_path += '_inverse'
+                inverse_test_config.dataset_path += "_inverse"
                 self.inverse_datasets["test"] = get_datasets(inverse_test_config)[-1]
 
     def gradient_based_counterfactual(
@@ -219,7 +219,9 @@ class CounterfactualExplainer(ExplainerInterface):
             x_counterfactual = self.inverse_datasets[mode][idx][0]
             x_counterfactual_list.append(x_counterfactual)
             preds = torch.nn.Softmax()(
-                self.downstream_model(x_counterfactual.unsqueeze(0).to(self.device)).detach().cpu()
+                self.downstream_model(x_counterfactual.unsqueeze(0).to(self.device))
+                .detach()
+                .cpu()
             )
             y_target_end_confidence_list.append(preds[0][target_classes[i]])
             z_difference_list.append(x_in[i] - x_counterfactual)
@@ -235,7 +237,6 @@ class CounterfactualExplainer(ExplainerInterface):
         remove_below_threshold: bool = True,
         pbar=None,
         mode="",
-        model: nn.Module = None,
     ) -> dict:
         """
         This function generates a counterfactual for a given batch of inputs.
@@ -324,8 +325,44 @@ class CounterfactualExplainer(ExplainerInterface):
             ) = self.dataset.generate_contrastive_collage(
                 target_confidence_goal=target_confidence_goal,
                 base_path=base_path,
-                classifier=model,
+                classifier=self.downstream_model,
                 start_idx=start_idx,
                 **batch_out,
             )
+
         return batch_out
+
+    def run(self, dataset):
+        """
+        This function runs the explainer.
+        """
+        batches_out = []
+        batch = None
+        for idx in range(len(dataset)):
+            x, y = dataset[idx]
+            y_pred = self.downstream_model(x.unsqueeze(0).to(self.device))[0].argmax()
+            y_target = (y_pred + 1) % dataset.output_size
+            if not batch is None or len(batch["x_list"]) < self.explainer_config.batch_size:
+                batch = {
+                    "x_list": x.unsqueeze(0),
+                    "y_target_list": torch.tensor([y_target]),
+                    "y_source_list": torch.tensor([y_pred]),
+                    "idx_list": [idx],
+                }
+
+            else:
+                batch["x_list"] = torch.cat([batch["x_list"], x.unsqueeze(0)], 0)
+                batch["y_target_list"] = torch.cat(
+                    [batch["y_target_list"], torch.tensor([y_target])], 0
+                )
+                batch["y_source_list"] = torch.cat(
+                    [batch["y_source_list"], torch.tensor([y_pred])], 0
+                )
+                batch["idx_list"].append(idx)
+                batches_out.append(self.explain_batch(batch))
+
+        batches_out_dict = {}
+        for key in batches_out[0].keys():
+            batches_out_dict[key] = torch.cat([batch[key] for batch in batches_out], 0)
+
+        return batches_out_dict

@@ -1,12 +1,9 @@
 import torch
 import os
-import yaml
-import torchvision
 import shutil
 import inspect
 import platform
 import numpy as np
-import sys
 
 from pathlib import Path
 from torch.utils.tensorboard import SummaryWriter
@@ -25,11 +22,7 @@ from peal.data.dataloaders import create_dataloaders_from_datasource
 from peal.generators.interfaces import Generator
 from peal.architectures.downstream_models import SequentialModel
 
-# from peal.generators.variational_autoencoders import VAE
-from peal.generators.normalizing_flows import Glow
 from peal.configs.architectures.architecture_template import ArchitectureConfig
-
-# from peal.configs.generators.generator_config import VAEConfig
 
 
 def calculate_test_accuracy(

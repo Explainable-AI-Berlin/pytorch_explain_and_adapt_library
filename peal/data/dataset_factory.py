@@ -166,9 +166,9 @@ def get_datasets(
     else:
         raise ValueError(
             "input_type: "
-            + config.input_type
+            + test_config.input_type
             + ", output_type: "
-            + config.output_type
+            + test_config.output_type
             + " combination is not supported!"
         )
 
@@ -195,14 +195,19 @@ def get_datasets(
     transform_test = transforms.Compose([transform_test, normalization])
 
     train_data = dataset(
-        base_dir, "train", config, transform_train, return_dict=return_dict
+        root_dir=base_dir, mode="train", config=config, transform=transform_train, return_dict=return_dict
     )
     val_data = dataset(
-        base_dir, "val", config, transform_validation, return_dict=return_dict
+        root_dir=base_dir, mode="val", config=config, transform=transform_validation, return_dict=return_dict
     )
-    test_data = dataset(
-        base_dir, "test", test_config, transform_test, return_dict=return_dict
-    )
+    # TODO this is super dirty!!!
+    if test_config.split[1] == 1.0:
+        test_data = val_data
+
+    else:
+        test_data = dataset(
+            mode="test", config=test_config, transform=transform_test, return_dict=return_dict
+        )
 
     # this is kind of dirty
     train_data.normalization = normalization

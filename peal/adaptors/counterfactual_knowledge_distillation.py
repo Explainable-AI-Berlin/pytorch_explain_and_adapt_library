@@ -382,13 +382,17 @@ class CounterfactualKnowledgeDistillation:
             y_source = int(cm_idx / self.output_size)
             y_target = int(cm_idx % self.output_size)
             if y_source == y_target:
-                cm_idx = (cm_idx + 1) % (self.output_size ** 2)
+                cm_idx = (cm_idx + 1) % (self.output_size**2)
                 y_source = int(cm_idx / self.output_size)
                 y_target = int(cm_idx % self.output_size)
 
-            cm_idx = (cm_idx + 1) % (self.output_size ** 2)
+            cm_idx = (cm_idx + 1) % (self.output_size**2)
+            try:
+                x, y = self.datastack.pop(int(y_source))
 
-            x, y = self.datastack.pop(int(y_source))
+            except Exception as e:
+                import pdb; pdb.set_trace()
+
             if isinstance(self.teacher, SegmentationMaskTeacher) or isinstance(
                 self.explainer.explainer_config, PerfectFalseCounterfactualConfig
             ):
@@ -407,7 +411,10 @@ class CounterfactualKnowledgeDistillation:
             )
             y_target_start_confidence = torch.nn.Softmax()(logits)[y_target]
             prediction = self.logits_to_prediction(logits)
-            if not self.adaptor_config.counterfactual_type == '1sided' or prediction == y == y_source:
+            if (
+                not self.adaptor_config.counterfactual_type == "1sided"
+                or prediction == y == y_source
+            ):
                 x_batch.append(x)
                 y_source_batch.append(y_source)
                 y_target_batch.append(torch.tensor(y_target))
@@ -427,7 +434,7 @@ class CounterfactualKnowledgeDistillation:
                 else:
                     idx_batch.append(0)
 
-            sample_idx += 1
+                sample_idx += 1
 
         x_batch = torch.stack(x_batch)
         y_target_batch = torch.stack(y_target_batch)
@@ -502,7 +509,6 @@ class CounterfactualKnowledgeDistillation:
                     remove_below_threshold=True,
                     pbar=pbar,
                     mode="Training",
-                    model=self.student,
                 )
                 for key in tracked_keys:
                     tracked_values[key].extend(values[key])
@@ -642,7 +648,17 @@ class CounterfactualKnowledgeDistillation:
         else:
             num_samples = -1
 
-        counterfactual_rate = len(list(tracked_values.values())[0]) / num_samples
+        flip_rate = (
+            len(
+                list(
+                    filter(
+                        lambda x: x >= 0.51,
+                        tracked_values["y_target_end_confidence_list"],
+                    )
+                )
+            )
+            / num_samples
+        )
         ood_rate = len(list(filter(lambda sample: sample == "ood", feedback))) / len(
             feedback
         )
@@ -679,7 +695,7 @@ class CounterfactualKnowledgeDistillation:
         fa_absolute = num_true_1sided / num_samples"""
 
         feedback_stats = {
-            "counterfactual_rate": counterfactual_rate,
+            "flip_rate": flip_rate,
             "ood_rate": ood_rate,
             "feedback_accuracy": fa_2sided,
         }
@@ -750,7 +766,7 @@ class CounterfactualKnowledgeDistillation:
                     "This can not be a false counterfactual!",
                 )"""
                 x_list.append(x_counterfactual_list[sample_idx])
-                #y_list.append(int(y_source_list[sample_idx]))
+                # y_list.append(int(y_source_list[sample_idx]))
                 y_counterfactual_list.append(int(y_list[sample_idx]))
                 sample_names.append(sample_name)
                 sample_idx += 1
@@ -803,7 +819,9 @@ class CounterfactualKnowledgeDistillation:
                 datasource=val_dataset_path,
             )
             self.dataloaders_val[1] = dataloader_val
-            log_images_to_writer(dataloader_val, writer, "validation_" + str(finetune_iteration))
+            log_images_to_writer(
+                dataloader_val, writer, "validation_" + str(finetune_iteration)
+            )
 
             #
             mixing_ratio = min(0.5, 1 - self.feedback_accuracy)
@@ -1028,19 +1046,24 @@ class CounterfactualKnowledgeDistillation:
                 self.explainer.explainer_config = copy.deepcopy(
                     original_explainer_config
                 )
-                for attribute in self.explainer.explainer_config.__dict__.items():
-                    if isinstance(attribute[1], list) and len(attribute[1]) == 2:
-                        if i == 0:
-                            effective_idx = 0
+                if self.adaptor_config.validation_runs > 1:
+                    for attribute in self.explainer.explainer_config.__dict__.items():
+                        if isinstance(attribute[1], list) and len(attribute[1]) == 2:
+                            if i == 0:
+                                effective_idx = 0
 
-                        else:
-                            effective_idx = i / (self.adaptor_config.validation_runs - 1) * (attribute[1][1] - attribute[1][0])
+                            else:
+                                effective_idx = (
+                                    i
+                                    / (self.adaptor_config.validation_runs - 1)
+                                    * (attribute[1][1] - attribute[1][0])
+                                )
 
-                        setattr(
-                            self.explainer.explainer_config,
-                            attribute[0],
-                            attribute[1][0] + effective_idx,
-                        )
+                            setattr(
+                                self.explainer.explainer_config,
+                                attribute[0],
+                                attribute[1][0] + effective_idx,
+                            )
 
                 (
                     validation_tracked_values_current,
@@ -1148,7 +1171,9 @@ class CounterfactualKnowledgeDistillation:
 
                 with open(
                     os.path.join(
-                        self.base_dir, str(finetune_iteration), "validation_prestats.npz"
+                        self.base_dir,
+                        str(finetune_iteration),
+                        "validation_prestats.npz",
                     ),
                     "wb",
                 ) as f:
@@ -1370,9 +1395,14 @@ class CounterfactualKnowledgeDistillation:
             ):
                 torch.save(self.student, os.path.join(self.base_dir, "model.cpl"))
 
-            if validation_stats["feedback_accuracy"] > self.adaptor_config.best_feedback_accuracy:
+            if (
+                validation_stats["feedback_accuracy"]
+                > self.adaptor_config.best_feedback_accuracy
+            ):
                 # self.adaptor_config["fa_1sided_prime"] = validation_stats["fa_1sided"]
-                self.adaptor_config.best_feedback_accuracy = validation_stats["fa_1sided"]
+                self.adaptor_config.best_feedback_accuracy = validation_stats[
+                    "fa_1sided"
+                ]
                 if self.adaptor_config.replacement_strategy == "direct":
                     torch.save(self.student, os.path.join(self.base_dir, "model.cpl"))
 
