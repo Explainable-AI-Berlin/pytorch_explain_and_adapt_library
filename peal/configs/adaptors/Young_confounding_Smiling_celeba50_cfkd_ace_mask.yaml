@@ -8,6 +8,7 @@ max_validation_samples               :  50
 continuous_learning                  :  "finetune"
 replace_model                        :  True
 use_visualization                    :  False #True
+tracking_level                       :  2 #True
 calculate_group_accuracies           :  True
 explainer                            :  <PEAL_BASE>/configs/explainers/ace_default.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
@@ -15,7 +16,7 @@ data                                 :  <PEAL_BASE>/configs/data/Young_confoundi
 test_data                            :  <PEAL_BASE>/configs/data/Young_confounding_Smiling_celeba.yaml
 student                              :  /home/space/datasets/peal/peal_runs/Young_confounding_Smiling_celeba/classifier_unpoisened/model.cpl
 teacher                              :  SegmentationMask
-generator                            :  /home/space/datasets/peal/peal_runs/ddpm_celeba_downloaded/config.yaml
+generator                            :  /home/space/datasets/peal/peal_runs/celeba_ddpm_downloaded/config.yaml
 base_dir                             :  /home/space/datasets/peal/peal_runs/Young_confounding_Smiling_celeba/classifier_unpoisened/cfkd_ace_mask
 task:
   criterions:

@@ -1,4 +1,4 @@
-# python train_predictor.py --model_config peal/configs/models/Male_confounding_Blond_Hair_celeba_classifier_poisened090.yaml
+# python train_predictor.py --model_config peal/configs/models/Male_confounding_Blond_Hair_celeba_classifier_natural.yaml
 model_path        : /home/space/datasets/peal/peal_runs/Male_confounding_Blond_Hair_celeba/classifier_natural
 data              : <PEAL_BASE>/configs/data/Male_confounding_Blond_Hair_celeba_natural.yaml
 training          : <PEAL_BASE>/configs/training/img_classifier.yaml

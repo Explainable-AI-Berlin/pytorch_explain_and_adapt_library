@@ -1,23 +1,22 @@
-# python run_cfkd.py --adaptor_config "<PEAL_BASE>/configs/adaptors/Young_confounding_Smiling_celeba500x100_cfkd_ace.yaml"
+# python run_cfkd.py --adaptor_config "<PEAL_BASE>/configs/adaptors/Young_confounding_Smiling_celeba500x098_cfkd_perfect_false_counterfactuals.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
-batch_size                           :  1
+batch_size                           :  5
 finetune_iterations                  :  1
 min_train_samples                    :  400
 max_validation_samples               :  100
-tracking_level                       :  2 #100
 continuous_learning                  :  "finetune"
 replace_model                        :  True
 use_visualization                    :  False #True
 calculate_group_accuracies           :  True
-explainer                            :  <PEAL_BASE>/configs/explainers/ace_default.yaml
+explainer                            :  <PEAL_BASE>/configs/explainers/perfect_false_counterfactuals.yaml
 training                             :  <PEAL_BASE>/configs/training/img_classifier.yaml
-data                                 :  <PEAL_BASE>/configs/data/Young_confounding_OverdrawnSmiling_celeba500_poisened100.yaml
+data                                 :  <PEAL_BASE>/configs/data/Young_confounding_OverdrawnSmiling_celeba500_poisened098.yaml
 test_data                            :  <PEAL_BASE>/configs/data/Young_confounding_Smiling_celeba.yaml
-student                              :  /home/space/datasets/peal/peal_runs/Young_confounding_Smiling_celeba/classifier_poisened100/model.cpl
+student                              :  /home/space/datasets/peal/peal_runs/Young_confounding_Smiling_celeba/classifier_poisened098/model.cpl
 teacher                              :  /home/space/datasets/peal/peal_runs/Young_confounding_Smiling_celeba/classifier_unpoisened/model.cpl
-generator                            :  /home/space/datasets/peal/peal_runs/celeba_ddpm_downloaded/config.yaml
-base_dir                             :  /home/space/datasets/peal/peal_runs/Young_confounding_Smiling_celeba/classifier_poisened100/cfkd_ace
+generator                            :  /home/space/datasets/peal/peal_runs/ddpm_CopyrightTag_celeba_1000/config.yaml
+base_dir                             :  /home/space/datasets/peal/peal_runs/Young_confounding_Smiling_celeba/classifier_poisened098/cfkd_perfect_false_counterfactuals
 task:
   criterions:
     ce     : 1.0
