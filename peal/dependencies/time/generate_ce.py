@@ -15,8 +15,8 @@ import torch.nn.functional as F
 
 from diffusers import DDIMInverseScheduler, DDIMScheduler
 
-from core.edict import EDICT
-from core.utils import (
+from peal.dependencies.time.core.edict import EDICT
+from peal.dependencies.time.core.utils import (
     Print,
     accuracy,
     ImageSaver,
@@ -25,7 +25,7 @@ from core.utils import (
     generate_prompt,
     load_tokens_and_embeddings,
 )
-from core.dataset import (
+from peal.dependencies.time.core.dataset import (
     ChunkedDataset,
     get_dataset,
     BINARYDATASET,
@@ -33,7 +33,7 @@ from core.dataset import (
     SlowSingleLabel,
 )
 
-from models import get_classifier
+from peal.dependencies.time.models import get_classifier
 
 
 def arguments():

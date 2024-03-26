@@ -3,7 +3,7 @@ from typing import Union
 from peal.configs.explainers.explainer_config import ExplainerConfig
 
 
-class ACEConfig(ExplainerConfig):
+class TIMEConfig(ExplainerConfig):
     """
     This class defines the config of a ACEConfig.
     """

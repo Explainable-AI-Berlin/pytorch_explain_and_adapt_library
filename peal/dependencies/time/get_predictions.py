@@ -1,14 +1,15 @@
+from pathlib import Path
+
 import torch
 import yaml
 import torch.utils.data as data
-
-from core.dataset import CelebAHQDataset, BDD100k
-from models import get_classifier
-
 import os
 import tqdm
 import argparse
 import pandas as pd
+
+from peal.dependencies.time.core.dataset import CelebAHQDataset, BDD100k
+from peal.dependencies.time.models import get_classifier
 
 
 def arguments():
@@ -86,10 +87,22 @@ def get_predictions(args=None):
     n = 0
     acc = 0
 
-    for img, lab, img_file in tqdm.tqdm(loader):
+    for sample in tqdm.tqdm(loader):
+        if len(sample) == 3:
+            img, lab, img_file = sample
+
+        else:
+            img, (lab, img_file) = sample
+
         img = img.to(device)
         lab = lab.to(device)
-        pred = (classifier(img) > 0).int()
+        logits = classifier(img)
+        if len(logits.shape) > 1:
+            pred = logits.argmax(dim=1)
+
+        else:
+            pred = (logits > 0).int()
+
         acc += (pred == lab).float().sum().item()
         n += lab.size(0)
 
@@ -98,11 +111,14 @@ def get_predictions(args=None):
 
     print(acc / n)
     df = pd.DataFrame(data=d)
+    Path(args.label_path).mkdir(exist_ok=True, parents=True)
     df.to_csv(
         os.path.join(
             args.label_path,
             "{}-{}-prediction-label-{}.csv".format(
-                args.dataset.lower(), args.partition, args.label_query
+                args.dataset.config.dataset_path.replace("/", "__").lower(),
+                args.partition,
+                args.label_query,
             ),
         ),
         index=False,

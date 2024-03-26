@@ -14,3 +14,5 @@ class StableDiffusionConfig(GeneratorConfig):
     The type of generator that shall be used.
     """
     generator_type: str = "StableDiffusion"
+    base_path: str = "/home/space/datasets/peal/peal_runs/stable_diffusion"
+    full_args: Union[None, dict] = None

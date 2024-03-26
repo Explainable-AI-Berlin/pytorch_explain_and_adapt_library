@@ -138,6 +138,7 @@ class CounterfactualKnowledgeDistillation:
             if not generator is None
             else self.adaptor_config.generator,
             device=self.device,
+            classifier_dataset=self.val_dataloader.dataset,
         ).to(self.device)
 
         self.output_size = (

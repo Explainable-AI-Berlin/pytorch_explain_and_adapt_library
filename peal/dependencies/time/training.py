@@ -14,14 +14,14 @@ import torch.nn.functional as F
 
 from diffusers import StableDiffusionPipeline, DDPMScheduler
 
-from core.dataset import get_dataset, TextualDataset
-from core.utils import (
+from peal.dependencies.time.core.dataset import get_dataset, TextualDataset
+from peal.dependencies.time.core.utils import (
     Print,
     add_new_tokens,
     load_tokens_and_embeddings,
     save_tokens_and_embeddings,
 )
-from core.phrases import get_phrase_generator
+from peal.dependencies.time.core.phrases import get_phrase_generator
 
 
 def freeze(m, names):
@@ -252,14 +252,17 @@ def training(args=None):
             # Get the target for loss depending on the prediction type
             if noise_scheduler.config.prediction_type == "epsilon":
                 target = noise
+
             elif noise_scheduler.config.prediction_type == "v_prediction":
                 target = noise_scheduler.get_velocity(latents, noise, timesteps)
+
             else:
                 raise ValueError(
                     f"Unknown prediction type {noise_scheduler.config.prediction_type}"
                 )
 
             loss = F.mse_loss(model_pred.float(), target.float(), reduction="sum") / B
+            import pdb; pdb.set_trace()
             loss.backward()
 
         # modify gradients of tokens that we don't want to change
