@@ -262,7 +262,6 @@ def training(args=None):
                 )
 
             loss = F.mse_loss(model_pred.float(), target.float(), reduction="sum") / B
-            import pdb; pdb.set_trace()
             loss.backward()
 
         # modify gradients of tokens that we don't want to change
@@ -292,10 +291,16 @@ def training(args=None):
                 )
                 differences.append(d.detach().cpu())
                 Print(f"Mean difference at iteration {iterations}:", differences[-1])
+
             save_tokens_and_embeddings(
                 sd_model=pipeline,
                 tokens=args.custom_tokens,
                 output=args.output_path[:-4] + f"-ckpt-{iterations}.pth",
+            )
+            save_tokens_and_embeddings(
+                sd_model=pipeline,
+                tokens=args.custom_tokens,
+                output=args.output_path,
             )
 
         if iterations > args.iterations:

@@ -1,12 +1,10 @@
 import os
 import torch
 import copy
-import yaml
 import shutil
 import torchvision
 import numpy as np
 import platform
-import sys
 
 from torch.utils.tensorboard import SummaryWriter
 from pathlib import Path

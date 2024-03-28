@@ -1,4 +1,5 @@
 import copy
+import os
 
 import torch
 import torchvision
@@ -25,7 +26,7 @@ class CounterfactualExplainer(ExplainerInterface):
     def __init__(
         self,
         downstream_model: nn.Module,
-        generator: InvertibleGenerator,
+        generator: Union[InvertibleGenerator, EditCapableGenerator],
         input_type: str,
         dataset: PealDataset,
         tracking_level: int = 0,
@@ -302,6 +303,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 pbar=pbar,
                 mode=mode,
                 classifier_dataset=self.dataset,
+                base_path=os.path.join(*base_path.split(os.sep)[:-1]),
             )
 
         batch_out = {}

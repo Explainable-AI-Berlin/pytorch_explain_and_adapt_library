@@ -16,3 +16,7 @@ class StableDiffusionConfig(GeneratorConfig):
     generator_type: str = "StableDiffusion"
     base_path: str = "/home/space/datasets/peal/peal_runs/stable_diffusion"
     full_args: Union[None, dict] = None
+    """
+    The config of the data.
+    """
+    data: DataConfig = DataConfig()

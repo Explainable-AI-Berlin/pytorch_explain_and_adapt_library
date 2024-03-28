@@ -494,6 +494,7 @@ class Image2MixedDataset(ImageDataset):
         config,
         mode,
         root_dir=None,
+        data_dir=None,
         transform=ToTensor(),
         task_config=None,
         return_dict=False,
@@ -520,10 +521,13 @@ class Image2MixedDataset(ImageDataset):
         self.hints_enabled = False
         self.groups_enabled = False
         self.idx_enabled = False
+        self.url_enabled = False
         self.return_dict = return_dict
         # TODO
         # self.config.class_ratios = None
-        data_dir = os.path.join(self.root_dir, "data.csv")
+        if data_dir is None:
+            data_dir = os.path.join(self.root_dir, "data.csv")
+
         if not config.delimiter is None:
             delimiter = config.delimiter
 
@@ -576,6 +580,12 @@ class Image2MixedDataset(ImageDataset):
 
     def disable_idx(self):
         self.idx_enabled = False
+
+    def enable_url(self):
+        self.url_enabled = True
+
+    def disable_url(self):
+        self.url_enabled = False
 
     def set_task_specific_keys(self):
         self.task_specific_keys = []
@@ -674,6 +684,9 @@ class Image2MixedDataset(ImageDataset):
 
         if self.idx_enabled:
             return_dict["idx"] = idx
+
+        if self.url_enabled:
+            return_dict["url"] = name
 
         if self.return_dict:
             return return_dict

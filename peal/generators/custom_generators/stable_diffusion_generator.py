@@ -2,6 +2,8 @@ import os
 import types
 import shutil
 import copy
+from pathlib import Path
+
 import torch
 import io
 import blobfile as bf
@@ -11,6 +13,7 @@ from torch import nn
 from PIL import Image
 from torchvision.transforms import ToTensor
 
+from peal.data.datasets import Image2MixedDataset
 from peal.generators.interfaces import EditCapableGenerator
 from peal.global_utils import load_yaml_config, embed_numberstring
 from peal.dependencies.time.generate_ce import (
@@ -25,6 +28,7 @@ class StableDiffusion(EditCapableGenerator):
         super().__init__()
         self.config = load_yaml_config(config)
         self.classifier_dataset = copy.deepcopy(classifier_dataset)
+        self.generator_dataset = None
 
         if not model_dir is None:
             self.model_dir = model_dir
@@ -34,71 +38,50 @@ class StableDiffusion(EditCapableGenerator):
 
         self.data_dir = os.path.join(self.model_dir, "data_test")
         self.counterfactual_path = os.path.join(self.model_dir, "counterfactuals_test")
-        self.initialized = False
 
     def sample_x(self, batch_size=1):
         return self.diffusion.p_sample_loop(
             self.model, [batch_size] + self.classifier_dataset.config.input_size
         )
 
-    def initialize(self, classifier):
-        self.classifier_dataset.enable_idx()
-        prediction_args = types.SimpleNamespace(
-            batch_size=32,
-            dataset=self.classifier_dataset,
-            classifier=classifier,
-            label_path=os.path.join(self.config.base_path, "class_predictions"),
-            partition="train",
-            label_query=0,
-        )
-        get_predictions(prediction_args)
-        train_context_embedding_args = types.SimpleNamespace(
-            sd_model="CompVis/stable-diffusion-v1-4",
-            embedding_files=[],
-            output_path=os.path.join(self.config.base_path, "context_embedding"),
-            dataset=self.classifier_dataset,
-            label_query=0,
-            training_label=-1,
-            custom_tokens=['|<C*1>|', '|<C*2>|', '|<C*3>|'],
-            custom_tokens_init=['centered', 'realistic', 'celebrity'],
-            phase="context",
-            mini_batch_size=1,
-            enable_xformers_memory_efficient_attention=False,
-            gpu="0",
-            use_fp16=False,
-            lr=1e-4,
-            adam_beta1=0.9,
-            adam_beta2=0.999,
-            adam_epsilon=1e-9,
-            weight_decay=1e-4,
-            iterations=3000,
-            batch_size=64,
-            image_size=128,
-            partition="train",
-            seed=99999999,
-        )
-        training(train_context_embedding_args)
-        for class_idx in range(self.classifier_dataset.config.num_classes):
-            class_related_bias_embedding_args = types.SimpleNamespace(
-                sd_model="CompVis/stable-diffusion-v1-4",
-                embedding_files=os.path.join(self.config.base_path, "context_embedding"),
-                output_path=os.path.join(
-                    self.config.base_path, "class_token" + str(class_idx)
-                ),
+    def initialize(self, classifier, base_path):
+        class_predictions_path = os.path.join(base_path, "explainer", "predictions.csv")
+        Path(os.path.join(base_path, "explainer")).mkdir(exist_ok=True, parents=True)
+        if not os.path.exists(class_predictions_path):
+            self.classifier_dataset.enable_url()
+            prediction_args = types.SimpleNamespace(
+                batch_size=32,
                 dataset=self.classifier_dataset,
+                classifier=classifier,
+                label_path=class_predictions_path,
+                partition="train",
                 label_query=0,
-                training_label=class_idx,
-                custom_tokens="'|<A*"
-                + str(class_idx)
-                + "1>|' '|<A*"
-                + str(class_idx)
-                + "2>|' '|<A*"
-                + str(class_idx)
-                + "3>|'",
-                custom_tokens_init="centered realistic celebrity",
-                phase="class",
+            )
+            get_predictions(prediction_args)
+            self.classifier_dataset.disable_url()
+
+        generator_dataset_config = copy.deepcopy(self.config.data)
+        generator_dataset_config.split = [1.0, 1.0]
+        self.generator_dataset = Image2MixedDataset(
+            config=generator_dataset_config,
+            mode="train",
+            data_dir=class_predictions_path,
+        )
+        context_embedding_path = os.path.join(
+            base_path, "explainer", "context_embedding"
+        )
+        if not os.path.exists(context_embedding_path):
+            train_context_embedding_args = types.SimpleNamespace(
+                sd_model="CompVis/stable-diffusion-v1-4",
+                embedding_files=[],
+                output_path=os.path.join(self.config.base_path, "context_embedding"),
+                dataset=self.generator_dataset,
+                label_query=0,
+                training_label=-1,
+                custom_tokens=["|<C*1>|", "|<C*2>|", "|<C*3>|"],
+                custom_tokens_init=["centered", "realistic", "celebrity"],
+                phase="context",
                 mini_batch_size=1,
-                base_prompt="A |<C*1>| |<C*2>| |<C*3>| photo",
                 enable_xformers_memory_efficient_attention=False,
                 gpu="0",
                 use_fp16=False,
@@ -113,7 +96,44 @@ class StableDiffusion(EditCapableGenerator):
                 partition="train",
                 seed=99999999,
             )
-            training(class_related_bias_embedding_args)
+            training(train_context_embedding_args)
+
+        for class_idx in range(self.classifier_dataset.config.num_classes):
+            class_token_path = os.path.join(
+                self.config.base_path, "class_token" + str(class_idx)
+            )
+            if not os.path.exists(class_token_path):
+                class_related_bias_embedding_args = types.SimpleNamespace(
+                    sd_model="CompVis/stable-diffusion-v1-4",
+                    embedding_files=context_embedding_path,
+                    output_path=class_token_path,
+                    dataset=self.generator_dataset,
+                    label_query=0,
+                    training_label=class_idx,
+                    custom_tokens=[
+                        "|<A*" + str(class_idx) + "1>|",
+                        "|<A*" + str(class_idx) + "2>|",
+                        "|<A*" + str(class_idx) + "3>|",
+                    ],
+                    custom_tokens_init=["centered", "realistic", "celebrity"],
+                    phase="class",
+                    mini_batch_size=1,
+                    base_prompt="A |<C*1>| |<C*2>| |<C*3>| photo",
+                    enable_xformers_memory_efficient_attention=False,
+                    gpu="0",
+                    use_fp16=False,
+                    lr=1e-4,
+                    adam_beta1=0.9,
+                    adam_beta2=0.999,
+                    adam_epsilon=1e-9,
+                    weight_decay=1e-4,
+                    iterations=3000,
+                    batch_size=64,
+                    image_size=128,
+                    partition="train",
+                    seed=99999999,
+                )
+                training(class_related_bias_embedding_args)
 
     def edit(
         self,
@@ -122,19 +142,19 @@ class StableDiffusion(EditCapableGenerator):
         source_classes: torch.Tensor,
         target_classes: torch.Tensor,
         classifier: nn.Module,
+        base_path="peal_runs/stable_diffusion",
         pbar=None,
         mode="",
         **kwargs
     ):
-        if not self.initialized:
-            self.initialize(classifier)
-            self.initialized = True
+        if self.generator_dataset is None:
+            self.initialize(classifier, base_path)
 
         ce_generation_args = types.SimpleNamespace(
             embedding_files=[
-                os.path.join(self.config.base_path, "context_embedding"),
-                os.path.join(self.config.base_path, "class_token0"),
-                os.path.join(self.config.base_path, "class_token1"),
+                os.path.join(base_path, "explainer", "context_embedding"),
+                os.path.join(base_path, "explainer", "class_token0"),
+                os.path.join(base_path, "explainer", "class_token1"),
             ],
             use_negative_guidance_denoise=True,
             use_negative_guidance_inverse=True,
@@ -145,14 +165,14 @@ class StableDiffusion(EditCapableGenerator):
             exp_name="time",
             label_target=-1,
             label_query=31,
-            neg_custom_token='|<A*01>| |<A*02>| |<A*03>|',
-            pos_custom_token='|<A*11>| |<A*12>| |<A*13>|',
+            neg_custom_token="|<A*01>| |<A*02>| |<A*03>|",
+            pos_custom_token="|<A*11>| |<A*12>| |<A*13>|",
             base_prompt="A |<C*1>| |<C*2>| |<C*3>| photo",
             chunks=1,
             chunk=0,
             enable_xformers_memory_efficient_attention=False,
             partition="val",
-            dataset=self.classifier_dataset,
+            dataset=self.generator_dataset,
             classifier=classifier,
         )
         x_counterfactuals = generate_time_counterfactuals(ce_generation_args)

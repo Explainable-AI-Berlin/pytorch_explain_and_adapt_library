@@ -93,6 +93,7 @@ def get_predictions(args=None):
 
         else:
             img, (lab, img_file) = sample
+            img_file = int(img_file)
 
         img = img.to(device)
         lab = lab.to(device)
@@ -111,18 +112,12 @@ def get_predictions(args=None):
 
     print(acc / n)
     df = pd.DataFrame(data=d)
-    Path(args.label_path).mkdir(exist_ok=True, parents=True)
     df.to_csv(
-        os.path.join(
-            args.label_path,
-            "{}-{}-prediction-label-{}.csv".format(
-                args.dataset.config.dataset_path.replace("/", "__").lower(),
-                args.partition,
-                args.label_query,
-            ),
-        ),
+        args.label_path,
         index=False,
     )
+
+    torch.set_grad_enabled(True)
 
 
 if __name__ == "__main__":
