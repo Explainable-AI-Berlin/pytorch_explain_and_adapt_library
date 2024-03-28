@@ -87,13 +87,12 @@ def get_predictions(args=None):
     n = 0
     acc = 0
 
-    for sample in tqdm.tqdm(loader):
+    for idx, sample in enumerate(tqdm.tqdm(loader)):
         if len(sample) == 3:
             img, lab, img_file = sample
 
         else:
             img, (lab, img_file) = sample
-            img_file = int(img_file)
 
         img = img.to(device)
         lab = lab.to(device)

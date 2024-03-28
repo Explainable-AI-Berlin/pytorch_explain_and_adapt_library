@@ -17,24 +17,30 @@ logging.getLogger().setLevel(logging.INFO)
 
 
 class VAE(nn.Module):
-    def __init__(self, input_dim: int, encoder_dims: list, decoder_dims: list, latent_dim: int):
+    def __init__(
+        self, input_dim: int, encoder_dims: list, decoder_dims: list, latent_dim: int
+    ):
         super(VAE, self).__init__()
         self.input_dim = input_dim
         self.latent_dim = latent_dim
 
         self.encoder = nn.Sequential()
         for i, dim in enumerate(encoder_dims):
-            self.encoder.add_module(f'layer_{i + 1}', nn.Sequential(nn.LazyLinear(dim), nn.SiLU()))
-        self.encoder.add_module('norm_encoder', nn.LayerNorm(dim))
+            self.encoder.add_module(
+                f"layer_{i + 1}", nn.Sequential(nn.LazyLinear(dim), nn.SiLU())
+            )
+        self.encoder.add_module("norm_encoder", nn.LayerNorm(dim))
 
         self.latent_mean = nn.Sequential(nn.LazyLinear(latent_dim))
         self.latent_logvar = nn.Sequential(nn.LazyLinear(latent_dim))
 
         self.decoder = nn.Sequential()
         for i, dim in enumerate(decoder_dims):
-            self.decoder.add_module(f'layer_{i + 1}', nn.Sequential(nn.LazyLinear(dim), nn.SiLU()))
-        self.decoder.add_module('norm_decoder', nn.LayerNorm(dim))
-        self.decoder.add_module(f'to_original', nn.Sequential(nn.LazyLinear(input_dim)))
+            self.decoder.add_module(
+                f"layer_{i + 1}", nn.Sequential(nn.LazyLinear(dim), nn.SiLU())
+            )
+        self.decoder.add_module("norm_decoder", nn.LayerNorm(dim))
+        self.decoder.add_module(f"to_original", nn.Sequential(nn.LazyLinear(input_dim)))
 
     def reparameterize(self, mean, logvar):
         if self.training:
@@ -95,21 +101,27 @@ class CircleVAEAdaptor(EditCapableGenerator):
 
     def train_and_load_vae(self, model_name="vae.pt", mode=None):
         self.model_path = os.path.join(self.model_dir, model_name)
-        model = VAE(input_dim=self.input_dim, encoder_dims=self.encoder_dims, decoder_dims=self.decoder_dims,
-                    latent_dim=self.latent_dim)
+        model = VAE(
+            input_dim=self.input_dim,
+            encoder_dims=self.encoder_dims,
+            decoder_dims=self.decoder_dims,
+            latent_dim=self.latent_dim,
+        )
 
         if model_name in os.listdir(self.model_dir) and not mode == "train":
             model.load_state_dict(torch.load(self.model_path))
-            logging.info(f'Model found with path {self.model_path}')
-        elif model_name not in os.listdir(self.model_dir) and mode != 'train':
-            logging.info('Model not found. Please run train_and_load_vae method and set its argument mode="train" ')
-        else:
+            logging.info(f"Model found with path {self.model_path}")
+        elif model_name not in os.listdir(self.model_dir) and mode != "train":
             logging.info(
-                f'Training model with path {self.model_path}'
+                'Model not found. Please run train_and_load_vae method and set its argument mode="train" '
             )
+        else:
+            logging.info(f"Training model with path {self.model_path}")
 
         def VAELoss(x, x_hat, mean, logvar, beta=self.config.beta):
-            kl_loss = torch.mean(-0.5 * torch.sum(1 + logvar - mean ** 2 - logvar.exp(), dim=1), dim=0)
+            kl_loss = torch.mean(
+                -0.5 * torch.sum(1 + logvar - mean**2 - logvar.exp(), dim=1), dim=0
+            )
             reconstruction_loss = F.mse_loss(x, x_hat)
             return reconstruction_loss + beta * kl_loss
 
@@ -123,18 +135,22 @@ class CircleVAEAdaptor(EditCapableGenerator):
                     x = x
                     optimizer.zero_grad()
                     x_hat, mean, logvar = model(x[:, self.input_idx])
-                    loss = VAELoss(x[:, self.input_idx], x_hat=x_hat, mean=mean, logvar=logvar)
+                    loss = VAELoss(
+                        x[:, self.input_idx], x_hat=x_hat, mean=mean, logvar=logvar
+                    )
                     total_loss += loss.item()
                     loss.backward()
                     optimizer.step()
 
-                print(f'Epoch: {epoch}, Loss: {loss}')
+                print(f"Epoch: {epoch}, Loss: {loss}")
 
             return x, x_hat
 
-        if mode == 'train':
+        if mode == "train":
             model.train()
-            dataloader = DataLoader(self.dataset, batch_size=self.config.batch_size, shuffle=True)
+            dataloader = DataLoader(
+                self.dataset, batch_size=self.config.batch_size, shuffle=True
+            )
             train(model=model, data_loader=dataloader, epochs=self.config.num_epochs)
             torch.save(model.state_dict(), self.model_path)
 
@@ -158,7 +174,9 @@ class CircleVAEAdaptor(EditCapableGenerator):
 
         epsilon = torch.randn_like(z, requires_grad=True)
         epsilon.data *= 0.01
-        optimizer = torch.optim.Adam([epsilon], lr=self.config.lr_counterfactual, weight_decay=0)
+        optimizer = torch.optim.Adam(
+            [epsilon], lr=self.config.lr_counterfactual, weight_decay=0
+        )
 
         for it in range(self.config.num_iterations):
             optimizer.zero_grad()
@@ -167,10 +185,15 @@ class CircleVAEAdaptor(EditCapableGenerator):
 
             decoded = model.decode(z_perturbed)
 
-            classifier_criterion = lambda x: F.cross_entropy(classifier(x), target_classes)
+            classifier_criterion = lambda x: F.cross_entropy(
+                classifier(x), target_classes
+            )
             loss_attack = classifier_criterion(decoded)
 
-            recon_regularizer = reconstruction_weight * torch.abs((clean_batch - decoded).mean(dim=-1)).sum()
+            recon_regularizer = (
+                reconstruction_weight
+                * torch.abs((clean_batch - decoded).mean(dim=-1)).sum()
+            )
             lasso_regularizer = lasso_weight * (torch.abs(z_perturbed - z)).sum()
             regularizer = recon_regularizer + lasso_regularizer
 
@@ -183,23 +206,23 @@ class CircleVAEAdaptor(EditCapableGenerator):
         return clean_batch, model.decode(z + epsilon).detach()
 
     def edit(
-            self,
-            x_in: torch.Tensor,
-            target_confidence_goal: float,
-            target_classes: torch.Tensor,
-            classifier: torch.nn.Module,
-            **kwargs,
+        self,
+        x_in: torch.Tensor,
+        target_confidence_goal: float,
+        source_classes: torch.Tensor,
+        target_classes: torch.nn.Module,
+        classifier=None,
     ) -> Tuple[
         list[torch.Tensor], list[torch.Tensor], list[torch.Tensor], list[torch.Tensor]
     ]:
         """
         Edit a batch of samples to achieve a target confidence goal.
         Args:
+            base_path:
             x_in: Batch of samples to edit.
             target_confidence_goal: Target confidence goal.
             target_classes: Target classes for each sample in the batch.
             classifier: Classifier to use for confidence estimation.
-            **kwargs: Additional keyword arguments.
         Returns:
             Tuple of (edited samples, confidence estimates, number of iterations, number of queries).
         """
@@ -208,9 +231,15 @@ class CircleVAEAdaptor(EditCapableGenerator):
         y_target_end_confidence = torch.zeros([x_in.shape[0]])
         counterfactuals = x_in
         for i in range(len(x_in)):
-            #while True:
-            _, counterfactual = self.DIVE(x_in[i:i + 1], target_classes[i:i + 1], self.model, classifier)
-            current_confidence = classifier(counterfactual).softmax(dim=-1)[0][target_classes[i].item()].item()
+            # while True:
+            _, counterfactual = self.DIVE(
+                x_in[i : i + 1], target_classes[i : i + 1], self.model, classifier
+            )
+            current_confidence = (
+                classifier(counterfactual)
+                .softmax(dim=-1)[0][target_classes[i].item()]
+                .item()
+            )
             #    if current_confidence > target_confidence_goal:
             #        break
             y_target_end_confidence[i] = current_confidence

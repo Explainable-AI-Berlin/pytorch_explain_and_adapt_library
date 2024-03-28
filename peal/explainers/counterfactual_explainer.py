@@ -303,7 +303,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 pbar=pbar,
                 mode=mode,
                 classifier_dataset=self.dataset,
-                base_path=os.path.join(*base_path.split(os.sep)[:-1]),
+                base_path=os.path.join(*([os.path.abspath(os.sep)] + base_path.split(os.sep)[:-1])),
             )
 
         batch_out = {}

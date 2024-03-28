@@ -15,6 +15,7 @@ import torch.nn.functional as F
 
 from diffusers import DDIMInverseScheduler, DDIMScheduler
 
+from peal.data.dataset_interfaces import PealDataset
 from peal.dependencies.time.core.edict import EDICT
 from peal.dependencies.time.core.utils import (
     Print,
@@ -172,30 +173,28 @@ def generate_time_counterfactuals(args=None):
         if args.dataset in ["BDD100k"]
         else args.sd_image_size
     )
-    if isinstance(args.dataset, torch.utils.data.Dataset):
-        dataset = args.dataset
-        if hasattr(dataset, "project_to_pytorch_default"):
-            postprocess = lambda x, size: dataset.project_to_pytorch_default(x)
-
-        else:
-            postprocess = lambda x, size: x
+    if isinstance(args.dataset, list):
+        loader = args.dataset
+        postprocess = args.postprocess
 
     else:
         dataset, postprocess = get_dataset(args, training=False)
 
-    filter_label = -1
-    if args.label_target != -1:
-        filter_label = (
-            1 - args.label_target if args.dataset in BINARYDATASET else args.label_query
+        filter_label = -1
+        if args.label_target != -1:
+            filter_label = (
+                1 - args.label_target
+                if args.dataset in BINARYDATASET
+                else args.label_query
+            )
+
+        dataset = SlowSingleLabel(
+            label=filter_label, dataset=dataset, maxlen=args.num_samples
         )
 
-    dataset = SlowSingleLabel(
-        label=filter_label, dataset=dataset, maxlen=args.num_samples
-    )
+        dataset = ChunkedDataset(dataset, chunk=args.chunk, num_chunks=args.chunks)
 
-    dataset = ChunkedDataset(dataset, chunk=args.chunk, num_chunks=args.chunks)
-
-    loader = TD.DataLoader(dataset, batch_size=args.batch_size, num_workers=5)
+        loader = TD.DataLoader(dataset, batch_size=args.batch_size, num_workers=5)
 
     # ========================================
     # Get variables of interest
@@ -235,6 +234,7 @@ def generate_time_counterfactuals(args=None):
     assert len(args.guidance_scale_denoising) == max_length
     assert len(args.num_inference_steps) == max_length
 
+    counterfactuals = []
     for idx, (indexes, img, lab) in enumerate(loader):
         print(
             f"[Chunks ({args.chunk}+1) / {args.chunks}] {idx} / {len(loader)} | Time: {int(time.time() - start_time)}s"
@@ -242,30 +242,58 @@ def generate_time_counterfactuals(args=None):
 
         B = img.size(0)
         img = img.to(device, dtype=torch_dtype)
-        lab = lab.to(
-            device, dtype=torch_dtype if args.dataset in BINARYDATASET else torch.long
-        )
+        if isinstance(lab, list):
+            lab, target = lab
+            lab = lab.to(
+                device,
+                dtype=(
+                    torch.float
+                    if args.dataset in BINARYDATASET or isinstance(args.dataset, list)
+                    else torch.long
+                ),
+            )
+            target = target.to(
+                device,
+                dtype=(
+                    torch.float
+                    if args.dataset in BINARYDATASET or isinstance(args.dataset, list)
+                    else torch.long
+                ),
+            )
+            img_orig = postprocess(img, args.classifier_image_size)
+            c_log, c_pred = get_prediction(
+                classifier=classifier,
+                img=img_orig,
+                binary=False,
+            )
 
-        img_orig = postprocess(img, args.classifier_image_size)
-        c_log, c_pred = get_prediction(
-            classifier, img_orig, args.dataset in BINARYDATASET
-        )
+        else:
+            lab = lab.to(
+                device,
+                dtype=torch_dtype if args.dataset in BINARYDATASET else torch.long,
+            )
 
-        (acc1, acc5), _ = accuracy(c_log, lab, binary=args.dataset in BINARYDATASET)
-        stats["clean acc"] += acc1.sum().item()
-        stats["clean acc5"] += acc5.sum().item()
-        stats["n"] += lab.size(0)
+            img_orig = postprocess(img, args.classifier_image_size)
+            c_log, c_pred = get_prediction(
+                classifier, img_orig, args.dataset in BINARYDATASET
+            )
 
-        # =================================================================
-        # construct target
+            (acc1, acc5), _ = accuracy(c_log, lab, binary=args.dataset in BINARYDATASET)
+            stats["clean acc"] += acc1.sum().item()
+            stats["clean acc5"] += acc5.sum().item()
+            stats["n"] += lab.size(0)
 
-        target = None
-        if args.label_target != -1:
-            target = torch.ones_like(lab) * args.label_target
-            target[lab != c_pred] = lab[lab != c_pred]
-        elif args.dataset in BINARYDATASET:
-            target = 1 - c_pred
-            target[lab != c_pred] = lab[lab != c_pred]
+            # =================================================================
+            # construct target
+
+            target = None
+            if args.label_target != -1:
+                target = torch.ones_like(lab) * args.label_target
+                target[lab != c_pred] = lab[lab != c_pred]
+
+            elif args.dataset in BINARYDATASET:
+                target = 1 - c_pred
+                target[lab != c_pred] = lab[lab != c_pred]
 
         # =================================================================
         # Generate phrases
@@ -343,76 +371,86 @@ def generate_time_counterfactuals(args=None):
                 feats=feats,
             )
             cf = postprocess(cf, args.classifier_image_size)
+            counterfactuals.append(cf)
 
-            # check if explanation flipped
-            log, _ = get_prediction(
-                classifier, cf, binary=args.dataset in BINARYDATASET
+            if not isinstance(args.dataset, list):
+                # check if explanation flipped
+                log, _ = get_prediction(
+                    classifier, cf, binary=args.dataset in BINARYDATASET
+                )
+                (flipped,), _ = accuracy(
+                    log,
+                    target[~transformed],
+                    binary=args.dataset in BINARYDATASET,
+                    topk=(1,),
+                )
+
+                if jdx == 0:
+                    ce = cf.clone().detach()
+                ce[~transformed] = cf
+                transformed[~transformed] = flipped
+                if transformed.float().sum().item() == transformed.size(0):
+                    break
+
+        if not isinstance(args.dataset, list):
+            # =================================================================
+            # Checking CE Accuray
+
+            ce_log, ce_pred = get_prediction(
+                classifier, ce, binary=args.dataset in BINARYDATASET
             )
-            (flipped,), _ = accuracy(
-                log,
-                target[~transformed],
-                binary=args.dataset in BINARYDATASET,
-                topk=(1,),
+            (cf, cf5), prob = accuracy(
+                ce_log, target, binary=args.dataset in BINARYDATASET
+            )
+            l1 = (img_orig - ce).view(B, -1).abs().mean(dim=1).cpu()
+            linf = (img_orig - ce).abs().view(B, -1).max(dim=1)[0].cpu()
+            stats["explanation"]["cf"] += cf.sum().item()
+            stats["explanation"]["cf5"] += cf5.sum().item()
+            stats["explanation"]["l1"] += l1.sum().item()
+            stats["explanation"]["l inf"] += linf.sum().item()
+            stats["explanation"]["p"] += prob[cf].sum().item()
+
+            # save images
+            image_saver(
+                imgs=tensor_to_numpy(img_orig),
+                cfs=tensor_to_numpy(ce),
+                recs=None if not args.recover else tensor_to_numpy(rec),
+                target=target,
+                label=lab,
+                pred=c_pred,
+                pred_cf=ce_pred,
+                l_inf=linf,
+                l_1=l1,
+                indexes=indexes.numpy(),
             )
 
-            if jdx == 0:
-                ce = cf.clone().detach()
-            ce[~transformed] = cf
-            transformed[~transformed] = flipped
-            if transformed.float().sum().item() == transformed.size(0):
+            if (idx + 1) == len(loader):
+                print(
+                    f"[Chunks ({args.chunk}+1) / {args.chunks}] {idx + 1} / {len(loader)} | Time: {int(time.time() - start_time)}s"
+                )
+                print("\nDone")
                 break
 
-        # =================================================================
-        # Checking CE Accuray
+    if not isinstance(args.dataset, list):
+        stats["clean acc"] /= stats["n"]
+        stats["clean acc5"] /= stats["n"]
+        correct = stats["explanation"]["cf"]
+        for k in stats["explanation"].keys():
+            if k == "p":
+                stats["explanation"][k] /= correct
+                continue
+            stats["explanation"][k] /= stats["n"]
 
-        ce_log, ce_pred = get_prediction(
-            classifier, ce, binary=args.dataset in BINARYDATASET
-        )
-        (cf, cf5), prob = accuracy(ce_log, target, binary=args.dataset in BINARYDATASET)
-        l1 = (img_orig - ce).view(B, -1).abs().mean(dim=1).cpu()
-        linf = (img_orig - ce).abs().view(B, -1).max(dim=1)[0].cpu()
-        stats["explanation"]["cf"] += cf.sum().item()
-        stats["explanation"]["cf5"] += cf5.sum().item()
-        stats["explanation"]["l1"] += l1.sum().item()
-        stats["explanation"]["l inf"] += linf.sum().item()
-        stats["explanation"]["p"] += prob[cf].sum().item()
+        prefix = "" if args.chunks == 1 else f"c-{args.chunk}_{args.chunks}-"
+        with open(
+            osp.join(
+                args.output_path, "Results", args.exp_name, prefix + "summary.yaml"
+            ),
+            "w",
+        ) as f:
+            f.write(str(stats))
 
-        # save images
-        image_saver(
-            imgs=tensor_to_numpy(img_orig),
-            cfs=tensor_to_numpy(ce),
-            recs=None if not args.recover else tensor_to_numpy(rec),
-            target=target,
-            label=lab,
-            pred=c_pred,
-            pred_cf=ce_pred,
-            l_inf=linf,
-            l_1=l1,
-            indexes=indexes.numpy(),
-        )
-
-        if (idx + 1) == len(loader):
-            print(
-                f"[Chunks ({args.chunk}+1) / {args.chunks}] {idx + 1} / {len(loader)} | Time: {int(time.time() - start_time)}s"
-            )
-            print("\nDone")
-            break
-
-    stats["clean acc"] /= stats["n"]
-    stats["clean acc5"] /= stats["n"]
-    correct = stats["explanation"]["cf"]
-    for k in stats["explanation"].keys():
-        if k == "p":
-            stats["explanation"][k] /= correct
-            continue
-        stats["explanation"][k] /= stats["n"]
-
-    prefix = "" if args.chunks == 1 else f"c-{args.chunk}_{args.chunks}-"
-    with open(
-        osp.join(args.output_path, "Results", args.exp_name, prefix + "summary.yaml"),
-        "w",
-    ) as f:
-        f.write(str(stats))
+    return counterfactuals
 
 
 if __name__ == "__main__":

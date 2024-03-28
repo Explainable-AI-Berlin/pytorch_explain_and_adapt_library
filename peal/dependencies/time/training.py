@@ -123,7 +123,11 @@ def training(args=None):
     # Initialize token(s)
 
     # load previous tokens
-    load_tokens_and_embeddings(sd_model=pipeline, files=args.embedding_files)
+    try:
+        load_tokens_and_embeddings(sd_model=pipeline, files=args.embedding_files)
+
+    except Exception:
+        import pdb; pdb.set_trace()
 
     # generate new tokens
     index_no_updates, placeholder_token_ids, initializer_token_ids = add_new_tokens(
@@ -203,7 +207,6 @@ def training(args=None):
     for image, text in tqdm.tqdm(
         data_loader(iterations), desc="Iterations", total=args.iterations
     ):
-        iterations += 1
         image = image.to(device, dtype=torch_dtype)
         text_inputs = tokenizer(
             text,
@@ -305,6 +308,8 @@ def training(args=None):
 
         if iterations > args.iterations:
             break
+
+        iterations += 1
 
     pipeline.to("cpu")
     save_tokens_and_embeddings(

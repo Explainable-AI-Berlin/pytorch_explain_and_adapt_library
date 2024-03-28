@@ -13,6 +13,7 @@ from torch import nn
 from PIL import Image
 from torchvision.transforms import ToTensor
 
+from peal.data.dataset_factory import get_datasets
 from peal.data.datasets import Image2MixedDataset
 from peal.generators.interfaces import EditCapableGenerator
 from peal.global_utils import load_yaml_config, embed_numberstring
@@ -46,27 +47,26 @@ class StableDiffusion(EditCapableGenerator):
 
     def initialize(self, classifier, base_path):
         class_predictions_path = os.path.join(base_path, "explainer", "predictions.csv")
+        generator_dataset = get_datasets(self.config.data)[0]
+        generator_dataset.task_config = self.classifier_dataset.task_config
         Path(os.path.join(base_path, "explainer")).mkdir(exist_ok=True, parents=True)
         if not os.path.exists(class_predictions_path):
-            self.classifier_dataset.enable_url()
+            generator_dataset.enable_url()
             prediction_args = types.SimpleNamespace(
                 batch_size=32,
-                dataset=self.classifier_dataset,
+                dataset=generator_dataset,
                 classifier=classifier,
                 label_path=class_predictions_path,
                 partition="train",
                 label_query=0,
             )
             get_predictions(prediction_args)
-            self.classifier_dataset.disable_url()
 
         generator_dataset_config = copy.deepcopy(self.config.data)
         generator_dataset_config.split = [1.0, 1.0]
-        self.generator_dataset = Image2MixedDataset(
-            config=generator_dataset_config,
-            mode="train",
-            data_dir=class_predictions_path,
-        )
+        self.generator_dataset = get_datasets(
+            config=generator_dataset_config, data_dir=class_predictions_path
+        )[0]
         context_embedding_path = os.path.join(
             base_path, "explainer", "context_embedding"
         )
@@ -74,7 +74,7 @@ class StableDiffusion(EditCapableGenerator):
             train_context_embedding_args = types.SimpleNamespace(
                 sd_model="CompVis/stable-diffusion-v1-4",
                 embedding_files=[],
-                output_path=os.path.join(self.config.base_path, "context_embedding"),
+                output_path=context_embedding_path,
                 dataset=self.generator_dataset,
                 label_query=0,
                 training_label=-1,
@@ -98,14 +98,13 @@ class StableDiffusion(EditCapableGenerator):
             )
             training(train_context_embedding_args)
 
-        for class_idx in range(self.classifier_dataset.config.num_classes):
-            class_token_path = os.path.join(
-                self.config.base_path, "class_token" + str(class_idx)
-            )
+        # TODO how to extend this for multiclass??
+        for class_idx in range(2):
+            class_token_path = os.path.join(base_path, "explainer", "class_token" + str(class_idx))
             if not os.path.exists(class_token_path):
                 class_related_bias_embedding_args = types.SimpleNamespace(
                     sd_model="CompVis/stable-diffusion-v1-4",
-                    embedding_files=context_embedding_path,
+                    embedding_files=[context_embedding_path],
                     output_path=class_token_path,
                     dataset=self.generator_dataset,
                     label_query=0,
@@ -142,14 +141,22 @@ class StableDiffusion(EditCapableGenerator):
         source_classes: torch.Tensor,
         target_classes: torch.Tensor,
         classifier: nn.Module,
-        base_path="peal_runs/stable_diffusion",
+        explainer_config,
+        classifier_dataset,
         pbar=None,
         mode="",
-        **kwargs
+        base_path="",
     ):
         if self.generator_dataset is None:
             self.initialize(classifier, base_path)
 
+        dataset = [
+            (
+                torch.zeros([len(x_in)], dtype=torch.long),
+                x_in,
+                [source_classes, target_classes],
+            )
+        ]
         ce_generation_args = types.SimpleNamespace(
             embedding_files=[
                 os.path.join(base_path, "explainer", "context_embedding"),
@@ -158,10 +165,10 @@ class StableDiffusion(EditCapableGenerator):
             ],
             use_negative_guidance_denoise=True,
             use_negative_guidance_inverse=True,
-            guidance_scale_denoising="4 4 4 4",
-            guidance_scale_invertion="4 4 4 4",
-            num_inference_steps="15 20 25 35",
-            output_path=self.counterfactual_path,
+            guidance_scale_denoising=[4,4,4,4],
+            guidance_scale_invertion=[4,4,4,4],
+            num_inference_steps=[15,20,25,35],
+            output_path=os.path.join(base_path, "explainer", "outputs"),
             exp_name="time",
             label_target=-1,
             label_query=31,
@@ -172,8 +179,21 @@ class StableDiffusion(EditCapableGenerator):
             chunk=0,
             enable_xformers_memory_efficient_attention=False,
             partition="val",
-            dataset=self.generator_dataset,
+            dataset=dataset,
             classifier=classifier,
+            use_fp16=False,
+            sd_model="CompVis/stable-diffusion-v1-4",
+            sd_image_size=128,
+            custom_obj_token="|<C*>|",
+            p=0.93,
+            l2=0.0,
+            batch_size=1,
+            classifier_image_size=128,
+            recover=False,
+            num_samples=9999999999999999,
+            merge_chunks=False,
+            postprocess=lambda x, size: self.generator_dataset.project_to_pytorch_default(x),
+            generic_custom_tokens=["|<C*1>|", "|<C*2>|", "|<C*3>|"],
         )
         x_counterfactuals = generate_time_counterfactuals(ce_generation_args)
 
