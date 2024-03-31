@@ -13,13 +13,14 @@ class ACEConfig(ExplainerConfig):
     Options: ['counterfactual', 'lrp']
     """
     explainer_type: str = "ACE"
-    attack_iterations: Union[list, int] = [30, 70]
-    sampling_time_fraction: Union[list, float] = [0.2, 0.4]
-    dist_l1: Union[list, float] = 0.00000001
+    attack_iterations: Union[list, int] = [10,50]
+    sampling_time_fraction: Union[list, float] = [0.1,0.3]
+    dist_l1: Union[list, float] = [1.0, 0.0001]
     dist_l2: Union[list, float] = 0.0
     sampling_inpaint: Union[list, float] = [0.3, 0.1]
     sampling_dilation: Union[list, int] = 17
     timestep_respacing: Union[list, int] = 50
+    attempts: int = 5
     clip_denoised: bool = True  # Clipping noise
     batch_size: int = 32  # Batch size
     gpu: str = "0"  # GPU index, should only be 1 gpu
@@ -56,4 +57,4 @@ class ACEConfig(ExplainerConfig):
     chunks: int = 1  # Chunking for spliting the CE generation into multiple gpus
     chunk: int = 0  # current chunk (between 0 and chunks - 1)
     merge_chunks: bool = False  # to merge all chunked results
-    y_target_goal_confidence: float = 0.5  # to merge all chunked results
+    y_target_goal_confidence: float = 0.65

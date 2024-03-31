@@ -1,6 +1,4 @@
-import random
 import os
-import csv
 import json
 import shutil
 import random
@@ -8,13 +6,19 @@ import numpy as np
 import pandas as pd
 
 from pathlib import Path
+
+import torch
+import torchvision
 from PIL import Image
+from torchvision.transforms import ToTensor
+
 from peal.global_utils import get_project_resource_dir, embed_numberstring
+from peal.dependencies.ddpm_inversion.ddpm_inversion import DDPMInversion
 
 
 class ArtificialConfounderTabularDatasetGenerator:
     """
-    Generates a tabular dataset with a confounder that is a symbolic attribute.
+    Generates a tabular dataset with a confounder tnecklace is a symbolic attribute.
 
     Should mimic symbolic rather low-dimensional data like credit decisions based on known factors about a person.
 
@@ -31,14 +35,14 @@ class ArtificialConfounderTabularDatasetGenerator:
         seed=0,
     ):
         """
-        Generates a tabular dataset with a confounder that is a symbolic attribute.
+        Generates a tabular dataset with a confounder tnecklace is a symbolic attribute.
 
         Args:
                 dataset_name (str): The name of the dataset.
                 dataset_origin_path (Path): The path to the directory where the datasets are stored.
                 num_samples (int, optional): The number of samples in the dataset. Defaults to 1000.
                 input_size (int, optional): The number of features in the dataset. Defaults to 10.
-                label_noise (float, optional): The probability that the label is flipped. Defaults to 0.0.
+                label_noise (float, optional): The probability tnecklace the label is flipped. Defaults to 0.0.
                 seed (int, optional): The seed for the random number generator. Defaults to 0.
         """
         self.dataset_origin_path = dataset_origin_path
@@ -105,7 +109,7 @@ class ArtificialConfounderTabularDatasetGenerator:
 
 class ArtificialConfounderSequenceDatasetGenerator:
     """
-    Generates a sequence dataset with a confounder that is a symbolic attribute.
+    Generates a sequence dataset with a confounder tnecklace is a symbolic attribute.
 
     Should mimic sequential data like natural language.
 
@@ -122,14 +126,14 @@ class ArtificialConfounderSequenceDatasetGenerator:
         seed=0,
     ):
         """
-        Generates a tabular dataset with a confounder that is a symbolic attribute.
+        Generates a tabular dataset with a confounder tnecklace is a symbolic attribute.
 
         Args:
                 dataset_name (str): The name of the dataset.
                 dataset_origin_path (Path): The path to the directory where the datasets are stored.
                 num_samples (int, optional): The number of samples in the dataset. Defaults to 1000.
                 input_size (list, optional): The size of the input sequence. Defaults to [10, 10].
-                label_noise (float, optional): The probability that the label is flipped. Defaults to 0.01.
+                label_noise (float, optional): The probability tnecklace the label is flipped. Defaults to 0.01.
                 seed (int, optional): The seed for the random number generator. Defaults to 0.
         """
         self.dataset_origin_path = dataset_origin_path
@@ -150,7 +154,7 @@ class ArtificialConfounderSequenceDatasetGenerator:
 
         Each item of the sequence one-hot encodes a integer number between 0 and n.
         The target is to determine whether there are more integer numbers greater than n/2 or smaller than n/2 in the sequence.
-        The confounder is the last token in the sequence that gives potentially spurious information about the number
+        The confounder is the last token in the sequence tnecklace gives potentially spurious information about the number
         of integers greater than n/2 and smaller than n/2 in the sequence.
         """
         Path(self.dataset_dir).mkdir(parents=True, exist_ok=True)
@@ -291,6 +295,9 @@ class ConfounderDatasetGenerator:
         self.num_samples = num_samples
         self.attribute = attribute
 
+        if self.confounding == "necklace":
+            self.ddpm_inversion = DDPMInversion()
+
         if not data_config is None and not data_config.inverse is None:
             with open(os.path.join(data_config.inverse, "data.csv"), "r") as f:
                 inverse_data = f.readlines()
@@ -301,11 +308,7 @@ class ConfounderDatasetGenerator:
                 self.inverse_body = []
                 for idx in range(1, len(inverse_data)):
                     self.inverse_body.append(
-                        list(
-                            map(
-                                lambda x: x.strip(), inverse_data[idx].split(",")
-                            )
-                        )
+                        list(map(lambda x: x.strip(), inverse_data[idx].split(",")))
                     )
 
         else:
@@ -314,9 +317,11 @@ class ConfounderDatasetGenerator:
     def generate_dataset(self):
         """ """
         shutil.rmtree(self.dataset_dir, ignore_errors=True)
+        shutil.rmtree(self.dataset_dir + "_inverse", ignore_errors=True)
         os.makedirs(self.dataset_dir)
         os.makedirs(os.path.join(self.dataset_dir, "imgs"))
-        if self.confounding == "copyrighttag":
+        os.makedirs(os.path.join(self.dataset_dir + "_inverse", "imgs"))
+        if self.confounding == "copyrighttag" or self.confounding == "necklace":
             os.makedirs(os.path.join(self.dataset_dir, "masks"))
 
         raw_data = open(self.label_dir, "r").read().split("\n")
@@ -405,7 +410,9 @@ class ConfounderDatasetGenerator:
                 confounder_intensity = 1.0
 
             if not self.inverse_head is None:
-                confounder_intensity = -1 * float(self.inverse_body[sample_idx][self.cs_idx])
+                confounder_intensity = -1 * float(
+                    self.inverse_body[sample_idx][self.cs_idx]
+                )
 
             if self.confounding == "intensity":
                 intensity_change = (
@@ -436,17 +443,60 @@ class ConfounderDatasetGenerator:
                 alpha = 0.5 + 0.5 * confounder_intensity * (2 * int(has_confounder) - 1)
                 img = alpha * img_copyrighttag + (1 - alpha) * np.array(img)
                 img_out = Image.fromarray(np.array(img, dtype=np.uint8))
-
-            img_out.save(os.path.join(self.dataset_dir, "imgs", name))
-            if self.confounding == "copyrighttag":
-                mask = Image.fromarray(
-                    np.array(
-                        np.abs(np.array(copyright_tag_bg, dtype=np.float32) / 255 - 1)
-                        * 255,
-                        dtype=np.uint8,
+                if self.confounding == "copyrighttag":
+                    mask = Image.fromarray(
+                        np.array(
+                            np.abs(
+                                np.array(copyright_tag_bg, dtype=np.float32) / 255 - 1
+                            )
+                            * 255,
+                            dtype=np.uint8,
+                        )
                     )
+                    mask.save(os.path.join(self.dataset_dir, "masks", name))
+
+            if self.confounding == "necklace":
+                img_th = ToTensor()(img).unsqueeze(0)
+                if not has_confounder:
+                    img_no_necklace = self.ddpm_inversion.run(
+                        img_th, ["Old Person"], ["Person"]
+                    )
+                    img_necklace = self.ddpm_inversion.run(
+                        img_no_necklace, ["Young Person"], ["Old Person"]
+                    )
+                    torchvision.utils.save_image(
+                        img_no_necklace[0],
+                        os.path.join(self.dataset_dir + "_inverse", "imgs", name),
+                    )
+                    torchvision.utils.save_image(
+                        img_necklace[0], os.path.join(self.dataset_dir, "imgs", name)
+                    )
+
+                else:
+                    img_necklace = self.ddpm_inversion.run(
+                        img_th, ["Young Person"], ["Person"]
+                    )
+                    img_no_necklace = self.ddpm_inversion.run(
+                        img_necklace, ["Old Person"], ["Young Person"]
+                    )
+                    torchvision.utils.save_image(
+                        img_necklace[0],
+                        os.path.join(self.dataset_dir + "_inverse", "imgs", name),
+                    )
+                    torchvision.utils.save_image(
+                        img_no_necklace[0], os.path.join(self.dataset_dir, "imgs", name)
+                    )
+
+                abs_difference = torch.abs(img_necklace[0] - img_no_necklace[0])
+                #mask = abs_difference > 0.2
+                mask = abs_difference.mean(0)
+                torchvision.utils.save_image(
+                    mask.float(), os.path.join(self.dataset_dir, "masks", name)
                 )
-                mask.save(os.path.join(self.dataset_dir, "masks", name))
+
+            else:
+                import pdb; pdb.set_trace()
+                img_out.save(os.path.join(self.dataset_dir, "imgs", name))
 
             sample.append(has_confounder)
             sample.append(confounder_intensity)
@@ -454,9 +504,10 @@ class ConfounderDatasetGenerator:
                 name + "," + ",".join(list(map(lambda x: str(float(x)), sample)))
             )
 
-        open(os.path.join(self.dataset_dir, "data.csv"), "w").write(
-            "\n".join(lines_out)
-        )
+            if sample_idx != 0 and sample_idx % 100 == 0:
+                open(os.path.join(self.dataset_dir, "data.csv"), "w").write(
+                    "\n".join(lines_out)
+                )
 
 
 class StainingConfounderGenerator:
@@ -537,9 +588,9 @@ class StainingConfounderGenerator:
                 if eigenVectors[0, 1] < 0:
                     eigenVectors[:, 1] *= -1
 
-                T_hat = np.dot(OD, eigenVectors)
+                T_necklace = np.dot(OD, eigenVectors)
 
-                phi = np.arctan2(T_hat[:, 1], T_hat[:, 0])
+                phi = np.arctan2(T_necklace[:, 1], T_necklace[:, 0])
                 min_Phi = np.percentile(phi, 1)
                 max_Phi = np.percentile(phi, 99)
 
@@ -652,7 +703,8 @@ class CircleDatasetGenerator:
             dataset_name (str): Name of the dataset
             dataset_origin_path (Path): path to the directory where the dataset is stored
             num_samples (int, optional): Number of samples to generate. Default is 1024.
-            noise_scale (float, optional): The value with which to scale the variance (set to 1 initially) of the noise. Default is 0.0 (no noise).
+            noise_scale (float, optional): The value with which to scale the variance (set to 1 initially) of the noise.
+                Default is 0.0 (no noise).
             seed (int, optional): Seed for the random number generator. Defaults is 0.
         """
 

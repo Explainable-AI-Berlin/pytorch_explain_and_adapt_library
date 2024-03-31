@@ -1,11 +1,12 @@
 # python run_cfkd.py --adaptor_config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba500x098_cfkd_ace.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
-batch_size                           :  5
+batch_size                           :  1
 tracking_level                       :  2
-min_train_samples                    :  400
+min_train_samples                    :  4 #400
 finetune_iterations                  :  1
 max_validation_samples               :  100
+max_test_batches                     :  1
 continuous_learning                  :  "finetune"
 replace_model                        :  True
 use_visualization                    :  False #True

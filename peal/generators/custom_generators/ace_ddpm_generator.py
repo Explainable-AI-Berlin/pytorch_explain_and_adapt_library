@@ -11,6 +11,8 @@ from mpi4py import MPI
 from torch import nn
 from types import SimpleNamespace
 
+from torch.utils.tensorboard import SummaryWriter
+
 from peal.generators.interfaces import EditCapableGenerator
 from peal.global_utils import load_yaml_config
 from peal.dependencies.ace.run_ace import main as ace_main
@@ -27,6 +29,7 @@ from peal.data.dataloaders import get_dataloader
 from peal.data.dataset_factory import get_datasets
 from peal.data.dataset_interfaces import PealDataset
 from peal.configs.explainers.ace_config import ACEConfig
+from peal.training.loggers import log_images_to_writer
 
 
 def load_state_dict(path, **kwargs):
@@ -72,7 +75,9 @@ class DDPM(EditCapableGenerator):
         self.model.to(device)
         self.model_path = os.path.join(self.model_dir, "final.pt")
         if os.path.exists(self.model_path):
-            self.model.load_state_dict(load_state_dict(self.model_path, map_location=device))
+            self.model.load_state_dict(
+                load_state_dict(self.model_path, map_location=device)
+            )
 
     def sample_x(self, batch_size=1, renormalize=True):
         sample = self.diffusion.p_sample_loop(
@@ -88,25 +93,49 @@ class DDPM(EditCapableGenerator):
     ):
         shutil.rmtree(self.model_dir, ignore_errors=True)
 
-        dist_util.setup_dist(self.config.gpus)
+        #dist_util.setup_dist(self.config.gpus)
         logger.configure(dir=self.model_dir)
 
         schedule_sampler = create_named_schedule_sampler(
             self.config.schedule_sampler, self.diffusion
         )
 
+        if not self.config.x_selection is None:
+            self.dataset.task_config = SimpleNamespace(**{"x_selection": self.config.x_selection})
+            print("self.dataset.task_config1")
+            print("self.dataset.task_config1")
+            print("self.dataset.task_config1")
+            print("self.dataset.task_config1")
+            print("self.dataset.task_config1")
+            print(self.dataset.task_config)
+
         logger.log("creating data loader...")
+        dataloader = get_dataloader(
+            self.dataset,
+            mode="train",
+            batch_size=self.config.batch_size,
+            training_config=types.SimpleNamespace(
+                **{"steps_per_epoch": self.config.max_steps}
+            ),
+        )
+
+        writer = SummaryWriter(os.path.join(self.model_dir, "logs"))
+        if not self.config.x_selection is None:
+            self.dataset.task_config = SimpleNamespace(**{"x_selection": self.config.x_selection})
+            print("self.dataset.task_config2")
+            print("self.dataset.task_config2")
+            print("self.dataset.task_config2")
+            print("self.dataset.task_config2")
+            print("self.dataset.task_config2")
+            print(self.dataset.task_config)
+
+        log_images_to_writer(dataloader, writer, "train")
         data = iter(
-            get_dataloader(
-                self.dataset,
-                mode="train",
-                batch_size=self.config.batch_size,
-                training_config={"steps_per_epoch": self.config.max_steps},
-            )
+            dataloader
         )
 
         logger.log("training...")
-        TrainLoop(
+        train_loop = TrainLoop(
             model=self.model,
             diffusion=self.diffusion,
             data=data,
@@ -123,7 +152,8 @@ class DDPM(EditCapableGenerator):
             weight_decay=self.config.weight_decay,
             lr_anneal_steps=self.config.lr_anneal_steps,
             model_dir=self.model_dir,
-        ).run_loop()
+        )
+        train_loop.run_loop(self.config, writer)
 
     def edit(
         self,
@@ -145,87 +175,122 @@ class DDPM(EditCapableGenerator):
             )
         ]
         args = copy.deepcopy(self.config).dict()
-        #args = copy.deepcopy(self.config.full_args)
+        # args = copy.deepcopy(self.config.full_args)
         args = SimpleNamespace(**args)
         args.output_path = self.counterfactual_path
         args.batch_size = x_in.shape[0]
         #
-        args.attack_iterations = int(
-            explainer_config.attack_iterations
-            if not isinstance(explainer_config.attack_iterations, list)
-            else random.randint(
-                explainer_config.attack_iterations[0],
-                explainer_config.attack_iterations[1],
+        x_counterfactuals = None
+        for idx in range(explainer_config.attempts):
+            # a0_0 = a_min + (a_max - a_min) / 2
+            # a1_0 = a_min + 0 * (a_max - a_min) / (explainer_config.attempts - 1)
+            # a1_1 = a_min + 1 * (a_max - a_min) / (explainer_config.attempts - 1)
+            # a2_0 = a_min + 0 * (a_max - a_min) / (explainer_config.attempts - 1)
+            # a2_0 = a_min + 1 * (a_max - a_min) / (explainer_config.attempts - 1)
+            # a2_0 = a_min + 2 * (a_max - a_min) / (explainer_config.attempts - 1)
+            multiplier = idx / (explainer_config.attempts - 1)
+            args.attack_iterations = int(
+                explainer_config.attack_iterations
+                if not isinstance(explainer_config.attack_iterations, list)
+                else int(
+                    explainer_config.attack_iterations[0]
+                    + (
+                        explainer_config.attack_iterations[1]
+                        - explainer_config.attack_iterations[0]
+                    )
+                    * multiplier
+                )
             )
-        )
-        args.sampling_time_fraction = float(
-            explainer_config.sampling_time_fraction
-            if not isinstance(explainer_config.sampling_time_fraction, list)
-            else random.uniform(
-                explainer_config.sampling_time_fraction[0],
-                explainer_config.sampling_time_fraction[1],
+            print("args.attack_iterations")
+            print(args.attack_iterations)
+            args.sampling_time_fraction = float(
+                explainer_config.sampling_time_fraction
+                if not isinstance(explainer_config.sampling_time_fraction, list)
+                else float(
+                    explainer_config.sampling_time_fraction[0]
+                    + (
+                        explainer_config.sampling_time_fraction[1]
+                        - explainer_config.sampling_time_fraction[0]
+                    )
+                    * multiplier
+                )
             )
-        )
-        args.dist_l1 = float(
-            explainer_config.dist_l1
-            if not isinstance(explainer_config.dist_l1, list)
-            else random.uniform(
-                explainer_config.dist_l1[0],
-                explainer_config.dist_l1[1],
+            args.dist_l1 = float(
+                explainer_config.dist_l1
+                if not isinstance(explainer_config.dist_l1, list)
+                else explainer_config.dist_l1[0]
+                * (
+                    (explainer_config.dist_l1[1] / explainer_config.dist_l1[0])
+                    ** (1 / (explainer_config.attempts - 1))
+                )
+                ** idx
             )
-        )
-        args.dist_l2 = float(
-            explainer_config.dist_l2
-            if not isinstance(explainer_config.dist_l2, list)
-            else random.uniform(
-                explainer_config.dist_l2[0],
-                explainer_config.dist_l2[1],
+            print("args.dist_l1")
+            print(args.dist_l1)
+            args.dist_l2 = float(
+                explainer_config.dist_l2
+                if not isinstance(explainer_config.dist_l2, list)
+                else explainer_config.dist_l1[0]
+                * (
+                    (explainer_config.dist_l2[1] / explainer_config.dist_l2[0])
+                    ** (1 / (explainer_config.attempts - 1))
+                )
+                ** idx
             )
-        )
-        args.sampling_inpaint = float(
-            explainer_config.sampling_inpaint
-            if not isinstance(explainer_config.sampling_inpaint, list)
-            else random.uniform(
-                explainer_config.sampling_inpaint[0],
-                explainer_config.sampling_inpaint[1],
+            args.sampling_inpaint = float(
+                explainer_config.sampling_inpaint
+                if not isinstance(explainer_config.sampling_inpaint, list)
+                else float(
+                    explainer_config.sampling_time_fraction[0]
+                    - (
+                        explainer_config.sampling_time_fraction[0]
+                        - explainer_config.sampling_time_fraction[1]
+                    )
+                    * multiplier
+                )
             )
-        )
-        args.sampling_dilation = int(
-            explainer_config.sampling_dilation
-            if not isinstance(explainer_config.sampling_dilation, list)
-            else random.randint(
-                explainer_config.sampling_dilation[0],
-                explainer_config.sampling_dilation[1],
+            args.__dict__.update(
+                {
+                    k: v
+                    for k, v in explainer_config.__dict__.items()
+                    if k not in args.__dict__
+                }
             )
-        )
-        args.timestep_respacing = str(
-            explainer_config.timestep_respacing
-            if not isinstance(explainer_config.timestep_respacing, list)
-            else random.uniform(
-                explainer_config.timestep_respacing[0],
-                explainer_config.timestep_respacing[1],
-            )
-        )
-        args.__dict__.update({k: v for k, v in explainer_config.__dict__.items() if k not in args.__dict__})
-        args.dataset = dataset
-        args.classifier_dataset = classifier_dataset
-        args.generator_dataset = self.dataset
-        args.model_path = os.path.join(self.model_dir, "final.pt")
-        args.classifier = classifier
-        args.diffusion = self.diffusion
-        args.model = self.model
-        #
-        x_counterfactuals = ace_main(args=args)
-        x_counterfactuals = torch.cat(x_counterfactuals, dim=0)
+            args.dataset = dataset
+            args.classifier_dataset = classifier_dataset
+            args.generator_dataset = self.dataset
+            args.model_path = os.path.join(self.model_dir, "final.pt")
+            args.classifier = classifier
+            args.diffusion = self.diffusion
+            args.model = self.model
+            #
+            x_counterfactuals_current = ace_main(args=args)
+            x_counterfactuals_current = torch.cat(x_counterfactuals_current, dim=0)
 
-        device = [p for p in classifier.parameters()][0].device
-        preds = torch.nn.Softmax(dim=-1)(
-            classifier(x_counterfactuals.to(device)).detach().cpu()
-        )
+            device = [p for p in classifier.parameters()][0].device
+            preds = torch.nn.Softmax(dim=-1)(
+                classifier(x_counterfactuals_current.to(device)).detach().cpu()
+            )
+            print("preds_final: " + str(list(preds)))
+            y_target_end_confidence_current = torch.zeros([x_in.shape[0]])
+            for i in range(x_in.shape[0]):
+                y_target_end_confidence_current[i] = preds[i, target_classes[i]]
 
-        y_target_end_confidence = torch.zeros([x_in.shape[0]])
-        for i in range(x_in.shape[0]):
-            y_target_end_confidence[i] = preds[i, target_classes[i]]
+            if x_counterfactuals is None:
+                x_counterfactuals = x_counterfactuals_current
+                y_target_end_confidence = y_target_end_confidence_current
+
+            else:
+                for i in range(x_in.shape[0]):
+                    if y_target_end_confidence[i] < 0.51:
+                        x_counterfactuals[i] = x_counterfactuals_current[i]
+                        y_target_end_confidence[i] = y_target_end_confidence_current[i]
+
+            num_successful = torch.sum(y_target_end_confidence >= 0.51).item()
+            print("num_successful")
+            print(num_successful)
+            if num_successful == x_in.shape[0]:
+                break
 
         return (
             list(x_counterfactuals),

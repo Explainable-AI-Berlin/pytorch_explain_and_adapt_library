@@ -4,13 +4,15 @@ import os
 import glob
 import copy
 import shutil
+
+import torch
 import yaml
 
 import blobfile as bf
 import torch as th
-import torch.distributed as dist
+#import torch.distributed as dist
 import torchvision.utils
-from torch.nn.parallel.distributed import DistributedDataParallel as DDP
+#from torch.nn.parallel.distributed import DistributedDataParallel as DDP
 from torch.optim import AdamW
 from tqdm import tqdm
 from pathlib import Path
@@ -74,7 +76,8 @@ class TrainLoop:
 
         self.step = 0
         self.resume_step = 0
-        self.global_batch = self.batch_size * dist.get_world_size()
+        #self.global_batch = self.batch_size * dist.get_world_size()
+        self.global_batch = self.batch_size
 
         self.sync_cuda = th.cuda.is_available()
 
@@ -101,7 +104,8 @@ class TrainLoop:
                 for _ in range(len(self.ema_rate))
             ]
 
-        if th.cuda.is_available():
+        """if False:
+            # th.cuda.is_available():
             self.use_ddp = True
             self.ddp_model = DDP(
                 self.model,
@@ -116,30 +120,31 @@ class TrainLoop:
                 logger.warn(
                     "Distributed training requires CUDA. "
                     "Gradients will not be synchronized properly!"
-                )
-            self.use_ddp = False
-            self.ddp_model = self.model
+                )"""
+        self.use_ddp = False
+        self.ddp_model = self.model
 
     def _load_and_sync_parameters(self):
         resume_checkpoint = find_resume_checkpoint() or self.resume_checkpoint
 
         if resume_checkpoint:
             self.resume_step = parse_resume_step_from_filename(resume_checkpoint)
-            if dist.get_rank() == 0:
+            """if dist.get_rank() == 0:
                 print(f"loading model from checkpoint: {resume_checkpoint}...")
                 # self.model.load_state_dict(
                 #     dist_util.load_state_dict(
                 #         resume_checkpoint, map_location=dist_util.dev()
                 #     )
-                # )
-                self.model.load_state_dict(
-                    load_from_DDP_model(
-                        th.load(resume_checkpoint, map_location=dist_util.dev())
-                    )
+                # )"""
+            self.model.load_state_dict(
+                load_from_DDP_model(
+                    th.load(resume_checkpoint, map_location=dist_util.dev())
                 )
-                print("done")
+            )
+            print("done")
 
-        dist_util.sync_params(self.model.parameters())
+        # TODO what is this doing?
+        #dist_util.sync_params(self.model.parameters())
 
     def _load_ema_parameters(self, rate):
         ema_params = copy.deepcopy(self.mp_trainer.master_params)
@@ -147,18 +152,18 @@ class TrainLoop:
         main_checkpoint = find_resume_checkpoint() or self.resume_checkpoint
         ema_checkpoint = find_ema_checkpoint(main_checkpoint, self.resume_step, rate)
         if ema_checkpoint:
-            if dist.get_rank() == 0:
+            """if dist.get_rank() == 0:
                 print(f"loading EMA from checkpoint: {ema_checkpoint}...")
                 # state_dict = dist_util.load_state_dict(
                 #     ema_checkpoint, map_location=dist_util.dev()
-                # )
-                state_dict = load_from_DDP_model(
-                    th.load(ema_checkpoint, map_location=dist_util.dev())
-                )
-                ema_params = self.mp_trainer.state_dict_to_master_params(state_dict)
-                print("done")
+                # )"""
+            state_dict = load_from_DDP_model(
+                th.load(ema_checkpoint, map_location=dist_util.dev())
+            )
+            ema_params = self.mp_trainer.state_dict_to_master_params(state_dict)
+            print("done")
 
-        dist_util.sync_params(ema_params)
+        #dist_util.sync_params(ema_params)
         return ema_params
 
     def _load_optimizer_state(self):
@@ -173,7 +178,7 @@ class TrainLoop:
             )
             self.opt.load_state_dict(state_dict)
 
-    def run_loop(self, config):
+    def run_loop(self, config, writer=None):
         print("Running training loop")
         pbar = tqdm(
             total=self.data.dataloader.train_config.steps_per_epoch
@@ -187,13 +192,21 @@ class TrainLoop:
         os.makedirs(os.path.join(self.model_dir, "model"), exist_ok=True)
         os.makedirs(os.path.join(self.model_dir, "optimizer"), exist_ok=True)
         os.makedirs(os.path.join(self.model_dir, "outputs"), exist_ok=True)
-        pbar.writer = SummaryWriter(os.path.join(self.model_dir, "logs"))
+        if not writer is None:
+            pbar.writer = writer
+
+        else:
+            pbar.writer = SummaryWriter(os.path.join(self.model_dir, "logs"))
         while (
             not self.lr_anneal_steps
             or self.step + self.resume_step < self.lr_anneal_steps
         ):
             pbar.step = self.step
             batch, cond = next(self.data)
+            if isinstance(cond, torch.Tensor):
+                #cond = {"y": cond}
+                cond = {}
+
             self.run_step(batch, cond, pbar)
             if self.step % self.save_interval == 0:
                 # save intermediate images as outputs
@@ -262,7 +275,6 @@ class TrainLoop:
                 t,
                 model_kwargs=micro_cond,
             )
-
             if last_batch or not self.use_ddp:
                 losses = compute_losses()
             else:
@@ -302,30 +314,30 @@ class TrainLoop:
     def save(self, pbar=None):
         def save_checkpoint(rate, params):
             state_dict = self.mp_trainer.master_params_to_state_dict(params)
-            if dist.get_rank() == 0:
-                print(f"saving model {rate}...")
-                if not rate:
-                    filename = os.path.join(
-                        f"model", f"{(self.step+self.resume_step):06d}.pt"
-                    )
-                    if (
-                        not pbar is None
-                        and pbar.config.current_fid < pbar.config.best_fid
-                    ):
-                        pbar.config.best_fid = pbar.config.current_fid
-                        with bf.BlobFile(
-                            bf.join(copy.deepcopy(self.model_dir), f"final.pt"), "wb"
-                        ) as f:
-                            th.save(state_dict, f)
-                else:
-                    filename = os.path.join(
-                        f"ema", f"{rate}_{(self.step+self.resume_step):06d}.pt"
-                    )
+            #if dist.get_rank() == 0:
+            print(f"saving model {rate}...")
+            if not rate:
+                filename = os.path.join(
+                    f"model", f"{(self.step+self.resume_step):06d}.pt"
+                )
+                if (
+                    not pbar is None
+                    and pbar.config.current_fid < pbar.config.best_fid
+                ):
+                    pbar.config.best_fid = pbar.config.current_fid
+                    with bf.BlobFile(
+                        bf.join(copy.deepcopy(self.model_dir), f"final.pt"), "wb"
+                    ) as f:
+                        th.save(state_dict, f)
+            else:
+                filename = os.path.join(
+                    f"ema", f"{rate}_{(self.step+self.resume_step):06d}.pt"
+                )
 
-                with bf.BlobFile(
-                    bf.join(copy.deepcopy(self.model_dir), filename), "wb"
-                ) as f:
-                    th.save(state_dict, f)
+            with bf.BlobFile(
+                bf.join(copy.deepcopy(self.model_dir), filename), "wb"
+            ) as f:
+                th.save(state_dict, f)
 
         # delete old checkpoints
         """if dist.get_rank() == 0:
@@ -336,17 +348,17 @@ class TrainLoop:
         for rate, params in zip(self.ema_rate, self.ema_params):
             save_checkpoint(rate, params)
 
-        if dist.get_rank() == 0:
-            with bf.BlobFile(
-                bf.join(
-                    copy.deepcopy(self.model_dir),
-                    os.path.join(f"opt", f"{(self.step+self.resume_step):06d}.pt"),
-                ),
-                "wb",
-            ) as f:
-                th.save(self.opt.state_dict(), f)
+        #if dist.get_rank() == 0:
+        with bf.BlobFile(
+            bf.join(
+                copy.deepcopy(self.model_dir),
+                os.path.join(f"opt", f"{(self.step+self.resume_step):06d}.pt"),
+            ),
+            "wb",
+        ) as f:
+            th.save(self.opt.state_dict(), f)
 
-        dist.barrier()
+        #dist.barrier()
 
 
 def parse_resume_step_from_filename(filename):
