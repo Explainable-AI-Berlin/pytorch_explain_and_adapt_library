@@ -1,37 +1,55 @@
-"wrapper": "tcvae",
+generator_type: 'DiveTCVAE'
+
+wrapper: "tcvae"
 # Hardware
-"ngpu": ngpu,
-"amp": 1,
+ngpu: 1
+amp: 1
 
 # Optimization
-"batch_size": 64 * ngpu,
-"target_loss": "val_loss",
-"lr": [0.0004],
-"max_epoch": 400,
+batch_size: 64 #(ngpu=1 for now),
+target_loss: 'val_loss'
+lr_tcvae: 0.0004
+max_epoch: 400 # constraint: >=4
 
 # Model
-"model": "biggan",
-"backbone": "resnet",
-"channels_width": 4,
-"z_dim": 128,
-"mlp_width": 4,
-"mlp_depth": 2,
+model: 'biggan'
+backbone: 'resnet'
+channels_width: 4
+z_dim: 128
+mlp_width: 4
+mlp_depth: 2
+#savedir : 'peal_runs/dive_tcvae'
+base_path : 'peal_runs/dive_tcvae/test2'
 
 # TCVAE
-"beta": [0.001], # the idea is to be able to interpolate while getting good reconstructions
-"tc_weight": [1], # we keep the total_correlation penalty high to encourage disentanglement
-"vgg_weight": [1],
-"beta_annealing": [True],
-"dp_prob": 0.3,
+beta: 0.001 # the idea is to be able to interpolate while getting good reconstructions
+tc_weight: 1 # we keep the total_correlation penalty high to encourage disentanglement
+vgg_weight: 1
+beta_annealing: True
+dp_prob: 0.3
 
 # Data
-"height": 128,
-"width": 128,
-"crop": 150,
+data : '<PEAL_BASE>/configs/data/copyrighttag_celeba_dive.yaml'
+height: 128
+width: 128
+crop: 150
 
-"dataset": "biased_celeba",
-"transforms": [["flip"]],
-"labels_path":   "celeba_meta_explanations/list_eval_unbiased.csv",
-"dataset_train": "celeba",
-"dataset_val":   "celeba",
-"dataset_test":  "celeba",
+# Attacks
+lr_dive: 0.01
+max_iters: 20
+cache_batch_size: 64
+force_cache: False
+stop_batch_threshold: 0.9
+attribute: "Smiling"
+num_explanations: 8
+method: fisher spectral inv
+reconstruction_weight: 10.0
+lasso_weight: 1.0
+diversity_weight: 1
+n_samples: 10
+fisher_samples: 0
+
+#teacher: '/home/space/datasets/peal/peal_runs/Smiling_confounding_copyrighttag_celeba/classifier_unpoisened/model.cpl'
+#student: '/home/space/datasets/peal/peal_runs/Smiling_confounding_copyrighttag_celeba/classifier_poisened100/model.cpl'
+
+#generator_path: 'peal_runs/dive'

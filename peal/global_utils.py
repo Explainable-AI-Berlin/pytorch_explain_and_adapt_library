@@ -20,14 +20,10 @@ def find_subclasses(base_class, directory):
     subclasses = []
 
     def check_module(module_name):
-        try:
-            module = importlib.import_module(module_name)
-            for name, obj in inspect.getmembers(module):
-                if inspect.isclass(obj) and issubclass(obj, base_class):
-                    subclasses.append(obj)
-
-        except Exception:
-            pass
+        module = importlib.import_module(module_name)
+        for name, obj in inspect.getmembers(module):
+            if inspect.isclass(obj) and issubclass(obj, base_class):
+                subclasses.append(obj)
 
     project_base_dir = get_project_resource_dir()
     for dirpath, dirnames, filenames in os.walk(directory):
