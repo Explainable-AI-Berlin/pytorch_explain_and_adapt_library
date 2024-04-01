@@ -238,6 +238,7 @@ class CounterfactualExplainer(ExplainerInterface):
         remove_below_threshold: bool = True,
         pbar=None,
         mode="",
+        explainer_path=None,
     ) -> dict:
         """
         This function generates a counterfactual for a given batch of inputs.
@@ -288,6 +289,9 @@ class CounterfactualExplainer(ExplainerInterface):
             )
 
         elif isinstance(self.generator, EditCapableGenerator):
+            if explainer_path is None:
+                explainer_path = os.path.join(*([os.path.abspath(os.sep)] + base_path.split(os.sep)[:-1]))
+
             (
                 batch["x_counterfactual_list"],
                 batch["z_difference_list"],
@@ -303,7 +307,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 pbar=pbar,
                 mode=mode,
                 classifier_dataset=self.dataset,
-                base_path=os.path.join(*([os.path.abspath(os.sep)] + base_path.split(os.sep)[:-1])),
+                base_path=explainer_path,
             )
 
         batch_out = {}

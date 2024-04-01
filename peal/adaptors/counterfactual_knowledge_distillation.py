@@ -132,9 +132,9 @@ class CounterfactualKnowledgeDistillation:
 
         #
         self.generator = get_generator(
-            generator=generator
-            if not generator is None
-            else self.adaptor_config.generator,
+            generator=(
+                generator if not generator is None else self.adaptor_config.generator
+            ),
             device=self.device,
             classifier_dataset=self.val_dataloader.dataset,
         ).to(self.device)
@@ -233,7 +233,7 @@ class CounterfactualKnowledgeDistillation:
         ):
             assert self.adaptor_config.current_iteration == 0
             print("Create base_dir in: " + str(self.base_dir))
-            shutil.rmtree(self.base_dir, ignore_errors=True)
+            #shutil.rmtree(self.base_dir, ignore_errors=True)
             Path(self.base_dir).mkdir(parents=True, exist_ok=True)
             writer = SummaryWriter(os.path.join(self.base_dir, "logs"))
             log_images_to_writer(self.train_dataloader, writer, "train0")
@@ -390,7 +390,9 @@ class CounterfactualKnowledgeDistillation:
                 x, y = self.datastack.pop(int(y_source))
 
             except Exception as e:
-                import pdb; pdb.set_trace()
+                import pdb
+
+                pdb.set_trace()
 
             if isinstance(self.teacher, SegmentationMaskTeacher) or isinstance(
                 self.explainer.explainer_config, PerfectFalseCounterfactualConfig
@@ -508,6 +510,9 @@ class CounterfactualKnowledgeDistillation:
                     remove_below_threshold=True,
                     pbar=pbar,
                     mode="Training",
+                    explainer_path=os.path.join(
+                        self.base_dir, str(finetune_iteration - 1)
+                    ),
                 )
                 for key in tracked_keys:
                     tracked_values[key].extend(values[key])
@@ -1127,15 +1132,15 @@ class CounterfactualKnowledgeDistillation:
             self.explainer.explainer_config = original_explainer_config
             if self.adaptor_config.validation_runs > 1:
                 self.datastack.dataset._initialize_performance_metrics()
-                validation_stats[
-                    "distance_to_manifold"
-                ] = self.datastack.dataset.distribution_distance(
-                    x_counterfactual_collection
+                validation_stats["distance_to_manifold"] = (
+                    self.datastack.dataset.distribution_distance(
+                        x_counterfactual_collection
+                    )
                 )
-                validation_stats[
-                    "pairwise_distance"
-                ] = self.datastack.dataset.pair_wise_distance(
-                    x_list_collection, x_counterfactual_collection
+                validation_stats["pairwise_distance"] = (
+                    self.datastack.dataset.pair_wise_distance(
+                        x_list_collection, x_counterfactual_collection
+                    )
                 )
                 validation_stats["diversity"] = self.datastack.dataset.variance(
                     x_counterfactual_collection

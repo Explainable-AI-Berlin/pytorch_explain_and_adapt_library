@@ -49,6 +49,7 @@ class StableDiffusion(EditCapableGenerator):
         class_predictions_path = os.path.join(base_path, "explainer", "predictions.csv")
         generator_dataset = get_datasets(self.config.data)[0]
         generator_dataset.task_config = self.classifier_dataset.task_config
+        import pdb; pdb.set_trace()
         Path(os.path.join(base_path, "explainer")).mkdir(exist_ok=True, parents=True)
         if not os.path.exists(class_predictions_path):
             generator_dataset.enable_url()
