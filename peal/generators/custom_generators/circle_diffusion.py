@@ -22,7 +22,10 @@ class PositionalEncoding(nn.Module):
         max_len += 1
         self.P = torch.zeros(max_len, embed_dim)
         freqs = torch.arange(max_len)[:, None] / (
-            torch.pow(10000, torch.arange(0, embed_dim, 2, dtype=torch.float32) / embed_dim))
+            torch.pow(
+                10000, torch.arange(0, embed_dim, 2, dtype=torch.float32) / embed_dim
+            )
+        )
 
         self.P[:, 0::2] = torch.sin(freqs)
         self.P[:, 1::2] = torch.cos(freqs)
@@ -118,10 +121,10 @@ class CircleDiffusionAdaptor(EditCapableGenerator):
                 steps = num_timesteps + 1
                 x = torch.linspace(0, num_timesteps, steps, dtype=torch.float64)
                 alphas_cumprod = (
-                        torch.cos(
-                            ((x / num_timesteps) + scale) / (1 + scale) * math.pi * 0.5
-                        )
-                        ** 2
+                    torch.cos(
+                        ((x / num_timesteps) + scale) / (1 + scale) * math.pi * 0.5
+                    )
+                    ** 2
                 )
                 alphas_cumprod = alphas_cumprod / alphas_cumprod[0]
                 betas = 1 - (alphas_cumprod[1:] / alphas_cumprod[:-1])
@@ -134,7 +137,7 @@ class CircleDiffusionAdaptor(EditCapableGenerator):
         self.register_buffer("alpha_bar", self.alpha.cumprod(0))
 
     def forward_diffusion(
-            self, clean_x: torch.Tensor, noise: torch.tensor, timestep: torch.Tensor
+        self, clean_x: torch.Tensor, noise: torch.tensor, timestep: torch.Tensor
     ):
         if isinstance(timestep, int):
             timestep = torch.tensor([timestep])
@@ -147,20 +150,20 @@ class CircleDiffusionAdaptor(EditCapableGenerator):
         return noisy_x
 
     def reverse_diffusion_ddpm(
-            self, noisy_x: torch.Tensor, model: nn.Module, timestep: torch.Tensor
+        self, noisy_x: torch.Tensor, model: nn.Module, timestep: torch.Tensor
     ):
         alpha_t = self.alpha[timestep].repeat(noisy_x.shape[0])[:, None]
         alpha_bar_t = self.alpha_bar[timestep].repeat(noisy_x.shape[0])[:, None]
         beta_t = 1 - alpha_t
         eps_hat = model(x=noisy_x, t=timestep)
         posterior_mean = (1 / torch.sqrt(alpha_t)) * (
-                noisy_x - (beta_t / torch.sqrt(1 - alpha_bar_t) * eps_hat)
+            noisy_x - (beta_t / torch.sqrt(1 - alpha_bar_t) * eps_hat)
         )
         z = torch.randn_like(noisy_x)
 
         if timestep > 0:
             denoised_x = (
-                    posterior_mean + torch.sqrt(beta_t) * z
+                posterior_mean + torch.sqrt(beta_t) * z
             )  # * z * (timestep > 0))  # variance = beta_t
         else:
             denoised_x = posterior_mean
@@ -176,14 +179,13 @@ class CircleDiffusionAdaptor(EditCapableGenerator):
         )
         if model_name in os.listdir(self.model_dir) and not mode == "train":
             model.load_state_dict(torch.load(self.model_path))
-            logging.info(f'Model found with path {self.model_path}')
-        elif model_name not in os.listdir(self.model_dir) and mode != 'train':
+            logging.info(f"Model found with path {self.model_path}")
+        elif model_name not in os.listdir(self.model_dir) and mode != "train":
             logging.info(
-                'Model not found. Please run train_and_load_diffusion method and set its argument mode="train" ')
-        else:
-            logging.info(
-                f'Training model with path {self.model_path}'
+                'Model not found. Please run train_and_load_diffusion method and set its argument mode="train" '
             )
+        else:
+            logging.info(f"Training model with path {self.model_path}")
 
         def diffusion_loss(model: nn.Module, clean_x: torch.Tensor) -> torch.Tensor:
             t = torch.randint(self.num_timesteps, (clean_x.shape[0],))
@@ -197,7 +199,7 @@ class CircleDiffusionAdaptor(EditCapableGenerator):
             return loss_diff
 
         def run_epoch(
-                model: nn.Module, dataloader: torch.utils.data.dataloader.DataLoader
+            model: nn.Module, dataloader: torch.utils.data.dataloader.DataLoader
         ):
             model.train()
             epoch_loss = 0.0
@@ -215,7 +217,9 @@ class CircleDiffusionAdaptor(EditCapableGenerator):
             model.train()
             # num_epochs = self.config['num_epochs']
             num_epochs = self.config.num_epochs
-            dataloader = DataLoader(self.dataset, batch_size=self.config.batch_size, shuffle=True)
+            dataloader = DataLoader(
+                self.dataset, batch_size=self.config.batch_size, shuffle=True
+            )
             learning_rate = self.config.learning_rate
             optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
@@ -259,13 +263,13 @@ class CircleDiffusionAdaptor(EditCapableGenerator):
         return x
 
     def sample_counterfactual_ddpm(
-            self,
-            clean_batch: torch.Tensor,
-            model: nn.Module,
-            classifier: nn.Module,
-            num_noise_steps: int,
-            target_classes: int,
-            classifier_grad_weight: float,
+        self,
+        clean_batch: torch.Tensor,
+        model: nn.Module,
+        classifier: nn.Module,
+        num_noise_steps: int,
+        target_classes: int,
+        classifier_grad_weight: float,
     ):
         classifier.eval()
         self.classifier = classifier
@@ -359,9 +363,15 @@ class CircleDiffusionAdaptor(EditCapableGenerator):
 
         return counterfactuals, guided_grads, unguided_grads, total_series
 
-
-    def discard_counterfactuals(self, counterfactuals, classifier, target_classes, target_confidence,
-                                minimal_counterfactuals, tolerance=0.1):
+    def discard_counterfactuals(
+        self,
+        counterfactuals,
+        classifier,
+        target_classes,
+        target_confidence,
+        minimal_counterfactuals,
+        tolerance=0.1,
+    ):
 
         # compute distance of current minimal_counterefactuals from radius 1.0
         # current_counterfactual_distance_from_manifold = torch.abs((torch.pow(minimal_counterfactuals, 2).sum(dim=-1) - 1.0))
@@ -369,14 +379,22 @@ class CircleDiffusionAdaptor(EditCapableGenerator):
         for i in range(len(counterfactuals)):
 
             # compute classifier  for all the counterfactuals for each point
-            new_counterfactuals_confidence = classifier(counterfactuals[i]).softmax(dim=-1)[:, target_classes[i]]
+            new_counterfactuals_confidence = classifier(counterfactuals[i]).softmax(
+                dim=-1
+            )[:, target_classes[i]]
 
             # check if new counterfactuals satisfy the confidence constraint
 
-            new_confidence_satisfied_indices = torch.nonzero(new_counterfactuals_confidence > target_confidence)
+            new_confidence_satisfied_indices = torch.nonzero(
+                new_counterfactuals_confidence > target_confidence
+            )
 
-            current_confidence_satisfied = classifier(minimal_counterfactuals[i:i + 1]).softmax(dim=-1)[0][
-                                               target_classes[i]].item() > target_confidence
+            current_confidence_satisfied = (
+                classifier(minimal_counterfactuals[i : i + 1])
+                .softmax(dim=-1)[0][target_classes[i]]
+                .item()
+                > target_confidence
+            )
 
             # if current counterfactual satisfies confidence and tolerance, maintain status quo
 
@@ -384,7 +402,9 @@ class CircleDiffusionAdaptor(EditCapableGenerator):
                 continue
 
             elif new_confidence_satisfied_indices.nelement() != 0:
-                minimal_counterfactuals[i] = counterfactuals[i][new_confidence_satisfied_indices[0].item()]
+                minimal_counterfactuals[i] = counterfactuals[i][
+                    new_confidence_satisfied_indices[0].item()
+                ]
 
             else:
                 minimal_counterfactuals[i] = counterfactuals[i][-1]
@@ -392,20 +412,20 @@ class CircleDiffusionAdaptor(EditCapableGenerator):
         return minimal_counterfactuals
 
     def edit(
-            self,
-            x_in: torch.Tensor,
-            target_confidence_goal: float,
-            target_classes: torch.Tensor,
-            classifier: nn.Module,
-            **kwargs,
+        self,
+        x_in: torch.Tensor,
+        target_confidence_goal: float,
+        source_classes: torch.Tensor,
+        target_classes: nn.Module,
+        classifier=None,
     ) -> Tuple[
         list[torch.Tensor], list[torch.Tensor], list[torch.Tensor], list[torch.Tensor]
     ]:
 
         self.original_sample = x_in
 
-        #scales = self.config['grad_scales']
-        #noise_steps = self.config['noise_steps_for_counterfactuals']
+        # scales = self.config['grad_scales']
+        # noise_steps = self.config['noise_steps_for_counterfactuals']
 
         scales = self.config.grad_scales
         noise_steps = self.config.noise_steps_for_counterfactuals

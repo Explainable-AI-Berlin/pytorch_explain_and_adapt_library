@@ -93,7 +93,7 @@ class DDPM(EditCapableGenerator):
     ):
         shutil.rmtree(self.model_dir, ignore_errors=True)
 
-        #dist_util.setup_dist(self.config.gpus)
+        # dist_util.setup_dist(self.config.gpus)
         logger.configure(dir=self.model_dir)
 
         schedule_sampler = create_named_schedule_sampler(
@@ -101,7 +101,9 @@ class DDPM(EditCapableGenerator):
         )
 
         if not self.config.x_selection is None:
-            self.dataset.task_config = SimpleNamespace(**{"x_selection": self.config.x_selection})
+            self.dataset.task_config = SimpleNamespace(
+                **{"x_selection": self.config.x_selection}
+            )
             print("self.dataset.task_config1")
             print("self.dataset.task_config1")
             print("self.dataset.task_config1")
@@ -121,7 +123,9 @@ class DDPM(EditCapableGenerator):
 
         writer = SummaryWriter(os.path.join(self.model_dir, "logs"))
         if not self.config.x_selection is None:
-            self.dataset.task_config = SimpleNamespace(**{"x_selection": self.config.x_selection})
+            self.dataset.task_config = SimpleNamespace(
+                **{"x_selection": self.config.x_selection}
+            )
             print("self.dataset.task_config2")
             print("self.dataset.task_config2")
             print("self.dataset.task_config2")
@@ -130,9 +134,7 @@ class DDPM(EditCapableGenerator):
             print(self.dataset.task_config)
 
         log_images_to_writer(dataloader, writer, "train")
-        data = iter(
-            dataloader
-        )
+        data = iter(dataloader)
 
         logger.log("training...")
         train_loop = TrainLoop(
@@ -166,6 +168,7 @@ class DDPM(EditCapableGenerator):
         classifier_dataset: PealDataset,
         pbar=None,
         mode="",
+        base_path="",
     ):
         dataset = [
             (
