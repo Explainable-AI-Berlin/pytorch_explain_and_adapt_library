@@ -14,3 +14,4 @@
 'confounder_probability'  : 0.5
 'confounding_factors'     : []
 'split' : [0.8, 0.9]
+'crop_size':

@@ -1,4 +1,5 @@
 import os
+import random
 
 import torch
 from torch.utils.tensorboard import SummaryWriter
@@ -23,6 +24,7 @@ class DiveTCVAE(InvertibleGenerator):
         super().__init__()
         self.config = load_yaml_config(config)
         self.config.savedir = self.config.base_path  # hacky
+        self.config.crop_size = None
         self.exp_dict = self.config.__dict__
         self.tcvae = TCVAE(exp_dict=self.exp_dict, savedir=self.exp_dict["savedir"])
         self.train_dataset, self.val_dataset, _ = get_datasets(self.config.data)
@@ -96,8 +98,9 @@ class DiveTCVAE(InvertibleGenerator):
             os.makedirs(os.path.join(self.config.base_path, str(epoch)), exist_ok=True)
             torch.save(self.tcvae.state_dict(), os.path.join(self.config.base_path, str(epoch), "model.pt"))
             generated_samples = self.sample_x(batch_size=100)
-            image_pil = transforms.ToPILImage()(generated_samples[0, :, :])
-            image_pil.save(os.path.join(self.config.base_path, str(epoch), "samples.png"))
+            for i in range(5):
+                image_pil = transforms.ToPILImage()((generated_samples[random.randint(0, 99),:, :, :]+1)/2)
+                image_pil.save(os.path.join(self.config.base_path, str(epoch), f"sample{i}.png"))
             self.fid.update((255 * generated_samples.to("cuda")).to(torch.uint8), real=False)
             writer.add_scalar("fid", float(self.fid.compute()), global_step=epoch)
 
