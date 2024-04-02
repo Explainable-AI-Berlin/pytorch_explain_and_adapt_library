@@ -1,0 +1,9 @@
+dataset_path            : /home/space/datasets/peal/datasets/celeba
+num_samples             : 44000
+split                   : [0.8,0.9]
+input_type              : image
+input_size              : [3, 128, 128]
+output_type             : multiclass
+output_size             : [41]
+confounder_probability  : 0.80
+confounding_factors     : [Young, Smiling] #copyrighttag]

@@ -11,7 +11,8 @@ from peal.data.transformations import (
     RandomRotation,
     Normalization,
     IdentityNormalization,
-    SetChannels, RandomResizeCropPad,
+    SetChannels,
+    RandomResizeCropPad,
 )
 from peal.data.datasets import (
     Image2MixedDataset,
@@ -31,6 +32,7 @@ def get_datasets(
     task_config: TaskConfig = None,
     return_dict: bool = False,
     test_config: DataConfig = None,
+    data_dir: str = None,
 ):
     """
     This function is used to get the datasets for training, validation and testing.
@@ -103,7 +105,9 @@ def get_datasets(
 
         if "color_jitter" in config.invariances:
             transform_list_train.append(
-                transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1)
+                transforms.ColorJitter(
+                    brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1
+                )
             )
 
         if "sharpness" in config.invariances:
@@ -195,10 +199,20 @@ def get_datasets(
     transform_test = transforms.Compose([transform_test, normalization])
 
     train_data = dataset(
-        root_dir=base_dir, mode="train", config=config, transform=transform_train, return_dict=return_dict
+        root_dir=base_dir,
+        mode="train",
+        config=config,
+        transform=transform_train,
+        return_dict=return_dict,
+        data_dir=data_dir,
     )
     val_data = dataset(
-        root_dir=base_dir, mode="val", config=config, transform=transform_validation, return_dict=return_dict
+        root_dir=base_dir,
+        mode="val",
+        config=config,
+        transform=transform_validation,
+        return_dict=return_dict,
+        data_dir=data_dir,
     )
     # TODO this is super dirty!!!
     if test_config.split[1] == 1.0:
@@ -206,7 +220,10 @@ def get_datasets(
 
     else:
         test_data = dataset(
-            mode="test", config=test_config, transform=transform_test, return_dict=return_dict
+            mode="test",
+            config=test_config,
+            transform=transform_test,
+            return_dict=return_dict,
         )
 
     # this is kind of dirty

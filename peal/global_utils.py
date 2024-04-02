@@ -20,14 +20,10 @@ def find_subclasses(base_class, directory):
     subclasses = []
 
     def check_module(module_name):
-        try:
-            module = importlib.import_module(module_name)
-            for name, obj in inspect.getmembers(module):
-                if inspect.isclass(obj) and issubclass(obj, base_class):
-                    subclasses.append(obj)
-
-        except Exception:
-            pass
+        module = importlib.import_module(module_name)
+        for name, obj in inspect.getmembers(module):
+            if inspect.isclass(obj) and issubclass(obj, base_class):
+                subclasses.append(obj)
 
     project_base_dir = get_project_resource_dir()
     for dirpath, dirnames, filenames in os.walk(directory):
@@ -189,13 +185,14 @@ def _load_yaml_config(config_path):
         for key in config.keys():
             if isinstance(config[key], str) and config[key][-5:] == ".yaml":
                 # TODO can this be made interoperable with windows again?
-                #config[key] = _load_yaml_config(os.path.join(*config[key].split("/")))
+                # config[key] = _load_yaml_config(os.path.join(*config[key].split("/")))
                 config[key] = _load_yaml_config(config[key])
 
         return config
 
     else:
         raise Exception(config_path + " has no valid ending!")
+
 
 def get_config_model(config_data):
     config_class_str = config_data[config_data["category"] + "_type"] + "Config"
@@ -205,7 +202,12 @@ def get_config_model(config_data):
         "configs",
         config_data["category"] + "s",
     )
-    module_path = os.path.join("peal", "configs", config_data["category"] + "s", config_data["category"] + "_config")
+    module_path = os.path.join(
+        "peal",
+        "configs",
+        config_data["category"] + "s",
+        config_data["category"] + "_config",
+    )
     module_name = module_path.replace("/", ".")
     module = importlib.import_module(module_name)
     superclass = None
@@ -220,13 +222,10 @@ def get_config_model(config_data):
     class_dict = {
         generator_class.__name__: generator_class for generator_class in class_list
     }
-    try:
-        config_model = class_dict[config_class_str]
-
-    except Exception as e:
-        import pdb; pdb.set_trace()
+    config_model = class_dict[config_class_str]
 
     return config_model
+
 
 def load_yaml_config(config_path, config_model=None):
     config_data = _load_yaml_config(config_path)

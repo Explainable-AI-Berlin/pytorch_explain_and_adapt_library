@@ -8,6 +8,7 @@ from peal.configs.explainers.explainer_config import ExplainerConfig
 from peal.data.dataset_interfaces import PealDataset
 from peal.generators.abstract_interface import Generator
 
+
 class InvertibleGenerator(Generator):
     def encode(self, x):
         """
@@ -84,12 +85,14 @@ class EditCapableGenerator(Generator):
         classifier_dataset: PealDataset,
         pbar=None,
         mode="",
+        base_path="",
     ) -> Tuple[
         list[torch.Tensor], list[torch.Tensor], list[torch.Tensor], list[torch.Tensor]
     ]:
         """
         This function edits the input to match the target confidence goal and target classes
         Args:
+            base_path:
             x_in: The input
             target_confidence_goal: The target confidence goal
             source_classes: The source classes

@@ -20,6 +20,7 @@ from peal.training.trainers import ModelTrainer
 def get_generator(
     generator: Union[InvertibleGenerator, str, dict],
     device: Union[str, torch.device] = "cuda",
+    classifier_dataset=None,
 ) -> InvertibleGenerator:
     """
     This function returns a generator.
@@ -52,10 +53,14 @@ def get_generator(
             generator_class.__name__: generator_class
             for generator_class in generator_class_list
         }
-        if hasattr(generator_config, "generator_type") and generator_config.generator_type in generator_class_dict.keys():
+        if (
+            hasattr(generator_config, "generator_type")
+            and generator_config.generator_type in generator_class_dict.keys()
+        ):
             generator_out = generator_class_dict[generator_config.generator_type](
                 config=generator_config,
                 device=device,
+                classifier_dataset=classifier_dataset,
             )
 
         """elif hasattr(generator_config.architecture, "n_flow"):
