@@ -5,6 +5,7 @@ from diffusers import StableDiffusionPipeline
 from diffusers import DDIMScheduler
 
 from peal.configs.data.data_config import DataConfig
+from peal.configs.editors.ddpm_inversion_config import DDPMInversionConfig
 from peal.data.datasets import Image2MixedDataset
 from peal.dependencies.ddpm_inversion.prompt_to_prompt.ptp_classes import AttentionStore
 from peal.dependencies.ddpm_inversion.prompt_to_prompt.ptp_utils import (
@@ -18,10 +19,10 @@ from peal.global_utils import load_yaml_config
 
 
 class DDPMInversion:
-    def __init__(self, config="<PEAL_BASE>/configs/explainers/ddpm_inversion.yaml"):
+    def __init__(self, config=DDPMInversionConfig()):
         self.config = load_yaml_config(config)
-        self.config.data = DataConfig(**self.config.data)
-        if not self.config.data.normalization is None:
+        #self.config.data = DataConfig(**self.config.data)
+        if not self.config.data is None and self.config.data.normalization is None:
             self.project_to_pytorch_default = lambda x: (
                 x * torch.tensor(self.config.data.normalization[1])
                 + torch.tensor(self.config.data.normalization[0])

@@ -16,6 +16,7 @@ import torch.nn.functional as F
 from diffusers import DDIMInverseScheduler, DDIMScheduler
 
 from peal.data.dataset_interfaces import PealDataset
+from peal.dependencies.ddpm_inversion.ddpm_inversion import DDPMInversion
 from peal.dependencies.time.core.edict import EDICT
 from peal.dependencies.time.core.utils import (
     Print,
@@ -113,7 +114,7 @@ def generate_time_counterfactuals(args=None):
         with open("generate_ce.yaml", "w") as f:
             yaml.dump(vars(args), f, default_flow_style=False)
 
-    print(args)
+    #print(args)
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
     torch_dtype = torch.float16 if args.use_fp16 else torch.float32
     device = torch.device("cuda")
@@ -143,27 +144,29 @@ def generate_time_counterfactuals(args=None):
     # =================================================================
     # Instantiate Pipeline
     Print("Loading pipeline")
-    pipeline = EDICT.from_pretrained(
-        args.sd_model,
-        torch_dtype=torch_dtype,
-        safety_checker=None,
-        feature_extractor=None,
-        requires_safety_checker=False,
-    )
-    load_tokens_and_embeddings(sd_model=pipeline, files=args.embedding_files)
-    pipeline.reverse_scheduler = DDIMInverseScheduler.from_config(
-        pipeline.scheduler.config
-    )
-    pipeline.scheduler = DDIMScheduler.from_config(pipeline.scheduler.config)
-    pipeline.to(device)
-    pipeline.text_encoder.eval()  # just in case
-    pipeline.set_progress_bar_config(disable=True)  # disable anoying progress bar
+    if args.editor is None:
+        if args.editing_type == "edict":
+            pipeline = EDICT.from_pretrained(
+                args.sd_model,
+                torch_dtype=torch_dtype,
+                safety_checker=None,
+                feature_extractor=None,
+                requires_safety_checker=False,
+            )
+            load_tokens_and_embeddings(sd_model=pipeline, files=args.embedding_files)
+            pipeline.reverse_scheduler = DDIMInverseScheduler.from_config(
+                pipeline.scheduler.config
+            )
+            pipeline.scheduler = DDIMScheduler.from_config(pipeline.scheduler.config)
+            pipeline.to(device)
+            pipeline.text_encoder.eval()  # just in case
+            pipeline.set_progress_bar_config(disable=True)  # disable anoying progress bar
 
-    if args.enable_xformers_memory_efficient_attention:
-        """
-        Must have 0.0.17>xformer.__version__
-        """
-        pipeline.unet.enable_xformers_memory_efficient_attention()
+            if args.enable_xformers_memory_efficient_attention:
+                """
+                Must have 0.0.17>xformer.__version__
+                """
+                pipeline.unet.enable_xformers_memory_efficient_attention()
 
     # =================================================================
     # Loading Dataset
@@ -260,7 +263,15 @@ def generate_time_counterfactuals(args=None):
                     else torch.long
                 ),
             )
+            print("[img.min(), img.max()]")
+            print([img.min(), img.max()])
+            print([img.min(), img.max()])
+            print([img.min(), img.max()])
             img_orig = postprocess(img, args.classifier_image_size)
+            print("[img_orig.min(), img_orig.max()]")
+            print([img_orig.min(), img_orig.max()])
+            print([img_orig.min(), img_orig.max()])
+            print([img_orig.min(), img_orig.max()])
             c_log, c_pred = get_prediction(
                 classifier=classifier,
                 img=img_orig,
@@ -304,7 +315,7 @@ def generate_time_counterfactuals(args=None):
                 args=args,
                 target=t.item(),
                 pred=p.item(),
-                binary=args.dataset in BINARYDATASET,
+                binary=args.dataset in BINARYDATASET or isinstance(args.dataset, list)
             )
             target_prompts.append(t)
             source_prompts.append(n)
@@ -324,26 +335,14 @@ def generate_time_counterfactuals(args=None):
             sp = [s for i, s in enumerate(source_prompts) if not transformed[i].item()]
 
             # Inversion
-            xt, yt, _, _, feats = pipeline.Invert(
-                prompt=source_prompts,
-                prompt_embeds=None,
-                image=img[~transformed],
-                num_inference_steps=nis,
-                total_num_inference_steps=args.total_num_inference_steps,
-                guidance_scale=gsi,
-                p=args.p,
-                return_pil=False,
-                negative_prompt=tp if args.use_negative_guidance_inverse else None,
-                l2=args.l2,
-            )
+            if not args.editor is None:
+                cf = args.editor.run(x = img, prompt_tar_list = tp, prompt_src = sp)
 
-            rec = None
-            if args.recover:
-                rec = pipeline.Denoise(
+            elif args.editing_type == "edict":
+                xt, yt, _, _, feats = pipeline.Invert(
                     prompt=source_prompts,
                     prompt_embeds=None,
-                    xt=xt,
-                    yt=yt,
+                    image=img[~transformed],
                     num_inference_steps=nis,
                     total_num_inference_steps=args.total_num_inference_steps,
                     guidance_scale=gsi,
@@ -351,27 +350,52 @@ def generate_time_counterfactuals(args=None):
                     return_pil=False,
                     negative_prompt=tp if args.use_negative_guidance_inverse else None,
                     l2=args.l2,
+                )
+
+                rec = None
+                if args.recover:
+                    rec = pipeline.Denoise(
+                        prompt=source_prompts,
+                        prompt_embeds=None,
+                        xt=xt,
+                        yt=yt,
+                        num_inference_steps=nis,
+                        total_num_inference_steps=args.total_num_inference_steps,
+                        guidance_scale=gsi,
+                        p=args.p,
+                        return_pil=False,
+                        negative_prompt=tp if args.use_negative_guidance_inverse else None,
+                        l2=args.l2,
+                        feats=feats,
+                    )
+                    rec = postprocess(rec, args.classifier_image_size)
+
+                # Denoising
+                cf = pipeline.Denoise(
+                    prompt=target_prompts,
+                    prompt_embeds=None,
+                    xt=xt,
+                    yt=yt,
+                    num_inference_steps=nis,
+                    total_num_inference_steps=args.total_num_inference_steps,
+                    guidance_scale=gsd,
+                    p=args.p,
+                    return_pil=False,
+                    negative_prompt=sp if args.use_negative_guidance_denoise else None,
+                    l2=args.l2,
                     feats=feats,
                 )
-                rec = postprocess(rec, args.classifier_image_size)
 
-            # Denoising
-            cf = pipeline.Denoise(
-                prompt=target_prompts,
-                prompt_embeds=None,
-                xt=xt,
-                yt=yt,
-                num_inference_steps=nis,
-                total_num_inference_steps=args.total_num_inference_steps,
-                guidance_scale=gsd,
-                p=args.p,
-                return_pil=False,
-                negative_prompt=sp if args.use_negative_guidance_denoise else None,
-                l2=args.l2,
-                feats=feats,
-            )
-            cf = postprocess(cf, args.classifier_image_size)
             counterfactuals.append(cf)
+            print("[cf.min(), cf.max()]")
+            print([cf.min(), cf.max()])
+            print([cf.min(), cf.max()])
+            print([cf.min(), cf.max()])
+            cf = postprocess(cf, args.classifier_image_size)
+            print("[cf_postprocessed.min(), cf_postprocessed.max()]")
+            print([cf.min(), cf.max()])
+            print([cf.min(), cf.max()])
+            print([cf.min(), cf.max()])
 
             if not isinstance(args.dataset, list):
                 # check if explanation flipped
