@@ -80,8 +80,13 @@ class DiveTCVAE(InvertibleGenerator):
         score_list = []
 
         for epoch in range(self.config.max_epoch):
+            os.makedirs(os.path.join(self.config.base_path, str(epoch)), exist_ok=True)
             train_dict = self.tcvae.train_on_loader(epoch, train_dataloader)
-            val_dict = self.tcvae.train_on_loader(epoch, val_dataloader)
+            val_dict = self.tcvae.val_on_loader(epoch, val_dataloader, vis_flag=True)
+
+            Image.fromarray(val_dict['val_images']).save(os.path.join(self.config.base_path, str(epoch), "reconstruction.png"), "PNG")
+            del val_dict['val_images']
+
 
             score_dict = {}
             score_dict.update(self.tcvae.get_lr())
@@ -94,8 +99,6 @@ class DiveTCVAE(InvertibleGenerator):
             # score_list += [score_dict]
 
             # Report
-            # score_df = pd.DataFrame(score_list)
-            os.makedirs(os.path.join(self.config.base_path, str(epoch)), exist_ok=True)
             torch.save(self.tcvae.state_dict(), os.path.join(self.config.base_path, str(epoch), "model.pt"))
             generated_samples = self.sample_x(batch_size=100)
             for i in range(5):
