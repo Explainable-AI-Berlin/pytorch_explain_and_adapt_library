@@ -94,9 +94,10 @@ class DDPMInversion:
         x_counterfactuals = torchvision.transforms.Resize(x.shape[2:])(
             x_counterfactuals
         )
-        x_counterfactuals = torch.clamp(self.project_to_pytorch_default(
+        """x_counterfactuals = torch.clamp(self.project_to_pytorch_default(
             x_counterfactuals
-        ), 0, 1)
+        ), 0, 1)"""
+        print("DDPM: [x_counterfactuals.min(), x_counterfactuals.max()]")
         print([x_counterfactuals.min(), x_counterfactuals.max()])
 
         return x_counterfactuals

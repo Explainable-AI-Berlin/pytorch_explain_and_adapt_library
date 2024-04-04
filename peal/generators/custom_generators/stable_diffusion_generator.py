@@ -13,6 +13,7 @@ from torch import nn
 from PIL import Image
 from torchvision.transforms import ToTensor
 
+from peal.configs.editors.ddpm_inversion_config import DDPMInversionConfig
 from peal.data.dataset_factory import get_datasets
 from peal.data.datasets import Image2MixedDataset
 from peal.dependencies.ddpm_inversion.ddpm_inversion import DDPMInversion
@@ -105,7 +106,10 @@ class StableDiffusion(EditCapableGenerator):
 
         if explainer_config.editing_type == "ddpm_inversion":
             # TODO somehow the config should be possible to influence
-            self.editor = DDPMInversion()
+            ddpm_inversion_config = DDPMInversionConfig()
+            #ddpm_inversion_config.cfg_scale_src = 3.0
+            ddpm_inversion_config.cfg_scale_tar = 6.0
+            self.editor = DDPMInversion(ddpm_inversion_config)
             embedding_files=[
                 os.path.join(base_path, "explainer", "context_embedding"),
                 os.path.join(base_path, "explainer", "class_token0"),
