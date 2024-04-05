@@ -6,14 +6,14 @@ finetune_iterations                  :  1
 min_train_samples                    :  400
 max_validation_samples               :  100
 tracking_level                       :  2
-max_test_batches                     :  1 #100
 continuous_learning                  :  "finetune"
 replace_model                        :  True
 use_visualization                    :  False #True
 calculate_group_accuracies           :  True
 explainer                            :  <PEAL_BASE>/configs/explainers/time_default.yaml
 training                             :  <PEAL_BASE>/configs/training/img_classifier.yaml
-data                                 :  <PEAL_BASE>/configs/data/Young_confounding_OverdrawnSmiling_celeba500_poisened100.yaml
+#data                                 :  <PEAL_BASE>/configs/data/Young_confounding_OverdrawnSmiling_celeba500_poisened100.yaml
+data                                 :  <PEAL_BASE>/configs/data/Young_confounding_Smiling_celeba500_poisened100.yaml
 test_data                            :  <PEAL_BASE>/configs/data/Young_confounding_Smiling_celeba.yaml
 student                              :  /home/space/datasets/peal/peal_runs/Young_confounding_Smiling_celeba/classifier_poisened100/model.cpl
 teacher                              :  /home/space/datasets/peal/peal_runs/Young_confounding_Smiling_celeba/classifier_unpoisened/model.cpl

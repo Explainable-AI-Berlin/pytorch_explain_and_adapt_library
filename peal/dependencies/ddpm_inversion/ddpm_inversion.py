@@ -45,7 +45,7 @@ class DDPMInversion:
         self.pipe.scheduler.set_timesteps(self.config.num_diffusion_steps)
 
     def run(self, x, prompt_tar_list, prompt_src):
-        x = self.project_from_pytorch_default(x)
+        #x = self.project_from_pytorch_default(x)
         # TODO do i have to upsample here?
         x0 = torchvision.transforms.Resize([512, 512])(
             torch.clone(x).to(self.device)

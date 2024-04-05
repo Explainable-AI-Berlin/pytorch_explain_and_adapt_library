@@ -114,7 +114,7 @@ def generate_time_counterfactuals(args=None):
         with open("generate_ce.yaml", "w") as f:
             yaml.dump(vars(args), f, default_flow_style=False)
 
-    #print(args)
+    # print(args)
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
     torch_dtype = torch.float16 if args.use_fp16 else torch.float32
     device = torch.device("cuda")
@@ -160,7 +160,9 @@ def generate_time_counterfactuals(args=None):
             pipeline.scheduler = DDIMScheduler.from_config(pipeline.scheduler.config)
             pipeline.to(device)
             pipeline.text_encoder.eval()  # just in case
-            pipeline.set_progress_bar_config(disable=True)  # disable anoying progress bar
+            pipeline.set_progress_bar_config(
+                disable=True
+            )  # disable anoying progress bar
 
             if args.enable_xformers_memory_efficient_attention:
                 """
@@ -315,7 +317,7 @@ def generate_time_counterfactuals(args=None):
                 args=args,
                 target=t.item(),
                 pred=p.item(),
-                binary=args.dataset in BINARYDATASET or isinstance(args.dataset, list)
+                binary=args.dataset in BINARYDATASET or isinstance(args.dataset, list),
             )
             target_prompts.append(t)
             source_prompts.append(n)
@@ -335,8 +337,14 @@ def generate_time_counterfactuals(args=None):
             sp = [s for i, s in enumerate(source_prompts) if not transformed[i].item()]
 
             # Inversion
+            print(args.editor)
+            print(args.editor)
+            print(args.editor)
             if not args.editor is None:
-                cf = args.editor.run(x = img, prompt_tar_list = tp, prompt_src = sp)
+                print('DDPM inversion')
+                print('DDPM inversion')
+                print('DDPM inversion')
+                cf = args.editor.run(x=img, prompt_tar_list=tp, prompt_src=sp)
 
             elif args.editing_type == "edict":
                 xt, yt, _, _, feats = pipeline.Invert(
@@ -364,7 +372,9 @@ def generate_time_counterfactuals(args=None):
                         guidance_scale=gsi,
                         p=args.p,
                         return_pil=False,
-                        negative_prompt=tp if args.use_negative_guidance_inverse else None,
+                        negative_prompt=tp
+                        if args.use_negative_guidance_inverse
+                        else None,
                         l2=args.l2,
                         feats=feats,
                     )

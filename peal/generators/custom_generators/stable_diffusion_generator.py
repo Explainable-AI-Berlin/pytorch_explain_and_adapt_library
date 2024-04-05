@@ -75,13 +75,13 @@ class StableDiffusion(EditCapableGenerator):
         )
         if not os.path.exists(context_embedding_path):
             train_context_embedding_args = types.SimpleNamespace(
-                sd_model="CompVis/stable-diffusion-v1-4",
                 embedding_files=[],
                 output_path=context_embedding_path,
                 dataset=self.generator_dataset,
                 partition="train",
                 phase="context",
                 batch_size=explainer_config.train_batch_size,
+                custom_tokens=explainer_config.custom_tokens_context,
                 **explainer_config.__dict__
             )
             training(train_context_embedding_args)
@@ -108,7 +108,7 @@ class StableDiffusion(EditCapableGenerator):
             # TODO somehow the config should be possible to influence
             ddpm_inversion_config = DDPMInversionConfig()
             #ddpm_inversion_config.cfg_scale_src = 3.0
-            ddpm_inversion_config.cfg_scale_tar = 6.0
+            ddpm_inversion_config.cfg_scale_tar = 4.0
             self.editor = DDPMInversion(ddpm_inversion_config)
             embedding_files=[
                 os.path.join(base_path, "explainer", "context_embedding"),
