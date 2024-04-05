@@ -8,10 +8,9 @@ from diffusers.models.attention_processor import Attention
 def hasnan(t):
     return torch.any(torch.isnan(t))
 
+
 class EDICT(StableDiffusionPipeline):
-
     def decode_latents(self, latents):
-
         latents = 1 / self.vae.config.scaling_factor * latents
         image = self.vae.decode(latents, return_dict=False)[0]
         # image = (image / 2 + 0.5).clamp(0, 1)
@@ -33,9 +32,14 @@ class EDICT(StableDiffusionPipeline):
             truncation=True,
             return_tensors="pt",
         )
-        text_input_ids = text_inputs.input_ids.to(self._execution_device, dtype=torch.long)
+        text_input_ids = text_inputs.input_ids.to(
+            self._execution_device, dtype=torch.long
+        )
 
-        if hasattr(self.text_encoder.config, "use_attention_mask") and self.text_encoder.config.use_attention_mask:
+        if (
+            hasattr(self.text_encoder.config, "use_attention_mask")
+            and self.text_encoder.config.use_attention_mask
+        ):
             attention_mask = text_inputs.attention_mask.to(self._execution_device)
         else:
             attention_mask = None
@@ -53,14 +57,16 @@ class EDICT(StableDiffusionPipeline):
         prompt_embeds,
         do_classifier_free_guidance,
     ):
-        assert (prompt is not None) != (prompt_embeds is not None), 'only "prompt" or "prompt_embeds" can be None, not both or neither'
+        assert (prompt is not None) != (
+            prompt_embeds is not None
+        ), 'only "prompt" or "prompt_embeds" can be None, not both or neither'
 
         if prompt_embeds is None:
             prompt_embeds = self.encode_string(prompt=prompt)
 
         uncond = None
         if do_classifier_free_guidance:
-            uncond = self.encode_string(prompt='')
+            uncond = self.encode_string(prompt="")
             uncond = uncond.expand(prompt_embeds.size(0), -1, -1)
 
         return prompt_embeds, uncond
@@ -82,25 +88,27 @@ class EDICT(StableDiffusionPipeline):
         eta=0.0,
         generator=None,
         cross_attention_kwargs=None,
-
         decode=True,
         return_pil=True,
-
         # EDICT inputs
         p=0.93,
         negative_prompt=None,
         negative_prompt_embeds=None,
         l2=0.0,
     ):
-        assert hasattr(self, 'reverse_scheduler'), 'Pipeline must has "reverse_scheduler" scheduler. Initialize it with pipeline.reverse_scheduler = DDIMInverseScheduler'
+        assert hasattr(
+            self, "reverse_scheduler"
+        ), 'Pipeline must has "reverse_scheduler" scheduler. Initialize it with pipeline.reverse_scheduler = DDIMInverseScheduler'
 
         do_classifier_free_guidance = guidance_scale != 1.0
-        do_negative_guidance = (negative_prompt is not None) or (negative_prompt_embeds is not None)
+        do_negative_guidance = (negative_prompt is not None) or (
+            negative_prompt_embeds is not None
+        )
 
         # Prepare variables
         device = self._execution_device
         # extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta)
-        extra_step_kwargs = {'eta': eta}
+        extra_step_kwargs = {"eta": eta}
 
         # Prepare timesteps
         self.reverse_scheduler.set_timesteps(total_num_inference_steps, device=device)
@@ -122,7 +130,8 @@ class EDICT(StableDiffusionPipeline):
         cond, uncond = self.encode_prompt(
             prompt=prompt,
             prompt_embeds=prompt_embeds,
-            do_classifier_free_guidance=do_classifier_free_guidance and not do_negative_guidance,
+            do_classifier_free_guidance=do_classifier_free_guidance
+            and not do_negative_guidance,
         )
 
         if do_negative_guidance and do_classifier_free_guidance:
@@ -134,8 +143,9 @@ class EDICT(StableDiffusionPipeline):
 
         feats = {} if (l2 > 0) else None
 
-        for t in timesteps[:num_inference_steps]:  # still need to set this to something intermediate
-            
+        for t in timesteps[
+            :num_inference_steps
+        ]:  # still need to set this to something intermediate
             # Stabilization
             yt = (yt - (1 - p) * xt) / p
             xt = (xt - (1 - p) * yt) / p
@@ -144,7 +154,7 @@ class EDICT(StableDiffusionPipeline):
                 xt,
                 t,
                 encoder_hidden_states=cond,
-                cross_attention_kwargs=cross_attention_kwargs
+                cross_attention_kwargs=cross_attention_kwargs,
             ).sample
 
             if do_classifier_free_guidance:
@@ -152,7 +162,7 @@ class EDICT(StableDiffusionPipeline):
                     xt,
                     t,
                     encoder_hidden_states=uncond,
-                    cross_attention_kwargs=cross_attention_kwargs
+                    cross_attention_kwargs=cross_attention_kwargs,
                 ).sample
 
                 eps = eps_uncond + guidance_scale * (eps - eps_uncond)
@@ -163,7 +173,7 @@ class EDICT(StableDiffusionPipeline):
                 yt,
                 t,
                 encoder_hidden_states=cond,
-                cross_attention_kwargs=cross_attention_kwargs
+                cross_attention_kwargs=cross_attention_kwargs,
             ).sample
 
             if do_classifier_free_guidance:
@@ -171,15 +181,17 @@ class EDICT(StableDiffusionPipeline):
                     yt,
                     t,
                     encoder_hidden_states=uncond,
-                    cross_attention_kwargs=cross_attention_kwargs
+                    cross_attention_kwargs=cross_attention_kwargs,
                 ).sample
                 eps = eps_uncond + guidance_scale * (eps - eps_uncond)
 
             xt = self.reverse_scheduler.step(eps, t, xt, eta=eta).prev_sample
 
             if torch.any(torch.isnan(xt)) or torch.any(torch.isnan(yt)):
-                print('Found nan!')
-                import ipdb; ipdb.set_trace()
+                print("Found nan!")
+                import ipdb
+
+                ipdb.set_trace()
 
             if l2 > 0:
                 feats[t.item()] = [xt.detach().cpu(), yt.detach().cpu()]
@@ -190,7 +202,13 @@ class EDICT(StableDiffusionPipeline):
             if return_pil:
                 xt_dec = self.numpy_to_pil(xt_dec)
 
-        return xt, yt, x0_dec, xt_dec, feats  # Return cond and uncond embeddings just in case
+        return (
+            xt,
+            yt,
+            x0_dec,
+            xt_dec,
+            feats,
+        )  # Return cond and uncond embeddings just in case
 
     def Denoise(
         self,
@@ -204,27 +222,31 @@ class EDICT(StableDiffusionPipeline):
         eta=0.0,
         generator=None,
         cross_attention_kwargs=None,
-
         decode=True,
         return_pil=True,
-
         # EDICT inputs
         p=0.93,
         negative_prompt=None,
         negative_prompt_embeds=None,
         l2=0.0,
-        feats=None
+        feats=None,
     ):
-        assert hasattr(self, 'reverse_scheduler'), 'Pipeline must has "reverse_scheduler" scheduler. Initialize it with pipeline.reverse_scheduler = DDIMInverseScheduler'
-        assert not ((feats is None) and (l2 > 0)), 'If l2 is higher than 0, then feats should be differennt than None'
+        assert hasattr(
+            self, "reverse_scheduler"
+        ), 'Pipeline must has "reverse_scheduler" scheduler. Initialize it with pipeline.reverse_scheduler = DDIMInverseScheduler'
+        assert not (
+            (feats is None) and (l2 > 0)
+        ), "If l2 is higher than 0, then feats should be differennt than None"
 
         do_classifier_free_guidance = guidance_scale != 1.0
-        do_negative_guidance = negative_prompt is not None or negative_prompt_embeds is not None
+        do_negative_guidance = (
+            negative_prompt is not None or negative_prompt_embeds is not None
+        )
 
         # Prepare variables
         device = self._execution_device
         # extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta)
-        extra_step_kwargs = {'eta': eta}
+        extra_step_kwargs = {"eta": eta}
 
         # Prepare timesteps
         self.scheduler.set_timesteps(total_num_inference_steps, device=device)
@@ -234,7 +256,8 @@ class EDICT(StableDiffusionPipeline):
         cond, uncond = self.encode_prompt(
             prompt=prompt,
             prompt_embeds=prompt_embeds,
-            do_classifier_free_guidance=do_classifier_free_guidance and not do_negative_guidance,
+            do_classifier_free_guidance=do_classifier_free_guidance
+            and not do_negative_guidance,
         )
 
         if do_negative_guidance and do_classifier_free_guidance:
@@ -245,7 +268,6 @@ class EDICT(StableDiffusionPipeline):
             )
 
         for t in timesteps[-num_inference_steps:]:
-
             # update l2 loss
             if l2 > 0.0:
                 # xt = l2 * xt + (1 - l2) * feats[t.item()][0]
@@ -257,7 +279,7 @@ class EDICT(StableDiffusionPipeline):
                 yt,
                 t,
                 encoder_hidden_states=cond,
-                cross_attention_kwargs=cross_attention_kwargs
+                cross_attention_kwargs=cross_attention_kwargs,
             ).sample
 
             if do_classifier_free_guidance:
@@ -265,10 +287,9 @@ class EDICT(StableDiffusionPipeline):
                     yt,
                     t,
                     encoder_hidden_states=uncond,
-                    cross_attention_kwargs=cross_attention_kwargs
+                    cross_attention_kwargs=cross_attention_kwargs,
                 ).sample
                 eps = eps_uncond + guidance_scale * (eps - eps_uncond)
-            
 
             xt = self.scheduler.step(eps, t, xt, eta=eta).prev_sample
 
@@ -276,7 +297,7 @@ class EDICT(StableDiffusionPipeline):
                 xt,
                 t,
                 encoder_hidden_states=cond,
-                cross_attention_kwargs=cross_attention_kwargs
+                cross_attention_kwargs=cross_attention_kwargs,
             ).sample
 
             if do_classifier_free_guidance:
@@ -284,9 +305,9 @@ class EDICT(StableDiffusionPipeline):
                     xt,
                     t,
                     encoder_hidden_states=uncond,
-                    cross_attention_kwargs=cross_attention_kwargs
+                    cross_attention_kwargs=cross_attention_kwargs,
                 ).sample
-                
+
                 eps = eps_uncond + guidance_scale * (eps - eps_uncond)
 
             yt = self.scheduler.step(eps, t, yt, eta=eta).prev_sample
@@ -300,4 +321,3 @@ class EDICT(StableDiffusionPipeline):
             decoded = self.numpy_to_pil(decoded)
 
         return decoded
-

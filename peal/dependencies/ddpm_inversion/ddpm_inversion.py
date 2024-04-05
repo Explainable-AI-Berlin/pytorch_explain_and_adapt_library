@@ -5,6 +5,7 @@ from diffusers import StableDiffusionPipeline
 from diffusers import DDIMScheduler
 
 from peal.configs.data.data_config import DataConfig
+from peal.configs.editors.ddpm_inversion_config import DDPMInversionConfig
 from peal.data.datasets import Image2MixedDataset
 from peal.dependencies.ddpm_inversion.prompt_to_prompt.ptp_classes import AttentionStore
 from peal.dependencies.ddpm_inversion.prompt_to_prompt.ptp_utils import (
@@ -18,10 +19,10 @@ from peal.global_utils import load_yaml_config
 
 
 class DDPMInversion:
-    def __init__(self, config="<PEAL_BASE>/configs/explainers/ddpm_inversion.yaml"):
+    def __init__(self, config=DDPMInversionConfig()):
         self.config = load_yaml_config(config)
-        self.config.data = DataConfig(**self.config.data)
-        if not self.config.data.normalization is None:
+        #self.config.data = DataConfig(**self.config.data)
+        if not self.config.data is None and self.config.data.normalization is None:
             self.project_to_pytorch_default = lambda x: (
                 x * torch.tensor(self.config.data.normalization[1])
                 + torch.tensor(self.config.data.normalization[0])
@@ -44,7 +45,7 @@ class DDPMInversion:
         self.pipe.scheduler.set_timesteps(self.config.num_diffusion_steps)
 
     def run(self, x, prompt_tar_list, prompt_src):
-        x = self.project_from_pytorch_default(x)
+        #x = self.project_from_pytorch_default(x)
         # TODO do i have to upsample here?
         x0 = torchvision.transforms.Resize([512, 512])(
             torch.clone(x).to(self.device)
@@ -93,9 +94,10 @@ class DDPMInversion:
         x_counterfactuals = torchvision.transforms.Resize(x.shape[2:])(
             x_counterfactuals
         )
-        x_counterfactuals = torch.clamp(self.project_to_pytorch_default(
+        """x_counterfactuals = torch.clamp(self.project_to_pytorch_default(
             x_counterfactuals
-        ), 0, 1)
+        ), 0, 1)"""
+        print("DDPM: [x_counterfactuals.min(), x_counterfactuals.max()]")
         print([x_counterfactuals.min(), x_counterfactuals.max()])
 
         return x_counterfactuals

@@ -20,3 +20,4 @@ class StableDiffusionConfig(GeneratorConfig):
     The config of the data.
     """
     data: DataConfig = DataConfig()
+    sd_model: str = "CompVis/stable-diffusion-v1-4"
