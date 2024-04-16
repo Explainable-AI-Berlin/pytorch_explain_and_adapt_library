@@ -290,7 +290,9 @@ class CounterfactualExplainer(ExplainerInterface):
 
         elif isinstance(self.generator, EditCapableGenerator):
             if explainer_path is None:
-                explainer_path = os.path.join(*([os.path.abspath(os.sep)] + base_path.split(os.sep)[:-1]))
+                explainer_path = os.path.join(
+                    *([os.path.abspath(os.sep)] + base_path.split(os.sep)[:-1])
+                )
 
             (
                 batch["x_counterfactual_list"],
@@ -309,9 +311,6 @@ class CounterfactualExplainer(ExplainerInterface):
                 classifier_dataset=self.dataset,
                 base_path=explainer_path,
             )
-            print('Counterfactual created!!!')
-            print('Counterfactual created!!!')
-            print('Counterfactual created!!!')
 
         batch_out = {}
         if remove_below_threshold:
@@ -338,9 +337,9 @@ class CounterfactualExplainer(ExplainerInterface):
                 start_idx=start_idx,
                 **batch_out,
             )
-            print('Counterfactual created2!!!')
-            print('Counterfactual created2!!!')
-            print('Counterfactual created2!!!')
+            print("Counterfactual created2!!!")
+            print("Counterfactual created2!!!")
+            print("Counterfactual created2!!!")
 
         return batch_out
 
@@ -354,7 +353,10 @@ class CounterfactualExplainer(ExplainerInterface):
             x, y = dataset[idx]
             y_pred = self.downstream_model(x.unsqueeze(0).to(self.device))[0].argmax()
             y_target = (y_pred + 1) % dataset.output_size
-            if not batch is None or len(batch["x_list"]) < self.explainer_config.batch_size:
+            if (
+                not batch is None
+                or len(batch["x_list"]) < self.explainer_config.batch_size
+            ):
                 batch = {
                     "x_list": x.unsqueeze(0),
                     "y_target_list": torch.tensor([y_target]),

@@ -6,7 +6,16 @@ from torch.cuda.amp import autocast
 
 
 class ResnetBlock(torch.nn.Module):
-    def __init__(self, ni, no, stride, activation, spectral_norm=False, dp_prob=.3, batchnorm=torch.nn.InstanceNorm2d):
+    def __init__(
+        self,
+        ni,
+        no,
+        stride,
+        activation,
+        spectral_norm=False,
+        dp_prob=0.3,
+        batchnorm=torch.nn.InstanceNorm2d,
+    ):
         super().__init__()
         self.activation = activation
         self.bn0 = batchnorm(ni, affine=True)
@@ -21,7 +30,9 @@ class ResnetBlock(torch.nn.Module):
             self.downsample = False
         if ni != no:
             self.reduce = True
-            self.conv_reduce = torch.nn.Conv2d(ni, no, 1, stride=1, padding=0, bias=False)
+            self.conv_reduce = torch.nn.Conv2d(
+                ni, no, 1, stride=1, padding=0, bias=False
+            )
         else:
             self.reduce = False
         if spectral_norm:
@@ -45,14 +56,26 @@ class ResnetBlock(torch.nn.Module):
 
 
 class ResnetGroup(torch.nn.Module):
-    def __init__(self, n, ni, no, stride, activation, spectral_norm, dp_prob=.3, batchnorm=None):
+    def __init__(
+        self, n, ni, no, stride, activation, spectral_norm, dp_prob=0.3, batchnorm=None
+    ):
         super().__init__()
         self.n = n
         in_plane = ni
         for i in range(n):
-            setattr(self, "block_%d" % i,
-                    ResnetBlock(in_plane, no, stride if i == 0 else 1, activation, spectral_norm, dp_prob=dp_prob,
-                                batchnorm=batchnorm))
+            setattr(
+                self,
+                "block_%d" % i,
+                ResnetBlock(
+                    in_plane,
+                    no,
+                    stride if i == 0 else 1,
+                    activation,
+                    spectral_norm,
+                    dp_prob=dp_prob,
+                    batchnorm=batchnorm,
+                ),
+            )
             in_plane = no
 
     def forward(self, x):
@@ -62,8 +85,17 @@ class ResnetGroup(torch.nn.Module):
 
 
 class Resnet(torch.nn.Module):
-    def __init__(self, ratio=0, depth=1, width=1, activation=F.relu, spectral_norm=False, dp_prob=.3,
-                 batchnorm=torch.nn.InstanceNorm2d, exp_dict=None):
+    def __init__(
+        self,
+        ratio=0,
+        depth=1,
+        width=1,
+        activation=F.relu,
+        spectral_norm=False,
+        dp_prob=0.3,
+        batchnorm=torch.nn.InstanceNorm2d,
+        exp_dict=None,
+    ):
         super().__init__()
         self.depth = depth
         self.width = width
@@ -94,11 +126,22 @@ class Resnet(torch.nn.Module):
         self.output_size = self.channels[-1]
         in_ch = 3
         for i, (out_ch, nblocks) in enumerate(zip(self.channels, self.nblocks)):
-            setattr(self, "group%d" % i,
-                    ResnetGroup(nblocks, in_ch, out_ch, stride=2, activation=activation, spectral_norm=spectral_norm,
-                                dp_prob=dp_prob, batchnorm=batchnorm))
+            setattr(
+                self,
+                "group%d" % i,
+                ResnetGroup(
+                    nblocks,
+                    in_ch,
+                    out_ch,
+                    stride=2,
+                    activation=activation,
+                    spectral_norm=spectral_norm,
+                    dp_prob=dp_prob,
+                    batchnorm=batchnorm,
+                ),
+            )
             in_resolution = in_resolution // 2
-            assert (in_resolution > 2)
+            assert in_resolution > 2
             in_ch = out_ch
 
     def forward(self, x):
@@ -116,7 +159,9 @@ class MLP(torch.nn.Module):
             if i == 0:
                 setattr(self, "linear%d" % i, torch.nn.Linear(ni, nhidden, bias=False))
             else:
-                setattr(self, "linear%d" % i, torch.nn.Linear(nhidden, nhidden, bias=False))
+                setattr(
+                    self, "linear%d" % i, torch.nn.Linear(nhidden, nhidden, bias=False)
+                )
             setattr(self, "bn%d" % i, torch.nn.LayerNorm(nhidden))
         if nlayers == 0:
             nhidden = ni
@@ -133,14 +178,36 @@ class MLP(torch.nn.Module):
 
 
 class Encoder(Resnet):
-    def __init__(self, z_dim, output_h, output_w, ratio=0, depth=1, width=1, dp_prob=.3, mlp_width=1, mlp_depth=1,
-                 batchnorm=torch.nn.InstanceNorm2d,
-                 exp_dict=None):
-        super().__init__(ratio=ratio, depth=depth, width=width, activation=lambda x: x * torch.sigmoid(x),
-                         dp_prob=dp_prob, batchnorm=batchnorm,
-                         exp_dict=exp_dict)
+    def __init__(
+        self,
+        z_dim,
+        output_h,
+        output_w,
+        ratio=0,
+        depth=1,
+        width=1,
+        dp_prob=0.3,
+        mlp_width=1,
+        mlp_depth=1,
+        batchnorm=torch.nn.InstanceNorm2d,
+        exp_dict=None,
+    ):
+        super().__init__(
+            ratio=ratio,
+            depth=depth,
+            width=width,
+            activation=lambda x: x * torch.sigmoid(x),
+            dp_prob=dp_prob,
+            batchnorm=batchnorm,
+            exp_dict=exp_dict,
+        )
         self.z_dim = z_dim
-        self.mlp = MLP(self.channels[-1] * output_h * output_w, 2 * self.z_dim, mlp_width * self.channels[-1], 1)
+        self.mlp = MLP(
+            self.channels[-1] * output_h * output_w,
+            2 * self.z_dim,
+            mlp_width * self.channels[-1],
+            1,
+        )
         self.bn_out = torch.nn.InstanceNorm2d(self.channels[-1], affine=True)
 
     def forward(self, x, return_features=False):
@@ -160,7 +227,12 @@ class Encoder(Resnet):
 
 class Discriminator(Resnet):
     def __init__(self, *args, n_out=1, **kwargs):
-        super().__init__(*args, activation=torch.nn.LeakyReLU(0.2, inplace=True), spectral_norm=True, **kwargs)
+        super().__init__(
+            *args,
+            activation=torch.nn.LeakyReLU(0.2, inplace=True),
+            spectral_norm=True,
+            **kwargs
+        )
         self.classifier = torch.nn.Linear(self.channels[-1], n_out)
         self.bn_out = torch.nn.InstanceNorm2d(self.channels[-1], affine=True)
         self.n_out = n_out
@@ -226,9 +298,17 @@ class InterpolateResidualGroup(torch.nn.Module):
         self.nblocks = nblocks
         for n in range(nblocks):
             if n == 0:
-                setattr(self, "block%d" % n, InterpolateResidualBlock(ni, no, z_dim, upsample=upsample))
+                setattr(
+                    self,
+                    "block%d" % n,
+                    InterpolateResidualBlock(ni, no, z_dim, upsample=upsample),
+                )
             else:
-                setattr(self, "block%d" % n, InterpolateResidualBlock(no, no, z_dim, upsample=False))
+                setattr(
+                    self,
+                    "block%d" % n,
+                    InterpolateResidualBlock(no, no, z_dim, upsample=False),
+                )
 
     def forward(self, x, z):
         for n in range(self.nblocks):
@@ -246,7 +326,7 @@ class ConditionalBatchNorm(torch.nn.Module):
 
     def forward(self, x, z):
         cond = self.condition(z).view(-1, 2 * self.no, 1, 1)
-        return self.bn(x) * cond[:, :self.no] + cond[:, self.no:]
+        return self.bn(x) * cond[:, : self.no] + cond[:, self.no :]
 
 
 class InterpolateResidualBlock(torch.nn.Module):
@@ -265,13 +345,13 @@ class InterpolateResidualBlock(torch.nn.Module):
 
     def forward(self, x, z):
         if self.upsample:
-            shortcut = F.interpolate(x, scale_factor=2, mode='nearest')
+            shortcut = F.interpolate(x, scale_factor=2, mode="nearest")
         else:
             shortcut = x.clone()
         x = self.bn0(x, z)
         x = x * torch.sigmoid(x)
         if self.upsample:
-            x = F.interpolate(x, scale_factor=2, mode='nearest')
+            x = F.interpolate(x, scale_factor=2, mode="nearest")
         x = self.conv0(x)
         x = self.bn1(x, z)
         x = x * torch.sigmoid(x)
@@ -284,8 +364,19 @@ class InterpolateResidualBlock(torch.nn.Module):
 
 
 class Decoder(torch.nn.Module):
-    def __init__(self, z_dim, width, in_ch, depth, ratio, in_h, in_w, mlp_width, mlp_depth,
-                 exp_dict=None):
+    def __init__(
+        self,
+        z_dim,
+        width,
+        in_ch,
+        depth,
+        ratio,
+        in_h,
+        in_w,
+        mlp_width,
+        mlp_depth,
+        exp_dict=None,
+    ):
         super().__init__()
         self.exp_dict = exp_dict
         self.mlp = MLP(z_dim, in_ch * in_h * in_w, in_ch * mlp_width, mlp_depth)
@@ -320,27 +411,36 @@ class Decoder(torch.nn.Module):
             raise ValueError
 
         for i, out_ch in enumerate(self.channels):
-            setattr(self, 'group%d' % i, InterpolateResidualGroup(self.nblocks[i], in_ch, out_ch, z_dim, upsample=True))
+            setattr(
+                self,
+                "group%d" % i,
+                InterpolateResidualGroup(
+                    self.nblocks[i], in_ch, out_ch, z_dim, upsample=True
+                ),
+            )
             in_ch = out_ch
         self.bn_out = torch.nn.InstanceNorm2d(self.channels[-1], affine=True)
-        self.conv_out = torch.nn.Conv2d(self.channels[-1], 3, kernel_size=3, stride=1, padding=1)
+        self.conv_out = torch.nn.Conv2d(
+            self.channels[-1], 3, kernel_size=3, stride=1, padding=1
+        )
 
     def forward(self, z):
         z = z.view(z.size(0), -1)
+        import pdb; pdb.set_trace()
         x = self.mlp(z)
         x = x.view(-1, self.in_ch, self.in_h, self.in_w)
         for i in range(len(self.channels)):
             group = getattr(self, "group%d" % i)
             x = group(x, z)
-        x = (self.bn_out(x))
+        x = self.bn_out(x)
         x = x * torch.sigmoid(x)
         return torch.tanh(self.conv_out(x))
 
 
 def get_normalizer(exp_dict):
-    if exp_dict.get('normalizer', 'instancenorm') == 'instancenorm':
+    if exp_dict.get("normalizer", "instancenorm") == "instancenorm":
         return torch.nn.InstanceNorm2d
-    elif exp_dict.get('normalizer', 'instancenorm') == 'batchnorm':
+    elif exp_dict.get("normalizer", "instancenorm") == "batchnorm":
         return torch.nn.BatchNorm2d
     else:
         raise ValueError("Normalizer not found.")
@@ -371,36 +471,40 @@ class VAE(torch.nn.Module):
         self.channels_width = exp_dict["channels_width"]
         self.network_depth = exp_dict.get("network_depth", 2)
         if exp_dict["backbone"].lower() == "resnet":
-            self.encoder = Encoder(self.z_dim,
-                                   self.output_h,
-                                   self.output_w,
-                                   ratio=self.ratio,
-                                   depth=self.network_depth,
-                                   width=self.channels_width,
-                                   dp_prob=exp_dict["dp_prob"],
-                                   mlp_width=self.exp_dict["mlp_width"],
-                                   mlp_depth=self.exp_dict["mlp_depth"],
-                                   batchnorm=get_normalizer(exp_dict),
-                                   exp_dict=exp_dict)
+            self.encoder = Encoder(
+                self.z_dim,
+                self.output_h,
+                self.output_w,
+                ratio=self.ratio,
+                depth=self.network_depth,
+                width=self.channels_width,
+                dp_prob=exp_dict["dp_prob"],
+                mlp_width=self.exp_dict["mlp_width"],
+                mlp_depth=self.exp_dict["mlp_depth"],
+                batchnorm=get_normalizer(exp_dict),
+                exp_dict=exp_dict,
+            )
         self.output_size = self.encoder.output_size * self.output_w * self.output_h
         self.z_dim_decoder = self.exp_dict.get("z_dim_decoder", self.z_dim)
-        self.decoder = Decoder(self.z_dim_decoder,
-                               self.channels_width,
-                               self.encoder.output_size,
-                               depth=self.network_depth,
-                               ratio=self.ratio,
-                               in_h=self.output_h,
-                               in_w=self.output_w,
-                               mlp_width=self.exp_dict["mlp_width"],
-                               mlp_depth=self.exp_dict["mlp_depth"],
-                               exp_dict=exp_dict)
+        self.decoder = Decoder(
+            self.z_dim_decoder,
+            self.channels_width,
+            self.encoder.output_size,
+            depth=self.network_depth,
+            ratio=self.ratio,
+            in_h=self.output_h,
+            in_w=self.output_w,
+            mlp_width=self.exp_dict["mlp_width"],
+            mlp_depth=self.exp_dict["mlp_depth"],
+            exp_dict=exp_dict,
+        )
 
         # custom weights initialization called on netG and netD
         def weights_init(m):
             classname = m.__class__.__name__
-            if classname.find('Conv') != -1:
+            if classname.find("Conv") != -1:
                 m.weight.data.normal_(0.0, 0.02)
-            elif classname.find('BatchNorm') != -1:
+            elif classname.find("BatchNorm") != -1:
                 try:
                     m.weight.data.normal_(1.0, 0.02)
                     m.bias.data.fill_(0)
@@ -412,7 +516,9 @@ class VAE(torch.nn.Module):
     def encode(self, x):
         b = x.size(0)
         code_params = self.encoder(x)
-        return code_params[:, :self.z_dim].view(b, -1), code_params[:, self.z_dim:].view(b, -1)
+        return code_params[:, : self.z_dim].view(b, -1), code_params[
+            :, self.z_dim :
+        ].view(b, -1)
 
     def reparameterize(self, mu, logvar):
         std = torch.exp(0.5 * logvar)

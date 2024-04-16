@@ -81,6 +81,7 @@ class StableDiffusion(EditCapableGenerator):
                 partition="train",
                 phase="context",
                 batch_size=explainer_config.train_batch_size,
+                training_label=-1,
                 custom_tokens=explainer_config.custom_tokens_context,
                 **explainer_config.__dict__
             )
@@ -96,7 +97,7 @@ class StableDiffusion(EditCapableGenerator):
                     embedding_files=[context_embedding_path],
                     output_path=class_token_path,
                     dataset=self.generator_dataset,
-                    custom_tokens=explainer_config.class_custom_token[class_idx],
+                    custom_tokens=explainer_config.class_custom_token[class_idx].split(" "),
                     training_label=class_idx,
                     phase="class",
                     batch_size=explainer_config.train_batch_size,

@@ -1,4 +1,5 @@
 generator_type: 'DiveTCVAE'
+category: 'generator'
 
 wrapper: "tcvae"
 # Hardware

@@ -8,8 +8,8 @@ import torch.nn.functional as F
 from peal.dependencies.dive.src.models import get_model
 from peal.dependencies.dive.src.wrappers.base_wrapper import BaseWrapper
 
-#from models import get_model
-#from base_wrapper import BaseWrapper
+# from models import get_model
+# from base_wrapper import BaseWrapper
 
 from tqdm import tqdm
 
@@ -22,12 +22,12 @@ class TCVAE(BaseWrapper):
     """Trains a model on multiple GPUs"""
 
     def __init__(self, exp_dict, savedir=None, datadir=None):
-        """ Constructor
+        """Constructor
         Args:
             model: architecture to train
             exp_dict: reference to dictionary with the global state of the application
             savedir: where to save images for debugging
-            writer: tensorboard 
+            writer: tensorboard
         """
         super().__init__()
         # Create model, opt, wrapper
@@ -40,8 +40,7 @@ class TCVAE(BaseWrapper):
         self.beta = self.exp_dict["beta"]
         if self.exp_dict["vgg_weight"] > 0:
             self.perceptual_loss = VGGPerceptualLoss(resize=False).cuda()
-        self.model_parallel = torch.nn.DataParallel(
-            self.model, list(range(self.ngpu)))
+        self.model_parallel = torch.nn.DataParallel(self.model, list(range(self.ngpu)))
 
         # self.discriminator = Discriminator(ratio=self.model.ratio,
         #                                    width=self.exp_dict["channels_width"],
@@ -51,9 +50,9 @@ class TCVAE(BaseWrapper):
         if "lr_tcvae" in self.exp_dict:
             self.exp_dict["lr"] = self.exp_dict["lr_tcvae"]
 
-        self.optimizer = torch.optim.Adam(self.model.parameters(),
-                                          betas=(0.9, 0.999),
-                                          lr=self.exp_dict["lr"])
+        self.optimizer = torch.optim.Adam(
+            self.model.parameters(), betas=(0.9, 0.999), lr=self.exp_dict["lr"]
+        )
         if self.exp_dict["amp"] > 0:
             self.scaler = amp.GradScaler()
 
@@ -88,17 +87,18 @@ class TCVAE(BaseWrapper):
         # im_reco = x_reco.permute(1,2,0).data.cpu().numpy()
         # im = np.concatenate([im_orig, im_reco], 1)
         # im = np.floor((im + 1) * 0.5 * 255)
-        #pylab.imsave(os.path.join(self.savedir, 'tmp_%d.jpg' %idx), im.astype('uint8'))
+        # pylab.imsave(os.path.join(self.savedir, 'tmp_%d.jpg' %idx), im.astype('uint8'))
         im = torch.cat(images, 2).data
         im = (im + 1) / 2
         im = im.permute(1, 2, 0)
         im = im * 255
-        im = im.cpu().numpy().astype('uint8')
+        im = im.cpu().numpy().astype("uint8")
         return im
 
     def get_beta(self, epoch):
         """Helper function for beta annealing in beta-vae
-        Fu, Hao, et al. "Cyclical annealing schedule: A simple approach to mitigating kl vanishing." arXiv preprint arXiv:1903.10145 (2019).
+        Fu, Hao, et al. "Cyclical annealing schedule: A simple approach to mitigating kl vanishing."
+        arXiv preprint arXiv:1903.10145 (2019).
 
         Args:
             epoch (int): Current training epoch
@@ -108,10 +108,9 @@ class TCVAE(BaseWrapper):
         """
         if self.exp_dict["beta"] > 0:
             if self.exp_dict["beta_annealing"] == True:
-                cycle_size = (self.exp_dict["max_epoch"] // 4)
+                cycle_size = self.exp_dict["max_epoch"] // 4
                 _epoch = epoch % cycle_size
-                ratio = max(self.beta * 1e-3,
-                            min(1, _epoch / (cycle_size * 0.5)))
+                ratio = max(self.beta * 1e-3, min(1, _epoch / (cycle_size * 0.5)))
                 beta = self.beta * ratio
             else:
                 beta = self.beta
@@ -149,46 +148,56 @@ class TCVAE(BaseWrapper):
 
             # Encoder
             b = x.size(0)
-            #if self.exp_dict["vgg_weight"] > 0:
-            #with amp.autocast(enabled=False):
-            vgg_mse = torch.nn.DataParallel(self.perceptual_loss, list(
-                    range(self.ngpu)))(reconstruction, x).mean()
+            # if self.exp_dict["vgg_weight"] > 0:
+            # with amp.autocast(enabled=False):
+            vgg_mse = torch.nn.DataParallel(
+                self.perceptual_loss, list(range(self.ngpu))
+            )(reconstruction, x).mean()
             pix_mse = l1_loss(x, reconstruction)
 
-
-            #else:
+            # else:
             #    pix_mse = l1_loss(x, reconstruction)
             #    vgg_mse = 0
-            loss = self.exp_dict["vgg_weight"] * vgg_mse + self.exp_dict["pix_mse_weight"] * pix_mse
+            loss = (
+                self.exp_dict["vgg_weight"] * vgg_mse
+                + self.exp_dict["pix_mse_weight"] * pix_mse
+            )
             beta = self.get_beta(epoch)
             if self.exp_dict["tc_weight"] > 0 and beta > 0:
-                mi_loss, tc_loss, dw_kl_loss = btc_vae_loss(self.n_data, (mu, logvar),
-                                                            latent_sample=z, is_mss=True)
-                loss += mi_loss * self.beta + tc_loss * self.exp_dict["tc_weight"] * self.beta + dw_kl_loss * beta
+                mi_loss, tc_loss, dw_kl_loss = btc_vae_loss(
+                    self.n_data, (mu, logvar), latent_sample=z, is_mss=True
+                )
+                loss += (
+                    mi_loss * self.beta
+                    + tc_loss * self.exp_dict["tc_weight"] * self.beta
+                    + dw_kl_loss * beta
+                )
             elif beta > 0:
                 loss += kl_loss * beta
         if self.exp_dict["amp"] > 0:
             loss = self.scaler.scale(loss)
             loss.backward()
-            if self.exp_dict['clip']:
+            if self.exp_dict["clip"]:
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1)
             self.scaler.step(self.optimizer)
             self.scaler.update()
         else:
             loss.backward()
-            if self.exp_dict['clip']:
+            if self.exp_dict["clip"]:
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1)
             self.optimizer.step()
 
-        return dict(train_loss=float(kl_loss + pix_mse),
-                    pix_mse=float(pix_mse),
-                    vgg_mse=float(vgg_mse),
-                    kl_loss=float(kl_loss),
-                    tc_loss=float(tc_loss),
-                    tc_weight=float(self.exp_dict["tc_weight"]),
-                    running_beta=float(beta),
-                    mean_mu=float(mu.mean()),
-                    mean_logvar=float(logvar.mean()))
+        return dict(
+            train_loss=float(kl_loss + pix_mse),
+            pix_mse=float(pix_mse),
+            vgg_mse=float(vgg_mse),
+            kl_loss=float(kl_loss),
+            tc_loss=float(tc_loss),
+            tc_weight=float(self.exp_dict["tc_weight"]),
+            running_beta=float(beta),
+            mean_mu=float(mu.mean()),
+            mean_logvar=float(logvar.mean()),
+        )
 
     def val_on_batch(self, epoch, batch_idx, batch, vis_flag):
         """Validate on one batch
@@ -211,18 +220,23 @@ class TCVAE(BaseWrapper):
         kl_loss = get_kl_loss(mu, logvar)
         pix_mse_loss = l1_loss(x, reconstruction)
 
-        ret = dict(val_kl_loss=float(kl_loss),
-                   val_pix_mse_loss=float(pix_mse_loss),
-                   val_loss=float(pix_mse_loss + kl_loss),
-                   mu=mu.data.cpu().numpy())
+        ret = dict(
+            val_kl_loss=float(kl_loss),
+            val_pix_mse_loss=float(pix_mse_loss),
+            val_loss=float(pix_mse_loss + kl_loss),
+            mu=mu.data.cpu().numpy(),
+        )
 
         if vis_flag and batch_idx == 0:
             with amp.autocast(enabled=self.exp_dict["amp"] > 0):
                 z_2 = torch.randn_like(z)
                 reconstruction_2 = self.model.decode(z_2)
-            im = self.save_img("val_reconstruction", [
-                x[0], reconstruction[0], reconstruction_2[0]], epoch)
-            ret['val_images'] = im
+            im = self.save_img(
+                "val_reconstruction",
+                [x[0], reconstruction[0], reconstruction_2[0]],
+                epoch,
+            )
+            ret["val_images"] = im
         return ret
 
     def predict_on_batch(self, x):
@@ -277,8 +291,11 @@ class TCVAE(BaseWrapper):
         # sap_score = _compute_sap(np.concatenate(ret['mu'], 0),
         #                          np.concatenate(labels, 0))
         sap_score = 0
-        ret = {k: np.mean(v) if k not in ['val_images'] else v[0]
-               for k, v in ret.items() if k not in ['mu']}
+        ret = {
+            k: np.mean(v) if k not in ["val_images"] else v[0]
+            for k, v in ret.items()
+            if k not in ["mu"]
+        }
         ret["val_sap_score"] = sap_score
         return ret
 
@@ -307,8 +324,19 @@ class TCVAE(BaseWrapper):
         return ret
 
     def load_state_dict(self, state_dict):
-        self.optimizer.load_state_dict(state_dict["optimizer"])
-        self.model.load_state_dict(state_dict["model"])
+        if hasattr(state_dict, "optimizer"):
+            self.optimizer.load_state_dict(state_dict["optimizer"])
+
+        if hasattr(state_dict, "model"):
+            self.model.load_state_dict(state_dict["model"])
+
+        else:
+            try:
+                self.model.load_state_dict(state_dict)
+
+            except Exception as e:
+                import pdb; pdb.set_trace()
+
         if self.exp_dict["amp"] > 0:
             self.scaler.load_state_dict(state_dict["amp"])
 
