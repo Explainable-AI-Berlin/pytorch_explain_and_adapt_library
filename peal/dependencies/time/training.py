@@ -310,6 +310,7 @@ def training(args=None):
             break
 
         iterations += 1
+        break
 
     pipeline.to("cpu")
     save_tokens_and_embeddings(
