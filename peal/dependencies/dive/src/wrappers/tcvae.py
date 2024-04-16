@@ -149,15 +149,17 @@ class TCVAE(BaseWrapper):
 
             # Encoder
             b = x.size(0)
-            if self.exp_dict["vgg_weight"] > 0:
-                with amp.autocast(enabled=False):
-                    vgg_mse = torch.nn.DataParallel(self.perceptual_loss, list(
-                        range(self.ngpu)))(reconstruction, x).mean()
-                pix_mse = 0
-            else:
-                pix_mse = l1_loss(x, reconstruction)
-                vgg_mse = 0
-            loss = vgg_mse + pix_mse
+            #if self.exp_dict["vgg_weight"] > 0:
+            #with amp.autocast(enabled=False):
+            vgg_mse = torch.nn.DataParallel(self.perceptual_loss, list(
+                    range(self.ngpu)))(reconstruction, x).mean()
+            pix_mse = l1_loss(x, reconstruction)
+
+
+            #else:
+            #    pix_mse = l1_loss(x, reconstruction)
+            #    vgg_mse = 0
+            loss = self.exp_dict["vgg_weight"] * vgg_mse + self.exp_dict["pix_mse_weight"] * pix_mse
             beta = self.get_beta(epoch)
             if self.exp_dict["tc_weight"] > 0 and beta > 0:
                 mi_loss, tc_loss, dw_kl_loss = btc_vae_loss(self.n_data, (mu, logvar),
