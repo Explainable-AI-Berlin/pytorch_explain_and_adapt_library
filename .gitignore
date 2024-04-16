@@ -22,3 +22,5 @@ outputs
 dime2/outputs
 peal/dependencies/ace/outputs
 environment.yaml
+
+!peal/dependencies/dive/src/datasets
