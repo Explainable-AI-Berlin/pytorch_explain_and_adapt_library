@@ -56,7 +56,7 @@ def load_state_dict(path, **kwargs):
 
 
 class DDPM(EditCapableGenerator):
-    def __init__(self, config, model_dir=None, device="cpu"):
+    def __init__(self, config, model_dir=None, device="cpu", classifier_dataset=None):
         super().__init__()
         self.config = load_yaml_config(config)
 

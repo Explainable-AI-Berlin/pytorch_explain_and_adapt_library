@@ -20,13 +20,18 @@ from peal.dependencies.dive.src.wrappers.tcvae import TCVAE
 
 
 class DiveTCVAE(InvertibleGenerator):
-    def __init__(self, config, model_dir=None, device="cpu"):
+    def __init__(self, config, model_dir=None, device="cpu", classifier_dataset=None):
         super().__init__()
         self.config = load_yaml_config(config)
         self.config.savedir = self.config.base_path  # hacky
         self.config.crop_size = None
         self.exp_dict = self.config.__dict__
         self.tcvae = TCVAE(exp_dict=self.exp_dict, savedir=self.exp_dict["savedir"])
+        if os.path.exists(os.path.join(self.config.base_path, "final.pt")):
+            self.tcvae.load_state_dict(
+                torch.load(os.path.join(self.config.base_path, "final.pt"))
+            )
+
         self.train_dataset, self.val_dataset, _ = get_datasets(self.config.data)
 
         self.prior = torch.distributions.Normal(
@@ -58,13 +63,13 @@ class DiveTCVAE(InvertibleGenerator):
         return self.tcvae.model.decode(z_sample.cuda())
 
     def encode(self, x) -> list[torch.Tensor]:
-        mu, logvar = self.tcvae.encode(x)
-        z = self.tcvae.model.reparemetrize(mu, logvar)
+        mu, logvar = self.tcvae.model.encode(x)
+        z = self.tcvae.model.reparameterize(mu, logvar)
 
         return [tensor for tensor in z]
 
     def decode(self, z):
-        return self.decode(z)
+        return self.tcvae.model.decode(z[0])
 
     def train_model(
         self,

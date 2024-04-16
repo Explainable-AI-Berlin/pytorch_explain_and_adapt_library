@@ -24,7 +24,7 @@ class DiffeoCFConfig(ExplainerConfig):
     """
     The learning rate used for finding the counterfactual
     """
-    learning_rate: float = None
+    learning_rate: float = 0.01
     """
     The desired target confidence.
     Consider the tradeoff between minimality and clarity of counterfactual

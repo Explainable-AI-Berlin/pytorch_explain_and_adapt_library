@@ -21,18 +21,17 @@ z_dim: 128
 mlp_width: 4
 mlp_depth: 2
 #savedir : 'peal_runs/dive_tcvae'
-base_path : '/home/space/datasets/peal/peal_runs/dive_celeba'
+base_path : '/home/space/datasets/peal/peal_runs/dive_celeba_copyrighttag'
 
 # TCVAE
 beta: 0.001 # the idea is to be able to interpolate while getting good reconstructions
 tc_weight: 1 # we keep the total_correlation penalty high to encourage disentanglement
-vgg_weight: 1
-pix_mse_weight: 0.0001
+vgg_weight: 0
 beta_annealing: True
 dp_prob: 0.3
 
 # Data
-data : '<PEAL_BASE>/configs/data/celeba.yaml'
+data : '<PEAL_BASE>/configs/data/copyrighttag_celeba_dive.yaml'
 height: 128
 width: 128
 
