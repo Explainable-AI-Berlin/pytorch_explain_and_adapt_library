@@ -22,4 +22,3 @@ outputs
 dime2/outputs
 peal/dependencies/ace/outputs
 environment.yaml
-dive/*

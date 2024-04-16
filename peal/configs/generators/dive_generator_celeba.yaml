@@ -20,12 +20,12 @@ z_dim: 128
 mlp_width: 4
 mlp_depth: 2
 #savedir : 'peal_runs/dive_tcvae'
-base_path : 'peal_runs/dive_tcvae/test4'
+base_path : 'peal_runs/dive_tcvae/test_pixmse'
 
 # TCVAE
 beta: 0.001 # the idea is to be able to interpolate while getting good reconstructions
 tc_weight: 1 # we keep the total_correlation penalty high to encourage disentanglement
-vgg_weight: 1
+vgg_weight: 0
 beta_annealing: True
 dp_prob: 0.3
 
