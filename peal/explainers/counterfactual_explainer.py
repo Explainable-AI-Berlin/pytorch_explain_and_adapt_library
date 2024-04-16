@@ -309,6 +309,9 @@ class CounterfactualExplainer(ExplainerInterface):
                 classifier_dataset=self.dataset,
                 base_path=explainer_path,
             )
+            print('Counterfactual created!!!')
+            print('Counterfactual created!!!')
+            print('Counterfactual created!!!')
 
         batch_out = {}
         if remove_below_threshold:
@@ -335,6 +338,9 @@ class CounterfactualExplainer(ExplainerInterface):
                 start_idx=start_idx,
                 **batch_out,
             )
+            print('Counterfactual created2!!!')
+            print('Counterfactual created2!!!')
+            print('Counterfactual created2!!!')
 
         return batch_out
 

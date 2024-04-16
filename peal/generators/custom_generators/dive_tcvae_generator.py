@@ -29,10 +29,14 @@ class DiveTCVAE(InvertibleGenerator):
         self.tcvae = TCVAE(exp_dict=self.exp_dict, savedir=self.exp_dict["savedir"])
         self.train_dataset, self.val_dataset, _ = get_datasets(self.config.data)
 
-        self.prior = torch.distributions.Normal(torch.tensor([0.0] * self.config.z_dim),
-                                                torch.tensor([1.0] * self.config.z_dim))
+        self.prior = torch.distributions.Normal(
+            torch.tensor([0.0] * self.config.z_dim),
+            torch.tensor([1.0] * self.config.z_dim),
+        )
 
-        self.fid = torchmetrics.image.fid.FrechetInceptionDistance(feature=192, reset_real_features=False)
+        self.fid = torchmetrics.image.fid.FrechetInceptionDistance(
+            feature=192, reset_real_features=False
+        )
         real_images = [self.train_dataset[i][0] for i in range(500)]
         self.fid = self.fid.to("cuda")
         self.fid.update(
@@ -63,19 +67,15 @@ class DiveTCVAE(InvertibleGenerator):
         return self.decode(z)
 
     def train_model(
-            self,
+        self,
     ):
         writer = SummaryWriter(os.path.join(self.config.base_path, "logs"))
         train_dataloader = get_dataloader(
-            self.train_dataset,
-            mode="train",
-            batch_size=self.config.batch_size
+            self.train_dataset, mode="train", batch_size=self.config.batch_size
         )
 
         val_dataloader = get_dataloader(
-            self.val_dataset,
-            mode="train",
-            batch_size=self.config.batch_size
+            self.val_dataset, mode="train", batch_size=self.config.batch_size
         )
         score_list = []
 
@@ -84,9 +84,11 @@ class DiveTCVAE(InvertibleGenerator):
             train_dict = self.tcvae.train_on_loader(epoch, train_dataloader)
             val_dict = self.tcvae.val_on_loader(epoch, val_dataloader, vis_flag=True)
 
-            Image.fromarray(val_dict['val_images']).save(os.path.join(self.config.base_path, str(epoch), "reconstruction.png"), "PNG")
-            del val_dict['val_images']
-
+            Image.fromarray(val_dict["val_images"]).save(
+                os.path.join(self.config.base_path, str(epoch), "reconstruction.png"),
+                "PNG",
+            )
+            del val_dict["val_images"]
 
             score_dict = {}
             score_dict.update(self.tcvae.get_lr())
@@ -99,12 +101,21 @@ class DiveTCVAE(InvertibleGenerator):
             # score_list += [score_dict]
 
             # Report
-            torch.save(self.tcvae.state_dict(), os.path.join(self.config.base_path, str(epoch), "model.pt"))
+            torch.save(
+                self.tcvae.state_dict(),
+                os.path.join(self.config.base_path, str(epoch), "model.pt"),
+            )
             generated_samples = self.sample_x(batch_size=100)
             for i in range(5):
-                image_pil = transforms.ToPILImage()((generated_samples[random.randint(0, 99),:, :, :]+1)/2)
-                image_pil.save(os.path.join(self.config.base_path, str(epoch), f"sample{i}.png"))
-            self.fid.update((255 * generated_samples.to("cuda")).to(torch.uint8), real=False)
+                image_pil = transforms.ToPILImage()(
+                    (generated_samples[random.randint(0, 99), :, :, :] + 1) / 2
+                )
+                image_pil.save(
+                    os.path.join(self.config.base_path, str(epoch), f"sample{i}.png")
+                )
+            self.fid.update(
+                (255 * generated_samples.to("cuda")).to(torch.uint8), real=False
+            )
             writer.add_scalar("fid", float(self.fid.compute()), global_step=epoch)
 
     # def edit(

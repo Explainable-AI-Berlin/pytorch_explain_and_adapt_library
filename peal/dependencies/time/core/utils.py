@@ -26,13 +26,15 @@ def generate_prompt(args, target, pred, binary):
         s = args.pos_custom_token if pred == 1 else args.neg_custom_token
         t = args.pos_custom_token if pred != 1 else args.neg_custom_token
 
-        if args.dataset == "CelebAHQ":
+        if args.dataset == "BDD100k":
+            sp = f"{base} indicating to {s}"
+            tp = f"{base} indicating to {t}"
+
+        else:
+            #args.dataset == "CelebAHQ":
             sp = f"{base} with a {s}"
             tp = f"{base} with a {t}"
 
-        elif args.dataset == "BDD100k":
-            sp = f"{base} indicating to {s}"
-            tp = f"{base} indicating to {t}"
 
     else:
         sp = f"{base} with a " + args.generic_custom_token.replace("&", str(pred))
