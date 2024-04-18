@@ -323,22 +323,12 @@ class TCVAE(BaseWrapper):
             ret["amp"] = self.scaler.state_dict()
         return ret
 
-    def load_state_dict(self, state_dict):
-        if hasattr(state_dict, "optimizer"):
-            self.optimizer.load_state_dict(state_dict["optimizer"])
-
-        if hasattr(state_dict, "model"):
-            self.model.load_state_dict(state_dict["model"])
-
-        else:
-            try:
-                self.model.load_state_dict(state_dict)
-
-            except Exception as e:
-                import pdb; pdb.set_trace()
+    """def load_state_dict(self, state_dict):
+        self.optimizer.load_state_dict(state_dict["optimizer"])
+        self.model.load_state_dict(state_dict["model"])
 
         if self.exp_dict["amp"] > 0:
-            self.scaler.load_state_dict(state_dict["amp"])
+            self.scaler.load_state_dict(state_dict["amp"])"""
 
     def get_lr(self):
         ret = {}

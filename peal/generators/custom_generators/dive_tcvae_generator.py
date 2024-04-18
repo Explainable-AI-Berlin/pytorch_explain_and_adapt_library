@@ -33,6 +33,7 @@ class DiveTCVAE(InvertibleGenerator):
             )
 
         self.train_dataset, self.val_dataset, _ = get_datasets(self.config.data)
+        self.dataset = self.val_dataset
 
         self.prior = torch.distributions.Normal(
             torch.tensor([0.0] * self.config.z_dim),
@@ -55,8 +56,9 @@ class DiveTCVAE(InvertibleGenerator):
         return self.prior.sample((batch_size,))
 
     def log_prob_z(self, z):
-        dist = torch.distributions.Normal(self.mu, torch.exp(0.5 * self.logvar))
-        return dist.log_prob(z)
+        # dist = torch.distributions.Normal(torch.zeros_like(z), torch.ones_like(z))
+        # return dist.log_prob(z)
+        return torch.sum([z_elem**2 for z_elem in z])
 
     def sample_x(self, batch_size=1):
         z_sample = self.sample_z(batch_size=batch_size)
@@ -65,8 +67,7 @@ class DiveTCVAE(InvertibleGenerator):
     def encode(self, x) -> list[torch.Tensor]:
         mu, logvar = self.tcvae.model.encode(x)
         z = self.tcvae.model.reparameterize(mu, logvar)
-
-        return [tensor for tensor in z]
+        return [z]
 
     def decode(self, z):
         return self.tcvae.model.decode(z[0])

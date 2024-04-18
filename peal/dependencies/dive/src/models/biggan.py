@@ -426,7 +426,6 @@ class Decoder(torch.nn.Module):
 
     def forward(self, z):
         z = z.view(z.size(0), -1)
-        import pdb; pdb.set_trace()
         x = self.mlp(z)
         x = x.view(-1, self.in_ch, self.in_h, self.in_w)
         for i in range(len(self.channels)):
@@ -516,9 +515,7 @@ class VAE(torch.nn.Module):
     def encode(self, x):
         b = x.size(0)
         code_params = self.encoder(x)
-        return code_params[:, : self.z_dim].view(b, -1), code_params[
-            :, self.z_dim :
-        ].view(b, -1)
+        return code_params[:, : self.z_dim].view(b, -1), code_params[:, self.z_dim :].view(b, -1)
 
     def reparameterize(self, mu, logvar):
         std = torch.exp(0.5 * logvar)

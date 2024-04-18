@@ -108,8 +108,8 @@ class StableDiffusion(EditCapableGenerator):
         if explainer_config.editing_type == "ddpm_inversion":
             # TODO somehow the config should be possible to influence
             ddpm_inversion_config = DDPMInversionConfig()
-            #ddpm_inversion_config.cfg_scale_src = 3.0
-            ddpm_inversion_config.cfg_scale_tar = 4.0
+            ddpm_inversion_config.cfg_scale_src = explainer_config.guidance_scale_invertion[0]
+            ddpm_inversion_config.cfg_scale_tar = explainer_config.guidance_scale_denoising[0]
             self.editor = DDPMInversion(ddpm_inversion_config)
             embedding_files=[
                 os.path.join(base_path, "explainer", "context_embedding"),

@@ -47,7 +47,7 @@ class CounterfactualExplainer(ExplainerInterface):
         """
         self.downstream_model = downstream_model
         self.generator = generator
-        self.dataset = dataset
+        self.classifier_dataset = dataset
         self.explainer_config = load_yaml_config(explainer_config, ExplainerConfig)
         self.device = (
             "cuda" if next(self.downstream_model.parameters()).is_cuda else "cpu"
@@ -57,7 +57,7 @@ class CounterfactualExplainer(ExplainerInterface):
         self.loss = torch.nn.CrossEntropyLoss()
 
         if isinstance(self.explainer_config, PerfectFalseCounterfactualConfig):
-            inverse_config = copy.deepcopy(self.dataset.config)
+            inverse_config = copy.deepcopy(self.classifier_dataset.config)
             inverse_config.dataset_path += "_inverse"
             inverse_datasets = get_datasets(inverse_config)
             self.inverse_datasets = {}
@@ -67,7 +67,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 self.inverse_datasets["test"] = inverse_datasets[2]
 
             if not test_data_config is None:
-                inverse_test_config = copy.deepcopy(self.dataset.config)
+                inverse_test_config = copy.deepcopy(self.classifier_dataset.config)
                 inverse_test_config.dataset_path += "_inverse"
                 self.inverse_datasets["test"] = get_datasets(inverse_test_config)[-1]
 
@@ -84,8 +84,13 @@ class CounterfactualExplainer(ExplainerInterface):
             _type_: _description_
         """
         x = torch.clone(x_in)
-        x = self.dataset.project_from_pytorch_default(x)
+        x = self.classifier_dataset.project_to_pytorch_default(x)
+        x = self.generator.dataset.project_from_pytorch_default(x)
         x = torchvision.transforms.Resize(self.generator.config.data.input_size[1:])(x)
+        print("[x.min(), x.max()]")
+        print([x.min(), x.max()])
+        print([x.min(), x.max()])
+        print([x.min(), x.max()])
         v_original = self.generator.encode(x.to(self.device))
         if isinstance(v_original, list):
             v = []
@@ -121,9 +126,13 @@ class CounterfactualExplainer(ExplainerInterface):
             optimizer.zero_grad()
             img = self.generator.decode(latent_code)
 
-            img = torchvision.transforms.Resize(self.dataset.config.input_size[1:])(img)
-
-            img = self.dataset.project_to_pytorch_default(img)
+            img = self.generator.dataset.project_to_pytorch_default(img)
+            img = torchvision.transforms.Resize(self.classifier_dataset.config.input_size[1:])(img)
+            img = self.classifier_dataset.project_from_pytorch_default(img)
+            print("[img.min(), img.max()]")
+            print([img.min(), img.max()])
+            print([img.min(), img.max()])
+            print([img.min(), img.max()])
 
             logits = self.downstream_model(
                 img + self.explainer_config.img_noise_injection * torch.randn_like(img)
@@ -143,9 +152,9 @@ class CounterfactualExplainer(ExplainerInterface):
             loss += self.explainer_config.l1_regularization * torch.mean(
                 torch.stack(l1_losses)
             )
-            loss += self.explainer_config.log_prob_regularization * torch.mean(
+            """loss += self.explainer_config.log_prob_regularization * torch.mean(
                 self.generator.log_prob_z(latent_code)
-            )
+            )"""
 
             logit_confidences = torch.nn.Softmax(dim=-1)(logits).detach().cpu()
             target_confidences = [
@@ -186,10 +195,15 @@ class CounterfactualExplainer(ExplainerInterface):
 
         latent_code = [v_elem.to(self.device) for v_elem in v]
         counterfactual = self.generator.decode(latent_code).detach().cpu()
+        self.generator.dataset.project_to_pytorch_default(counterfactual)
         counterfactual = torchvision.transforms.Resize(
-            self.dataset.config.input_size[1:]
+            self.classifier_dataset.config.input_size[1:]
         )(counterfactual)
-        counterfactual = self.dataset.project_to_pytorch_default(counterfactual)
+        counterfactual = self.classifier_dataset.project_from_pytorch_default(counterfactual)
+        print("[counterfactual.min(), counterfactual.max()]")
+        print([counterfactual.min(), counterfactual.max()])
+        print([counterfactual.min(), counterfactual.max()])
+        print([counterfactual.min(), counterfactual.max()])
 
         attributions = []
         for v_idx in range(len(v_original)):
@@ -308,7 +322,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 explainer_config=self.explainer_config,
                 pbar=pbar,
                 mode=mode,
-                classifier_dataset=self.dataset,
+                classifier_dataset=self.classifier_dataset,
                 base_path=explainer_path,
             )
 
@@ -330,7 +344,7 @@ class CounterfactualExplainer(ExplainerInterface):
             (
                 batch_out["x_attribution_list"],
                 batch_out["collage_path_list"],
-            ) = self.dataset.generate_contrastive_collage(
+            ) = self.classifier_dataset.generate_contrastive_collage(
                 target_confidence_goal=target_confidence_goal,
                 base_path=base_path,
                 classifier=self.downstream_model,
