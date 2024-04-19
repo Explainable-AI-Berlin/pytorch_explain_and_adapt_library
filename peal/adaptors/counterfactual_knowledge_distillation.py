@@ -567,7 +567,7 @@ class CounterfactualKnowledgeDistillation:
         tracked_values_path = os.path.join(
             self.base_dir, str(finetune_iteration), "tracked_values.npz"
         )
-        if not os.path.exists(tracked_values_path):
+        if self.overwrite or not os.path.exists(tracked_values_path):
             tracked_values = self.generate_x_counterfactual_list(
                 error_matrix=validation_stats["error_matrix"],
                 confidence_score_stats=validation_stats["confidence_score_stats"],
@@ -622,7 +622,7 @@ class CounterfactualKnowledgeDistillation:
         return tracked_values
 
     def retrieve_feedback(self, tracked_values, finetune_iteration, mode):
-        if not os.path.exists(
+        if self.overwrite or not os.path.exists(
             os.path.join(self.base_dir, str(finetune_iteration), mode + "_feedback.txt")
         ):
             feedback = self.teacher.get_feedback(
@@ -808,7 +808,7 @@ class CounterfactualKnowledgeDistillation:
         return dataloader
 
     def finetune_student(self, finetune_iteration, dataset_path, writer):
-        if not os.path.exists(
+        if self.overwrite or not os.path.exists(
             os.path.join(
                 self.base_dir,
                 str(finetune_iteration),
@@ -1030,7 +1030,7 @@ class CounterfactualKnowledgeDistillation:
         return img
 
     def retrieve_validation_stats(self, finetune_iteration):
-        if os.path.exists(
+        if not self.overwrite and os.path.exists(
             os.path.join(self.base_dir, str(finetune_iteration), "validation_stats.npz")
         ):
             with open(
@@ -1049,7 +1049,7 @@ class CounterfactualKnowledgeDistillation:
         validation_values_path = os.path.join(
             self.base_dir, str(finetune_iteration), "validation_tracked_values.npz"
         )
-        if not os.path.exists(validation_values_path):
+        if self.overwrite or not os.path.exists(validation_values_path):
             x_list_collection = []
             x_counterfactual_collection = []
             y_confidence_list = []
