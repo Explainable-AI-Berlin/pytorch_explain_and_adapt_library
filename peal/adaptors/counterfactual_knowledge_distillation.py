@@ -436,13 +436,7 @@ class CounterfactualKnowledgeDistillation:
                     idx_batch.append(0)
 
                 sample_idx += 1
-                print([int(y), y_source, y_target, y_target_start_confidence])
-                print([int(y), y_source, y_target, y_target_start_confidence])
-                print([int(y), y_source, y_target, y_target_start_confidence])
-                print([int(y), y_source, y_target, y_target_start_confidence])
-                print([int(y), y_source, y_target, y_target_start_confidence])
-                print([int(y), y_source, y_target, y_target_start_confidence])
-                print([int(y), y_source, y_target, y_target_start_confidence])
+                print("[int(y), y_source, y_target, y_target_start_confidence]")
                 print([int(y), y_source, y_target, y_target_start_confidence])
                 print([int(y), y_source, y_target, y_target_start_confidence])
                 print([int(y), y_source, y_target, y_target_start_confidence])

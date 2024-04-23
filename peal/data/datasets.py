@@ -712,6 +712,7 @@ class Image2ClassDataset(ImageDataset):
         mode,
         config,
         root_dir=None,
+        data_dir=None,
         transform=ToTensor(),
         task_config=None,
         return_dict=False,

@@ -15,6 +15,7 @@ def main():
     parser.add_argument("--model_config", type=str, required=True)
     parser.add_argument("--model_path", type=str, default=None)
     parser.add_argument("--data_config", type=str, default=None)
+    parser.add_argument("--partition", type=int, default=-1)
     args = parser.parse_args()
 
     # TODO this can't be done properly before bug is fixed...
@@ -40,13 +41,14 @@ def main():
 
     model = torch.load(model_path, map_location=device)
     model.eval()
-    test_dataloader = create_dataloaders_from_datasource(model_config)[-1]
+    test_dataloader = create_dataloaders_from_datasource(model_config)[args.partition]
     correct, group_accuracies, group_distribution, worst_group_accuracy = calculate_test_accuracy(
         model, test_dataloader, device, True
     )
-    print("Test accuracy: ", correct)
-    print("Group accuracies: ", group_accuracies)
-    print("Group distribution: ", group_distribution)
-    print("Worst group accuracy: ", worst_group_accuracy)
+    partitions = ['Training', 'Validation', 'Test']
+    print(partitions[args.partition] + " accuracy: " + str(correct))
+    print("Group accuracies: " + str(group_accuracies))
+    print("Group distribution: " + str(group_distribution))
+    print("Worst group accuracy: " + str(worst_group_accuracy))
 
 main()

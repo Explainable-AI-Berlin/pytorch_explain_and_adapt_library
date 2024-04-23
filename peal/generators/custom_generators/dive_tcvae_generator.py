@@ -26,7 +26,9 @@ class DiveTCVAE(InvertibleGenerator):
         self.config.savedir = self.config.base_path  # hacky
         self.config.crop_size = None
         self.exp_dict = self.config.__dict__
+        print('initialize generator')
         self.tcvae = TCVAE(exp_dict=self.exp_dict, savedir=self.exp_dict["savedir"])
+        print('initializing generator done!')
         if os.path.exists(os.path.join(self.config.base_path, "final.pt")):
             self.tcvae.load_state_dict(
                 torch.load(os.path.join(self.config.base_path, "final.pt"))

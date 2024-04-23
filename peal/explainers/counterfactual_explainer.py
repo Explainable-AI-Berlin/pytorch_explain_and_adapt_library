@@ -195,7 +195,7 @@ class CounterfactualExplainer(ExplainerInterface):
 
         latent_code = [v_elem.to(self.device) for v_elem in v]
         counterfactual = self.generator.decode(latent_code).detach().cpu()
-        self.generator.dataset.project_to_pytorch_default(counterfactual)
+        counterfactual = self.generator.dataset.project_to_pytorch_default(counterfactual)
         counterfactual = torchvision.transforms.Resize(
             self.classifier_dataset.config.input_size[1:]
         )(counterfactual)
