@@ -20,7 +20,7 @@ from peal.dependencies.dive.src.wrappers.tcvae import TCVAE
 
 
 class DiveTCVAE(InvertibleGenerator):
-    def __init__(self, config, model_dir=None, device="cpu", classifier_dataset=None):
+    def __init__(self, config, model_dir=None, device="cpu", classifier_dataset=None, train=True):
         super().__init__()
         self.config = load_yaml_config(config)
         self.config.savedir = self.config.base_path  # hacky
@@ -30,8 +30,9 @@ class DiveTCVAE(InvertibleGenerator):
         self.tcvae = TCVAE(exp_dict=self.exp_dict, savedir=self.exp_dict["savedir"])
         print('initializing generator done!')
         if os.path.exists(os.path.join(self.config.base_path, "final.pt")):
+            # TODO this is kind of dangerous
             self.tcvae.load_state_dict(
-                torch.load(os.path.join(self.config.base_path, "final.pt"))
+                torch.load(os.path.join(self.config.base_path, "final.pt")), strict=False
             )
 
         self.train_dataset, self.val_dataset, _ = get_datasets(self.config.data)

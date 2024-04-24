@@ -386,13 +386,7 @@ class CounterfactualKnowledgeDistillation:
                 y_target = int(cm_idx % self.output_size)
 
             cm_idx = (cm_idx + 1) % (self.output_size**2)
-            try:
-                x, y = self.datastack.pop(int(y_source))
-
-            except Exception as e:
-                import pdb
-
-                pdb.set_trace()
+            x, y = self.datastack.pop(int(y_source))
 
             if isinstance(self.teacher, SegmentationMaskTeacher) or isinstance(
                 self.explainer.explainer_config, PerfectFalseCounterfactualConfig
@@ -671,15 +665,15 @@ class CounterfactualKnowledgeDistillation:
             feedback
         )
 
-        num_true_2sided = len(list(filter(lambda sample: sample == "true", feedback)))
+        """num_true_2sided = len(list(filter(lambda sample: sample == "true", feedback)))
         num_false_2sided = len(list(filter(lambda sample: sample == "false", feedback)))
         if num_true_2sided == 0:
             fa_2sided = 0
 
         else:
-            fa_2sided = num_true_2sided / (num_true_2sided + num_false_2sided)
+            fa_2sided = num_true_2sided / (num_true_2sided + num_false_2sided)"""
 
-        """num_true_1sided = len(
+        num_true_1sided = len(
             list(
                 filter(
                     lambda x: x[1] == "true"
@@ -700,12 +694,12 @@ class CounterfactualKnowledgeDistillation:
             )
         )
         fa_1sided = num_true_1sided / (num_true_1sided + num_false_1sided)
-        fa_absolute = num_true_1sided / num_samples"""
+        fa_absolute = num_true_1sided / num_samples
 
         feedback_stats = {
             "flip_rate": flip_rate,
             "ood_rate": ood_rate,
-            "feedback_accuracy": fa_2sided,
+            "feedback_accuracy": fa_1sided,
         }
 
         return feedback, feedback_stats
@@ -766,16 +760,17 @@ class CounterfactualKnowledgeDistillation:
                     + "_"
                     + str(sample_idx)
                 )
-                """assert (
+                assert (
                     self.student(
                         x_counterfactual_list[sample_idx].unsqueeze(0).to(self.device)
                     ).argmax()
                     == int(y_source_list[sample_idx]),
                     "This can not be a false counterfactual!",
-                )"""
+                )
                 x_list.append(x_counterfactual_list[sample_idx])
+                print([x_counterfactual_list[sample_idx].min(), [x_counterfactual_list[sample_idx].max()]])
                 # y_list.append(int(y_source_list[sample_idx]))
-                y_counterfactual_list.append(int(y_list[sample_idx]))
+                y_counterfactual_list.append(int(y_source_list[sample_idx]))
                 sample_names.append(sample_name)
                 sample_idx += 1
 
@@ -1038,8 +1033,6 @@ class CounterfactualKnowledgeDistillation:
                 for key in validation_tracked_file.keys():
                     validation_stats[key] = torch.tensor(validation_tracked_file[key])
 
-                return validation_stats
-
         validation_values_path = os.path.join(
             self.base_dir, str(finetune_iteration), "validation_tracked_values.npz"
         )
@@ -1256,14 +1249,6 @@ class CounterfactualKnowledgeDistillation:
         for key in validation_feedback_stats.keys():
             validation_stats[key] = validation_feedback_stats[key]
 
-        self.create_dataset(
-            feedback=validation_feedback,
-            finetune_iteration=finetune_iteration + 1,
-            mode="validation",
-            config=self.validation_data_config,
-            **validation_tracked_values,
-        )
-
         if self.adaptor_config.tracking_level > 0:
             with open(
                 os.path.join(
@@ -1282,6 +1267,14 @@ class CounterfactualKnowledgeDistillation:
                         validation_stats_file[key] = np.array(validation_stats[key])
 
                 np.savez(f, **validation_stats_file)
+
+        self.create_dataset(
+            feedback=validation_feedback,
+            finetune_iteration=finetune_iteration + 1,
+            mode="validation",
+            config=self.validation_data_config,
+            **validation_tracked_values,
+        )
 
         return validation_stats
 
