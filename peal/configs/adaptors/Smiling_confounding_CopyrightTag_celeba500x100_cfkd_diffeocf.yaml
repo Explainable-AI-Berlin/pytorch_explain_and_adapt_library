@@ -3,9 +3,9 @@ adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  1 #5
 tracking_level                       :  2
-min_train_samples                    :  400
+min_train_samples                    :  10 #400
 finetune_iterations                  :  1
-max_validation_samples               :  100
+max_validation_samples               :  10 #100
 max_test_batches                     :  1
 continuous_learning                  :  "finetune"
 replace_model                        :  True

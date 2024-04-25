@@ -1,8 +1,10 @@
+import torch
+
 from peal.teachers.teacher_interface import TeacherInterface
 
 
 class Model2ModelTeacher(TeacherInterface):
-    def __init__(self, model, dataset, tracking_level = 0, counterfactual_type = '1sided'):
+    def __init__(self, model, dataset, tracking_level=0, counterfactual_type="1sided"):
         self.model = model
         self.dataset = dataset
         self.tracking_level = tracking_level
@@ -18,6 +20,7 @@ class Model2ModelTeacher(TeacherInterface):
         y_target_end_confidence_list,
         base_dir=None,
         y_target_list=None,
+        student=None,
         **kwargs
     ):
         feedback = []
@@ -43,21 +46,50 @@ class Model2ModelTeacher(TeacherInterface):
 
             # TODO here has to be somehing added for OOD e.g. with FID score
             # TODO this will be a problem for multiclass
+            y_target_confidence_end = torch.nn.functional.softmax(
+                student(counterfactual.unsqueeze(0).to(self.device))[0]
+            )[y_target_list[idx]]
+            if (
+                not abs(y_target_confidence_end - y_target_end_confidence_list[idx])
+                < 0.01
+            ):
+                print("End confidences are not matching!")
+                import pdb
 
-            if self.counterfactual_type == '1sided' and not y_list[idx] == y_source_list[idx]:
+                pdb.set_trace()
+
+            if (
+                self.counterfactual_type == "1sided"
+                and y_list[idx] != y_source_list[idx]
+                or pred_original != y_list[idx]
+                or y_target_end_confidence_list[idx] < 0.5
+            ):
                 feedback.append("ood")
 
             else:
-                if y_target_end_confidence_list[idx] > 0.5:
-                    #if y_source_list[idx] == y_list[idx]:
-                    if pred_original != pred_counterfactual:
-                        feedback.append("true")
-
-                    else:
-                        feedback.append("false")
+                if pred_original != pred_counterfactual:
+                    feedback.append("true")
 
                 else:
-                    feedback.append("ood")
+                    y_counterfactual = y_source_list[idx]
+                    prediction = (
+                        student(counterfactual.unsqueeze(0).to(self.device))
+                        .squeeze(0)
+                        .detach()
+                        .cpu()
+                        .argmax(-1)
+                    )
+                    print("In teacher!")
+                    if prediction == int(y_counterfactual):
+                        print("This can not be a false counterfactual!")
+                        import pdb
+
+                        pdb.set_trace()
+
+                    else:
+                        print([int(prediction), int(y_counterfactual)])
+
+                    feedback.append("false")
 
             teacher_original.append(pred_original)
             teacher_counterfactual.append(pred_counterfactual)

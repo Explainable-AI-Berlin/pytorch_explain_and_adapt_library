@@ -233,7 +233,7 @@ class CounterfactualKnowledgeDistillation:
         ):
             assert self.adaptor_config.current_iteration == 0
             print("Create base_dir in: " + str(self.base_dir))
-            #shutil.rmtree(self.base_dir, ignore_errors=True)
+            # shutil.rmtree(self.base_dir, ignore_errors=True)
             Path(self.base_dir).mkdir(parents=True, exist_ok=True)
             writer = SummaryWriter(os.path.join(self.base_dir, "logs"))
             log_images_to_writer(self.train_dataloader, writer, "train0")
@@ -617,6 +617,7 @@ class CounterfactualKnowledgeDistillation:
                 base_dir=os.path.join(
                     self.base_dir, str(finetune_iteration), mode + "_teacher"
                 ),
+                student=self.student,
                 **tracked_values,
             )
 
@@ -760,17 +761,23 @@ class CounterfactualKnowledgeDistillation:
                     + "_"
                     + str(sample_idx)
                 )
-                assert (
-                    self.student(
-                        x_counterfactual_list[sample_idx].unsqueeze(0).to(self.device)
-                    ).argmax()
-                    == int(y_source_list[sample_idx]),
-                    "This can not be a false counterfactual!",
-                )
                 x_list.append(x_counterfactual_list[sample_idx])
-                print([x_counterfactual_list[sample_idx].min(), [x_counterfactual_list[sample_idx].max()]])
                 # y_list.append(int(y_source_list[sample_idx]))
                 y_counterfactual_list.append(int(y_source_list[sample_idx]))
+                prediction = self.student(
+                    x_list[-1].unsqueeze(0).to(self.device)
+                ).argmax()
+
+                print("In cfkd create dataset!")
+                if prediction == int(y_counterfactual_list[-1]):
+                    print("This can not be a false counterfactual!")
+                    import pdb
+
+                    pdb.set_trace()
+
+                else:
+                    print([int(prediction), int(y_counterfactual_list[-1])])
+
                 sample_names.append(sample_name)
                 sample_idx += 1
 
@@ -779,6 +786,7 @@ class CounterfactualKnowledgeDistillation:
             x_list=x_list,
             y_list=y_counterfactual_list,
             sample_names=sample_names,
+            classifier=self.student,
         )
         return dataset_dir
 
