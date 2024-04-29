@@ -53,11 +53,9 @@ class Model2ModelTeacher(TeacherInterface):
                 < 0.01
             ):
                 print("End confidences are not matching!")
-                import pdb
+                feedback.append("ood")
 
-                pdb.set_trace()
-
-            if (
+            elif (
                 self.counterfactual_type == "1sided"
                 and y_list[idx] != y_source_list[idx]
                 or pred_original != y_list[idx]

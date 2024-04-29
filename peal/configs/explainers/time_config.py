@@ -26,7 +26,8 @@ class TIMEConfig(ExplainerConfig):
         "|<A*01>| |<A*02>| |<A*03>|",
         "|<A*11>| |<A*12>| |<A*13>|",
     ]
-    base_prompt: str = "A |<C*1>| |<C*2>| |<C*3>| photo"
+    base_prompt: str = "A photo of a |<C*1>| |<C*2>| |<C*3>|"
+    prompt_connector: str = " that is "
     chunks: int = 1
     chunk: int = 0
     enable_xformers_memory_efficient_attention: bool = False

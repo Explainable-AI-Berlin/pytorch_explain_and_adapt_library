@@ -49,7 +49,7 @@ class DiveTCVAEConfig(GeneratorConfig):
     tc_weight: int = (
         1  # we keep the total_correlation penalty high to encourage disentanglement
     )
-    vgg_weight: int = 1
+    vgg_weight: float = 1.0
     pix_mse_weight: float = 0.0001
     beta_annealing: bool = True
     dp_prob: float = 0.3

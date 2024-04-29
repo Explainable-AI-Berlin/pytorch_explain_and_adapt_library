@@ -774,6 +774,7 @@ class CounterfactualKnowledgeDistillation:
                     import pdb
 
                     pdb.set_trace()
+                    quit()
 
                 else:
                     print([int(prediction), int(y_counterfactual_list[-1])])
