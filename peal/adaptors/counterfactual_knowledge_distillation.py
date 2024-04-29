@@ -373,6 +373,9 @@ class CounterfactualKnowledgeDistillation:
         else:
             cm_idx = 1
 
+        print("[int(y), y_source, y_target, y_target_start_confidence]")
+        print("[int(y), y_source, y_target, y_target_start_confidence]")
+        print("[int(y), y_source, y_target, y_target_start_confidence]")
         while not sample_idx >= self.adaptor_config.batch_size:
             if self.adaptor_config.use_confusion_matrix:
                 cm_idx = error_distribution.sample()
@@ -380,7 +383,7 @@ class CounterfactualKnowledgeDistillation:
             # TODO verify that this is actually balancing itself!
             y_source = int(cm_idx / self.output_size)
             y_target = int(cm_idx % self.output_size)
-            if y_source == y_target:
+            while y_source == y_target:
                 cm_idx = (cm_idx + 1) % (self.output_size**2)
                 y_source = int(cm_idx / self.output_size)
                 y_target = int(cm_idx % self.output_size)
@@ -430,9 +433,6 @@ class CounterfactualKnowledgeDistillation:
                     idx_batch.append(0)
 
                 sample_idx += 1
-                print("[int(y), y_source, y_target, y_target_start_confidence]")
-                print([int(y), y_source, y_target, y_target_start_confidence])
-                print([int(y), y_source, y_target, y_target_start_confidence])
                 print([int(y), y_source, y_target, y_target_start_confidence])
 
         x_batch = torch.stack(x_batch)
@@ -1094,6 +1094,7 @@ class CounterfactualKnowledgeDistillation:
                     max_validation_samples=self.adaptor_config.max_validation_samples,
                     min_start_target_percentile=self.adaptor_config.min_start_target_percentile,
                 )
+                # torch.nn.functional.softmax(self.student(validation_tracked_values_current['x_counterfactual_list'][i].unsqueeze(0).to('cuda')).squeeze(0))[validation_tracked_values_current['y_target_list'][i]]
                 if validation_tracked_values is None:
                     validation_tracked_values = validation_tracked_values_current
 

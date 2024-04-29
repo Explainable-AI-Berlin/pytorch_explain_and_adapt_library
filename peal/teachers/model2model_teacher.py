@@ -46,9 +46,8 @@ class Model2ModelTeacher(TeacherInterface):
 
             # TODO here has to be somehing added for OOD e.g. with FID score
             # TODO this will be a problem for multiclass
-            y_target_confidence_end = torch.nn.functional.softmax(
-                student(counterfactual.unsqueeze(0).to(self.device))[0]
-            )[y_target_list[idx]]
+            # TODO is this a numerical problem???
+            y_target_confidence_end = torch.nn.functional.softmax(student(counterfactual.unsqueeze(0).to(self.device))[0])[y_target_list[idx]]
             if (
                 not abs(y_target_confidence_end - y_target_end_confidence_list[idx])
                 < 0.01
