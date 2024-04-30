@@ -114,10 +114,10 @@ class DiveTCVAE(InvertibleGenerator):
                 self.tcvae.state_dict(),
                 os.path.join(self.config.base_path, str(epoch), "model.pt"),
             )
-            generated_samples = self.sample_x(batch_size=100)
+            generated_samples = self.sample_x(batch_size=self.config.batch_size)
             for i in range(5):
                 image_pil = transforms.ToPILImage()(
-                    (generated_samples[random.randint(0, 99), :, :, :] + 1) / 2
+                    (generated_samples[random.randint(0, self.config.batch_size-1), :, :, :] + 1) / 2
                 )
                 image_pil.save(
                     os.path.join(self.config.base_path, str(epoch), f"sample{i}.png")

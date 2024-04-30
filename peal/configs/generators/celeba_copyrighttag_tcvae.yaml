@@ -1,4 +1,4 @@
-# python -W ignore train_generator --config "<PEAL_BASE>/configs/generators/dive_generator_celeba_copyrighttag.yaml"
+# python -W ignore train_generator.py --config "<PEAL_BASE>/configs/generators/dive_generator_celeba_copyrighttag.yaml"
 generator_type: 'DiveTCVAE'
 category: 'generator'
 

@@ -1412,7 +1412,7 @@ class CounterfactualKnowledgeDistillation:
             ):
                 # self.adaptor_config["fa_1sided_prime"] = validation_stats["fa_1sided"]
                 self.adaptor_config.best_feedback_accuracy = validation_stats[
-                    "fa_1sided"
+                    "feedback_accuracy"
                 ]
                 if self.adaptor_config.replacement_strategy == "direct":
                     torch.save(self.student, os.path.join(self.base_dir, "model.cpl"))
