@@ -1,3 +1,4 @@
+# python -W ignore train_generator --config "<PEAL_BASE>/configs/generators/dive_generator_celeba_copyrighttag.yaml"
 generator_type: 'DiveTCVAE'
 category: 'generator'
 
@@ -17,16 +18,16 @@ clip: True
 model: 'biggan'
 backbone: 'resnet'
 channels_width: 4
-z_dim: 128
-mlp_width: 4
-mlp_depth: 2
+z_dim: 1024
+mlp_width: 10 #4
+mlp_depth: 5 #2
 #savedir : 'peal_runs/dive_tcvae'
-base_path : '/home/space/datasets/peal/peal_runs/dive_celeba_copyrighttag'
+base_path : '/home/space/datasets/peal/peal_runs/celeba_copyrighttag/tcvae2'
 
 # TCVAE
 beta: 0.001 # the idea is to be able to interpolate while getting good reconstructions
 tc_weight: 1 # we keep the total_correlation penalty high to encourage disentanglement
-vgg_weight: 0
+vgg_weight: 1.0
 beta_annealing: True
 dp_prob: 0.3
 

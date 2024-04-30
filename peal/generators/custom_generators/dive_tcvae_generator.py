@@ -46,7 +46,7 @@ class DiveTCVAE(InvertibleGenerator):
         self.fid = torchmetrics.image.fid.FrechetInceptionDistance(
             feature=192, reset_real_features=False
         )
-        real_images = [self.train_dataset[i][0] for i in range(500)]
+        real_images = [self.train_dataset[i][0] for i in range(min(len(self.train_dataset), 500))]
         self.fid = self.fid.to("cuda")
         self.fid.update(
             torch.tensor(255 * torch.stack(real_images, dim=0), dtype=torch.uint8).to(

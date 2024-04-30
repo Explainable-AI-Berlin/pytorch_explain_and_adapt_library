@@ -305,6 +305,9 @@ def training(args=None):
                 tokens=args.custom_tokens,
                 output=args.output_path,
             )
+            images = pipeline(args.prompt).images
+            for i, img in enumerate(images):
+                img.save(args.output_path[:-4] + f"_image-{iterations}-{i}.png")
 
         if iterations > args.iterations:
             break

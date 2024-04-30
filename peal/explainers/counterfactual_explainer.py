@@ -87,10 +87,6 @@ class CounterfactualExplainer(ExplainerInterface):
         x = self.classifier_dataset.project_to_pytorch_default(x)
         x = self.generator.dataset.project_from_pytorch_default(x)
         x = torchvision.transforms.Resize(self.generator.config.data.input_size[1:])(x)
-        print("[x.min(), x.max()]")
-        print([x.min(), x.max()])
-        print([x.min(), x.max()])
-        print([x.min(), x.max()])
         v_original = self.generator.encode(x.to(self.device))
         if isinstance(v_original, list):
             v = []
@@ -127,17 +123,15 @@ class CounterfactualExplainer(ExplainerInterface):
             img = self.generator.decode(latent_code)
 
             img = self.generator.dataset.project_to_pytorch_default(img)
-            img = torchvision.transforms.Resize(self.classifier_dataset.config.input_size[1:])(img)
+            img = torchvision.transforms.Resize(
+                self.classifier_dataset.config.input_size[1:]
+            )(img)
             img = self.classifier_dataset.project_from_pytorch_default(img)
-            print("[img.min(), img.max()]")
-            print([img.min(), img.max()])
-            print([img.min(), img.max()])
-            print([img.min(), img.max()])
 
-            logits = self.downstream_model(
+            logits_perturbed = self.downstream_model(
                 img + self.explainer_config.img_noise_injection * torch.randn_like(img)
             )
-            loss = self.loss(logits, target_classes.to(self.device))
+            loss = self.loss(logits_perturbed, target_classes.to(self.device))
             l1_losses = []
             for v_idx in range(len(v_original)):
                 l1_losses.append(
@@ -155,8 +149,7 @@ class CounterfactualExplainer(ExplainerInterface):
             """loss += self.explainer_config.log_prob_regularization * torch.mean(
                 self.generator.log_prob_z(latent_code)
             )"""
-
-            logit_confidences = torch.nn.Softmax(dim=-1)(logits).detach().cpu()
+            logit_confidences = torch.nn.Softmax(dim=-1)(logits_perturbed).detach().cpu()
             target_confidences = [
                 float(logit_confidences[i][target_classes[i]])
                 for i in range(len(target_classes))
@@ -195,15 +188,21 @@ class CounterfactualExplainer(ExplainerInterface):
 
         latent_code = [v_elem.to(self.device) for v_elem in v]
         counterfactual = self.generator.decode(latent_code).detach().cpu()
-        counterfactual = self.generator.dataset.project_to_pytorch_default(counterfactual)
+        counterfactual = self.generator.dataset.project_to_pytorch_default(
+            counterfactual
+        )
         counterfactual = torchvision.transforms.Resize(
             self.classifier_dataset.config.input_size[1:]
         )(counterfactual)
-        counterfactual = self.classifier_dataset.project_from_pytorch_default(counterfactual)
-        print("[counterfactual.min(), counterfactual.max()]")
-        print([counterfactual.min(), counterfactual.max()])
-        print([counterfactual.min(), counterfactual.max()])
-        print([counterfactual.min(), counterfactual.max()])
+        counterfactual = self.classifier_dataset.project_from_pytorch_default(
+            counterfactual
+        )
+        logits = self.downstream_model(img)
+        logit_confidences = torch.nn.Softmax(dim=-1)(logits).detach().cpu()
+        target_confidences = [
+            float(logit_confidences[i][target_classes[i]])
+            for i in range(len(target_classes))
+        ]
 
         attributions = []
         for v_idx in range(len(v_original)):
@@ -351,9 +350,6 @@ class CounterfactualExplainer(ExplainerInterface):
                 start_idx=start_idx,
                 **batch_out,
             )
-            print("Counterfactual created2!!!")
-            print("Counterfactual created2!!!")
-            print("Counterfactual created2!!!")
 
         return batch_out
 
