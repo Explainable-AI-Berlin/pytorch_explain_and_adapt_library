@@ -21,7 +21,7 @@ z_dim: 128
 mlp_width: 4
 mlp_depth: 2
 #savedir : 'peal_runs/dive_tcvae'
-base_path : '/home/space/datasets/peal/peal_runs/dive_celeba'
+base_path : '/home/space/datasets/peal/peal_runs/celeba/tcvae'
 
 # TCVAE
 beta: 0.001 # the idea is to be able to interpolate while getting good reconstructions
