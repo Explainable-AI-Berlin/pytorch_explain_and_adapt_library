@@ -11,6 +11,7 @@ import blobfile as bf
 from mpi4py import MPI
 from torch import nn
 from PIL import Image
+from torch.utils.tensorboard import SummaryWriter
 from torchvision.transforms import ToTensor
 
 from peal.configs.editors.ddpm_inversion_config import DDPMInversionConfig
@@ -65,13 +66,14 @@ class StableDiffusion(EditCapableGenerator):
             )
             get_predictions(prediction_args)
 
+        writer = SummaryWriter(os.path.join(base_path, "explainer", "logs"))
         generator_dataset_config = copy.deepcopy(self.config.data)
-        generator_dataset_config.split = [1.0, 1.0]
-        self.generator_dataset = get_datasets(
+        generator_dataset_config.split = [0.9, 1.0]
+        self.generator_dataset, self.generator_dataset_val, _ = get_datasets(
             config=generator_dataset_config, data_dir=class_predictions_path
-        )[0]
+        )
         context_embedding_path = os.path.join(
-            base_path, "explainer", "context_embedding"
+            base_path, "explainer", "context", "context_embedding"
         )
         if not os.path.exists(context_embedding_path):
             train_context_embedding_args = types.SimpleNamespace(
@@ -84,6 +86,8 @@ class StableDiffusion(EditCapableGenerator):
                 training_label=-1,
                 custom_tokens=explainer_config.custom_tokens_context,
                 prompt=explainer_config.base_prompt,
+                generator_dataset_val=self.generator_dataset_val,
+                writer=writer,
                 **explainer_config.__dict__
             )
             training(train_context_embedding_args)
@@ -91,7 +95,7 @@ class StableDiffusion(EditCapableGenerator):
         # TODO how to extend this for multiclass??
         for class_idx in range(2):
             class_token_path = os.path.join(
-                base_path, "explainer", "class_token" + str(class_idx)
+                base_path, "explainer", "class" + str(class_idx), "class_token" + str(class_idx)
             )
             if not os.path.exists(class_token_path):
                 class_related_bias_embedding_args = types.SimpleNamespace(
@@ -104,6 +108,8 @@ class StableDiffusion(EditCapableGenerator):
                     training_label=class_idx,
                     phase="class",
                     batch_size=explainer_config.train_batch_size,
+                    generator_dataset_val=self.generator_dataset_val,
+                    writer=writer,
                     prompt=explainer_config.base_prompt
                     + explainer_config.prompt_connector
                     + explainer_config.class_custom_token[class_idx],
@@ -122,9 +128,9 @@ class StableDiffusion(EditCapableGenerator):
             )
             self.editor = DDPMInversion(ddpm_inversion_config)
             embedding_files = [
-                os.path.join(base_path, "explainer", "context_embedding"),
-                os.path.join(base_path, "explainer", "class_token0"),
-                os.path.join(base_path, "explainer", "class_token1"),
+                os.path.join(base_path, "explainer", "context", "context_embedding"),
+                os.path.join(base_path, "explainer", "class0", "class_token0"),
+                os.path.join(base_path, "explainer", "class1", "class_token1"),
             ]
             load_tokens_and_embeddings(sd_model=self.editor.pipe, files=embedding_files)
 

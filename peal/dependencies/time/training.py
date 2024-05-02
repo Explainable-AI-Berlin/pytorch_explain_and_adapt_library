@@ -1,11 +1,16 @@
 # I based the embedding learning on this repo
 # https://colab.research.google.com/github/huggingface/notebooks/blob/main/diffusers/sd_textual_inversion_training.ipynb
+import math
+
+import torchmetrics
 import yaml
 import os
 import tqdm
 import random
 import argparse
 import numpy as np
+import matplotlib
+import matplotlib.pyplot as plt
 
 import torch
 import torch.linalg as linalg
@@ -88,6 +93,115 @@ def seed_worker(worker_id):
     random.seed(worker_seed)
 
 
+def run_epoch(
+    data_loader,
+    pipeline,
+    noise_scheduler,
+    optimizer,
+    device,
+    torch_dtype,
+    args,
+    iterations,
+    num_chunks,
+    tokenizer,
+    text_encoder,
+    index_no_updates,
+):
+    losses = []
+    for image, text in tqdm.tqdm(
+        data_loader(iterations), desc="Iterations", total=args.iterations
+    ):
+        image = image.to(device, dtype=torch_dtype)
+        text_inputs = tokenizer(
+            text,
+            padding="max_length",
+            max_length=tokenizer.model_max_length,
+            truncation=True,
+            return_tensors="pt",
+        )
+        text_input_ids = text_inputs.input_ids.to(device, dtype=torch.long)
+        B = image.size(0)
+
+        for img, text_ids in zip(
+            image.chunk(num_chunks), text_input_ids.chunk(num_chunks)
+        ):
+            # Image encoding
+            with torch.no_grad():
+                latents = (
+                    pipeline.vae.encode(img).latent_dist.sample().detach()
+                )  # this encodes 256x256 images!
+                latents = latents * pipeline.vae.config.scaling_factor
+
+                # Sample noise that we'll add to the latents
+                if optimizer is None:
+                    torch.manual_seed(0)
+
+                noise = torch.randn_like(latents)
+                bsz = latents.shape[0]
+
+                # Sample a random timestep for each image
+                timesteps = torch.randint(
+                    0, noise_scheduler.config.num_train_timesteps, (bsz,), device=device
+                )
+                timesteps = timesteps.long()
+
+                # Add noise to the latents according to the noise magnitude at each timestep
+                # (this is the forward diffusion process)
+                noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
+
+            # Get the text embedding for conditioning
+            encoder_hidden_states = pipeline.text_encoder(text_ids)[0].to(
+                dtype=torch_dtype
+            )
+
+            # Predict the noise residual
+            model_pred = pipeline.unet(
+                noisy_latents, timesteps, encoder_hidden_states
+            ).sample
+
+            # Get the target for loss depending on the prediction type
+            if noise_scheduler.config.prediction_type == "epsilon":
+                target = noise
+
+            elif noise_scheduler.config.prediction_type == "v_prediction":
+                target = noise_scheduler.get_velocity(latents, noise, timesteps)
+
+            else:
+                raise ValueError(
+                    f"Unknown prediction type {noise_scheduler.config.prediction_type}"
+                )
+
+            loss = F.mse_loss(model_pred.float(), target.float(), reduction="sum") / B
+            if not optimizer is None:
+                loss.backward()
+
+            losses.append(loss.item())
+
+        if not optimizer is None:
+            # modify gradients of tokens that we don't want to change
+            with torch.no_grad():
+                grad = text_encoder.get_input_embeddings().weight.grad
+                # weight decay
+                try:
+                    grad = grad.add(
+                        text_encoder.get_input_embeddings().weight.data, alpha=args.weight_decay
+                    )
+
+                except Exception:
+                    import pdb; pdb.set_trace()
+                # zero-out gradients of those embeddings we don't want to modify
+                grad = grad * (1 - index_no_updates.unsqueeze(1))
+                text_encoder.get_input_embeddings().weight.grad = grad
+
+            optimizer.step()
+            optimizer.zero_grad()
+
+        if iterations > args.iterations:
+            return torch.mean(losses)
+
+        iterations += 1
+
+
 def training(args=None):
     # =================================================================
     # Custom variables
@@ -97,6 +211,8 @@ def training(args=None):
         with open("training.yaml", "w") as f:
             yaml.dump(vars(args), f, default_flow_style=False)
 
+    phase = args.phase
+    phase += str(args.training_label) if args.training_label >= 0 else ""
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
     torch_dtype = torch.float16 if args.use_fp16 else torch.float32
     device = torch.device("cuda")
@@ -127,7 +243,9 @@ def training(args=None):
         load_tokens_and_embeddings(sd_model=pipeline, files=args.embedding_files)
 
     except Exception:
-        import pdb; pdb.set_trace()
+        import pdb
+
+        pdb.set_trace()
 
     # generate new tokens
     index_no_updates, placeholder_token_ids, initializer_token_ids = add_new_tokens(
@@ -190,6 +308,19 @@ def training(args=None):
         worker_init_fn=seed_worker,
         generator=g,
     )
+    dataset_val = TextualDataset(
+        custom_tokens=args.custom_tokens,
+        base_prompt_generator=get_phrase_generator(args),
+        dataset=args.generator_dataset_val,
+    )
+    loader_val = data.DataLoader(
+        dataset_val,
+        batch_size=args.batch_size,
+        num_workers=5,
+        shuffle=True,
+        worker_init_fn=seed_worker,
+        generator=g,
+    )
 
     # =================================================================
     # Training Loop
@@ -200,119 +331,94 @@ def training(args=None):
     differences = []
     iterations = 0
 
-    def data_loader(iterations):
-        while True:
-            yield from loader
+    fid = torchmetrics.image.fid.FrechetInceptionDistance(
+        feature=192, reset_real_features=False
+    )
+    fid.to(device)
+    real_images = []
+    for i in range(min(len(args.generator_dataset_val), 100)):
+        real_images.append(args.generator_dataset_val[i][0])
 
-    for image, text in tqdm.tqdm(
-        data_loader(iterations), desc="Iterations", total=args.iterations
-    ):
-        image = image.to(device, dtype=torch_dtype)
-        text_inputs = tokenizer(
-            text,
-            padding="max_length",
-            max_length=tokenizer.model_max_length,
-            truncation=True,
-            return_tensors="pt",
+    real_images = torch.stack(real_images, dim=0).to(device)
+    fid.update(torch.tensor(255 * real_images, dtype=torch.uint8), real=True)
+
+    for epoch in range(args.max_epoch):
+        def data_loader(iterations):
+            while True:
+                yield from loader
+
+        train_loss = run_epoch(
+            data_loader,
+            pipeline,
+            noise_scheduler,
+            optimizer,
+            device,
+            torch_dtype,
+            args,
+            iterations,
+            num_chunks,
+            tokenizer,
+            text_encoder,
+            index_no_updates,
         )
-        text_input_ids = text_inputs.input_ids.to(device, dtype=torch.long)
-        B = image.size(0)
-
-        for img, text_ids in zip(
-            image.chunk(num_chunks), text_input_ids.chunk(num_chunks)
-        ):
-            # Image encoding
-            with torch.no_grad():
-                latents = (
-                    pipeline.vae.encode(img).latent_dist.sample().detach()
-                )  # this encodes 256x256 images!
-                latents = latents * pipeline.vae.config.scaling_factor
-
-                # Sample noise that we'll add to the latents
-                noise = torch.randn_like(latents)
-                bsz = latents.shape[0]
-
-                # Sample a random timestep for each image
-                timesteps = torch.randint(
-                    0, noise_scheduler.config.num_train_timesteps, (bsz,), device=device
-                )
-                timesteps = timesteps.long()
-
-                # Add noise to the latents according to the noise magnitude at each timestep
-                # (this is the forward diffusion process)
-                noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
-
-            # Get the text embedding for conditioning
-            encoder_hidden_states = pipeline.text_encoder(text_ids)[0].to(
-                dtype=torch_dtype
-            )
-
-            # Predict the noise residual
-            model_pred = pipeline.unet(
-                noisy_latents, timesteps, encoder_hidden_states
-            ).sample
-
-            # Get the target for loss depending on the prediction type
-            if noise_scheduler.config.prediction_type == "epsilon":
-                target = noise
-
-            elif noise_scheduler.config.prediction_type == "v_prediction":
-                target = noise_scheduler.get_velocity(latents, noise, timesteps)
-
-            else:
-                raise ValueError(
-                    f"Unknown prediction type {noise_scheduler.config.prediction_type}"
-                )
-
-            loss = F.mse_loss(model_pred.float(), target.float(), reduction="sum") / B
-            loss.backward()
-
-        # modify gradients of tokens that we don't want to change
+        args.writer.add_scalar(phase + "_train_loss", train_loss, epoch)
+        val_loss = run_epoch(
+            loader_val,
+            pipeline,
+            noise_scheduler,
+            None,
+            device,
+            torch_dtype,
+            args,
+            iterations,
+            num_chunks,
+            tokenizer,
+            text_encoder,
+            index_no_updates,
+        )
+        args.writer.add_scalar(phase + "_val_loss", val_loss, epoch)
         with torch.no_grad():
-            grad = text_encoder.get_input_embeddings().weight.grad
-            # weight decay
-            grad = grad.add(
-                text_encoder.get_input_embeddings().weight.data, alpha=args.weight_decay
-            )
-            # zero-out gradients of those embeddings we don't want to modify
-            grad = grad * (1 - index_no_updates.unsqueeze(1))
-            text_encoder.get_input_embeddings().weight.grad = grad
-
-        optimizer.step()
-        optimizer.zero_grad()
-
-        if (iterations % 500 == 0) or (iterations > args.iterations):
-            with torch.no_grad():
-                embeddings = text_encoder.get_input_embeddings().weight.data
-                d = (
-                    (
-                        embeddings[placeholder_token_ids]
-                        - embeddings[initializer_token_ids]
-                    )
-                    .abs()
-                    .mean(dim=1, keepdim=True)
+            embeddings = text_encoder.get_input_embeddings().weight.data
+            d = (
+                (
+                    embeddings[placeholder_token_ids]
+                    - embeddings[initializer_token_ids]
                 )
-                differences.append(d.detach().cpu())
-                Print(f"Mean difference at iteration {iterations}:", differences[-1])
-
-            save_tokens_and_embeddings(
-                sd_model=pipeline,
-                tokens=args.custom_tokens,
-                output=args.output_path[:-4] + f"-ckpt-{iterations}.pth",
+                .abs()
+                .mean(dim=1, keepdim=True)
             )
-            save_tokens_and_embeddings(
-                sd_model=pipeline,
-                tokens=args.custom_tokens,
-                output=args.output_path,
-            )
-            images = pipeline(args.prompt).images
-            for i, img in enumerate(images):
-                img.save(args.output_path[:-4] + f"_image-{iterations}-{i}.png")
+            differences.append(d.detach().cpu())
+            Print(f"Mean difference at epoch {epoch}:", differences[-1])
 
-        if iterations > args.iterations:
-            break
 
-        iterations += 1
+        matplotlib.use("Agg")
+        differences = torch.cat(differences, dim=1).numpy()
+        for idx, token in enumerate(args.custom_tokens):
+            plt.plot(differences[idx, :], label=token)
+
+        plt.title("L_1 difference")
+        plt.legend()
+        plt.savefig(args.output_path[:-4] + f"differences-{epoch}.png")
+        plt.close()
+
+        save_tokens_and_embeddings(
+            sd_model=pipeline,
+            tokens=args.custom_tokens,
+            output=args.output_path[:-4] + f"-ckpt-{iterations}.pth",
+        )
+        save_tokens_and_embeddings(
+            sd_model=pipeline,
+            tokens=args.custom_tokens,
+            output=args.output_path,
+        )
+        images = pipeline(args.prompt).images
+        for i, img in enumerate(images):
+            img.save(args.output_path[:-4] + f"_image-{iterations}-{i}.png")
+
+        # TODO log FID scores and validation losses
+        fid.update(torch.tensor(255 * images, dtype=torch.uint8), real=False)
+        fid_score = float(fid.compute())
+        args.writer.add_scalar(phase + "_fid", fid_score, epoch)
 
     pipeline.to("cpu")
     save_tokens_and_embeddings(
@@ -321,18 +427,6 @@ def training(args=None):
         output=args.output_path,
     )
 
-    import matplotlib
-    import matplotlib.pyplot as plt
-
-    matplotlib.use("Agg")
-
-    differences = torch.cat(differences, dim=1).numpy()
-    for idx, token in enumerate(args.custom_tokens):
-        plt.plot(differences[idx, :], label=token)
-    plt.title("L_1 difference")
-    plt.legend()
-    plt.savefig(f"differences-{args.phase}.png")
-    plt.close()
 
 
 if __name__ == "__main__":

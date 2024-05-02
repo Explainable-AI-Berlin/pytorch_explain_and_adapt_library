@@ -52,7 +52,8 @@ class TIMEConfig(ExplainerConfig):
     adam_beta2: float = 0.999
     adam_epsilon: float = 1e-9
     weight_decay: float = 1e-4
-    iterations: int = 3000
+    iterations: int = 500
+    max_epoch: int = 10
     train_batch_size: int = 64
     image_size: int = 128
     seed: int = 99999999
