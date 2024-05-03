@@ -57,7 +57,8 @@ class DiveTCVAEConfig(GeneratorConfig):
     # Data
     height: int = 128
     width: int = 128
-    crop_size: Union[int, None] = None
+    crop_size: Union[int, type(None)] = None
+    x_selection: Union[list, type(None)] = None
 
     # Attacks
     lr_dive: float = 0.01

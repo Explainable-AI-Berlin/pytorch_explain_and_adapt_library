@@ -1,5 +1,6 @@
 import os
 import random
+from types import SimpleNamespace
 
 import torch
 from torch.utils.tensorboard import SummaryWriter
@@ -86,12 +87,32 @@ class DiveTCVAE(InvertibleGenerator):
         val_dataloader = get_dataloader(
             self.val_dataset, mode="train", batch_size=self.config.batch_size
         )
+
+        if not self.config.x_selection is None:
+            self.train_dataset.task_config = SimpleNamespace(
+                **{"x_selection": self.config.x_selection}
+            )
+            self.val_dataset.task_config = SimpleNamespace(
+                **{"x_selection": self.config.x_selection}
+            )
+            print("self.dataset.task_config1")
+            print("self.dataset.task_config1")
+            print("self.dataset.task_config1")
+            print("self.dataset.task_config1")
+            print("self.dataset.task_config1")
+            print(self.train_dataset.task_config)
         score_list = []
 
         for epoch in range(self.config.max_epoch):
             os.makedirs(os.path.join(self.config.base_path, str(epoch)), exist_ok=True)
             train_dict = self.tcvae.train_on_loader(epoch, train_dataloader)
             val_dict = self.tcvae.val_on_loader(epoch, val_dataloader, vis_flag=True)
+            print("self.dataset.task_config1")
+            print("self.dataset.task_config1")
+            print("self.dataset.task_config1")
+            print("self.dataset.task_config1")
+            print("self.dataset.task_config1")
+            print(self.train_dataset.task_config)
 
             Image.fromarray(val_dict["val_images"]).save(
                 os.path.join(self.config.base_path, str(epoch), "reconstruction.png"),

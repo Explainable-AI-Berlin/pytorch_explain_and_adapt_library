@@ -344,7 +344,17 @@ def generate_time_counterfactuals(args=None):
                 print('DDPM inversion')
                 print('DDPM inversion')
                 print('DDPM inversion')
-                cf = args.editor.run(x=img, prompt_tar_list=tp, prompt_src=sp)
+                target_confidences = torch.zeros([img.shape[0]])
+                attack = 0
+                cf_final = torch.clone(img)
+                while target_confidences.min() < args.y_target_goal_confidence or attack < args.max_attacks:
+                    cf = args.editor.run(x=img, prompt_tar_list=tp, prompt_src=sp)
+                    confidences = torch.nn.functional.softmax(postprocess(cf), dim=-1)
+                    for i in range(len(confidences)):
+                        target_confidence = confidences[i][target[i]]
+                        if target_confidence < args.y_target_goal_confidence:
+                            cf_final[i] = cf[i]
+                            target_confidences[i] = target_confidence
 
             elif args.editing_type == "edict":
                 xt, yt, _, _, feats = pipeline.Invert(

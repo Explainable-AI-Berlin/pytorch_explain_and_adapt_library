@@ -18,6 +18,7 @@ import torch.utils.data as data
 import torch.nn.functional as F
 
 from diffusers import StableDiffusionPipeline, DDPMScheduler
+from torchvision.transforms import ToTensor
 
 from peal.dependencies.time.core.dataset import get_dataset, TextualDataset
 from peal.dependencies.time.core.utils import (
@@ -184,11 +185,14 @@ def run_epoch(
                 # weight decay
                 try:
                     grad = grad.add(
-                        text_encoder.get_input_embeddings().weight.data, alpha=args.weight_decay
+                        text_encoder.get_input_embeddings().weight.data,
+                        alpha=args.weight_decay,
                     )
 
                 except Exception:
-                    import pdb; pdb.set_trace()
+                    import pdb
+
+                    pdb.set_trace()
                 # zero-out gradients of those embeddings we don't want to modify
                 grad = grad * (1 - index_no_updates.unsqueeze(1))
                 text_encoder.get_input_embeddings().weight.grad = grad
@@ -197,7 +201,7 @@ def run_epoch(
             optimizer.zero_grad()
 
         if iterations > args.iterations:
-            return torch.mean(losses)
+            return torch.mean(torch.tensor(losses))
 
         iterations += 1
 
@@ -343,9 +347,14 @@ def training(args=None):
     fid.update(torch.tensor(255 * real_images, dtype=torch.uint8), real=True)
 
     for epoch in range(args.max_epoch):
+
         def data_loader(iterations):
             while True:
                 yield from loader
+
+        def data_loader_val(iterations):
+            while True:
+                yield from loader_val
 
         train_loss = run_epoch(
             data_loader,
@@ -363,7 +372,7 @@ def training(args=None):
         )
         args.writer.add_scalar(phase + "_train_loss", train_loss, epoch)
         val_loss = run_epoch(
-            loader_val,
+            data_loader_val,
             pipeline,
             noise_scheduler,
             None,
@@ -380,44 +389,50 @@ def training(args=None):
         with torch.no_grad():
             embeddings = text_encoder.get_input_embeddings().weight.data
             d = (
-                (
-                    embeddings[placeholder_token_ids]
-                    - embeddings[initializer_token_ids]
-                )
+                (embeddings[placeholder_token_ids] - embeddings[initializer_token_ids])
                 .abs()
                 .mean(dim=1, keepdim=True)
             )
             differences.append(d.detach().cpu())
             Print(f"Mean difference at epoch {epoch}:", differences[-1])
 
-
         matplotlib.use("Agg")
-        differences = torch.cat(differences, dim=1).numpy()
+        differences_th = torch.cat(differences, dim=1).numpy()
         for idx, token in enumerate(args.custom_tokens):
-            plt.plot(differences[idx, :], label=token)
+            plt.plot(differences_th[idx, :], label=token)
 
         plt.title("L_1 difference")
         plt.legend()
-        plt.savefig(args.output_path[:-4] + f"differences-{epoch}.png")
+        plt.savefig(args.output_path[:-4] + f"_differences-{epoch}.png")
         plt.close()
 
         save_tokens_and_embeddings(
             sd_model=pipeline,
             tokens=args.custom_tokens,
-            output=args.output_path[:-4] + f"-ckpt-{iterations}.pth",
+            output=args.output_path[:-4] + f"-ckpt-{epoch}.pth",
         )
         save_tokens_and_embeddings(
             sd_model=pipeline,
             tokens=args.custom_tokens,
             output=args.output_path,
         )
-        images = pipeline(args.prompt).images
+        images = pipeline(5 * [args.prompt]).images
         for i, img in enumerate(images):
-            img.save(args.output_path[:-4] + f"_image-{iterations}-{i}.png")
+            img.save(args.output_path[:-4] + f"_image_{epoch}_{i}.png")
 
         # TODO log FID scores and validation losses
-        fid.update(torch.tensor(255 * images, dtype=torch.uint8), real=False)
-        fid_score = float(fid.compute())
+        fid.update(
+            torch.tensor(
+                255 * torch.stack([ToTensor()(image) for image in images]),
+                dtype=torch.uint8,
+            ).to(device),
+            real=False,
+        )
+        try:
+            fid_score = float(fid.compute())
+
+        except Exception:
+            import pdb; pdb.set_trace()
         args.writer.add_scalar(phase + "_fid", fid_score, epoch)
 
     pipeline.to("cpu")
@@ -426,7 +441,6 @@ def training(args=None):
         tokens=args.custom_tokens,
         output=args.output_path,
     )
-
 
 
 if __name__ == "__main__":

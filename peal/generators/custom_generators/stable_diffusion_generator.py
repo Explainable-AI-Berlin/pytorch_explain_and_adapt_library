@@ -76,6 +76,7 @@ class StableDiffusion(EditCapableGenerator):
             base_path, "explainer", "context", "context_embedding"
         )
         if not os.path.exists(context_embedding_path):
+            os.makedirs(os.path.join(base_path, "explainer", "context"), exist_ok=True)
             train_context_embedding_args = types.SimpleNamespace(
                 embedding_files=[],
                 output_path=context_embedding_path,
@@ -98,6 +99,7 @@ class StableDiffusion(EditCapableGenerator):
                 base_path, "explainer", "class" + str(class_idx), "class_token" + str(class_idx)
             )
             if not os.path.exists(class_token_path):
+                os.makedirs(os.path.join(base_path, "explainer", "class" + str(class_idx)), exist_ok=True)
                 class_related_bias_embedding_args = types.SimpleNamespace(
                     embedding_files=[context_embedding_path],
                     output_path=class_token_path,
