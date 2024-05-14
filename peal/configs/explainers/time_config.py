@@ -26,7 +26,8 @@ class TIMEConfig(ExplainerConfig):
         "|<A*01>| |<A*02>| |<A*03>|",
         "|<A*11>| |<A*12>| |<A*13>|",
     ]
-    base_prompt: str = "A |<C*1>| |<C*2>| |<C*3>| photo"
+    base_prompt: str = "A photo of a |<C*1>| |<C*2>| |<C*3>|"
+    prompt_connector: str = " that is "
     chunks: int = 1
     chunk: int = 0
     enable_xformers_memory_efficient_attention: bool = False
@@ -51,7 +52,10 @@ class TIMEConfig(ExplainerConfig):
     adam_beta2: float = 0.999
     adam_epsilon: float = 1e-9
     weight_decay: float = 1e-4
-    iterations: int = 3000
+    iterations: int = 500
+    max_epoch: int = 10
     train_batch_size: int = 64
     image_size: int = 128
     seed: int = 99999999
+    y_target_goal_confidence: float = 0.9
+    max_attacks: int = 10

@@ -16,7 +16,7 @@ class DiffeoCFConfig(ExplainerConfig):
     """
     The maximum number of gradients step done for explaining the network
     """
-    gradient_steps: PositiveInt = 30
+    gradient_steps: PositiveInt = 1000
     """
     The optimizer used for searching the counterfactual
     """
@@ -29,7 +29,7 @@ class DiffeoCFConfig(ExplainerConfig):
     The desired target confidence.
     Consider the tradeoff between minimality and clarity of counterfactual
     """
-    y_target_goal_confidence: float = 0.65
+    y_target_goal_confidence: float = 0.9
     """
     Whether samples in the current search batch are masked after reaching y_target_goal_confidence
     or whether they are continued to be updated until the last surpasses the threshhold

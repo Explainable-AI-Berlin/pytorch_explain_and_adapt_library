@@ -49,7 +49,7 @@ class DiveTCVAEConfig(GeneratorConfig):
     tc_weight: int = (
         1  # we keep the total_correlation penalty high to encourage disentanglement
     )
-    vgg_weight: int = 1
+    vgg_weight: float = 1.0
     pix_mse_weight: float = 0.0001
     beta_annealing: bool = True
     dp_prob: float = 0.3
@@ -57,7 +57,8 @@ class DiveTCVAEConfig(GeneratorConfig):
     # Data
     height: int = 128
     width: int = 128
-    crop_size: Union[int, None] = None
+    crop_size: Union[int, type(None)] = None
+    x_selection: Union[list, type(None)] = None
 
     # Attacks
     lr_dive: float = 0.01

@@ -316,7 +316,7 @@ class ImageDataset(PealDataset):
 
         return heatmap_list, collage_paths
 
-    def serialize_dataset(self, output_dir, x_list, y_list, sample_names=None):
+    def serialize_dataset(self, output_dir, x_list, y_list, sample_names=None, classifier=None):
         # TODO this does not seem very clean
         for class_name in range(max(2, self.output_size)):
             Path(os.path.join(output_dir, "imgs", str(class_name))).mkdir(
@@ -712,6 +712,7 @@ class Image2ClassDataset(ImageDataset):
         mode,
         config,
         root_dir=None,
+        data_dir=None,
         transform=ToTensor(),
         task_config=None,
         return_dict=False,

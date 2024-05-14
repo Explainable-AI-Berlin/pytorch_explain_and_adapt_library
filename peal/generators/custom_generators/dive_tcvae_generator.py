@@ -1,5 +1,6 @@
 import os
 import random
+from types import SimpleNamespace
 
 import torch
 from torch.utils.tensorboard import SummaryWriter
@@ -20,19 +21,23 @@ from peal.dependencies.dive.src.wrappers.tcvae import TCVAE
 
 
 class DiveTCVAE(InvertibleGenerator):
-    def __init__(self, config, model_dir=None, device="cpu", classifier_dataset=None):
+    def __init__(self, config, model_dir=None, device="cpu", classifier_dataset=None, train=True):
         super().__init__()
         self.config = load_yaml_config(config)
         self.config.savedir = self.config.base_path  # hacky
         self.config.crop_size = None
         self.exp_dict = self.config.__dict__
+        print('initialize generator')
         self.tcvae = TCVAE(exp_dict=self.exp_dict, savedir=self.exp_dict["savedir"])
+        print('initializing generator done!')
         if os.path.exists(os.path.join(self.config.base_path, "final.pt")):
+            # TODO this is kind of dangerous
             self.tcvae.load_state_dict(
-                torch.load(os.path.join(self.config.base_path, "final.pt"))
+                torch.load(os.path.join(self.config.base_path, "final.pt")), strict=False
             )
 
         self.train_dataset, self.val_dataset, _ = get_datasets(self.config.data)
+        self.dataset = self.val_dataset
 
         self.prior = torch.distributions.Normal(
             torch.tensor([0.0] * self.config.z_dim),
@@ -42,7 +47,7 @@ class DiveTCVAE(InvertibleGenerator):
         self.fid = torchmetrics.image.fid.FrechetInceptionDistance(
             feature=192, reset_real_features=False
         )
-        real_images = [self.train_dataset[i][0] for i in range(500)]
+        real_images = [self.train_dataset[i][0] for i in range(min(len(self.train_dataset), 500))]
         self.fid = self.fid.to("cuda")
         self.fid.update(
             torch.tensor(255 * torch.stack(real_images, dim=0), dtype=torch.uint8).to(
@@ -55,8 +60,9 @@ class DiveTCVAE(InvertibleGenerator):
         return self.prior.sample((batch_size,))
 
     def log_prob_z(self, z):
-        dist = torch.distributions.Normal(self.mu, torch.exp(0.5 * self.logvar))
-        return dist.log_prob(z)
+        # dist = torch.distributions.Normal(torch.zeros_like(z), torch.ones_like(z))
+        # return dist.log_prob(z)
+        return torch.sum([z_elem**2 for z_elem in z])
 
     def sample_x(self, batch_size=1):
         z_sample = self.sample_z(batch_size=batch_size)
@@ -65,8 +71,7 @@ class DiveTCVAE(InvertibleGenerator):
     def encode(self, x) -> list[torch.Tensor]:
         mu, logvar = self.tcvae.model.encode(x)
         z = self.tcvae.model.reparameterize(mu, logvar)
-
-        return [tensor for tensor in z]
+        return [z]
 
     def decode(self, z):
         return self.tcvae.model.decode(z[0])
@@ -74,6 +79,10 @@ class DiveTCVAE(InvertibleGenerator):
     def train_model(
         self,
     ):
+        # write the yaml config on disk
+        with open(os.path.join(self.config.base_path, "config.yaml"), "w") as f:
+            f.write(self.config.yaml())
+
         writer = SummaryWriter(os.path.join(self.config.base_path, "logs"))
         train_dataloader = get_dataloader(
             self.train_dataset, mode="train", batch_size=self.config.batch_size
@@ -82,12 +91,32 @@ class DiveTCVAE(InvertibleGenerator):
         val_dataloader = get_dataloader(
             self.val_dataset, mode="train", batch_size=self.config.batch_size
         )
+
+        if not self.config.x_selection is None:
+            self.train_dataset.task_config = SimpleNamespace(
+                **{"x_selection": self.config.x_selection}
+            )
+            self.val_dataset.task_config = SimpleNamespace(
+                **{"x_selection": self.config.x_selection}
+            )
+            print("self.dataset.task_config1")
+            print("self.dataset.task_config1")
+            print("self.dataset.task_config1")
+            print("self.dataset.task_config1")
+            print("self.dataset.task_config1")
+            print(self.train_dataset.task_config)
         score_list = []
 
         for epoch in range(self.config.max_epoch):
             os.makedirs(os.path.join(self.config.base_path, str(epoch)), exist_ok=True)
             train_dict = self.tcvae.train_on_loader(epoch, train_dataloader)
             val_dict = self.tcvae.val_on_loader(epoch, val_dataloader, vis_flag=True)
+            print("self.dataset.task_config1")
+            print("self.dataset.task_config1")
+            print("self.dataset.task_config1")
+            print("self.dataset.task_config1")
+            print("self.dataset.task_config1")
+            print(self.train_dataset.task_config)
 
             Image.fromarray(val_dict["val_images"]).save(
                 os.path.join(self.config.base_path, str(epoch), "reconstruction.png"),
@@ -110,10 +139,10 @@ class DiveTCVAE(InvertibleGenerator):
                 self.tcvae.state_dict(),
                 os.path.join(self.config.base_path, str(epoch), "model.pt"),
             )
-            generated_samples = self.sample_x(batch_size=100)
+            generated_samples = self.sample_x(batch_size=self.config.batch_size)
             for i in range(5):
                 image_pil = transforms.ToPILImage()(
-                    (generated_samples[random.randint(0, 99), :, :, :] + 1) / 2
+                    (generated_samples[random.randint(0, self.config.batch_size-1), :, :, :] + 1) / 2
                 )
                 image_pil.save(
                     os.path.join(self.config.base_path, str(epoch), f"sample{i}.png")

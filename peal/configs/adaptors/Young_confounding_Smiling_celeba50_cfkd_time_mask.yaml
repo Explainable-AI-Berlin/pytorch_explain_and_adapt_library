@@ -6,7 +6,7 @@ finetune_iterations                  :  0
 min_train_samples                    :  0
 max_validation_samples               :  50
 continuous_learning                  :  "finetune"
-repltime_model                        :  True
+replace_model                        :  True
 use_visualization                    :  False #True
 tracking_level                       :  2 #True
 calculate_group_accuracies           :  True

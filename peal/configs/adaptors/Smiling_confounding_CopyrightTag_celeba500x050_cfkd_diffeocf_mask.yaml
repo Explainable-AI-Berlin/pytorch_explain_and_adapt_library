@@ -1,12 +1,12 @@
-# python run_cfkd.py --adaptor_config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba500x100_cfkd_diffeocf.yaml"
+# python run_cfkd.py --adaptor_config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba500x050_cfkd_diffeocf_mask.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
-batch_size                           :  6
+batch_size                           :  2 #5
 tracking_level                       :  2
-min_train_samples                    :  400
-finetune_iterations                  :  1
+min_train_samples                    :  0
+finetune_iterations                  :  0
 max_validation_samples               :  100
-#max_test_batches                     :  1
+max_test_batches                     :  1
 continuous_learning                  :  "finetune"
 replace_model                        :  True
 use_visualization                    :  False #True
@@ -15,10 +15,10 @@ explainer                            :  <PEAL_BASE>/configs/explainers/diffeocf_
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba500_poisened100.yaml
 test_data                            :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba.yaml
-student                              :  /home/space/datasets/peal/peal_runs/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened100/model.cpl
-teacher                              :  /home/space/datasets/peal/peal_runs/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened050/model.cpl
+student                              :  /home/space/datasets/peal/peal_runs/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened050/model.cpl
+teacher                              :  SegmentationMask
 generator                            :  /home/space/datasets/peal/peal_runs/celeba_copyrighttag/tcvae/config.yaml
-base_dir                             :  /home/space/datasets/peal/peal_runs/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened100/cfkd_diffeocf
+base_dir                             :  /home/space/datasets/peal/peal_runs/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened050/cfkd_diffeocf_mask
 task:
   criterions:
     ce     : 1.0

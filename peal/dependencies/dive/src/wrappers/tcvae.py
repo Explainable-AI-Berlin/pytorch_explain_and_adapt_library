@@ -31,15 +31,17 @@ class TCVAE(BaseWrapper):
         """
         super().__init__()
         # Create model, opt, wrapper
+        print('get model')
         model = get_model(exp_dict["model"], exp_dict=exp_dict)
+        print('getting model is done!')
         self.model = model.cuda()
         self.exp_dict = exp_dict
         self.ngpu = self.exp_dict["ngpu"]
         self.devices = list(range(self.ngpu))
         self.savedir = savedir
         self.beta = self.exp_dict["beta"]
-        if self.exp_dict["vgg_weight"] > 0:
-            self.perceptual_loss = VGGPerceptualLoss(resize=False).cuda()
+
+        print('model parallel')
         self.model_parallel = torch.nn.DataParallel(self.model, list(range(self.ngpu)))
 
         # self.discriminator = Discriminator(ratio=self.model.ratio,
@@ -252,6 +254,12 @@ class TCVAE(BaseWrapper):
             data_loader: iterable training data loader
             max_iter: max number of iterations to perform if the end of the dataset is not reached
         """
+
+        if self.exp_dict["vgg_weight"] > 0 and not hasattr(self, "perceptual_loss"):
+            print('get perceptual loss!')
+            self.perceptual_loss = VGGPerceptualLoss(resize=False).cuda()
+            print('perceptual loss loaded!')
+
         self.model.train()
         self.n_data = len(data_loader.dataset)
         ret = {}
@@ -323,22 +331,12 @@ class TCVAE(BaseWrapper):
             ret["amp"] = self.scaler.state_dict()
         return ret
 
-    def load_state_dict(self, state_dict):
-        if hasattr(state_dict, "optimizer"):
-            self.optimizer.load_state_dict(state_dict["optimizer"])
-
-        if hasattr(state_dict, "model"):
-            self.model.load_state_dict(state_dict["model"])
-
-        else:
-            try:
-                self.model.load_state_dict(state_dict)
-
-            except Exception as e:
-                import pdb; pdb.set_trace()
+    """def load_state_dict(self, state_dict):
+        self.optimizer.load_state_dict(state_dict["optimizer"])
+        self.model.load_state_dict(state_dict["model"])
 
         if self.exp_dict["amp"] > 0:
-            self.scaler.load_state_dict(state_dict["amp"])
+            self.scaler.load_state_dict(state_dict["amp"])"""
 
     def get_lr(self):
         ret = {}

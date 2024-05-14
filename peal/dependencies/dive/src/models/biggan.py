@@ -152,26 +152,31 @@ class Resnet(torch.nn.Module):
 
 
 class MLP(torch.nn.Module):
-    def __init__(self, ni, no, nhidden, nlayers):
+    def __init__(self, n_in, n_out, nhidden, nlayers):
         super().__init__()
         self.nlayers = nlayers
         for i in range(nlayers):
             if i == 0:
-                setattr(self, "linear%d" % i, torch.nn.Linear(ni, nhidden, bias=False))
+                setattr(self, "linear%d" % i, torch.nn.Linear(n_in, nhidden, bias=False))
             else:
                 setattr(
                     self, "linear%d" % i, torch.nn.Linear(nhidden, nhidden, bias=False)
                 )
             setattr(self, "bn%d" % i, torch.nn.LayerNorm(nhidden))
         if nlayers == 0:
-            nhidden = ni
-        self.linear_out = torch.nn.Linear(nhidden, no)
+            nhidden = n_in
+        self.linear_out = torch.nn.Linear(nhidden, n_out)
 
     def forward(self, x):
         for i in range(self.nlayers):
             linear = getattr(self, "linear%d" % i)
             bn = getattr(self, "bn%d" % i)
-            x = linear(x)
+            try:
+                x = linear(x)
+
+            except Exception:
+                import pdb; pdb.set_trace()
+
             x = bn(x)
             x = x * torch.sigmoid(x)
         return self.linear_out(x)
@@ -203,10 +208,10 @@ class Encoder(Resnet):
         )
         self.z_dim = z_dim
         self.mlp = MLP(
-            self.channels[-1] * output_h * output_w,
-            2 * self.z_dim,
-            mlp_width * self.channels[-1],
-            1,
+            n_in=self.channels[-1] * output_h * output_w,
+            n_out=2 * self.z_dim,
+            nhidden=mlp_width * self.channels[-1],
+            nlayers=1,
         )
         self.bn_out = torch.nn.InstanceNorm2d(self.channels[-1], affine=True)
 
@@ -426,7 +431,6 @@ class Decoder(torch.nn.Module):
 
     def forward(self, z):
         z = z.view(z.size(0), -1)
-        import pdb; pdb.set_trace()
         x = self.mlp(z)
         x = x.view(-1, self.in_ch, self.in_h, self.in_w)
         for i in range(len(self.channels)):
@@ -516,9 +520,7 @@ class VAE(torch.nn.Module):
     def encode(self, x):
         b = x.size(0)
         code_params = self.encoder(x)
-        return code_params[:, : self.z_dim].view(b, -1), code_params[
-            :, self.z_dim :
-        ].view(b, -1)
+        return code_params[:, : self.z_dim].view(b, -1), code_params[:, self.z_dim :].view(b, -1)
 
     def reparameterize(self, mu, logvar):
         std = torch.exp(0.5 * logvar)
