@@ -58,4 +58,4 @@ class TIMEConfig(ExplainerConfig):
     image_size: int = 128
     seed: int = 99999999
     y_target_goal_confidence: float = 0.9
-    max_attacks = 10
+    max_attacks: int = 10

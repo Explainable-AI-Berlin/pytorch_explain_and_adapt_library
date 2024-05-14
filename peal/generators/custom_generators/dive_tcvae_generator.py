@@ -79,6 +79,10 @@ class DiveTCVAE(InvertibleGenerator):
     def train_model(
         self,
     ):
+        # write the yaml config on disk
+        with open(os.path.join(self.config.base_path, "config.yaml"), "w") as f:
+            f.write(self.config.yaml())
+
         writer = SummaryWriter(os.path.join(self.config.base_path, "logs"))
         train_dataloader = get_dataloader(
             self.train_dataset, mode="train", batch_size=self.config.batch_size
