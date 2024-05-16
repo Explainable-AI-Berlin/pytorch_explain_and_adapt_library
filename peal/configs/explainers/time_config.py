@@ -30,7 +30,7 @@ class TIMEConfig(ExplainerConfig):
     prompt_connector: str = " that is "
     chunks: int = 1
     chunk: int = 0
-    enable_xformers_memory_efficient_attention: bool = False
+    enable_xformers_memory_efficient_attention: bool = True
     use_fp16: bool = False
     sd_image_size: int = 128
     custom_obj_token: str = "|<C*>|"
