@@ -10,7 +10,7 @@ import torchvision.transforms as transforms
 from PIL import Image
 
 from peal.generators.interfaces import InvertibleGenerator
-from peal.global_utils import load_yaml_config
+from peal.global_utils import load_yaml_config, save_yaml_config
 from peal.data.dataloaders import get_dataloader
 from peal.data.dataset_factory import get_datasets
 from peal.data.dataset_interfaces import PealDataset
@@ -27,6 +27,7 @@ class DiveTCVAE(InvertibleGenerator):
         self.config.savedir = self.config.base_path  # hacky
         self.config.crop_size = None
         self.exp_dict = self.config.__dict__
+        print(self.config)
         print('initialize generator')
         self.tcvae = TCVAE(exp_dict=self.exp_dict, savedir=self.exp_dict["savedir"])
         print('initializing generator done!')
@@ -79,6 +80,9 @@ class DiveTCVAE(InvertibleGenerator):
     def train_model(
         self,
     ):
+        # write the yaml config on disk
+        save_yaml_config(self.config, os.path.join(self.config.base_path, "config.yaml"))
+
         writer = SummaryWriter(os.path.join(self.config.base_path, "logs"))
         train_dataloader = get_dataloader(
             self.train_dataset, mode="train", batch_size=self.config.batch_size

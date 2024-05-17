@@ -1,0 +1,11 @@
+# python train_generator.py --config "<PEAL_BASE>/configs/generators/follicle_tcvae.yaml"
+generator_type : DiveTCVAE
+category : generator
+base_path : /home/space/datasets/peal/peal_runs/follicles_cut/tcvae
+savedir : /home/space/datasets/peal/peal_runs/follicles_cut/tcvae
+data: "<PEAL_BASE>/configs/data/follicles_generator.yaml"
+height: 256
+width: 256
+batch_size: 32
+max_epoch: 100000
+x_selection: [imgs_cut]
