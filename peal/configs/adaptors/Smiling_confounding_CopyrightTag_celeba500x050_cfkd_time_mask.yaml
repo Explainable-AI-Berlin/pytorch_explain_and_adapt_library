@@ -18,7 +18,7 @@ test_data                            :  <PEAL_BASE>/configs/data/Smiling_confoun
 student                              :  /home/space/datasets/peal/peal_runs/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened050/model.cpl
 teacher                              :  SegmentationMask
 generator                            :  <PEAL_BASE>/configs/generators/stable_diffusion_default.yaml
-base_dir                             :  /home/space/datasets/peal/peal_runs/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened050/cfkd_time_mask_fast
+base_dir                             :  /home/space/datasets/peal/peal_runs/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened050/cfkd_time_mask
 task:
   criterions:
     ce     : 1.0

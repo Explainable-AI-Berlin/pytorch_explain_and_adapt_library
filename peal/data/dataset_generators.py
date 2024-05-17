@@ -488,14 +488,16 @@ class ConfounderDatasetGenerator:
                     )
 
                 abs_difference = torch.abs(img_necklace[0] - img_no_necklace[0])
-                #mask = abs_difference > 0.2
+                # mask = abs_difference > 0.2
                 mask = abs_difference.mean(0)
                 torchvision.utils.save_image(
                     mask.float(), os.path.join(self.dataset_dir, "masks", name)
                 )
 
             else:
-                import pdb; pdb.set_trace()
+                import pdb
+
+                pdb.set_trace()
                 img_out.save(os.path.join(self.dataset_dir, "imgs", name))
 
             sample.append(has_confounder)
@@ -793,3 +795,83 @@ class CircleDatasetGenerator:
         self.data = data
 
         return self
+
+
+class SquareDatasetGenerator:
+    """ """
+
+    def __init__(
+        self,
+        data_config,
+        **kwargs,
+    ):
+        """ """
+        self.data_config = data_config
+
+    def generate_dataset(self):
+        """ """
+        shutil.rmtree(self.data_config.dataset_path, ignore_errors=True)
+        shutil.rmtree(self.data_config.dataset_path + "_inverse", ignore_errors=True)
+        os.makedirs(self.data_config.dataset_path)
+        os.makedirs(os.path.join(self.data_config.dataset_path, "imgs"))
+        os.makedirs(os.path.join(self.data_config.dataset_path + "_inverse", "imgs"))
+
+        for sample_idx in range(self.data_config.num_samples):
+            if sample_idx % 2 == 0:
+                class_a = 1
+                color_a = np.random.randint(128, 256)
+
+            else:
+                class_a = 0
+                color_a = np.random.randint(0, 128)
+
+            if (sample_idx / 2) % 2 == 0:
+                class_b = 1
+                color_b = np.random.randint(128, 256)
+
+            else:
+                class_b = 0
+                color_b = np.random.randint(0, 128)
+
+            if (sample_idx / 4) % 2 == 0:
+                class_c = 1
+                position_x = np.random.randint(28, 56)
+
+            else:
+                class_c = 0
+                position_x = np.random.randint(0, 28)
+
+            if (sample_idx / 8) % 2 == 0:
+                class_d = 1
+                position_y = np.random.randint(28, 56)
+
+            else:
+                class_d = 0
+                position_y = np.random.randint(0, 28)
+
+            img = np.ones([64, 64, 3], dtype=np.uint8) * color_b
+            img[position_x : position_x + 8, position_y : position_y + 8] = color_a
+            img = Image.fromarray(img)
+            img.save(os.path.join(self.data_config.dataset_path, "imgs", str(sample_idx) + ".png"))
+            img_inverse = np.ones([64, 64, 3], dtype=np.uint8) * abs(color_b - 255)
+            img_inverse[position_x : position_x + 8, position_y : position_y + 8] = color_a
+            img_inverse = Image.fromarray(img_inverse)
+            img_inverse.save(
+                os.path.join(self.data_config.dataset_path + "_inverse", "imgs", str(sample_idx) + ".png")
+            )
+
+            attributes = [
+                str(class_a),
+                str(class_b),
+                str(class_c),
+                str(class_d),
+                str(color_a),
+                str(color_b),
+                str(position_x),
+                str(position_y),
+            ]
+            lines_out = ",".join(attributes)
+            if sample_idx != 0 and sample_idx % 100 == 0:
+                open(os.path.join(self.data_config.dataset_path, "data.csv"), "w").write(
+                    "\n".join(lines_out)
+                )

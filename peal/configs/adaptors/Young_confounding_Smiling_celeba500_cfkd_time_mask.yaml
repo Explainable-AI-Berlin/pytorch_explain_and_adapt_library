@@ -14,10 +14,10 @@ explainer                            :  <PEAL_BASE>/configs/explainers/time_defa
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/Young_confounding_OverdrawnSmiling_celeba500_poisened100.yaml
 test_data                            :  <PEAL_BASE>/configs/data/Young_confounding_Smiling_celeba.yaml
-student                              :  /home/space/datasets/peal/peal_runs/Young_confounding_Smiling_celeba/classifier_unpoisened/model.cpl
+student                              :  /home/space/datasets/peal/peal_runs/celeba/Young_confounding_Smiling/unregularized0/unpoisened/model.cpl
 teacher                              :  SegmentationMask
 generator                            :  <PEAL_BASE>/configs/generators/stable_diffusion_default.yaml
-base_dir                             :  /home/space/datasets/peal/peal_runs/Young_confounding_Smiling_celeba/classifier_unpoisened/cfkd_time_mask
+base_dir                             :  /home/space/datasets/peal/peal_runs/celeba/Young_confounding_Smiling/unregularized0/unpoisened/cfkd_time_mask
 task:
   criterions:
     ce     : 1.0
