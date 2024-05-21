@@ -349,9 +349,12 @@ def generate_time_counterfactuals(args=None):
                 cf_final = torch.clone(img)
                 while target_confidences.min() < args.y_target_goal_confidence or attack < args.max_attacks:
                     cf = args.editor.run(x=img, prompt_tar_list=tp, prompt_src=sp)
-                    confidences = torch.nn.functional.softmax(postprocess(cf), dim=-1)
+                    cf_postprocessed = postprocess(cf, args.classifier_image_size)
+                    logits = classifier(cf_postprocessed.to(device))
+                    confidences = torch.nn.functional.softmax(logits, dim=-1).cpu()
+
                     for i in range(len(confidences)):
-                        target_confidence = confidences[i][target[i]]
+                        target_confidence = confidences[i][int(target[i])]
                         if target_confidence < args.y_target_goal_confidence:
                             cf_final[i] = cf[i]
                             target_confidences[i] = target_confidence

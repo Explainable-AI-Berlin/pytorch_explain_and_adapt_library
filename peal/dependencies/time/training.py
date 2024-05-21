@@ -3,6 +3,7 @@
 import math
 
 import torchmetrics
+import torchvision.utils
 import yaml
 import os
 import tqdm
@@ -113,6 +114,7 @@ def run_epoch(
         data_loader(iterations), desc="Iterations", total=args.iterations
     ):
         image = image.to(device, dtype=torch_dtype)
+        image = torchvision.transforms.Resize([512,512])(image)
         text_inputs = tokenizer(
             text,
             padding="max_length",
@@ -343,8 +345,24 @@ def training(args=None):
     for i in range(min(len(args.generator_dataset_val), 100)):
         real_images.append(args.generator_dataset_val[i][0])
 
-    real_images = torch.stack(real_images, dim=0).to(device)
+    real_images = torch.stack(real_images, dim=0).to(device) * 0.5 + 0.5
     fid.update(torch.tensor(255 * real_images, dtype=torch.uint8), real=True)
+
+    images = pipeline(5 * [args.prompt]).images
+    images_torch = torch.stack([ToTensor()(image) for image in images])
+    images_torch_resized = torchvision.transforms.Resize(real_images.shape[-2:])(images_torch)
+    concatenated_imgs = torch.cat([real_images[:5].cpu() , images_torch_resized], dim=0)
+    torchvision.utils.save_image(concatenated_imgs, args.output_path[:-4] + "_start.png",nrow=5)
+
+    fid.update(
+        torch.tensor(
+            255 * concatenated_imgs,
+            dtype=torch.uint8,
+        ).to(device),
+        real=False,
+    )
+    fid_score = float(fid.compute())
+    args.writer.add_scalar(phase + "_fid", fid_score, -1)
 
     for epoch in range(args.max_epoch):
 
@@ -417,22 +435,19 @@ def training(args=None):
             output=args.output_path,
         )
         images = pipeline(5 * [args.prompt]).images
-        for i, img in enumerate(images):
-            img.save(args.output_path[:-4] + f"_image_{epoch}_{i}.png")
+        images_torch = torch.stack([ToTensor()(image) for image in images])
+        images_torch_resized = torchvision.transforms.Resize(real_images.shape[-2:])(images_torch)
+        concatenated_imgs = torch.cat([real_images[:5].cpu() , images_torch_resized], dim=0)
+        torchvision.utils.save_image(concatenated_imgs, args.output_path[:-4] + f"_image_{epoch}.png",nrow=5)
 
-        # TODO log FID scores and validation losses
         fid.update(
             torch.tensor(
-                255 * torch.stack([ToTensor()(image) for image in images]),
+                255 * concatenated_imgs,
                 dtype=torch.uint8,
             ).to(device),
             real=False,
         )
-        try:
-            fid_score = float(fid.compute())
-
-        except Exception:
-            import pdb; pdb.set_trace()
+        fid_score = float(fid.compute())
         args.writer.add_scalar(phase + "_fid", fid_score, epoch)
 
     pipeline.to("cpu")

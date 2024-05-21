@@ -1,4 +1,4 @@
-# python -W ignore train_generator.py --config "<PEAL_BASE>/configs/generators/dive_generator_celeba_copyrighttag.yaml"
+# python -W ignore train_generator.py --config "<PEAL_BASE>/configs/generators/celeba_copyrighttag_tcvae.yaml"
 generator_type: 'DiveTCVAE'
 category: 'generator'
 
@@ -11,7 +11,7 @@ amp: 0
 batch_size: 64 #(ngpu=1 for now),
 target_loss: 'val_loss'
 lr_tcvae: 0.0004
-max_epoch: 400 # constraint: >=4
+max_epoch: 5000 # constraint: >=4
 clip: True
 
 # Model
