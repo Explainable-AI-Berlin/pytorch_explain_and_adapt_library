@@ -851,6 +851,7 @@ class SquareDatasetGenerator:
 
             img = np.ones([64, 64, 3], dtype=np.uint8) * color_b
             img[position_x : position_x + 8, position_y : position_y + 8] = color_a
+            img = img + (np.random.randn(*img.shape) * 10).astype(dtype=np.uint8)
             img = Image.fromarray(img)
             img.save(os.path.join(self.data_config.dataset_path, "imgs", str(sample_idx) + ".png"))
             img_inverse = np.ones([64, 64, 3], dtype=np.uint8) * abs(color_b - 255)
