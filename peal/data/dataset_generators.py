@@ -815,6 +815,7 @@ class SquareDatasetGenerator:
         os.makedirs(self.data_config.dataset_path)
         os.makedirs(os.path.join(self.data_config.dataset_path, "imgs"))
         os.makedirs(os.path.join(self.data_config.dataset_path + "_inverse", "imgs"))
+        lines_out = ["Name,ClassA,ClassB,ClassC,ClassD,ColorA,ColorB,PositionX,PositionY"]
 
         for sample_idx in range(self.data_config.num_samples):
             if sample_idx % 2 == 0:
@@ -825,7 +826,7 @@ class SquareDatasetGenerator:
                 class_a = 0
                 color_a = np.random.randint(0, 128)
 
-            if (sample_idx / 2) % 2 == 0:
+            if int(sample_idx / 2) % 2 == 0:
                 class_b = 1
                 color_b = np.random.randint(128, 256)
 
@@ -833,7 +834,7 @@ class SquareDatasetGenerator:
                 class_b = 0
                 color_b = np.random.randint(0, 128)
 
-            if (sample_idx / 4) % 2 == 0:
+            if int(sample_idx / 4) % 2 == 0:
                 class_c = 1
                 position_x = np.random.randint(28, 56)
 
@@ -841,7 +842,7 @@ class SquareDatasetGenerator:
                 class_c = 0
                 position_x = np.random.randint(0, 28)
 
-            if (sample_idx / 8) % 2 == 0:
+            if int(sample_idx / 8) % 2 == 0:
                 class_d = 1
                 position_y = np.random.randint(28, 56)
 
@@ -849,30 +850,32 @@ class SquareDatasetGenerator:
                 class_d = 0
                 position_y = np.random.randint(0, 28)
 
+            sample_name = embed_numberstring(sample_idx, 8) + ".png"
             img = np.ones([64, 64, 3], dtype=np.uint8) * color_b
             img[position_x : position_x + 8, position_y : position_y + 8] = color_a
             img = img + (np.random.randn(*img.shape) * 10).astype(dtype=np.uint8)
             img = Image.fromarray(img)
-            img.save(os.path.join(self.data_config.dataset_path, "imgs", str(sample_idx) + ".png"))
+            img.save(os.path.join(self.data_config.dataset_path, "imgs", sample_name))
             img_inverse = np.ones([64, 64, 3], dtype=np.uint8) * abs(color_b - 255)
             img_inverse[position_x : position_x + 8, position_y : position_y + 8] = color_a
             img_inverse = Image.fromarray(img_inverse)
             img_inverse.save(
-                os.path.join(self.data_config.dataset_path + "_inverse", "imgs", str(sample_idx) + ".png")
+                os.path.join(self.data_config.dataset_path + "_inverse", "imgs", sample_name)
             )
 
             attributes = [
+                sample_name,
                 str(class_a),
                 str(class_b),
                 str(class_c),
                 str(class_d),
-                str(color_a),
-                str(color_b),
-                str(position_x),
-                str(position_y),
+                str(float(color_a) / 255),
+                str(float(color_b) / 255),
+                str(float(position_x) / 64),
+                str(float(position_y) / 64),
             ]
-            lines_out = ",".join(attributes)
-            if sample_idx != 0 and sample_idx % 100 == 0:
+            lines_out.append(",".join(attributes))
+            if (sample_idx + 1) % 100 == 0:
                 open(os.path.join(self.data_config.dataset_path, "data.csv"), "w").write(
                     "\n".join(lines_out)
                 )

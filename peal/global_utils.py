@@ -114,6 +114,7 @@ def set_adaptive_batch_size(config, gigabyte_vram, samples_per_iteration):
 
 
 def embed_numberstring(number_str, num_digits=7):
+    number_str = str(number_str)
     return "0" * (num_digits - len(number_str)) + number_str
 
 
