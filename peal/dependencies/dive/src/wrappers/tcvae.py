@@ -152,9 +152,14 @@ class TCVAE(BaseWrapper):
             b = x.size(0)
             # if self.exp_dict["vgg_weight"] > 0:
             # with amp.autocast(enabled=False):
-            vgg_mse = torch.nn.DataParallel(
-                self.perceptual_loss, list(range(self.ngpu))
-            )(reconstruction, x).mean()
+            if hasattr(self, "perceptual_loss"):
+                vgg_mse = torch.nn.DataParallel(
+                    self.perceptual_loss, list(range(self.ngpu))
+                )(reconstruction, x).mean()
+
+            else:
+                vgg_mse = 0
+
             pix_mse = l1_loss(x, reconstruction)
 
             # else:
