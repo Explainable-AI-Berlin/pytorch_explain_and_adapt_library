@@ -296,22 +296,22 @@ def training(args=None):
     # =================================================================
     # Dataset
     if isinstance(args.dataset, torch.utils.data.Dataset):
-        dataset = args.dataset
+        dataset_raw = args.dataset
 
     else:
-        dataset = get_dataset(args)
+        dataset_raw = get_dataset(args)
 
     if args.training_label >= 0:
-        dataset.enable_class_restriction(args.training_label)
+        dataset_raw.enable_class_restriction(args.training_label)
         print("len restricted dataset")
         print("len restricted dataset")
         print("len restricted dataset")
-        print(len(dataset))
+        print(len(dataset_raw))
 
     dataset = TextualDataset(
         custom_tokens=args.custom_tokens,
         base_prompt_generator=get_phrase_generator(args),
-        dataset=dataset,
+        dataset=dataset_raw,
     )
     loader = data.DataLoader(
         dataset,
@@ -466,7 +466,7 @@ def training(args=None):
         tokens=args.custom_tokens,
         output=args.output_path,
     )
-    dataset.disable_class_restriction()
+    dataset_raw.disable_class_restriction()
     print("len unrestricted dataset")
     print("len unrestricted dataset")
     print("len unrestricted dataset")
