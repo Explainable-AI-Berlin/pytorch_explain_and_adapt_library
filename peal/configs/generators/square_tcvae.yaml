@@ -8,7 +8,7 @@ ngpu: 1
 amp: 0
 
 # Optimization
-batch_size: 64 #(ngpu=1 for now),
+batch_size: 1024 #(ngpu=1 for now),
 target_loss: 'val_loss'
 lr_tcvae: 0.0004
 max_epoch: 5000 # constraint: >=4
@@ -18,13 +18,13 @@ clip: True
 model: 'biggan'
 backbone: 'resnet'
 channels_width: 4
-z_dim: 64
+z_dim: 256 #64
 mlp_width: 10 #4
 mlp_depth: 5 #2
 #savedir : 'peal_runs/dive_tcvae'
 
 # TCVAE
-beta: 0.001 # the idea is to be able to interpolate while getting good reconstructions
+beta: 0.0001 # 0.001 # the idea is to be able to interpolate while getting good reconstructions
 tc_weight: 1 # we keep the total_correlation penalty high to encourage disentanglement
 vgg_weight: 0.0
 beta_annealing: True

@@ -15,6 +15,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torchvision.transforms import ToTensor
 
 from peal.configs.editors.ddpm_inversion_config import DDPMInversionConfig
+from peal.configs.models.model_config import TaskConfig
 from peal.data.dataset_factory import get_datasets
 from peal.data.datasets import Image2MixedDataset
 from peal.dependencies.ddpm_inversion.ddpm_inversion import DDPMInversion
@@ -63,6 +64,7 @@ class StableDiffusion(EditCapableGenerator):
                 label_path=class_predictions_path,
                 partition="train",
                 label_query=0,
+                max_samples=explainer_config.max_samples,
             )
             get_predictions(prediction_args)
 
@@ -72,6 +74,8 @@ class StableDiffusion(EditCapableGenerator):
         self.generator_dataset, self.generator_dataset_val, _ = get_datasets(
             config=generator_dataset_config, data_dir=class_predictions_path
         )
+        self.generator_dataset.task_config = TaskConfig(y_selection=['prediction'])
+        self.generator_dataset_val.task_config = self.generator_dataset.task_config
         context_embedding_path = os.path.join(
             base_path, "explainer", "context", "context_embedding"
         )

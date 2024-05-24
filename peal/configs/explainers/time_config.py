@@ -59,3 +59,4 @@ class TIMEConfig(ExplainerConfig):
     seed: int = 99999999
     y_target_goal_confidence: float = 0.9
     max_attacks: int = 10
+    max_samples: Union[int, type(None)] = None

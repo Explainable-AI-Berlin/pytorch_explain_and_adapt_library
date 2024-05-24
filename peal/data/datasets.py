@@ -534,6 +534,7 @@ class Image2MixedDataset(ImageDataset):
         else:
             delimiter = ","
 
+        self.data_dir = data_dir
         self.attributes, self.data, self.keys = parse_csv(
             data_dir, config, mode, key_type="name", delimiter=delimiter
         )
@@ -586,6 +587,18 @@ class Image2MixedDataset(ImageDataset):
 
     def disable_url(self):
         self.url_enabled = False
+
+    def enable_class_restriction(self, class_idx):
+        assert not self.task_config is None, "Task config must be set"
+        self.backup_keys = copy.deepcopy(self.keys)
+        self.keys = []
+        for key in self.backup_keys:
+            if int(self.data[key][self.attributes.index(self.task_config.y_selection[0])]) == class_idx:
+                self.keys.append(key)
+
+    def disable_class_restriction(self):
+        if hasattr(self, "backup_keys"):
+            self.keys = copy.deepcopy(self.backup_keys)
 
     def set_task_specific_keys(self):
         self.task_specific_keys = []

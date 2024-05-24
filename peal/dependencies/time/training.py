@@ -301,6 +301,13 @@ def training(args=None):
     else:
         dataset = get_dataset(args)
 
+    if args.training_label >= 0:
+        dataset.enable_class_restriction(args.training_label)
+        print("len restricted dataset")
+        print("len restricted dataset")
+        print("len restricted dataset")
+        print(len(dataset))
+
     dataset = TextualDataset(
         custom_tokens=args.custom_tokens,
         base_prompt_generator=get_phrase_generator(args),
@@ -314,6 +321,9 @@ def training(args=None):
         worker_init_fn=seed_worker,
         generator=g,
     )
+    if args.training_label >= 0:
+        args.generator_dataset_val.enable_class_restriction(args.training_label)
+
     dataset_val = TextualDataset(
         custom_tokens=args.custom_tokens,
         base_prompt_generator=get_phrase_generator(args),
@@ -456,6 +466,12 @@ def training(args=None):
         tokens=args.custom_tokens,
         output=args.output_path,
     )
+    dataset.disable_class_restriction()
+    print("len unrestricted dataset")
+    print("len unrestricted dataset")
+    print("len unrestricted dataset")
+    print(len(dataset))
+    args.generator_dataset_val.disable_class_restriction()
 
 
 if __name__ == "__main__":
