@@ -380,6 +380,8 @@ class ImageDataset(PealDataset):
             raise NotImplementedError("Generator type not supported")
 
         generated_images = generated_images[:num_samples]
+        if generated_images.shape[0] == 1:
+            generated_images = torch.cat([generated_images, generated_images], dim=0)
 
         if not hasattr(self, "fid"):
             self.fid = torchmetrics.image.fid.FrechetInceptionDistance(
@@ -387,7 +389,7 @@ class ImageDataset(PealDataset):
             )
             self.fid.to(generated_images.device)
             real_images = []
-            for i in range(num_samples):
+            for i in range(min(len(self), 100)):
                 real_images.append(self[i][0])
 
             real_images = torch.stack(real_images, dim=0).to(generated_images.device)

@@ -1,4 +1,6 @@
 # This whole file contains all the stuff, that is written too bad and had no clear position where it should be located in the project!
+from pathlib import Path
+
 import numpy as np
 import sys
 import types
@@ -281,6 +283,10 @@ def save_yaml_config(config, config_path):
         return obj
 
     processed_data = process_object(config)
+    directory_path = os.path.dirname(config_path)
+    if not os.path.exists(directory_path):
+        Path(directory_path).mkdir(parents=True, exist_ok=True)
+
     with open(config_path, "w") as outfile:
         yaml.dump(processed_data, outfile, default_flow_style=False)
 
