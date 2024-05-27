@@ -347,7 +347,7 @@ def generate_time_counterfactuals(args=None):
                 target_confidences = torch.zeros([img.shape[0]])
                 attack = 0
                 cf_final = torch.clone(img)
-                while target_confidences.min() < args.y_target_goal_confidence or attack < args.max_attacks:
+                while target_confidences.min() < args.y_target_goal_confidence and attack < args.max_attacks:
                     cf = args.editor.run(x=img, prompt_tar_list=tp, prompt_src=sp)
                     cf_postprocessed = postprocess(cf, args.classifier_image_size)
                     logits = classifier(cf_postprocessed.to(device))
@@ -358,6 +358,8 @@ def generate_time_counterfactuals(args=None):
                         if target_confidence < args.y_target_goal_confidence:
                             cf_final[i] = cf[i]
                             target_confidences[i] = target_confidence
+
+                    attack += 1
 
             elif args.editing_type == "edict":
                 xt, yt, _, _, feats = pipeline.Invert(

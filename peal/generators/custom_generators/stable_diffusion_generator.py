@@ -16,12 +16,14 @@ from torchvision.transforms import ToTensor
 
 from peal.configs.editors.ddpm_inversion_config import DDPMInversionConfig
 from peal.configs.models.model_config import TaskConfig
+from peal.data.dataloaders import get_dataloader
 from peal.data.dataset_factory import get_datasets
 from peal.data.datasets import Image2MixedDataset
 from peal.dependencies.ddpm_inversion.ddpm_inversion import DDPMInversion
+from peal.dependencies.lora.train_text_to_image_lora import main as lora_finetune
 from peal.dependencies.time.core.utils import load_tokens_and_embeddings
 from peal.generators.interfaces import EditCapableGenerator
-from peal.global_utils import load_yaml_config, embed_numberstring
+from peal.global_utils import load_yaml_config, embed_numberstring, save_yaml_config
 from peal.dependencies.time.generate_ce import (
     generate_time_counterfactuals,
 )
@@ -49,6 +51,23 @@ class StableDiffusion(EditCapableGenerator):
         return self.diffusion.p_sample_loop(
             self.model, [batch_size] + self.classifier_dataset.config.input_size
         )
+
+    def train_model(
+        self,
+    ):
+        # write the yaml config on disk
+        save_yaml_config(self.config, os.path.join(self.config.base_path, "config.yaml"))
+
+        writer = SummaryWriter(os.path.join(self.config.base_path, "logs"))
+        train_dataloader = get_dataloader(
+            self.train_dataset, mode="train", batch_size=self.config.batch_size
+        )
+
+        val_dataloader = get_dataloader(
+            self.val_dataset, mode="train", batch_size=self.config.batch_size
+        )
+        finetune_args = copy.deepcopy(self.config)
+        lora_finetune(finetune_args)
 
     def initialize(self, classifier, base_path, explainer_config):
         class_predictions_path = os.path.join(base_path, "explainer", "predictions.csv")
