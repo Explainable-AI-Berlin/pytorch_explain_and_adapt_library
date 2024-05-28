@@ -1,0 +1,6 @@
+# python train_generator.py --config "<PEAL_BASE>/configs/generators/follicle_stable_diffusion.yaml"
+category: generator
+generator_type: StableDiffusion
+data: "<PEAL_BASE>/configs/data/follicles_generator.yaml"
+base_path : /home/space/datasets/peal/peal_runs/follicles_cut/stable_diffusion
+train_data_dir: /home/space/datasets/peal/datasets/follicles_captions

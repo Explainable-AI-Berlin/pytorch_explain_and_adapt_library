@@ -540,6 +540,18 @@ class Image2MixedDataset(ImageDataset):
         self.attributes, self.data, self.keys = parse_csv(
             data_dir, config, mode, key_type="name", delimiter=delimiter
         )
+        self.attributes_positive = []
+        self.attributes_negative = []
+        for attribute in self.attributes:
+            attribute_values = attribute.split('_vs_')
+            if len(attribute_values) == 2:
+                self.attributes_positive.append(attribute_values[0])
+                self.attributes_negative.append(attribute_values[1])
+
+            else:
+                self.attributes_positive.append(attribute)
+                self.attributes_negative.append("Not " + attribute)
+
         self.task_specific_keys = None
         if (
             not self.task_config is None
@@ -589,6 +601,21 @@ class Image2MixedDataset(ImageDataset):
 
     def disable_url(self):
         self.url_enabled = False
+
+    def enable_string_description(self):
+        self.string_description_enabled = True
+
+    def disable_string_description(self):
+        self.string_description_enabled = False
+
+    def enable_tokens(self, tokenizer):
+        self.string_description_enabled_buffer = self.string_description_enabled
+        self.enable_string_description()
+        self.tokenizer = tokenizer
+
+    def disable_tokens(self):
+        self.string_description_enabled = self.string_description_enabled_buffer
+        self.tokenizer = None
 
     def enable_class_restriction(self, class_idx):
         assert not self.task_config is None, "Task config must be set"
@@ -702,6 +729,28 @@ class Image2MixedDataset(ImageDataset):
 
         if self.url_enabled:
             return_dict["url"] = name
+
+        if self.string_description_enabled:
+            return_dict["description"] = ""
+            for target_idx, attribute in enumerate(self.task_config.y_selection):
+                attribute_idx = self.attributes.index(attribute)
+                if target[attribute_idx] > 0.5:
+                    return_dict["description"] += self.attributes_positive[attribute_idx]
+
+                else:
+                    return_dict["description"] += self.attributes_negative[attribute_idx]
+
+                if not target_idx == len(self.task_config.y_selection) - 1:
+                    return_dict["description"] += ", "
+
+            if self.tokenizer is not None:
+                return_dict["tokens"] = self.tokenizer(
+                    return_dict["description"],
+                    max_length=self.tokenizer.model_max_length,
+                    padding="max_length",
+                    truncation=True,
+                    return_tensors="pt",
+                ).input_ids
 
         if self.return_dict:
             return return_dict

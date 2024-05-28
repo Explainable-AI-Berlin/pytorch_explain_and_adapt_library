@@ -56,17 +56,21 @@ class StableDiffusion(EditCapableGenerator):
         self,
     ):
         # write the yaml config on disk
-        save_yaml_config(self.config, os.path.join(self.config.base_path, "config.yaml"))
+        if not os.path.exists(self.config.base_path):
+            Path(self.config.base_path).mkdir(parents=True, exist_ok=True)
 
-        writer = SummaryWriter(os.path.join(self.config.base_path, "logs"))
-        train_dataloader = get_dataloader(
+        save_yaml_config(self.config, os.path.join(self.config.base_path, "config.yaml"))
+        finetune_args = types.SimpleNamespace(**self.config.__dict__)
+
+        """train_dataloader = get_dataloader(
             self.train_dataset, mode="train", batch_size=self.config.batch_size
         )
 
         val_dataloader = get_dataloader(
             self.val_dataset, mode="train", batch_size=self.config.batch_size
         )
-        finetune_args = copy.deepcopy(self.config)
+        finetune_args.train_dataloader = train_dataloader
+        finetune_args.val_dataloader = val_dataloader"""
         lora_finetune(finetune_args)
 
     def initialize(self, classifier, base_path, explainer_config):
