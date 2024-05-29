@@ -2,6 +2,7 @@ from typing import Union
 
 from peal.configs.generators.generator_config import GeneratorConfig
 from peal.configs.data.data_config import DataConfig
+from peal.configs.models.model_config import TaskConfig
 
 
 class StableDiffusionConfig(GeneratorConfig):
@@ -70,4 +71,5 @@ class StableDiffusionConfig(GeneratorConfig):
     enable_xformers_memory_efficient_attention: bool = False
     noise_offset: float = 0.0
     rank: int = 4
+    task_config: Union[TaskConfig, type(None)] = None
 

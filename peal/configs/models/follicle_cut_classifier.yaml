@@ -6,7 +6,6 @@ data              : <PEAL_BASE>/configs/data/follicles.yaml
 task:
   criterions:
     ce     : 1.0
-    l1     : 10000.0
     l2     : 1.0
   output_type             : singleclass
   x_selection             : [imgs_cut]

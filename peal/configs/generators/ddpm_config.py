@@ -58,7 +58,7 @@ class DDPMConfig(GeneratorConfig):
     learn_sigma : bool = True
     diffusion_steps : int = 1000
     noise_schedule : str = "linear"
-    timestep_respacing : str = ""
+    timestep_respacing : str = "50"
     use_kl : bool = False
     predict_xstart : bool = False
     rescale_timesteps : bool = False

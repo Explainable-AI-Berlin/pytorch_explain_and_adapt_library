@@ -1,5 +1,6 @@
 import os
 import random
+from pathlib import Path
 from types import SimpleNamespace
 
 import torch
@@ -10,7 +11,7 @@ import torchvision.transforms as transforms
 from PIL import Image
 
 from peal.generators.interfaces import InvertibleGenerator
-from peal.global_utils import load_yaml_config, save_yaml_config
+from peal.global_utils import load_yaml_config, save_yaml_config, embed_numberstring
 from peal.data.dataloaders import get_dataloader
 from peal.data.dataset_factory import get_datasets
 from peal.data.dataset_interfaces import PealDataset
@@ -81,6 +82,9 @@ class DiveTCVAE(InvertibleGenerator):
         self,
     ):
         # write the yaml config on disk
+        if not os.path.exists(self.config.base_path):
+            Path(self.config.base_path).mkdir(parents=True, exist_ok=True)
+
         save_yaml_config(self.config, os.path.join(self.config.base_path, "config.yaml"))
 
         writer = SummaryWriter(os.path.join(self.config.base_path, "logs"))
@@ -135,9 +139,12 @@ class DiveTCVAE(InvertibleGenerator):
             # score_list += [score_dict]
 
             # Report
+            Path(os.path.join(self.config.base_path, embed_numberstring(epoch))).mkdir(
+                parents=True, exist_ok=True
+            )
             torch.save(
                 self.tcvae.state_dict(),
-                os.path.join(self.config.base_path, str(epoch), "model.pt"),
+                os.path.join(self.config.base_path, embed_numberstring(epoch), "model.pt"),
             )
             generated_samples = self.sample_x(batch_size=self.config.batch_size)
             for i in range(5):

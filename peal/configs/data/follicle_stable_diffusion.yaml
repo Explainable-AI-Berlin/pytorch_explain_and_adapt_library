@@ -1,0 +1,12 @@
+dataset_name            : follicles
+dataset_path            : /home/space/datasets/peal/datasets/follicles
+num_samples             : 415
+split                   : [0.8, 0.9]
+input_type              : image
+input_size              : [3, 512, 512]
+output_type             : multiclass
+output_size             : [2]
+invariances             : [rotation, hflipping, vflipping, random_resize50]
+confounding_factors     : [Primordial_Follicle_vs_Growing_Follicle, size]
+normalization           : [0.5,0.5]
+has_hints               : True

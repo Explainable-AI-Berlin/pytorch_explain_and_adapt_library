@@ -259,6 +259,7 @@ class DDPM(EditCapableGenerator):
                     if k not in args.__dict__
                 }
             )
+            args.timestep_respacing = explainer_config.timestep_respacing
             args.dataset = dataset
             args.classifier_dataset = classifier_dataset
             args.generator_dataset = self.dataset

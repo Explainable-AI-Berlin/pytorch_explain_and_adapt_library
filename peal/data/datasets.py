@@ -524,6 +524,8 @@ class Image2MixedDataset(ImageDataset):
         self.groups_enabled = False
         self.idx_enabled = False
         self.url_enabled = False
+        self.string_description_enabled = False
+        self.tokenizer = None
         self.return_dict = return_dict
         # TODO
         # self.config.class_ratios = None
@@ -732,25 +734,31 @@ class Image2MixedDataset(ImageDataset):
 
         if self.string_description_enabled:
             return_dict["description"] = ""
-            for target_idx, attribute in enumerate(self.task_config.y_selection):
+            if hasattr(self, "task_config"):
+                y_selection = self.task_config.y_selection
+
+            else:
+                y_selection = self.attributes
+
+            for target_idx, attribute in enumerate(y_selection):
                 attribute_idx = self.attributes.index(attribute)
-                if target[attribute_idx] > 0.5:
+                if len(y_selection) == 1 and target > 0.5 or len(y_selection) > 1 and target[attribute_idx] > 0.5:
                     return_dict["description"] += self.attributes_positive[attribute_idx]
 
                 else:
                     return_dict["description"] += self.attributes_negative[attribute_idx]
 
-                if not target_idx == len(self.task_config.y_selection) - 1:
+                if not target_idx == len(y_selection) - 1:
                     return_dict["description"] += ", "
 
             if self.tokenizer is not None:
-                return_dict["tokens"] = self.tokenizer(
+                return_dict["tokens"] = torch.tensor(self.tokenizer(
                     return_dict["description"],
                     max_length=self.tokenizer.model_max_length,
                     padding="max_length",
                     truncation=True,
                     return_tensors="pt",
-                ).input_ids
+                ).input_ids)
 
         if self.return_dict:
             return return_dict

@@ -36,6 +36,10 @@ class StableDiffusion(EditCapableGenerator):
         super().__init__()
         self.config = load_yaml_config(config)
         self.classifier_dataset = copy.deepcopy(classifier_dataset)
+        self.train_dataset = get_datasets(self.config.data)[0]
+        if not self.config.task_config is None:
+            self.train_dataset.task_config = self.config.task_config
+
         self.generator_dataset = None
 
         if not model_dir is None:
@@ -61,6 +65,7 @@ class StableDiffusion(EditCapableGenerator):
 
         save_yaml_config(self.config, os.path.join(self.config.base_path, "config.yaml"))
         finetune_args = types.SimpleNamespace(**self.config.__dict__)
+        finetune_args.train_dataset = self.train_dataset
 
         """train_dataloader = get_dataloader(
             self.train_dataset, mode="train", batch_size=self.config.batch_size

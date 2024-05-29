@@ -9,14 +9,14 @@ from peal.configs.training.training_template import TrainingConfig
 from peal.configs.architectures.architecture_template import ArchitectureConfig
 
 
-class TaskConfig:
+class TaskConfig(BaseModel):
     """
     A dict of critirion names (that have to be implemented in peal.training.criterions)
     mapped to the weight.
     Like this the loss function can be post_hoc attached without changing the code.
     """
 
-    criterions: dict = {'ce' : 1.0, 'l1' : 10000.0, 'l2' : 1.0}
+    criterions: dict = {'ce' : 1.0, 'l2' : 1.0}
     """
     The output_type that either can just be the output_type of the dataset or could be some
     possible subtype.
@@ -32,20 +32,15 @@ class TaskConfig:
     """
     Gives the option to select a subset of the input variables. Only works for symbolic data.
     """
-    x_selection: list[str] = None
+    x_selection: Union[list[str], type(None)] = None
     """
     Gives the option to select a subset of the output_variables.
     Can be used e.g. to transform binary multiclass into the subtask of predicting one of the
     binary variables with single class classification.
     """
-    y_selection: list[str] = None
-    """
-    A dict containing all variables that could not be given with the current config structure
+    y_selection: Union[list[str], type(None)] = None
     """
     kwargs: dict = {}
-    """
-    The name of the class.
-    """
     __name__: str = "peal.TaskConfig"
 
     def __init__(
@@ -62,7 +57,7 @@ class TaskConfig:
         self.output_channels = output_channels if output_channels is not None else self.output_channels
         self.x_selection = x_selection if x_selection is not None else self.x_selection
         self.y_selection = y_selection if y_selection is not None else self.y_selection
-        self.kwargs = kwargs
+        self.kwargs = kwargs"""
 
 
 class ModelConfig:
