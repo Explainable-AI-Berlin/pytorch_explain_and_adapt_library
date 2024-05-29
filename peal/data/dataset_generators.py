@@ -814,6 +814,7 @@ class SquareDatasetGenerator:
         shutil.rmtree(self.data_config.dataset_path + "_inverse", ignore_errors=True)
         os.makedirs(self.data_config.dataset_path)
         os.makedirs(os.path.join(self.data_config.dataset_path, "imgs"))
+        os.makedirs(os.path.join(self.data_config.dataset_path, "masks"))
         os.makedirs(os.path.join(self.data_config.dataset_path + "_inverse", "imgs"))
         lines_out = ["Name,ClassA,ClassB,ClassC,ClassD,ColorA,ColorB,PositionX,PositionY"]
 
