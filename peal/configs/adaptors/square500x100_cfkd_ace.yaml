@@ -4,7 +4,7 @@ category                             :  "adaptor"
 batch_size                           :  1 #5
 tracking_level                       :  2
 min_train_samples                    :  400
-finetune_iterations                  :  0
+finetune_iterations                  :  1
 max_validation_samples               :  100
 continuous_learning                  :  "finetune"
 replace_model                        :  True
