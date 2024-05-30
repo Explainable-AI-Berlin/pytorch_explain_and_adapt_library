@@ -1,0 +1,10 @@
+dataset_class           : square
+dataset_path            : /home/space/datasets/peal/datasets/square
+num_samples             : 16000
+input_type              : image
+input_size              : [3, 512, 512]
+output_type             : mixed
+output_size             : [8]
+downsize                : Resize
+delimiter               : ","
+normalization           : [0.5,0.5]

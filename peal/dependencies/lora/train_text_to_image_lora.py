@@ -29,6 +29,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.utils.checkpoint
+import torchmetrics
+import torchvision
 import transformers
 from accelerate import Accelerator
 from accelerate.logging import get_logger
@@ -39,6 +41,7 @@ from packaging import version
 from peft import LoraConfig
 from peft.utils import get_peft_model_state_dict
 from torchvision import transforms
+from torchvision.transforms import ToTensor
 from tqdm.auto import tqdm
 from transformers import CLIPTextModel, CLIPTokenizer
 
@@ -61,6 +64,7 @@ from diffusers.utils.hub_utils import load_or_create_model_card, populate_model_
 from diffusers.utils.import_utils import is_xformers_available
 from diffusers.utils.torch_utils import is_compiled_module
 
+from peal.global_utils import embed_numberstring
 
 # Will error if the minimal version of diffusers is not installed. Remove at your own risks.
 check_min_version("0.28.0.dev0")
@@ -443,7 +447,7 @@ def parse_args():
         args.local_rank = env_local_rank
 
     # Sanity checks
-    if args.dataset_name is None and args.train_data_dir is None:
+    if args.train_dataset_name is None and args.train_data_dir is None:
         raise ValueError("Need either a dataset name or a training folder.")
 
     return args
@@ -454,7 +458,7 @@ DATASET_NAME_MAPPING = {
 }
 
 
-def main(args=None):
+def lora_finetune(args=None):
     if args is None:
         args = parse_args()
 
@@ -519,22 +523,37 @@ def main(args=None):
                 exist_ok=True,
                 token=args.hub_token,
             ).repo_id
-    # Load scheduler, tokenizer and models.
+
+    if not hasattr(args, "pipeline"):
+        # Load scheduler, tokenizer and models.
+        tokenizer = CLIPTokenizer.from_pretrained(
+            args.sd_model, subfolder="tokenizer", revision=args.revision
+        )
+        text_encoder = CLIPTextModel.from_pretrained(
+            args.sd_model, subfolder="text_encoder", revision=args.revision
+        )
+        vae = AutoencoderKL.from_pretrained(
+            args.sd_model, subfolder="vae", revision=args.revision, variant=args.variant
+        )
+        unet = UNet2DConditionModel.from_pretrained(
+            args.sd_model,
+            subfolder="unet",
+            revision=args.revision,
+            variant=args.variant,
+        )
+        pipeline = StableDiffusionPipeline(args.sd_model)
+
+    else:
+        tokenizer = args.pipeline.tokenizer
+        text_encoder = args.pipeline.text_encoder
+        vae = args.pipeline.vae
+        unet = args.pipeline.unet
+        pipeline = args.pipeline
+
     noise_scheduler = DDPMScheduler.from_pretrained(
         args.sd_model, subfolder="scheduler"
     )
-    tokenizer = CLIPTokenizer.from_pretrained(
-        args.sd_model, subfolder="tokenizer", revision=args.revision
-    )
-    text_encoder = CLIPTextModel.from_pretrained(
-        args.sd_model, subfolder="text_encoder", revision=args.revision
-    )
-    vae = AutoencoderKL.from_pretrained(
-        args.sd_model, subfolder="vae", revision=args.revision, variant=args.variant
-    )
-    unet = UNet2DConditionModel.from_pretrained(
-        args.sd_model, subfolder="unet", revision=args.revision, variant=args.variant
-    )
+
     # freeze parameters of models to save more memory
     unet.requires_grad_(False)
     vae.requires_grad_(False)
@@ -577,7 +596,7 @@ def main(args=None):
             xformers_version = version.parse(xformers.__version__)
             if xformers_version == version.parse("0.0.16"):
                 logger.warning(
-                    "xFormers 0.0.16 cannot be used for training in some GPUs. If you observe problems during training, please update xFormers to at least 0.0.17. See https://huggingface.co/docs/diffusers/main/en/optimization/xformers for more details."
+                    "xFormers 0.0.16 cannot be used for training in some GPUs."
                 )
             unet.enable_xformers_memory_efficient_attention()
         else:
@@ -627,16 +646,14 @@ def main(args=None):
     # Get the datasets: you can either provide your own training and evaluation files (see below)
     # or specify a Dataset from the hub (the dataset will be downloaded automatically from the datasets Hub).
 
-
-
     if not hasattr(args, "train_dataset"):
         # In distributed training, the load_dataset function guarantees that only one local process can concurrently
         # download the dataset.
-        if args.dataset_name is not None:
+        if args.train_dataset_name is not None:
             # Downloading and loading a dataset from the hub.
             dataset = load_dataset(
-                args.dataset_name,
-                args.dataset_config_name,
+                args.train_dataset_name,
+                args.train_dataset_config_name,
                 cache_dir=args.cache_dir,
                 data_dir=args.train_data_dir,
             )
@@ -658,7 +675,7 @@ def main(args=None):
         column_names = dataset["train"].column_names
 
         # 6. Get the column names for input/target.
-        dataset_columns = DATASET_NAME_MAPPING.get(args.dataset_name, None)
+        dataset_columns = DATASET_NAME_MAPPING.get(args.train_dataset_name, None)
         if args.image_column is None:
             image_column = (
                 dataset_columns[0] if dataset_columns is not None else column_names[0]
@@ -744,8 +761,12 @@ def main(args=None):
             train_dataset = dataset["train"].with_transform(preprocess_train)
 
         def collate_fn(examples):
-            pixel_values = torch.stack([example["pixel_values"] for example in examples])
-            pixel_values = pixel_values.to(memory_format=torch.contiguous_format).float()
+            pixel_values = torch.stack(
+                [example["pixel_values"] for example in examples]
+            )
+            pixel_values = pixel_values.to(
+                memory_format=torch.contiguous_format
+            ).float()
             input_ids = torch.stack([example["input_ids"] for example in examples])
             return {"pixel_values": pixel_values, "input_ids": input_ids}
 
@@ -848,6 +869,47 @@ def main(args=None):
             first_epoch = global_step // num_update_steps_per_epoch
     else:
         initial_global_step = 0
+
+    fid = torchmetrics.image.fid.FrechetInceptionDistance(
+        feature=192, reset_real_features=False
+    )
+    fid.to(accelerator.device)
+    real_images = []
+    for i in range(min(len(args.train_dataset), 100)):
+        real_images.append(args.train_dataset[i][0])
+
+    real_images = torch.stack(real_images, dim=0).to(accelerator.device) * 0.5 + 0.5
+    fid.update(torch.tensor(255 * real_images, dtype=torch.uint8), real=True)
+
+    target_idx = args.train_dataset.attributes.index(args.train_dataset.task_config.y_selection[0])
+    prompts_a = [args.train_dataset.attributes_positive[target_idx]]
+    prompts_b = [args.train_dataset.attributes_negative[target_idx]]
+    prompt = 3 * prompts_a + 3 * prompts_b
+    images = pipeline(prompt).images
+    images_torch = torch.stack([ToTensor()(image) for image in images])
+    images_torch_resized = torchvision.transforms.Resize(real_images.shape[-2:])(
+        images_torch
+    )
+    concatenated_imgs = torch.cat([real_images[:6].cpu(), images_torch_resized], dim=0)
+    output_dir = os.path.join(args.base_path, "outputs")
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    torchvision.utils.save_image(
+        concatenated_imgs,
+        os.path.join(output_dir, "start.png"),
+        nrow=6,
+    )
+
+    fid.update(
+        torch.tensor(
+            255 * concatenated_imgs,
+            dtype=torch.uint8,
+        ).to(accelerator.device),
+        real=False,
+    )
+    fid_score = float(fid.compute())
+    for tracker in accelerator.trackers:
+        if tracker.name == "tensorboard":
+            tracker.writer.add_scalar("fid", fid_score, -1)
 
     progress_bar = tqdm(
         range(0, args.max_train_steps),
@@ -1028,6 +1090,32 @@ def main(args=None):
             if global_step >= args.max_train_steps:
                 break
 
+        images = pipeline(prompt).images
+        images_torch = torch.stack([ToTensor()(image) for image in images])
+        images_torch_resized = torchvision.transforms.Resize(real_images.shape[-2:])(
+            images_torch
+        )
+        concatenated_imgs = torch.cat(
+            [real_images[:6].cpu(), images_torch_resized], dim=0
+        )
+        torchvision.utils.save_image(
+            concatenated_imgs,
+            os.path.join(output_dir, embed_numberstring(epoch) + ".png"),
+            nrow=6,
+        )
+
+        fid.update(
+            torch.tensor(
+                255 * concatenated_imgs,
+                dtype=torch.uint8,
+            ).to(accelerator.device),
+            real=False,
+        )
+        fid_score = float(fid.compute())
+        for tracker in accelerator.trackers:
+            if tracker.name == "tensorboard":
+                tracker.writer.add_scalar("fid", fid_score, epoch)
+
         if accelerator.is_main_process:
             if (
                 args.validation_prompt is not None
@@ -1109,7 +1197,7 @@ def main(args=None):
                 repo_id,
                 images=images,
                 base_model=args.sd_model,
-                dataset_name=args.dataset_name,
+                dataset_name=args.train_dataset_name,
                 repo_folder=args.base_path,
             )
             upload_folder(
@@ -1176,4 +1264,4 @@ def main(args=None):
 
 
 if __name__ == "__main__":
-    main()
+    lora_finetune()

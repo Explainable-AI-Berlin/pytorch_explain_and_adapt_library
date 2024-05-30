@@ -232,26 +232,24 @@ def training(args=None):
     # =================================================================
     # Instantiate Pipeline
     Print("Initializing Stable Diffusion")
-    pipeline = StableDiffusionPipeline.from_pretrained(
-        args.sd_model,
-        torch_dtype=torch_dtype,
-    )
-    pipeline.to(device)
+    if not hasattr(args, "pipeline"):
+        pipeline = StableDiffusionPipeline.from_pretrained(
+            args.sd_model,
+            torch_dtype=torch_dtype,
+        )
+        pipeline.to(device)
+
+    else:
+        pipeline = args.pipeline
+
     noise_scheduler = DDPMScheduler.from_pretrained(
         args.sd_model, subfolder="scheduler"
     )
-
     # =================================================================
     # Initialize token(s)
 
     # load previous tokens
-    try:
-        load_tokens_and_embeddings(sd_model=pipeline, files=args.embedding_files)
-
-    except Exception:
-        import pdb
-
-        pdb.set_trace()
+    load_tokens_and_embeddings(sd_model=pipeline, files=args.embedding_files)
 
     # generate new tokens
     index_no_updates, placeholder_token_ids, initializer_token_ids = add_new_tokens(
@@ -470,7 +468,7 @@ def training(args=None):
     print("len unrestricted dataset")
     print("len unrestricted dataset")
     print("len unrestricted dataset")
-    print(len(dataset))
+    print(len(dataset_raw))
     args.generator_dataset_val.disable_class_restriction()
 
 

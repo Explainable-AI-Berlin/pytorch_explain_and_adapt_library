@@ -816,7 +816,11 @@ class SquareDatasetGenerator:
         os.makedirs(os.path.join(self.data_config.dataset_path, "imgs"))
         os.makedirs(os.path.join(self.data_config.dataset_path, "masks"))
         os.makedirs(os.path.join(self.data_config.dataset_path + "_inverse", "imgs"))
+        os.makedirs(os.path.join(self.data_config.dataset_path + "_inverse", "masks"))
         lines_out = ["Name,ClassA,ClassB,ClassC,ClassD,ColorA,ColorB,PositionX,PositionY"]
+        lines_out_inverse = [
+            "Name,ClassA,ClassB,ClassC,ClassD,ColorA,ColorB,PositionX,PositionY"
+        ]
 
         for sample_idx in range(self.data_config.num_samples):
             if sample_idx % 2 == 0:
@@ -867,6 +871,11 @@ class SquareDatasetGenerator:
             mask[position_x : position_x + 8, position_y : position_y + 8] = 255
             img_mask = Image.fromarray(mask)
             img_mask.save(os.path.join(self.data_config.dataset_path, "masks", sample_name))
+            img_mask.save(
+                os.path.join(
+                    self.data_config.dataset_path + "_inverse", "masks", sample_name
+                )
+            )
 
             attributes = [
                 sample_name,
@@ -880,7 +889,23 @@ class SquareDatasetGenerator:
                 str(float(position_y) / 64),
             ]
             lines_out.append(",".join(attributes))
+            attributes_inverse = [
+                sample_name,
+                str(class_a),
+                str(class_b),
+                str(class_c),
+                str(class_d),
+                str(float(color_a) / 255),
+                str(float(color_b - 255) / 255),
+                str(float(position_x) / 64),
+                str(float(position_y) / 64),
+            ]
+            lines_out_inverse.append(",".join(attributes_inverse))
             if (sample_idx + 1) % 100 == 0:
                 open(os.path.join(self.data_config.dataset_path, "data.csv"), "w").write(
                     "\n".join(lines_out)
                 )
+                open(
+                    os.path.join(self.data_config.dataset_path + "_inverse", "data.csv"),
+                    "w",
+                ).write("\n".join(lines_out_inverse))

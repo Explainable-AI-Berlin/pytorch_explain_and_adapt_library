@@ -3,11 +3,9 @@ category: generator
 generator_type: StableDiffusion
 data: "<PEAL_BASE>/configs/data/follicle_stable_diffusion.yaml"
 base_path : /home/space/datasets/peal/peal_runs/follicles_cut/stable_diffusion
-train_data_dir: /home/space/datasets/peal/datasets/follicles_captions
 task_config:
   criterions:
     ce     : 1.0
-    l1     : 10000.0
     l2     : 1.0
   output_type             : singleclass
   x_selection             : [imgs_cut]

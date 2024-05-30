@@ -7,6 +7,7 @@ from pathlib import Path
 import torch
 import io
 import blobfile as bf
+from diffusers import StableDiffusionPipeline
 
 from mpi4py import MPI
 from torch import nn
@@ -20,7 +21,7 @@ from peal.data.dataloaders import get_dataloader
 from peal.data.dataset_factory import get_datasets
 from peal.data.datasets import Image2MixedDataset
 from peal.dependencies.ddpm_inversion.ddpm_inversion import DDPMInversion
-from peal.dependencies.lora.train_text_to_image_lora import main as lora_finetune
+from peal.dependencies.lora.train_text_to_image_lora import lora_finetune
 from peal.dependencies.time.core.utils import load_tokens_and_embeddings
 from peal.generators.interfaces import EditCapableGenerator
 from peal.global_utils import load_yaml_config, embed_numberstring, save_yaml_config
@@ -36,9 +37,13 @@ class StableDiffusion(EditCapableGenerator):
         super().__init__()
         self.config = load_yaml_config(config)
         self.classifier_dataset = copy.deepcopy(classifier_dataset)
+        # TODO something is wrong here!!!
         self.train_dataset = get_datasets(self.config.data)[0]
         if not self.config.task_config is None:
             self.train_dataset.task_config = self.config.task_config
+
+        elif not self.classifier_dataset is None:
+            self.train_dataset.task_config = self.classifier_dataset.task_config
 
         self.generator_dataset = None
 
@@ -50,6 +55,10 @@ class StableDiffusion(EditCapableGenerator):
 
         self.data_dir = os.path.join(self.model_dir, "data_test")
         self.counterfactual_path = os.path.join(self.model_dir, "counterfactuals_test")
+        self.pipeline = StableDiffusionPipeline.from_pretrained(
+            self.config.sd_model,
+        )
+        self.pipeline.to(device)
 
     def sample_x(self, batch_size=1):
         return self.diffusion.p_sample_loop(
@@ -66,6 +75,7 @@ class StableDiffusion(EditCapableGenerator):
         save_yaml_config(self.config, os.path.join(self.config.base_path, "config.yaml"))
         finetune_args = types.SimpleNamespace(**self.config.__dict__)
         finetune_args.train_dataset = self.train_dataset
+        finetune_args.pipeline = self.pipeline
 
         """train_dataloader = get_dataloader(
             self.train_dataset, mode="train", batch_size=self.config.batch_size
@@ -80,14 +90,12 @@ class StableDiffusion(EditCapableGenerator):
 
     def initialize(self, classifier, base_path, explainer_config):
         class_predictions_path = os.path.join(base_path, "explainer", "predictions.csv")
-        generator_dataset = get_datasets(self.config.data)[0]
-        generator_dataset.task_config = self.classifier_dataset.task_config
         Path(os.path.join(base_path, "explainer")).mkdir(exist_ok=True, parents=True)
         if not os.path.exists(class_predictions_path):
-            generator_dataset.enable_url()
+            self.classifier_dataset.enable_url()
             prediction_args = types.SimpleNamespace(
                 batch_size=32,
-                dataset=generator_dataset,
+                dataset=self.classifier_dataset,
                 classifier=classifier,
                 label_path=class_predictions_path,
                 partition="train",
@@ -95,6 +103,7 @@ class StableDiffusion(EditCapableGenerator):
                 max_samples=explainer_config.max_samples,
             )
             get_predictions(prediction_args)
+            self.classifier_dataset.disable_url()
 
         writer = SummaryWriter(os.path.join(base_path, "explainer", "logs"))
         generator_dataset_config = copy.deepcopy(self.config.data)
@@ -102,7 +111,7 @@ class StableDiffusion(EditCapableGenerator):
         self.generator_dataset, self.generator_dataset_val, _ = get_datasets(
             config=generator_dataset_config, data_dir=class_predictions_path
         )
-        self.generator_dataset.task_config = TaskConfig(y_selection=['prediction'])
+        self.generator_dataset.task_config.y_selection = ['prediction']
         self.generator_dataset_val.task_config = self.generator_dataset.task_config
         context_embedding_path = os.path.join(
             base_path, "explainer", "context", "context_embedding"
@@ -135,14 +144,14 @@ class StableDiffusion(EditCapableGenerator):
                 class_related_bias_embedding_args = types.SimpleNamespace(
                     embedding_files=[context_embedding_path],
                     output_path=class_token_path,
-                    dataset=self.generator_dataset,
+                    dataset=self.classifier_dataset, #self.generator_dataset,
                     custom_tokens=explainer_config.class_custom_token[class_idx].split(
                         " "
                     ),
                     training_label=class_idx,
                     phase="class",
                     batch_size=explainer_config.train_batch_size,
-                    generator_dataset_val=self.generator_dataset_val,
+                    generator_dataset_val=copy.deepcopy(self.classifier_dataset), #self.generator_dataset_val,
                     writer=writer,
                     prompt=explainer_config.base_prompt
                     + explainer_config.prompt_connector
