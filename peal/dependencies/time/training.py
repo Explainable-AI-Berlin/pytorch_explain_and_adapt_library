@@ -208,7 +208,7 @@ def run_epoch(
         iterations += 1
 
 
-def training(args=None):
+def textual_inversion_training(args=None):
     # =================================================================
     # Custom variables
 
@@ -473,4 +473,4 @@ def training(args=None):
 
 
 if __name__ == "__main__":
-    training()
+    textual_inversion_training()

@@ -857,11 +857,13 @@ class SquareDatasetGenerator:
 
             sample_name = embed_numberstring(sample_idx, 8) + ".png"
             img = np.ones([64, 64, 3], dtype=np.uint8) * color_b
+            noise = (np.random.randn(*img.shape) * 10).astype(dtype=np.uint8)
+            img_base = np.clip(img + noise, 0, 255)
+            img = np.copy(img_base)
             img[position_x : position_x + 8, position_y : position_y + 8] = color_a
-            img = img + (np.random.randn(*img.shape) * 10).astype(dtype=np.uint8)
             img = Image.fromarray(img)
             img.save(os.path.join(self.data_config.dataset_path, "imgs", sample_name))
-            img_inverse = np.ones([64, 64, 3], dtype=np.uint8) * abs(color_b - 255)
+            img_inverse = np.abs(img_base - 255)
             img_inverse[position_x : position_x + 8, position_y : position_y + 8] = color_a
             img_inverse = Image.fromarray(img_inverse)
             img_inverse.save(

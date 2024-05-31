@@ -7,6 +7,7 @@ from pathlib import Path
 import torch
 import io
 import blobfile as bf
+import torchvision
 from diffusers import StableDiffusionPipeline
 
 from mpi4py import MPI
@@ -29,7 +30,7 @@ from peal.dependencies.time.generate_ce import (
     generate_time_counterfactuals,
 )
 from peal.dependencies.time.get_predictions import get_predictions
-from peal.dependencies.time.training import training
+from peal.dependencies.time.training import textual_inversion_training
 
 
 class StableDiffusion(EditCapableGenerator):
@@ -59,11 +60,16 @@ class StableDiffusion(EditCapableGenerator):
             self.config.sd_model,
         )
         self.pipeline.to(device)
+        #self.pipeline.run_safety_checker = lambda image, device, dtype: image, False
+        self.pipeline.safety_checker = None
+        """lora_dir = os.path.join(self.model_dir, "pytorch_lora_weights.safetensors")
+        if os.path.exists(lora_dir):
+            self.pipeline.unet.load_attn_procs(lora_dir)"""
 
     def sample_x(self, batch_size=1):
-        return self.diffusion.p_sample_loop(
-            self.model, [batch_size] + self.classifier_dataset.config.input_size
-        )
+        images = self.pipeline(batch_size * [""]).images
+        images_torch = torch.stack([ToTensor()(image) for image in images])
+        return images_torch
 
     def train_model(
         self,
@@ -86,9 +92,18 @@ class StableDiffusion(EditCapableGenerator):
         )
         finetune_args.train_dataloader = train_dataloader
         finetune_args.val_dataloader = val_dataloader"""
-        lora_finetune(finetune_args)
+        print("Start LORA finetuning")
+        print("Start LORA finetuning")
+        print("Start LORA finetuning")
+        self.pipeline = lora_finetune(finetune_args)
+        print("Finished LORA finetuning")
+        print("Finished LORA finetuning")
+        print("Finished LORA finetuning")
 
     def initialize(self, classifier, base_path, explainer_config):
+        if explainer_config.use_lora:
+            self.train_model()
+
         class_predictions_path = os.path.join(base_path, "explainer", "predictions.csv")
         Path(os.path.join(base_path, "explainer")).mkdir(exist_ok=True, parents=True)
         if not os.path.exists(class_predictions_path):
@@ -111,28 +126,41 @@ class StableDiffusion(EditCapableGenerator):
         self.generator_dataset, self.generator_dataset_val, _ = get_datasets(
             config=generator_dataset_config, data_dir=class_predictions_path
         )
-        self.generator_dataset.task_config.y_selection = ['prediction']
+        if self.generator_dataset.task_config is None:
+            self.generator_dataset.task_config = TaskConfig()
+            self.generator_dataset.task_config.y_selection = ['prediction']
+
+        else:
+            self.generator_dataset.task_config.y_selection = ['prediction']
+
         self.generator_dataset_val.task_config = self.generator_dataset.task_config
-        context_embedding_path = os.path.join(
-            base_path, "explainer", "context", "context_embedding"
-        )
-        if not os.path.exists(context_embedding_path):
-            os.makedirs(os.path.join(base_path, "explainer", "context"), exist_ok=True)
-            train_context_embedding_args = types.SimpleNamespace(
-                embedding_files=[],
-                output_path=context_embedding_path,
-                dataset=self.generator_dataset,
-                partition="train",
-                phase="context",
-                batch_size=explainer_config.train_batch_size,
-                training_label=-1,
-                custom_tokens=explainer_config.custom_tokens_context,
-                prompt=explainer_config.base_prompt,
-                generator_dataset_val=self.generator_dataset_val,
-                writer=writer,
-                **explainer_config.__dict__
+
+        if explainer_config.learn_dataset_embedding:
+            context_embedding_path = os.path.join(
+                base_path, "explainer", "context", "context_embedding"
             )
-            training(train_context_embedding_args)
+            if not os.path.exists(context_embedding_path):
+                os.makedirs(os.path.join(base_path, "explainer", "context"), exist_ok=True)
+                train_context_embedding_args = types.SimpleNamespace(
+                    embedding_files=[],
+                    output_path=context_embedding_path,
+                    dataset=self.generator_dataset,
+                    partition="train",
+                    phase="context",
+                    batch_size=explainer_config.train_batch_size,
+                    training_label=-1,
+                    custom_tokens=explainer_config.custom_tokens_context,
+                    prompt=explainer_config.base_prompt,
+                    generator_dataset_val=self.generator_dataset_val,
+                    writer=writer,
+                    **explainer_config.__dict__
+                )
+                textual_inversion_training(train_context_embedding_args)
+
+            embedding_files = [context_embedding_path]
+
+        else:
+            embedding_files = []
 
         # TODO how to extend this for multiclass??
         for class_idx in range(2):
@@ -142,7 +170,7 @@ class StableDiffusion(EditCapableGenerator):
             if not os.path.exists(class_token_path):
                 os.makedirs(os.path.join(base_path, "explainer", "class" + str(class_idx)), exist_ok=True)
                 class_related_bias_embedding_args = types.SimpleNamespace(
-                    embedding_files=[context_embedding_path],
+                    embedding_files=embedding_files,
                     output_path=class_token_path,
                     dataset=self.classifier_dataset, #self.generator_dataset,
                     custom_tokens=explainer_config.class_custom_token[class_idx].split(
@@ -158,7 +186,7 @@ class StableDiffusion(EditCapableGenerator):
                     + explainer_config.class_custom_token[class_idx],
                     **explainer_config.__dict__
                 )
-                training(class_related_bias_embedding_args)
+                textual_inversion_training(class_related_bias_embedding_args)
 
         if explainer_config.editing_type == "ddpm_inversion":
             # TODO somehow the config should be possible to influence

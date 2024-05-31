@@ -359,7 +359,7 @@ def parse_args():
         "--prediction_type",
         type=str,
         default=None,
-        help="The prediction_type that shall be used for training. Choose between 'epsilon' or 'v_prediction' or leave `None`. If left to `None` the default prediction type of the scheduler: `noise_scheduler.config.prediction_type` is chosen.",
+        help="The prediction_type that shall be used for training. ",
     )
     parser.add_argument(
         "--hub_model_id",
@@ -783,6 +783,13 @@ def lora_finetune(args=None):
         batch_size=args.train_batch_size,
         num_workers=args.dataloader_num_workers,
     )
+    empty_input_ids = torch.tensor(tokenizer(
+        args.train_batch_size * [""],
+        max_length=tokenizer.model_max_length,
+        padding="max_length",
+        truncation=True,
+        return_tensors="pt",
+    ).input_ids).to(accelerator.device)
 
     def unwrap_model(model):
         model = accelerator.unwrap_model(model)
@@ -860,6 +867,7 @@ def lora_finetune(args=None):
             )
             args.resume_from_checkpoint = None
             initial_global_step = 0
+
         else:
             accelerator.print(f"Resuming from checkpoint {path}")
             accelerator.load_state(os.path.join(args.base_path, path))
@@ -867,6 +875,9 @@ def lora_finetune(args=None):
 
             initial_global_step = global_step
             first_epoch = global_step // num_update_steps_per_epoch
+            if global_step >= args.max_train_steps:
+                print("LORA finetuning already finished!!!")
+                return pipeline
     else:
         initial_global_step = 0
 
@@ -884,7 +895,7 @@ def lora_finetune(args=None):
     target_idx = args.train_dataset.attributes.index(args.train_dataset.task_config.y_selection[0])
     prompts_a = [args.train_dataset.attributes_positive[target_idx]]
     prompts_b = [args.train_dataset.attributes_negative[target_idx]]
-    prompt = 3 * prompts_a + 3 * prompts_b
+    prompt = 2 * [""] + 2 * prompts_a + 2 * prompts_b
     images = pipeline(prompt).images
     images_torch = torch.stack([ToTensor()(image) for image in images])
     images_torch_resized = torchvision.transforms.Resize(real_images.shape[-2:])(
@@ -962,7 +973,12 @@ def lora_finetune(args=None):
                 noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
 
                 # Get the text embedding for conditioning
-                encoder_hidden_states = text_encoder(input_ids, return_dict=False)[0]
+                is_unconditional = random.randint(0, 1)
+                if True:
+                    encoder_hidden_states = text_encoder(input_ids, return_dict=False)[0]
+
+                else:
+                    encoder_hidden_states = text_encoder(empty_input_ids, return_dict=False)[0]
 
                 # Get the target for loss depending on the prediction type
                 if args.prediction_type is not None:
@@ -1261,6 +1277,7 @@ def lora_finetune(args=None):
                         )
 
     accelerator.end_training()
+    return pipeline
 
 
 if __name__ == "__main__":

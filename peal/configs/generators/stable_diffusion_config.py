@@ -40,8 +40,8 @@ class StableDiffusionConfig(GeneratorConfig):
     center_crop: bool = False
     random_flip: bool = False
     train_batch_size: int = 16
-    num_train_epochs: int = 100
-    max_train_steps: Union[int, type(None)] = None
+    num_train_epochs: int = 5 # 100
+    max_train_steps: Union[int, type(None)] = 2500 # None
     gradient_accumulation_steps: int = 1
     gradient_checkpointing: bool = False
     learning_rate: float = 1e-4

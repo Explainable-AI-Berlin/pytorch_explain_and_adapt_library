@@ -26,8 +26,8 @@ class TIMEConfig(ExplainerConfig):
         "|<A*01>| |<A*02>| |<A*03>|",
         "|<A*11>| |<A*12>| |<A*13>|",
     ]
-    base_prompt: str = "A photo of a |<C*1>| |<C*2>| |<C*3>|"
-    prompt_connector: str = " that is "
+    base_prompt: str = "" # "A photo of a |<C*1>| |<C*2>| |<C*3>|"
+    prompt_connector: str = "" # " that is "
     chunks: int = 1
     chunk: int = 0
     enable_xformers_memory_efficient_attention: bool = True
@@ -44,7 +44,7 @@ class TIMEConfig(ExplainerConfig):
     generic_custom_tokens: list = ["|<C*1>|", "|<C*2>|", "|<C*3>|"]
     total_num_inference_steps: int = 50
     custom_tokens_context: list = ["|<C*1>|", "|<C*2>|", "|<C*3>|"]
-    custom_tokens_init: list = ["centered", "realistic", "celebrity"]
+    custom_tokens_init: list = ["", "", ""]
     mini_batch_size: int = 1
     gpu: str = "0"
     lr: float = 1e-4
@@ -60,3 +60,5 @@ class TIMEConfig(ExplainerConfig):
     y_target_goal_confidence: float = 0.9
     max_attacks: int = 10
     max_samples: Union[int, type(None)] = None
+    use_lora: bool = True
+    learn_dataset_embedding: bool = True
