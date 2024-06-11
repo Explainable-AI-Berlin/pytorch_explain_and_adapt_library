@@ -790,6 +790,7 @@ def lora_finetune(args=None):
         truncation=True,
         return_tensors="pt",
     ).input_ids).to(accelerator.device)
+    empty_input_ids = empty_input_ids.unsqueeze(1)
 
     def unwrap_model(model):
         model = accelerator.unwrap_model(model)
@@ -892,7 +893,12 @@ def lora_finetune(args=None):
     real_images = torch.stack(real_images, dim=0).to(accelerator.device) * 0.5 + 0.5
     fid.update(torch.tensor(255 * real_images, dtype=torch.uint8), real=True)
 
-    target_idx = args.train_dataset.attributes.index(args.train_dataset.task_config.y_selection[0])
+    if len(args.train_dataset.task_config.y_selection) > 0:
+        target_idx = args.train_dataset.attributes.index(args.train_dataset.task_config.y_selection[0])
+
+    else:
+        target_idx = 0
+
     prompts_a = [args.train_dataset.attributes_positive[target_idx]]
     prompts_b = [args.train_dataset.attributes_negative[target_idx]]
     prompt = 2 * [""] + 2 * prompts_a + 2 * prompts_b
@@ -974,7 +980,7 @@ def lora_finetune(args=None):
 
                 # Get the text embedding for conditioning
                 is_unconditional = random.randint(0, 1)
-                if True:
+                if is_unconditional:
                     encoder_hidden_states = text_encoder(input_ids, return_dict=False)[0]
 
                 else:
@@ -1096,6 +1102,31 @@ def lora_finetune(args=None):
                         )
 
                         logger.info(f"Saved state to {save_path}")
+                        images = pipeline(prompt).images
+                        images_torch = torch.stack([ToTensor()(image) for image in images])
+                        images_torch_resized = torchvision.transforms.Resize(real_images.shape[-2:])(
+                            images_torch
+                        )
+                        concatenated_imgs = torch.cat(
+                            [real_images[:6].cpu(), images_torch_resized], dim=0
+                        )
+                        torchvision.utils.save_image(
+                            concatenated_imgs,
+                            os.path.join(output_dir, embed_numberstring(global_step) + ".png"),
+                            nrow=6,
+                        )
+
+                        fid.update(
+                            torch.tensor(
+                                255 * concatenated_imgs,
+                                dtype=torch.uint8,
+                            ).to(accelerator.device),
+                            real=False,
+                        )
+                        fid_score = float(fid.compute())
+                        for tracker in accelerator.trackers:
+                            if tracker.name == "tensorboard":
+                                tracker.writer.add_scalar("fid", fid_score, global_step)
 
             logs = {
                 "step_loss": loss.detach().item(),
@@ -1105,32 +1136,6 @@ def lora_finetune(args=None):
 
             if global_step >= args.max_train_steps:
                 break
-
-        images = pipeline(prompt).images
-        images_torch = torch.stack([ToTensor()(image) for image in images])
-        images_torch_resized = torchvision.transforms.Resize(real_images.shape[-2:])(
-            images_torch
-        )
-        concatenated_imgs = torch.cat(
-            [real_images[:6].cpu(), images_torch_resized], dim=0
-        )
-        torchvision.utils.save_image(
-            concatenated_imgs,
-            os.path.join(output_dir, embed_numberstring(epoch) + ".png"),
-            nrow=6,
-        )
-
-        fid.update(
-            torch.tensor(
-                255 * concatenated_imgs,
-                dtype=torch.uint8,
-            ).to(accelerator.device),
-            real=False,
-        )
-        fid_score = float(fid.compute())
-        for tracker in accelerator.trackers:
-            if tracker.name == "tensorboard":
-                tracker.writer.add_scalar("fid", fid_score, epoch)
 
         if accelerator.is_main_process:
             if (

@@ -2,7 +2,7 @@
 category: generator
 generator_type: StableDiffusion
 data: "<PEAL_BASE>/configs/data/square_stable_diffusion.yaml"
-base_path : /home/space/datasets/peal/peal_runs/square/stable_diffusion
+base_path : /home/space/datasets/peal/peal_runs/square/stable_diffusion10K
 task_config:
   criterions:
     ce     : 1.0

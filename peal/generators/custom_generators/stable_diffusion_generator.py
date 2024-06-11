@@ -82,6 +82,7 @@ class StableDiffusion(EditCapableGenerator):
         finetune_args = types.SimpleNamespace(**self.config.__dict__)
         finetune_args.train_dataset = self.train_dataset
         finetune_args.pipeline = self.pipeline
+        finetune_args.resume_from_checkpoint = 'latest'
 
         """train_dataloader = get_dataloader(
             self.train_dataset, mode="train", batch_size=self.config.batch_size
