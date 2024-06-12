@@ -742,7 +742,7 @@ class Image2MixedDataset(ImageDataset):
 
             for target_idx, attribute in enumerate(y_selection):
                 attribute_idx = self.attributes.index(attribute)
-                if len(y_selection) == 1 and target > 0.5 or len(y_selection) > 1 and target[attribute_idx] > 0.5:
+                if len(y_selection) == 1 and target > 0.5 or len(y_selection) > 1 and target[target_idx] > 0.5:
                     return_dict["description"] += self.attributes_positive[attribute_idx]
 
                 else:

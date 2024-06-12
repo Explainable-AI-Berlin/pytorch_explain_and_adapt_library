@@ -8,5 +8,5 @@ task_config:
     bce     : 1.0
     l2      : 1.0
   output_type             : multiclass
-  y_selection             : []
-  output_channels         : 41
+  y_selection             : [Smiling, CopyrightTag]
+  output_channels         : 2

@@ -5,9 +5,9 @@ data: "<PEAL_BASE>/configs/data/follicle_stable_diffusion.yaml"
 base_path : /home/space/datasets/peal/peal_runs/follicles_cut/stable_diffusion
 task_config:
   criterions:
-    ce     : 1.0
-    l2     : 1.0
-  output_type             : singleclass
+    bce     : 1.0
+    l2      : 1.0
+  output_type             : multiclass
   x_selection             : [imgs_cut]
-  y_selection             : [Primordial_Follicle_vs_Growing_Follicle]
+  y_selection             : [Big_vs_Small, Primordial_Follicle_vs_Growing_Follicle]
   output_channels         : 2

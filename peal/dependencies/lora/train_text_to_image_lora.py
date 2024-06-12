@@ -1003,9 +1003,16 @@ def lora_finetune(args=None):
                     )
 
                 # Predict the noise residual and compute loss
-                model_pred = unet(
-                    noisy_latents, timesteps, encoder_hidden_states, return_dict=False
-                )[0]
+                try:
+                    model_pred = unet(
+                        noisy_latents, timesteps, encoder_hidden_states, return_dict=False
+                    )[0]
+                    noisy_latents_old = torch.clone(noisy_latents)
+                    timesteps_old = torch.clone(timesteps)
+                    encoder_hidden_states_old = torch.clone(encoder_hidden_states)
+
+                except Exception as e:
+                    import pdb; pdb.set_trace()
 
                 if args.snr_gamma is None:
                     loss = F.mse_loss(
