@@ -44,7 +44,7 @@ class TIMEConfig(ExplainerConfig):
     generic_custom_tokens: list = ["|<C*1>|", "|<C*2>|", "|<C*3>|"]
     total_num_inference_steps: int = 50
     custom_tokens_context: list = ["|<C*1>|", "|<C*2>|", "|<C*3>|"]
-    custom_tokens_init: list = ["", "", ""]
+    custom_tokens_init: list = ["<|endoftext|>", "<|endoftext|>", "<|endoftext|>"]
     mini_batch_size: int = 1
     gpu: str = "0"
     lr: float = 1e-4

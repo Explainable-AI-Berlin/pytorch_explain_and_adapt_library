@@ -8,5 +8,5 @@ task_config:
     bce     : 1.0
     l2      : 1.0
   output_type             : multiclass
-  y_selection             : [Smiling, CopyrightTag]
+  y_selection             : [Smiling, Confounder]
   output_channels         : 2

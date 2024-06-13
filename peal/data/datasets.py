@@ -551,7 +551,7 @@ class Image2MixedDataset(ImageDataset):
                 self.attributes_negative.append(attribute_values[1])
 
             else:
-                self.attributes_positive.append(attribute)
+                self.attributes_positive.append("Is " + attribute)
                 self.attributes_negative.append("Not " + attribute)
 
         self.task_specific_keys = None

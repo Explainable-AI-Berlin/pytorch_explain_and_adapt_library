@@ -784,7 +784,7 @@ def lora_finetune(args=None):
         num_workers=args.dataloader_num_workers,
     )
     empty_input_ids = torch.tensor(tokenizer(
-        args.train_batch_size * [""],
+        args.train_batch_size * ["<|endoftext|> <|endoftext|> <|endoftext|>"],
         max_length=tokenizer.model_max_length,
         padding="max_length",
         truncation=True,
@@ -984,7 +984,7 @@ def lora_finetune(args=None):
                     encoder_hidden_states = text_encoder(input_ids, return_dict=False)[0]
 
                 else:
-                    encoder_hidden_states = text_encoder(empty_input_ids, return_dict=False)[0]
+                    encoder_hidden_states = text_encoder(empty_input_ids[:bsz], return_dict=False)[0]
 
                 # Get the target for loss depending on the prediction type
                 if args.prediction_type is not None:
