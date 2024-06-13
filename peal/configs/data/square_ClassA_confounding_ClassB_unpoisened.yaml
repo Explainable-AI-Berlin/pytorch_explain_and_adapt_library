@@ -1,5 +1,5 @@
 dataset_class           : square
-dataset_path            : /home/space/datasets/peal/datasets/square
+dataset_path            : /home/space/datasets/peal/datasets/square2
 num_samples             : 16000
 split                   : [0.8,0.9]
 input_type              : image
