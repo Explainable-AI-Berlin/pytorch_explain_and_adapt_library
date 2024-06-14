@@ -40,8 +40,8 @@ class StableDiffusionConfig(GeneratorConfig):
     center_crop: bool = False
     random_flip: bool = False
     train_batch_size: int = 16
-    num_train_epochs: int = 10 # 100
-    max_train_steps: Union[int, type(None)] = 10000 # None
+    num_train_epochs: int = 100
+    max_train_steps: Union[int, type(None)] = 100000 # None
     gradient_accumulation_steps: int = 1
     gradient_checkpointing: bool = False
     learning_rate: float = 1e-4
@@ -70,6 +70,6 @@ class StableDiffusionConfig(GeneratorConfig):
     resume_from_checkpoint: Union[str, type(None)] = None
     enable_xformers_memory_efficient_attention: bool = False
     noise_offset: float = 0.0
-    rank: int = 4
+    rank: int = 10
     task_config: Union[TaskConfig, type(None)] = None
 

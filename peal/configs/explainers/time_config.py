@@ -61,4 +61,4 @@ class TIMEConfig(ExplainerConfig):
     max_attacks: int = 10
     max_samples: Union[int, type(None)] = None
     use_lora: bool = True
-    learn_dataset_embedding: bool = True
+    learn_dataset_embedding: bool = False

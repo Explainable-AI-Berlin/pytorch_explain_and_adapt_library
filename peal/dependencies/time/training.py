@@ -356,7 +356,8 @@ def textual_inversion_training(args=None):
     real_images = torch.stack(real_images, dim=0).to(device) * 0.5 + 0.5
     fid.update(torch.tensor(255 * real_images, dtype=torch.uint8), real=True)
 
-    images = pipeline(5 * [args.prompt]).images
+    #images = pipeline(5 * [args.prompt]).images
+    images = pipeline(2 * [""] + 3 * [args.prompt]).images
     images_torch = torch.stack([ToTensor()(image) for image in images])
     images_torch_resized = torchvision.transforms.Resize(real_images.shape[-2:])(images_torch)
     concatenated_imgs = torch.cat([real_images[:5].cpu() , images_torch_resized], dim=0)

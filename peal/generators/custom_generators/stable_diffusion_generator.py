@@ -135,7 +135,6 @@ class StableDiffusion(EditCapableGenerator):
             self.generator_dataset.task_config.y_selection = ['prediction']
 
         self.generator_dataset_val.task_config = self.generator_dataset.task_config
-
         if explainer_config.learn_dataset_embedding:
             context_embedding_path = os.path.join(
                 base_path, "explainer", "context", "context_embedding"
@@ -152,6 +151,7 @@ class StableDiffusion(EditCapableGenerator):
                     training_label=-1,
                     custom_tokens=explainer_config.custom_tokens_context,
                     prompt=explainer_config.base_prompt,
+                    pipeline=self.pipeline,
                     generator_dataset_val=self.generator_dataset_val,
                     writer=writer,
                     **explainer_config.__dict__
@@ -173,15 +173,16 @@ class StableDiffusion(EditCapableGenerator):
                 class_related_bias_embedding_args = types.SimpleNamespace(
                     embedding_files=embedding_files,
                     output_path=class_token_path,
-                    dataset=self.classifier_dataset, #self.generator_dataset,
+                    dataset=self.generator_dataset,
                     custom_tokens=explainer_config.class_custom_token[class_idx].split(
                         " "
                     ),
                     training_label=class_idx,
                     phase="class",
                     batch_size=explainer_config.train_batch_size,
-                    generator_dataset_val=copy.deepcopy(self.classifier_dataset), #self.generator_dataset_val,
+                    generator_dataset_val=self.generator_dataset_val,
                     writer=writer,
+                    pipeline=self.pipeline,
                     prompt=explainer_config.base_prompt
                     + explainer_config.prompt_connector
                     + explainer_config.class_custom_token[class_idx],

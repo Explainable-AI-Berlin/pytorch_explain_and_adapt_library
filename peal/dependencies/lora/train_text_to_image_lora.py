@@ -892,16 +892,27 @@ def lora_finetune(args=None):
 
     real_images = torch.stack(real_images, dim=0).to(accelerator.device) * 0.5 + 0.5
     fid.update(torch.tensor(255 * real_images, dtype=torch.uint8), real=True)
-
-    if len(args.train_dataset.task_config.y_selection) > 0:
-        target_idx = args.train_dataset.attributes.index(args.train_dataset.task_config.y_selection[0])
+    if len(args.train_dataset.task_config.y_selection) >= 2:
+        target_idx0 = args.train_dataset.attributes.index(args.train_dataset.task_config.y_selection[0])
+        target_idx1 = args.train_dataset.attributes.index(args.train_dataset.task_config.y_selection[1])
+        pos0 = args.train_dataset.attributes_positive[target_idx0]
+        pos1 = args.train_dataset.attributes_positive[target_idx1]
+        neg0 = args.train_dataset.attributes_negative[target_idx0]
+        neg1 = args.train_dataset.attributes_negative[target_idx1]
+        prompt = [neg0 + " " + neg1, neg0 + " " + pos1, pos0 + " " + neg1, pos0 + " " + pos1]
 
     else:
-        target_idx = 0
+        if len(args.train_dataset.task_config.y_selection) > 0:
+            target_idx = args.train_dataset.attributes.index(args.train_dataset.task_config.y_selection[0])
 
-    prompts_a = [args.train_dataset.attributes_positive[target_idx]]
-    prompts_b = [args.train_dataset.attributes_negative[target_idx]]
-    prompt = 2 * [""] + 2 * prompts_a + 2 * prompts_b
+        else:
+            target_idx = 0
+
+        prompts_a = [args.train_dataset.attributes_positive[target_idx]]
+        prompts_b = [args.train_dataset.attributes_negative[target_idx]]
+        prompt = 2 * prompts_a + 2 * prompts_b
+
+    prompt = 2 * [""] + prompt
     images = pipeline(prompt).images
     images_torch = torch.stack([ToTensor()(image) for image in images])
     images_torch_resized = torchvision.transforms.Resize(real_images.shape[-2:])(

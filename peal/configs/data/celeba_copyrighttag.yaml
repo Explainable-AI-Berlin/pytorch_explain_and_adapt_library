@@ -6,5 +6,5 @@ input_size              : [3, 128, 128]
 output_type             : multiclass
 output_size             : [41]
 confounding             : copyrighttag
-delimiter               : ,
+delimiter               : ","
 normalization           : [0.5, 0.5]
