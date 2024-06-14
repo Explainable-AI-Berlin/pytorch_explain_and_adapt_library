@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 from tqdm import tqdm
 import numpy as np
@@ -150,22 +151,22 @@ def train(args, model, optimizer, model_single):
             if i % 100 == 0:
                 with torch.no_grad():
                     utils.save_image(
-                        model_single.reverse(z_sample).cpu().data,
-                        os.path.join(args.base_path, f"sample/{str(i + 1).zfill(6)}.png"),
+                        model_single.reverse(z_sample).cpu().data / 2 + 0.5,
+                        os.path.join(args.base_path, "outputs", f"{str(i + 1).zfill(6)}.png"),
                         normalize=True,
                         nrow=10,
-                        range=(-0.5, 0.5),
+                        #range=(-0.5, 0.5),
                     )
 
             if i % 10000 == 0:
                 torch.save(
-                    model.state_dict(), os.path.join(args.base_path, f"checkpoint/model_{str(i + 1).zfill(6)}.pt")
+                    model.state_dict(), os.path.join(args.base_path, "checkpoint", f"model_{str(i + 1).zfill(6)}.pt")
                 )
                 torch.save(
                     model.state_dict(), os.path.join(args.base_path, f"final.pt")
                 )
                 torch.save(
-                    optimizer.state_dict(), os.path.join(args.base_path, f"checkpoint/optim_{str(i + 1).zfill(6)}.pt")
+                    optimizer.state_dict(), os.path.join(args.base_path, "checkpoint", f"optim_{str(i + 1).zfill(6)}.pt")
                 )
 
 def training(args=None):
@@ -185,7 +186,8 @@ def training(args=None):
     model = model.to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
-
+    Path(os.path.join(args.base_path, "outputs")).mkdir(parents=True, exist_ok=True)
+    Path(os.path.join(args.base_path, "checkpoint")).mkdir(parents=True, exist_ok=True)
     train(args, model, optimizer, model_single)
 
 if __name__ == "__main__":

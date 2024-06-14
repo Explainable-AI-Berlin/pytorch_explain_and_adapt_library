@@ -817,7 +817,9 @@ class SquareDatasetGenerator:
         os.makedirs(os.path.join(self.data_config.dataset_path, "masks"))
         os.makedirs(os.path.join(self.data_config.dataset_path + "_inverse", "imgs"))
         os.makedirs(os.path.join(self.data_config.dataset_path + "_inverse", "masks"))
-        lines_out = ["Name,ClassA,ClassB,ClassC,ClassD,ColorA,ColorB,PositionX,PositionY"]
+        lines_out = [
+            "Name,ClassA,ClassB,ClassC,ClassD,ColorA,ColorB,PositionX,PositionY"
+        ]
         lines_out_inverse = [
             "Name,ClassA,ClassB,ClassC,ClassD,ColorA,ColorB,PositionX,PositionY"
         ]
@@ -857,22 +859,36 @@ class SquareDatasetGenerator:
 
             sample_name = embed_numberstring(sample_idx, 8) + ".png"
             img = np.ones([64, 64, 3], dtype=np.float32) * color_b
-            noise = (np.random.randn(*img.shape) * 10).astype(dtype=np.uint8)
+            noise = np.random.randn(*img.shape) * 10
             img_base = np.clip(img + noise, 0, 255)
             img = np.copy(img_base)
-            img[position_x : position_x + 8, position_y : position_y + 8] = color_a
+            img[position_x : position_x + 8, position_y : position_y + 8] = np.clip(
+                color_a
+                + noise[position_x : position_x + 8, position_y : position_y + 8],
+                0,
+                255,
+            )
             img = Image.fromarray(img.astype(dtype=np.uint8))
             img.save(os.path.join(self.data_config.dataset_path, "imgs", sample_name))
             img_inverse = np.abs(img_base - 255)
-            img_inverse[position_x : position_x + 8, position_y : position_y + 8] = color_a
+            img_inverse[position_x : position_x + 8, position_y : position_y + 8] = np.clip(
+                color_a
+                - noise[position_x : position_x + 8, position_y : position_y + 8],
+                0,
+                255,
+            )
             img_inverse = Image.fromarray(img_inverse.astype(dtype=np.uint8))
             img_inverse.save(
-                os.path.join(self.data_config.dataset_path + "_inverse", "imgs", sample_name)
+                os.path.join(
+                    self.data_config.dataset_path + "_inverse", "imgs", sample_name
+                )
             )
             mask = np.ones([64, 64, 3], dtype=np.uint8) * color_b
             mask[position_x : position_x + 8, position_y : position_y + 8] = 255
             img_mask = Image.fromarray(mask)
-            img_mask.save(os.path.join(self.data_config.dataset_path, "masks", sample_name))
+            img_mask.save(
+                os.path.join(self.data_config.dataset_path, "masks", sample_name)
+            )
             img_mask.save(
                 os.path.join(
                     self.data_config.dataset_path + "_inverse", "masks", sample_name
@@ -904,10 +920,12 @@ class SquareDatasetGenerator:
             ]
             lines_out_inverse.append(",".join(attributes_inverse))
             if (sample_idx + 1) % 100 == 0:
-                open(os.path.join(self.data_config.dataset_path, "data.csv"), "w").write(
-                    "\n".join(lines_out)
-                )
                 open(
-                    os.path.join(self.data_config.dataset_path + "_inverse", "data.csv"),
+                    os.path.join(self.data_config.dataset_path, "data.csv"), "w"
+                ).write("\n".join(lines_out))
+                open(
+                    os.path.join(
+                        self.data_config.dataset_path + "_inverse", "data.csv"
+                    ),
                     "w",
                 ).write("\n".join(lines_out_inverse))
