@@ -3,19 +3,206 @@ import os
 
 import torch
 import torchvision
+from pydantic import PositiveInt
 
 from torch import nn
 from typing import Union
 
-from peal.configs.explainers.perfect_false_counterfactual_config import (
-    PerfectFalseCounterfactualConfig,
-)
 from peal.data.dataset_factory import get_datasets
+from peal.data.datasets import DataConfig
 from peal.global_utils import load_yaml_config
 from peal.generators.interfaces import InvertibleGenerator, EditCapableGenerator
-from peal.data.dataset_interfaces import PealDataset
-from peal.explainers.explainer_interface import ExplainerInterface
-from peal.configs.explainers.explainer_config import ExplainerConfig
+from peal.data.interfaces import PealDataset
+from peal.explainers.interfaces import ExplainerInterface, ExplainerConfig
+
+
+
+class ACEConfig(ExplainerConfig):
+    """
+    This class defines the config of a ACEConfig.
+    """
+
+    """
+    The type of explanation that shall be used.
+    Options: ['counterfactual', 'lrp']
+    """
+    explainer_type: str = "ACE"
+    attack_iterations: Union[list, int] = [10,50]
+    sampling_time_fraction: Union[list, float] = [0.1,0.3]
+    dist_l1: Union[list, float] = [1.0, 0.0001]
+    dist_l2: Union[list, float] = 0.0
+    sampling_inpaint: Union[list, float] = [0.3, 0.1]
+    sampling_dilation: Union[list, int] = 17
+    timestep_respacing: Union[list, int] = 50
+    attempts: int = 5
+    clip_denoised: bool = True  # Clipping noise
+    batch_size: int = 32  # Batch size
+    gpu: str = "0"  # GPU index, should only be 1 gpu
+    save_images: bool = False  # Saving all images
+    num_samples: int = 500000000000  # useful to sample few examples
+    # setting this to true will slow the computation time but will have identic results
+    # hwhen using the checkpoint backwards
+    cudnn_deterministic: bool = False
+    # path args
+    base_path: str = ""  # DDPM weights path
+    # Experiment name (will store the results at Output/Results/exp_name)
+    exp_name: str = "example_name"
+    # attack args
+    seed: int = 4  # Random seed
+    # Attack method (currently 'PGD', 'C&W', 'GD' and 'None' supported)
+    attack_method: str = "PGD"
+    attack_epsilon: float = 255  # L inf epsilon bound (will be devided by 255)
+    attack_step: float = 1.0  # Attack update step (will be devided by 255)
+    attack_joint: bool = True  # Set to false to generate adversarial attacks
+    # use checkpoint method for backward. Beware, this will substancially slow down the CE
+    # generation!
+    attack_joint_checkpoint: bool = False
+    # number of DDPM iterations per backward process. We highly recommend have a larger
+    # backward steps than batch size (e.g have 2 backward steps and batch size of 1 than 1
+    # backward step and batch size 2)
+    attack_checkpoint_backward_steps: int = 1
+    # Use dime2 shortcut to transfer gradients. We do not recommend it.
+    attack_joint_shortcut: bool = False
+    # schedule for the distance loss. We did not used any for our results
+    dist_schedule: str = "none"
+    # filtering args
+    sampling_stochastic: bool = True  # Set to False to remove the noise when sampling
+    # dataset
+    chunks: int = 1  # Chunking for spliting the CE generation into multiple gpus
+    chunk: int = 0  # current chunk (between 0 and chunks - 1)
+    merge_chunks: bool = False  # to merge all chunked results
+    y_target_goal_confidence: float = 0.65
+
+
+class DiffeoCFConfig(ExplainerConfig):
+    """
+    This class defines the config of a DiffeoCF.
+    """
+
+    """
+    The type of explanation that shall be used.
+    Options: ['counterfactual', 'lrp']
+    """
+    explanation_type: str = "DiffeoCFConfig"
+    """
+    The maximum number of gradients step done for explaining the network
+    """
+    gradient_steps: PositiveInt = 1000
+    """
+    The optimizer used for searching the counterfactual
+    """
+    optimizer: str = "Adam"
+    """
+    The learning rate used for finding the counterfactual
+    """
+    learning_rate: float = 0.01
+    """
+    The desired target confidence.
+    Consider the tradeoff between minimality and clarity of counterfactual
+    """
+    y_target_goal_confidence: float = 0.9
+    """
+    Whether samples in the current search batch are masked after reaching y_target_goal_confidence
+    or whether they are continued to be updated until the last surpasses the threshhold
+    """
+    use_masking: bool = True
+    """
+    How much noise to inject into the image while passing through it in the forward pass.
+    Helps avoiding adversarial attacks in the case of a weak generator
+    """
+    img_noise_injection: float = 0.01
+    """
+    Regularizing factor of the L1 distance in latent space between the latent code of the
+    original image and the counterfactual
+    """
+    l1_regularization: float = 1.0
+    """
+    Keeps the counterfactual in the high density area of the generative model
+    """
+    log_prob_regularization: float = 0.0
+    """
+    Regularization between counterfactual and original in image space to keep similariy high.
+    """
+    img_regularization: float = 0.0
+    """
+    A dict containing all variables that could not be given with the current config structure
+    """
+    kwargs: dict = {}
+
+
+class TIMEConfig(ExplainerConfig):
+    """
+    This class defines the config of a ACEConfig.
+    """
+
+    """
+    The type of explanation that shall be used.
+    Options: ['counterfactual', 'lrp']
+    """
+    explainer_type: str = "TIME"
+    editing_type: str = "ddpm_inversion"
+    sd_model: str = "CompVis/stable-diffusion-v1-4"
+    use_negative_guidance_denoise: bool = True
+    use_negative_guidance_inverse: bool = True
+    guidance_scale_denoising: list = [4]
+    guidance_scale_invertion: list = [4]
+    num_inference_steps: list = [50]
+    exp_name: str = "time"
+    label_target: int = -1
+    label_query: int = 31
+    class_custom_token: list = [
+        "|<A*01>| |<A*02>| |<A*03>|",
+        "|<A*11>| |<A*12>| |<A*13>|",
+    ]
+    base_prompt: str = "" # "A photo of a |<C*1>| |<C*2>| |<C*3>|"
+    prompt_connector: str = "" # " that is "
+    chunks: int = 1
+    chunk: int = 0
+    enable_xformers_memory_efficient_attention: bool = True
+    use_fp16: bool = False
+    sd_image_size: int = 128
+    custom_obj_token: str = "|<C*>|"
+    p: float = 0.93
+    l2: float = 0.0
+    inference_batch_size: int = 1
+    classifier_image_size: int = 128
+    recover: bool = False
+    num_samples: int = 9999999999999999
+    merge_chunks: bool = False
+    generic_custom_tokens: list = ["|<C*1>|", "|<C*2>|", "|<C*3>|"]
+    total_num_inference_steps: int = 50
+    custom_tokens_context: list = ["|<C*1>|", "|<C*2>|", "|<C*3>|"]
+    custom_tokens_init: list = ["<|endoftext|>", "<|endoftext|>", "<|endoftext|>"]
+    mini_batch_size: int = 1
+    gpu: str = "0"
+    lr: float = 1e-4
+    adam_beta1: float = 0.9
+    adam_beta2: float = 0.999
+    adam_epsilon: float = 1e-9
+    weight_decay: float = 1e-4
+    iterations: int = 100 #1000
+    max_epoch: int = 30
+    train_batch_size: int = 64
+    image_size: int = 128
+    seed: int = 99999999
+    y_target_goal_confidence: float = 0.9
+    max_attacks: int = 10
+    max_samples: Union[int, type(None)] = None
+    use_lora: bool = True
+    learn_dataset_embedding: bool = False
+
+
+class PerfectFalseCounterfactualConfig(ExplainerConfig):
+    """
+    This class defines the config of a PerfectFalseCounterfactualConfig.
+    """
+
+    """
+    The type of explanation that shall be used.
+    """
+    explainer_type: str = "PerfectFalseCounterfactual"
+    data: Union[str, DataConfig] = None
+    test_data: Union[str, DataConfig] = None
 
 
 class CounterfactualExplainer(ExplainerInterface):

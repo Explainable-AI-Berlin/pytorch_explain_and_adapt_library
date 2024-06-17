@@ -4,6 +4,7 @@ import os
 from torchvision import transforms
 from torchvision.transforms import ToTensor
 
+from peal.architectures.downstream_models import TaskConfig
 from peal.global_utils import load_yaml_config, get_project_resource_dir
 from peal.data.transformations import (
     CircularCut,
@@ -16,13 +17,11 @@ from peal.data.transformations import (
 )
 from peal.data.datasets import (
     Image2MixedDataset,
-    SequenceDataset,
     Image2ClassDataset,
     SymbolicDataset,
 )
-from peal.data.dataset_interfaces import PealDataset
-from peal.configs.data.data_config import DataConfig
-from peal.configs.models.model_config import TaskConfig
+from peal.data.interfaces import PealDataset
+from peal.data.datasets import DataConfig
 from peal.global_utils import find_subclasses
 
 
@@ -138,7 +137,7 @@ def get_datasets(
 
     dataset_class_list = find_subclasses(
         PealDataset,
-        os.path.join(get_project_resource_dir(), "data", "custom_datasets"),
+        os.path.join(get_project_resource_dir(), "peal", "data"),
     )
     dataset_class_dict = {
         dataset_class.__name__: dataset_class for dataset_class in dataset_class_list
@@ -161,11 +160,6 @@ def get_datasets(
         "singleclass",
     ]:
         dataset = SymbolicDataset
-
-    elif config.input_type == "sequence" and config.output_type in [
-        "singleclass",
-    ]:
-        dataset = SequenceDataset
 
     else:
         raise ValueError(

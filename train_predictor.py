@@ -1,8 +1,7 @@
 import argparse
 
-from peal.configs.models.model_config import ModelConfig
 from peal.global_utils import load_yaml_config, add_class_arguments, integrate_arguments
-from peal.training.trainers import ModelTrainer
+from peal.training.trainers import ModelTrainer, ModelConfig
 
 
 def main():

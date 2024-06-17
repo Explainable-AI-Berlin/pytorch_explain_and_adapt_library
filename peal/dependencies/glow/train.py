@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 
+import torchmetrics
 from tqdm import tqdm
 import numpy as np
 from PIL import Image
@@ -111,6 +112,17 @@ def train(args, model, optimizer, model_single):
         z_new = torch.randn(args.n_sample, *z) * args.temp
         z_sample.append(z_new.to(device))
 
+    fid = torchmetrics.image.fid.FrechetInceptionDistance(
+        feature=192, reset_real_features=False
+    )
+    fid.to(device)
+    real_images = []
+    for i in range(min(len(args.val_dataloader.dataset), 100)):
+        real_images.append(args.val_dataloader.dataset[i][0])
+
+    real_images = torch.stack(real_images, dim=0).to(device) * 0.5 + 0.5
+    fid.update(torch.tensor(255 * real_images, dtype=torch.uint8), real=True)
+
     with tqdm(range(args.iter)) as pbar:
         for i in pbar:
             image, _ = next(iter(dataset))
@@ -147,16 +159,26 @@ def train(args, model, optimizer, model_single):
             pbar.set_description(
                 f"Loss: {loss.item():.5f}; logP: {log_p.item():.5f}; logdet: {log_det.item():.5f}; lr: {warmup_lr:.7f}"
             )
+            args.writer.add_scalar("Loss", loss.item(), i)
+            args.writer.add_scalar("logP", log_p.item(), i)
+            args.writer.add_scalar("logdet", log_det.item(), i)
 
             if i % 100 == 0:
                 with torch.no_grad():
+                    img_samples = model_single.reverse(z_sample).data / 2 + 0.5
                     utils.save_image(
-                        model_single.reverse(z_sample).cpu().data / 2 + 0.5,
+                        img_samples.cpu(),
                         os.path.join(args.base_path, "outputs", f"{str(i + 1).zfill(6)}.png"),
                         normalize=True,
                         nrow=10,
                         #range=(-0.5, 0.5),
                     )
+                    fid.update(
+                        torch.tensor(255 * torch.clamp(img_samples, 0 , 1), dtype=torch.uint8),
+                        real=False,
+                    )
+                    fid_score = float(fid.compute())
+                    args.writer.add_scalar("fid", fid_score, i)
 
             if i % 10000 == 0:
                 torch.save(

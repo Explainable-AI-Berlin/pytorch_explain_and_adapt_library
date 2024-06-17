@@ -3,10 +3,41 @@ import torch
 from torch import nn
 from typing import Tuple
 
-from peal.configs.explainers.explainer_config import ExplainerConfig
+from peal.explainers.interfaces import ExplainerConfig
 
-from peal.data.dataset_interfaces import PealDataset
-from peal.generators.abstract_interface import Generator
+from pydantic import BaseModel
+class GeneratorConfig(BaseModel):
+    """
+    This class defines the config of a generator.
+    """
+
+    """
+    The type of generator that shall be used.
+    """
+    generator_type: str
+    """
+    The category of the config
+    """
+    category: str = 'generator'
+    """
+    The name of the class.
+    """
+    current_fid: float = float('inf')
+
+class Generator(nn.Module):
+    def sample_x(self, batch_size=1):
+        """
+        This function samples a batch of data samples from the generator.
+        If not implemented, it will throw a NotImplementedError.
+        """
+        raise NotImplementedError
+
+    def train_model(self):
+        """
+        This function trains the generator.
+        If not implemented, it will throw a NotImplementedError.
+        """
+        raise NotImplementedError
 
 
 class InvertibleGenerator(Generator):
@@ -82,7 +113,7 @@ class EditCapableGenerator(Generator):
         target_classes: torch.Tensor,
         classifier: nn.Module,
         explainer_config: ExplainerConfig,
-        classifier_dataset: PealDataset,
+        classifier_dataset,
         pbar=None,
         mode="",
         base_path="",

@@ -24,8 +24,9 @@ def find_subclasses(base_class, directory):
     def check_module(module_name):
         module = importlib.import_module(module_name)
         for name, obj in inspect.getmembers(module):
-            if inspect.isclass(obj) and issubclass(obj, base_class):
-                subclasses.append(obj)
+            if inspect.isclass(obj):
+                if issubclass(obj, base_class):
+                    subclasses.append(obj)
 
     project_base_dir = get_project_resource_dir()
     for dirpath, dirnames, filenames in os.walk(directory):
@@ -34,7 +35,6 @@ def find_subclasses(base_class, directory):
                 module_path = os.path.relpath(
                     os.path.join(dirpath, filename), project_base_dir
                 )
-                module_path = os.path.join("peal", module_path)
                 module_name = module_path.replace("/", ".")[:-3]
                 check_module(module_name)
 
@@ -148,9 +148,15 @@ def request(name, default, is_asking=True):
             return input("To what value do you want to change " + str(name) + "?")
 
 
-def get_project_resource_dir():
+"""def get_project_resource_dir():
     return os.path.abspath(os.sep) + os.path.join(
         *resource_filename(__name__, "peal").replace("\\", "/").split("/")[:-1]
+    )"""
+
+
+def get_project_resource_dir():
+    return os.path.abspath(os.sep) + os.path.join(
+        *resource_filename(__name__,".").replace("\\", "/").split("/")[:-2]
     )
 
 
@@ -200,30 +206,26 @@ def _load_yaml_config(config_path):
 def get_config_model(config_data):
     config_class_str = config_data[config_data["category"] + "_type"] + "Config"
 
-    superclass_dir = os.path.join(
-        get_project_resource_dir(),
-        "configs",
-        config_data["category"] + "s",
-    )
     module_path = os.path.join(
         "peal",
-        "configs",
         config_data["category"] + "s",
-        config_data["category"] + "_config",
     )
-    module_name = module_path.replace("/", ".")
-    module = importlib.import_module(module_name)
+    superclass_dir = os.path.join(module_path, "interfaces")
+    superclass_module_name = superclass_dir.replace("/", ".")
+    module = importlib.import_module(superclass_module_name)
     superclass = None
     for name, obj in inspect.getmembers(module):
         if inspect.isclass(obj):
-            superclass = obj
+            if obj.__name__[-6:] == "Config" and obj.__module__ == superclass_module_name:
+                superclass = obj
 
-    class_list = find_subclasses(
-        superclass,
-        superclass_dir,
+    subclass_dir = os.path.join(
+        get_project_resource_dir(),
+        module_path,
     )
+    class_list = find_subclasses(superclass, subclass_dir)
     class_dict = {
-        generator_class.__name__: generator_class for generator_class in class_list
+        c.__name__: c for c in class_list
     }
     config_model = class_dict[config_class_str]
 

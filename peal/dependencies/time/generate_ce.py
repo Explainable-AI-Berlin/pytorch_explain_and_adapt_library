@@ -15,7 +15,7 @@ import torch.nn.functional as F
 
 from diffusers import DDIMInverseScheduler, DDIMScheduler
 
-from peal.data.dataset_interfaces import PealDataset
+from peal.data.interfaces import PealDataset
 from peal.dependencies.ddpm_inversion.ddpm_inversion import DDPMInversion
 from peal.dependencies.time.core.edict import EDICT
 from peal.dependencies.time.core.utils import (

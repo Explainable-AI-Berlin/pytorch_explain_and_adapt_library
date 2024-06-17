@@ -4,8 +4,8 @@ import torchvision
 from diffusers import StableDiffusionPipeline
 from diffusers import DDIMScheduler
 
-from peal.configs.data.data_config import DataConfig
-from peal.configs.editors.ddpm_inversion_config import DDPMInversionConfig
+from peal.data.datasets import DataConfig
+from peal.editors.ddpm_inversion import DDPMInversionConfig
 from peal.data.datasets import Image2MixedDataset
 from peal.dependencies.ddpm_inversion.prompt_to_prompt.ptp_classes import AttentionStore
 from peal.dependencies.ddpm_inversion.prompt_to_prompt.ptp_utils import (

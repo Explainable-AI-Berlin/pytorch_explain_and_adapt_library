@@ -1,6 +1,6 @@
 import torch
 
-from peal.teachers.teacher_interface import TeacherInterface
+from peal.teachers.interfaces import TeacherInterface
 
 
 class SegmentationMaskTeacher(TeacherInterface):

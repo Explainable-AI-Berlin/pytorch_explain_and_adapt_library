@@ -6,7 +6,7 @@ from torch import nn
 from tqdm import tqdm
 from typing import Union
 
-from peal.explainers.explainer_interface import ExplainerInterface
+from peal.explainers.interfaces import ExplainerInterface
 
 
 def calculate_validation_statistics(

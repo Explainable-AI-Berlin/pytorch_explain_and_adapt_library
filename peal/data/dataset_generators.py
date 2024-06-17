@@ -871,7 +871,9 @@ class SquareDatasetGenerator:
             img = Image.fromarray(img.astype(dtype=np.uint8))
             img.save(os.path.join(self.data_config.dataset_path, "imgs", sample_name))
             img_inverse = np.abs(img_base - 255)
-            img_inverse[position_x : position_x + 8, position_y : position_y + 8] = np.clip(
+            img_inverse[
+                position_x : position_x + 8, position_y : position_y + 8
+            ] = np.clip(
                 color_a
                 - noise[position_x : position_x + 8, position_y : position_y + 8],
                 0,
