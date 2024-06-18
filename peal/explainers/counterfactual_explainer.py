@@ -144,8 +144,8 @@ class TIMEConfig(ExplainerConfig):
     sd_model: str = "CompVis/stable-diffusion-v1-4"
     use_negative_guidance_denoise: bool = True
     use_negative_guidance_inverse: bool = True
-    guidance_scale_denoising: list = [4]
-    guidance_scale_invertion: list = [4]
+    guidance_scale_denoising: list = [12]
+    guidance_scale_invertion: list = [8]
     num_inference_steps: list = [50]
     exp_name: str = "time"
     label_target: int = -1
@@ -186,7 +186,7 @@ class TIMEConfig(ExplainerConfig):
     image_size: int = 128
     seed: int = 99999999
     y_target_goal_confidence: float = 0.9
-    max_attacks: int = 10
+    max_attacks: int = 1
     max_samples: Union[int, type(None)] = None
     use_lora: bool = True
     learn_dataset_embedding: bool = False

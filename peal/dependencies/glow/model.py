@@ -343,6 +343,7 @@ class Glow(nn.Module):
         for i in range(n_block - 1):
             self.blocks.append(Block(n_channel, n_flow, affine=affine, conv_lu=conv_lu))
             n_channel *= 2
+
         self.blocks.append(Block(n_channel, n_flow, split=False, affine=affine))
 
     def forward(self, input):

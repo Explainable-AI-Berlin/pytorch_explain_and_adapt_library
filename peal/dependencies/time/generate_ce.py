@@ -352,6 +352,7 @@ def generate_time_counterfactuals(args=None):
                     cf_postprocessed = postprocess(cf, args.classifier_image_size)
                     logits = classifier(cf_postprocessed.to(device))
                     confidences = torch.nn.functional.softmax(logits, dim=-1).cpu()
+                    print(confidences)
 
                     for i in range(len(confidences)):
                         target_confidence = confidences[i][int(target[i])]
