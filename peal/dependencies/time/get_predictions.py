@@ -88,6 +88,9 @@ def get_predictions(args=None):
     acc = 0
 
     for idx, sample in enumerate(tqdm.tqdm(loader)):
+        if not args.max_samples is None and idx > args.max_samples:
+            break
+
         if len(sample) == 3:
             img, lab, img_file = sample
 

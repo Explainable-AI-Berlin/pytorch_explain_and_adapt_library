@@ -4,11 +4,11 @@ import torch
 from torch import nn
 from typing import Union
 
-from peal.teachers.teacher_interface import TeacherInterface
+from peal.teachers.interfaces import TeacherInterface
 from peal.teachers.model2model_teacher import Model2ModelTeacher
 from peal.teachers.human2model_teacher import Human2ModelTeacher
 from peal.teachers.segmentation_mask_teacher import SegmentationMaskTeacher
-from peal.data.dataset_interfaces import PealDataset
+from peal.data.interfaces import PealDataset
 
 
 def get_teacher(

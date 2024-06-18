@@ -208,7 +208,7 @@ def run_epoch(
         iterations += 1
 
 
-def training(args=None):
+def textual_inversion_training(args=None):
     # =================================================================
     # Custom variables
 
@@ -232,26 +232,24 @@ def training(args=None):
     # =================================================================
     # Instantiate Pipeline
     Print("Initializing Stable Diffusion")
-    pipeline = StableDiffusionPipeline.from_pretrained(
-        args.sd_model,
-        torch_dtype=torch_dtype,
-    )
-    pipeline.to(device)
+    if not hasattr(args, "pipeline"):
+        pipeline = StableDiffusionPipeline.from_pretrained(
+            args.sd_model,
+            torch_dtype=torch_dtype,
+        )
+        pipeline.to(device)
+
+    else:
+        pipeline = args.pipeline
+
     noise_scheduler = DDPMScheduler.from_pretrained(
         args.sd_model, subfolder="scheduler"
     )
-
     # =================================================================
     # Initialize token(s)
 
     # load previous tokens
-    try:
-        load_tokens_and_embeddings(sd_model=pipeline, files=args.embedding_files)
-
-    except Exception:
-        import pdb
-
-        pdb.set_trace()
+    load_tokens_and_embeddings(sd_model=pipeline, files=args.embedding_files)
 
     # generate new tokens
     index_no_updates, placeholder_token_ids, initializer_token_ids = add_new_tokens(
@@ -296,15 +294,22 @@ def training(args=None):
     # =================================================================
     # Dataset
     if isinstance(args.dataset, torch.utils.data.Dataset):
-        dataset = args.dataset
+        dataset_raw = args.dataset
 
     else:
-        dataset = get_dataset(args)
+        dataset_raw = get_dataset(args)
+
+    if args.training_label >= 0:
+        dataset_raw.enable_class_restriction(args.training_label)
+        print("len restricted dataset")
+        print("len restricted dataset")
+        print("len restricted dataset")
+        print(len(dataset_raw))
 
     dataset = TextualDataset(
         custom_tokens=args.custom_tokens,
         base_prompt_generator=get_phrase_generator(args),
-        dataset=dataset,
+        dataset=dataset_raw,
     )
     loader = data.DataLoader(
         dataset,
@@ -314,6 +319,9 @@ def training(args=None):
         worker_init_fn=seed_worker,
         generator=g,
     )
+    if args.training_label >= 0:
+        args.generator_dataset_val.enable_class_restriction(args.training_label)
+
     dataset_val = TextualDataset(
         custom_tokens=args.custom_tokens,
         base_prompt_generator=get_phrase_generator(args),
@@ -348,7 +356,8 @@ def training(args=None):
     real_images = torch.stack(real_images, dim=0).to(device) * 0.5 + 0.5
     fid.update(torch.tensor(255 * real_images, dtype=torch.uint8), real=True)
 
-    images = pipeline(5 * [args.prompt]).images
+    #images = pipeline(5 * [args.prompt]).images
+    images = pipeline(2 * [""] + 3 * [args.prompt]).images
     images_torch = torch.stack([ToTensor()(image) for image in images])
     images_torch_resized = torchvision.transforms.Resize(real_images.shape[-2:])(images_torch)
     concatenated_imgs = torch.cat([real_images[:5].cpu() , images_torch_resized], dim=0)
@@ -456,7 +465,13 @@ def training(args=None):
         tokens=args.custom_tokens,
         output=args.output_path,
     )
+    dataset_raw.disable_class_restriction()
+    print("len unrestricted dataset")
+    print("len unrestricted dataset")
+    print("len unrestricted dataset")
+    print(len(dataset_raw))
+    args.generator_dataset_val.disable_class_restriction()
 
 
 if __name__ == "__main__":
-    training()
+    textual_inversion_training()

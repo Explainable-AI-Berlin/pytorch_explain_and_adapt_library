@@ -8,7 +8,6 @@ from peal.generators.interfaces import (
     EditCapableGenerator,
     Generator,
 )
-from peal.generators.normalizing_flows import Glow
 from peal.global_utils import (
     load_yaml_config,
     find_subclasses,
@@ -47,7 +46,7 @@ def get_generator(
         generator_config = load_yaml_config(generator)
         generator_class_list = find_subclasses(
             Generator,
-            os.path.join(get_project_resource_dir(), "generators", "custom_generators"),
+            os.path.join(get_project_resource_dir(), "peal", "generators"),
         )
         generator_class_dict = {
             generator_class.__name__: generator_class
@@ -62,29 +61,6 @@ def get_generator(
                 device=device,
                 classifier_dataset=classifier_dataset,
             )
-
-        """elif hasattr(generator_config.architecture, "n_flow"):
-            # TODO this should be moved into the glow class
-            #generator_config.data = data_config
-            if os.path.exists(os.path.join(generator_config.base_path, "model.cpl")):
-                generator_out = torch.load(os.path.join(generator_config.base_path, "model.cpl"))
-                generator_out.config = generator_config
-
-            else:
-                generator_out = Glow(generator_config).to(device)
-                generator_trainer = ModelTrainer(
-                    config=generator_config,
-                    model=generator_out,
-                    datasource=(
-                        train_dataloader.dataset,
-                        dataloaders_val[0].dataset,
-                    ),
-                    base_dir=base_dir,
-                    model_name="generator",
-                    gigabyte_vram=gigabyte_vram,
-                )
-                print("Train generator model!")
-                generator_trainer.fit()"""
 
     else:
         generator_out = generator

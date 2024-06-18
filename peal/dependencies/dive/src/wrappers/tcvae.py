@@ -31,9 +31,9 @@ class TCVAE(BaseWrapper):
         """
         super().__init__()
         # Create model, opt, wrapper
-        print('get model')
+        print("get model")
         model = get_model(exp_dict["model"], exp_dict=exp_dict)
-        print('getting model is done!')
+        print("getting model is done!")
         self.model = model.cuda()
         self.exp_dict = exp_dict
         self.ngpu = self.exp_dict["ngpu"]
@@ -41,7 +41,7 @@ class TCVAE(BaseWrapper):
         self.savedir = savedir
         self.beta = self.exp_dict["beta"]
 
-        print('model parallel')
+        print("model parallel")
         self.model_parallel = torch.nn.DataParallel(self.model, list(range(self.ngpu)))
 
         # self.discriminator = Discriminator(ratio=self.model.ratio,
@@ -152,9 +152,14 @@ class TCVAE(BaseWrapper):
             b = x.size(0)
             # if self.exp_dict["vgg_weight"] > 0:
             # with amp.autocast(enabled=False):
-            vgg_mse = torch.nn.DataParallel(
-                self.perceptual_loss, list(range(self.ngpu))
-            )(reconstruction, x).mean()
+            if hasattr(self, "perceptual_loss"):
+                vgg_mse = torch.nn.DataParallel(
+                    self.perceptual_loss, list(range(self.ngpu))
+                )(reconstruction, x).mean()
+
+            else:
+                vgg_mse = 0
+
             pix_mse = l1_loss(x, reconstruction)
 
             # else:
@@ -174,8 +179,12 @@ class TCVAE(BaseWrapper):
                     + tc_loss * self.exp_dict["tc_weight"] * self.beta
                     + dw_kl_loss * beta
                 )
-            elif beta > 0:
-                loss += kl_loss * beta
+
+            else:
+                tc_loss = 0.0
+                if beta > 0:
+                    loss += kl_loss * beta
+
         if self.exp_dict["amp"] > 0:
             loss = self.scaler.scale(loss)
             loss.backward()
@@ -256,9 +265,9 @@ class TCVAE(BaseWrapper):
         """
 
         if self.exp_dict["vgg_weight"] > 0 and not hasattr(self, "perceptual_loss"):
-            print('get perceptual loss!')
+            print("get perceptual loss!")
             self.perceptual_loss = VGGPerceptualLoss(resize=False).cuda()
-            print('perceptual loss loaded!')
+            print("perceptual loss loaded!")
 
         self.model.train()
         self.n_data = len(data_loader.dataset)

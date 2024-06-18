@@ -1,0 +1,27 @@
+# python run_cfkd.py --adaptor_config "<PEAL_BASE>/configs/adaptors/square500_cfkd_ace.yaml"
+adaptor_type                         :  "CFKD"
+category                             :  "adaptor"
+batch_size                           :  1 #5
+tracking_level                       :  2
+min_train_samples                    :  400
+finetune_iterations                  :  0
+max_validation_samples               :  100
+continuous_learning                  :  "finetune"
+replace_model                        :  True
+use_visualization                    :  False #True
+calculate_group_accuracies           :  True
+explainer                            :  <PEAL_BASE>/configs/explainers/ace_default.yaml
+training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
+data                                 :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_unpoisened.yaml
+test_data                            :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_unpoisened.yaml
+student                              :  /home/space/datasets/peal/peal_runs/square/colora_confounding_colorb/classifier_unpoisened/model.cpl
+teacher                              :  SegmentationMask
+generator                            :  /home/space/datasets/peal/peal_runs/square/ddpm/config.yaml
+base_dir                             :  /home/space/datasets/peal/peal_runs/square/colora_confounding_colorb/classifier_unpoisened/cfkd_ace
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 1.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [ClassA]

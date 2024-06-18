@@ -1,6 +1,6 @@
 import argparse
 
-from peal.configs.adaptors.cfkd_config import CFKDConfig
+from peal.adaptors.counterfactual_knowledge_distillation import CFKDConfig
 from peal.global_utils import load_yaml_config, add_class_arguments, integrate_arguments
 from peal.adaptors.counterfactual_knowledge_distillation import (
     CounterfactualKnowledgeDistillation,

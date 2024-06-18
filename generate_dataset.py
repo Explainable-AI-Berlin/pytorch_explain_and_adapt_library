@@ -1,6 +1,6 @@
 import argparse
 
-from peal.configs.data.data_config import DataConfig
+from peal.data.datasets import DataConfig
 from peal.global_utils import load_yaml_config, add_class_arguments, integrate_arguments
 from peal.data.dataset_generators import ConfounderDatasetGenerator, SquareDatasetGenerator
 

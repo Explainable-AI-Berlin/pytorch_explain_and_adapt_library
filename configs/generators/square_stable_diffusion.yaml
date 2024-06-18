@@ -1,0 +1,12 @@
+# python train_generator.py --config "<PEAL_BASE>/configs/generators/square_stable_diffusion.yaml"
+category: generator
+generator_type: StableDiffusion
+data: "<PEAL_BASE>/configs/data/square_stable_diffusion.yaml"
+base_path : /home/space/datasets/peal/peal_runs/square/stable_diffusion
+task_config:
+  criterions:
+    bce     : 1.0
+    l2      : 1.0
+  output_type             : multiclass
+  y_selection             : [ClassA, ClassB]
+  output_channels         : 2

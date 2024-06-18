@@ -13,71 +13,138 @@ from pathlib import Path
 from matplotlib import pyplot as plt
 from typing import Union
 
-from peal.data.dataset_interfaces import PealDataset
+from peal.data.interfaces import PealDataset
 from peal.data.dataset_utils import parse_json, parse_csv
 from peal.global_utils import embed_numberstring
 from peal.generators.interfaces import Generator
 
 matplotlib.use("Agg")
 
+from pydantic import BaseModel, PositiveInt
+from typing import Union
 
-class SequenceDataset(PealDataset):
-    """Sequence dataset."""
 
-    def __init__(
-        self,
-        data_dir,
-        mode,
-        config,
-        transform=ToTensor(),
-        task_config=None,
-        **args,
-    ):
-        """
-        Initialize the dataset.
+class DataConfig(BaseModel):
+    """
+    This class defines the config of a dataset.
+    """
 
-        Args:
-            data_dir (Path): The path to the data directory.
-            mode (str): The mode of the dataset. Can be "train", "val", "test" or "all".
-            config (obj): The data config object.
-            transform (torchvision.transform, optional): The transform to apply to the data. Defaults to ToTensor().
-            task_config (obj, optional): The task config object. Defaults to None.
-        """
-        self.config = config
-        self.transform = transform
-        self.task_config = task_config
-        self.data, self.keys = parse_json(data_dir, config, mode)
-
-    def __len__(self):
-        return len(self.keys)
-
-    def __getitem__(self, idx):
-        name = self.keys[idx]
-
-        data = torch.tensor(self.data[name], dtype=torch.int64)
-
-        x = data[:-1]
-        # pad with EOS tokens
-        x = torch.cat(
-            [
-                x,
-                self.config.input_size[1]
-                * torch.ones(
-                    [self.config.input_size[0] - x.shape[0]], dtype=torch.int64
-                ),
-            ]
-        )
-        y = data[-1]
-
-        return x, y
-
-    def generate_contrastive_collage(x_in, counterfactual):
-        # TODO
-        return torch.zeros([x_in.shape[0], 3, 64, 64]), torch.zeros_like(x_in)
-
-    def serialize_dataset(output_dir, x_list, y_list, sample_names=None):
-        # TODO implement this!
-        pass
+    """
+    The input type of the data:
+    Options: ['image', 'sequence', 'symbolic']
+    """
+    input_type: str = 'image'
+    """
+    The output type of the data.
+    Options: ['singleclass', 'multiclass', 'continuous', 'mixed']
+    'mixed' is a hybrid between binary multiclass classification and continuous and
+    requires 'output_split' to be set
+    """
+    output_type: str = 'singleclass'
+    """
+    The input size of data.
+    For images: [Channels, Height, Width]
+    For sequences: [MaxLength, NumTokens]
+    For symbolic: [NumVariables]
+    """
+    input_size: list[PositiveInt] = [3, 128, 128]
+    """
+    The output size of the model.
+    For singleclass: [NumClasses]
+    For multiclass: [NumBinaryClasses]
+    For continuous: [NumVariables]
+    For mixed: [NumBinaryClasses + NumVariables]
+    """
+    output_size: list[PositiveInt] = 2
+    """
+    The path to the dataset.
+    """
+    dataset_path: Union[type(None), str] = None
+    """
+    The number of samples in the dataset.
+    Sometimes important when executing specific experiments.
+    """
+    num_samples: Union[type(None), int] = None
+    """
+    The name of the dataset.
+    Only necessary to tell dataset factory which customized dataset class to use
+    """
+    dataset_class: Union[type(None), str] = None
+    """
+    The split between train, validation and test set.
+    """
+    split: list[float] = [0.8, 0.9]
+    """
+    Whether the dataset contains spatial annotations where the true feature is.
+    """
+    has_hints: Union[type(None), bool] = False
+    """
+    The applied normalization.
+    Options: ['mean0std1']
+    """
+    normalization: Union[type(None), list] = None
+    """
+    A list of the invariances exploited for data augmentation:
+    Options: ['hflipping', 'vflipping', 'rotation', 'circlecut']
+    """
+    invariances: list[str] = []
+    """
+    The number of binary multiclass variables in the mixed setting.
+    Has to be smaller than output_size.
+    """
+    output_split: Union[type(None), int] = None
+    """
+    The way how to downsize an sample if required.
+    Options: ['Downsample', 'RandomCrop', 'CenterCrop']
+    """
+    downsize: Union[type(None), str] = None
+    """
+    A pair of known confounding factors, one usually being the target.
+    This knowledge helps for controlled sampling of confounders for experiments.
+    """
+    confounding_factors: list[str] = []
+    """
+    The correlation strength of the target and the confounding variable.
+    """
+    confounder_probability: Union[type(None), float] = None
+    """
+    The ratio of the classes in the dataset.
+    """
+    class_ratios: Union[type(None), list] = None
+    """
+    The seed the dataset was generated with.
+    Only relevant for generated datasets!
+    """
+    seed: Union[type(None), int] = None
+    """
+    The label noise of a generated dataset.
+    Necessary to mimic real dataset behauviour and avoid trivial non-robust solutions.
+    """
+    label_noise: Union[type(None), float] = None
+    """
+    Whether to set negative values to zero.
+    """
+    set_negative_to_zero: bool = False
+    """
+    The delimiter used for the csv file.
+    """
+    delimiter: Union[type(None), str] = None
+    """
+    The number of classes in the dataset.
+    """
+    crop_size: Union[type(None), int] = None
+    """
+    The type of confounder present in the dataset.
+    """
+    confounding: Union[type(None), str] = None
+    """
+    The path of the original dataset.
+    """
+    dataset_origin_path: Union[type(None), str] = None
+    """
+    The path of the original dataset.
+    """
+    inverse: Union[type(None), str] = None
 
 
 class SymbolicDataset(PealDataset):
@@ -380,6 +447,8 @@ class ImageDataset(PealDataset):
             raise NotImplementedError("Generator type not supported")
 
         generated_images = generated_images[:num_samples]
+        if generated_images.shape[0] == 1:
+            generated_images = torch.cat([generated_images, generated_images], dim=0)
 
         if not hasattr(self, "fid"):
             self.fid = torchmetrics.image.fid.FrechetInceptionDistance(
@@ -387,7 +456,7 @@ class ImageDataset(PealDataset):
             )
             self.fid.to(generated_images.device)
             real_images = []
-            for i in range(num_samples):
+            for i in range(min(len(self), 100)):
                 real_images.append(self[i][0])
 
             real_images = torch.stack(real_images, dim=0).to(generated_images.device)
@@ -522,6 +591,8 @@ class Image2MixedDataset(ImageDataset):
         self.groups_enabled = False
         self.idx_enabled = False
         self.url_enabled = False
+        self.string_description_enabled = False
+        self.tokenizer = None
         self.return_dict = return_dict
         # TODO
         # self.config.class_ratios = None
@@ -534,9 +605,22 @@ class Image2MixedDataset(ImageDataset):
         else:
             delimiter = ","
 
+        self.data_dir = data_dir
         self.attributes, self.data, self.keys = parse_csv(
             data_dir, config, mode, key_type="name", delimiter=delimiter
         )
+        self.attributes_positive = []
+        self.attributes_negative = []
+        for attribute in self.attributes:
+            attribute_values = attribute.split('_vs_')
+            if len(attribute_values) == 2:
+                self.attributes_positive.append(attribute_values[0])
+                self.attributes_negative.append(attribute_values[1])
+
+            else:
+                self.attributes_positive.append("Is " + attribute)
+                self.attributes_negative.append("Not " + attribute)
+
         self.task_specific_keys = None
         if (
             not self.task_config is None
@@ -586,6 +670,33 @@ class Image2MixedDataset(ImageDataset):
 
     def disable_url(self):
         self.url_enabled = False
+
+    def enable_string_description(self):
+        self.string_description_enabled = True
+
+    def disable_string_description(self):
+        self.string_description_enabled = False
+
+    def enable_tokens(self, tokenizer):
+        self.string_description_enabled_buffer = self.string_description_enabled
+        self.enable_string_description()
+        self.tokenizer = tokenizer
+
+    def disable_tokens(self):
+        self.string_description_enabled = self.string_description_enabled_buffer
+        self.tokenizer = None
+
+    def enable_class_restriction(self, class_idx):
+        assert not self.task_config is None, "Task config must be set"
+        self.backup_keys = copy.deepcopy(self.keys)
+        self.keys = []
+        for key in self.backup_keys:
+            if int(self.data[key][self.attributes.index(self.task_config.y_selection[0])]) == class_idx:
+                self.keys.append(key)
+
+    def disable_class_restriction(self):
+        if hasattr(self, "backup_keys"):
+            self.keys = copy.deepcopy(self.backup_keys)
 
     def set_task_specific_keys(self):
         self.task_specific_keys = []
@@ -687,6 +798,34 @@ class Image2MixedDataset(ImageDataset):
 
         if self.url_enabled:
             return_dict["url"] = name
+
+        if self.string_description_enabled:
+            return_dict["description"] = ""
+            if hasattr(self, "task_config"):
+                y_selection = self.task_config.y_selection
+
+            else:
+                y_selection = self.attributes
+
+            for target_idx, attribute in enumerate(y_selection):
+                attribute_idx = self.attributes.index(attribute)
+                if len(y_selection) == 1 and target > 0.5 or len(y_selection) > 1 and target[target_idx] > 0.5:
+                    return_dict["description"] += self.attributes_positive[attribute_idx]
+
+                else:
+                    return_dict["description"] += self.attributes_negative[attribute_idx]
+
+                if not target_idx == len(y_selection) - 1:
+                    return_dict["description"] += ", "
+
+            if self.tokenizer is not None:
+                return_dict["tokens"] = torch.tensor(self.tokenizer(
+                    return_dict["description"],
+                    max_length=self.tokenizer.model_max_length,
+                    padding="max_length",
+                    truncation=True,
+                    return_tensors="pt",
+                ).input_ids)
 
         if self.return_dict:
             return return_dict

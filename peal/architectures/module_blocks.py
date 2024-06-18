@@ -7,12 +7,151 @@ from peal.architectures.basic_modules import (
     SelfAttentionLayer,
     Transpose,
 )
-from peal.configs.architectures.architecture_template import (
-    VGGConfig,
-    ResnetConfig,
-    FCConfig,
-    TransformerConfig,
-)
+
+
+class FCConfig:
+    """
+    The config template for a Fully Connected Layer.
+    """
+
+    """
+    The number of neurons in the layer.
+    """
+    num_neurons: PositiveInt
+    """
+    Whether to use batchnorm or not.
+    """
+    dropout: float = 0.0
+    """
+    The dimension of the tensor.
+    Options: [0, 1, 2, 3]
+    """
+    tensor_dim: int = 0
+
+    def __init__(
+        self,
+        num_neurons: PositiveInt,
+        dropout: float = 0.0,
+        tensor_dim: int = 0,
+    ):
+        self.num_neurons = num_neurons
+        self.dropout = dropout
+        self.tensor_dim = tensor_dim
+
+    def dict(self):
+        return ["fc", self.num_neurons, self.dropout, self.tensor_dim]
+
+
+class VGGConfig:
+    """
+    The config template for a VGG Layer.
+    """
+
+    """
+    The number of neurons in the layer.
+    """
+    num_neurons: PositiveInt
+    """
+    Number of blocks per layer.
+    """
+    num_blocks: PositiveInt
+    """
+    Whether to use batchnorm or not.
+    """
+    use_batchnorm: bool = True
+    """
+    The size of the receptive field.
+    """
+    receptive_field: PositiveInt = 3
+    """
+    The dimension of the tensor.
+    Options: [1, 2, 3]
+    """
+    tensor_dim: PositiveInt = 2
+
+    def __init__(
+        self,
+        num_neurons: PositiveInt,
+        num_blocks: PositiveInt,
+        use_batchnorm: bool = True,
+        receptive_field: PositiveInt = 3,
+        tensor_dim: PositiveInt = 2,
+    ):
+        super().__init__()
+        self.num_neurons = num_neurons
+        self.num_blocks = num_blocks
+        self.use_batchnorm = use_batchnorm
+        self.receptive_field = receptive_field
+        self.tensor_dim = tensor_dim
+
+    def dict(self):
+        return [
+            "vgg",
+            self.num_neurons,
+            self.num_blocks,
+            self.use_batchnorm,
+            self.receptive_field,
+            self.tensor_dim,
+        ]
+
+
+class ResnetConfig:
+    """
+    The config template for a ResNet layer.
+    """
+
+    """
+    The number of neurons in the layer.
+    """
+    num_neurons: PositiveInt
+    """
+    Number of blocks per layer.
+    """
+    num_blocks: PositiveInt
+    """
+    Whether to use batchnorm or not.
+    """
+    use_batchnorm: bool = True
+    """
+    The dimension of the tensor.
+    Options: [1, 2, 3]
+    """
+    tensor_dim: PositiveInt = 2
+
+    def __init__(
+        self,
+        num_neurons: PositiveInt,
+        num_blocks: PositiveInt,
+        use_batchnorm: bool = True,
+        tensor_dim: PositiveInt = 2,
+        **kwargs,
+    ):
+        super().__init__()
+        self.num_neurons = num_neurons
+        self.num_blocks = num_blocks
+        self.use_batchnorm = use_batchnorm
+        self.tensor_dim = tensor_dim
+
+    def dict(self):
+        # TODO this does not seem to work...
+        return [
+            "resnet",
+            self.num_neurons,
+            self.num_blocks,
+            self.use_batchnorm,
+            self.tensor_dim,
+        ]
+
+
+# TODO complete this
+class TransformerConfig:
+    """
+    The config template for a transformer layer.
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__()
+        self.kwargs = kwargs
 
 
 class FCBlock(nn.Sequential):

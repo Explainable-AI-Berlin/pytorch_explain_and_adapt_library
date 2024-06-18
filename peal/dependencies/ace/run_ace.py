@@ -43,7 +43,7 @@ from peal.dependencies.ace.core.attacks_and_models import (
 )
 from peal.dependencies.ace.models import get_classifier
 
-from peal.data.dataset_interfaces import PealDataset
+from peal.data.interfaces import PealDataset
 from peal.architectures.downstream_models import SequentialModel
 
 import matplotlib

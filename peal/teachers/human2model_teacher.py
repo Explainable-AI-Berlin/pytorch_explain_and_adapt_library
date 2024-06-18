@@ -7,7 +7,7 @@ import time
 from flask import Flask, render_template, request
 from tqdm import tqdm
 
-from peal.teachers.teacher_interface import TeacherInterface
+from peal.teachers.interfaces import TeacherInterface
 from peal.global_utils import get_project_resource_dir, is_port_in_use
 
 
