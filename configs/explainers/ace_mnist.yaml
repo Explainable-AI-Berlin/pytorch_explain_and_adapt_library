@@ -1,0 +1,5 @@
+explainer_type : ACE
+category : explainer
+predictor_config: <PEAL_RUNS>/mnist/natural_classifier
+data_config: <PEAL_BASE>/configs/data/mnist.yaml
+generator_config: <PEAL_RUNS>/mnist/ddpm/config.yaml

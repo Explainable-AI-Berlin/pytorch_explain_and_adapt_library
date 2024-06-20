@@ -4,17 +4,17 @@ import torch
 #from peal.explainers.explainer_factory import get_explainer
 
 from peal.data.dataset_factory import get_datasets
+from peal.explainers.explainer_factory import get_explainer
 from peal.global_utils import load_yaml_config
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, required=True)
-    parser.add_argument("--dataset_config", type=str, required=True)
+    parser.add_argument("--dataset_config", type=str, default=None)
     parser.add_argument("--oracle_path", type=str, default=None)
     parser.add_argument("--confounder_oracle_path", type=str, default=None)
     args = parser.parse_args()
-    import pdb; pdb.set_trace()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     config = load_yaml_config(args.config)

@@ -1,5 +1,5 @@
 # python train_predictor.py --model_config peal/configs/models/Male_confounding_Blond_Hair_celeba_classifier_natural_unregularized.yaml
-model_path        : /home/space/datasets/peal/peal_runs/celeba/Male_confounding_Blond_Hair/unregularized0/classifier_natural
+model_path        : <PEAL_RUNS>/celeba/Male_confounding_Blond_Hair/unregularized0/classifier_natural
 data              : <PEAL_BASE>/configs/data/Male_confounding_Blond_Hair_celeba_natural.yaml
 training          : <PEAL_BASE>/configs/training/img_classifier.yaml
 architecture      : <PEAL_BASE>/configs/architectures/resnet18.yaml

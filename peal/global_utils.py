@@ -173,7 +173,15 @@ def _load_yaml_config(config_path):
         # config_path is already a config object
         return config_path
 
-    elif config_path[-5:] == ".yaml":
+    if config_path[:len("<PEAL_RUNS>")] == "<PEAL_RUNS>":
+        peal_runs = os.environ.get('PEAL_RUNS', "peal_runs")
+        config_path = os.path.join(peal_runs, config_path[len("<PEAL_RUNS>"):])
+
+    if config_path[:len("<PEAL_DATA>")] == "<PEAL_DATA>":
+        peal_data = os.environ.get('PEAL_DATA', "datasets")
+        config_path = os.path.join(peal_data, config_path[len("<PEAL_DATA>"):])
+
+    if config_path[-5:] == ".yaml":
         split_path = config_path.split("/")
         if split_path[0] == "<PEAL_BASE>":
             config_path = os.path.join(get_project_resource_dir(), *split_path[1:])
@@ -192,10 +200,17 @@ def _load_yaml_config(config_path):
                 raise e
 
         for key in config.keys():
-            if isinstance(config[key], str) and config[key][-5:] == ".yaml":
-                # TODO can this be made interoperable with windows again?
-                # config[key] = _load_yaml_config(os.path.join(*config[key].split("/")))
-                config[key] = _load_yaml_config(config[key])
+            if isinstance(config[key], str):
+                if config[key][:len("<PEAL_RUNS>")] == "<PEAL_RUNS>":
+                    peal_runs = os.environ.get('PEAL_RUNS', "peal_runs")
+                    config[key] = os.path.join(peal_runs, config[key][len("<PEAL_RUNS>"):])
+
+                if config[key][:len("<PEAL_DATA>")] == "<PEAL_DATA>":
+                    peal_data = os.environ.get('PEAL_DATA', "datasets")
+                    config[key] = os.path.join(peal_data, config[key][len("<PEAL_DATA>"):])
+
+                if config[key][-5:] == ".yaml":
+                    config[key] = _load_yaml_config(config[key])
 
         return config
 

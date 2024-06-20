@@ -1,5 +1,5 @@
 # python train_predictor.py --model_config peal/configs/models/Young_confounding_Smiling_celeba_classifier_poisened098.yaml
-model_path        : /home/space/datasets/peal/peal_runs/Young_confounding_Smiling_celeba/classifier_poisened098
+model_path        : <PEAL_RUNS>/Young_confounding_Smiling_celeba/classifier_poisened098
 data              : <PEAL_BASE>/configs/data/Young_confounding_Smiling_celeba_poisened098.yaml
 training          : <PEAL_BASE>/configs/training/img_classifier.yaml
 architecture      : <PEAL_BASE>/configs/architectures/resnet18.yaml

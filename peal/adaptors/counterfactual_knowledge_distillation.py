@@ -1076,6 +1076,13 @@ class CounterfactualKnowledgeDistillation(Adaptor):
                 continue
 
             elif feedback[sample_idx] == "false":
+                prediction = self.student(
+                    x_counterfactual_list[sample_idx].unsqueeze(0).to(self.device)
+                ).argmax()
+                if prediction == int(y_source_list[sample_idx]):
+                    print("This can not be a false counterfactual!")
+                    continue
+
                 sample_name = (
                     "false_"
                     + str(int(y_source_list[sample_idx]))
@@ -1087,20 +1094,6 @@ class CounterfactualKnowledgeDistillation(Adaptor):
                 x_list.append(x_counterfactual_list[sample_idx])
                 # y_list.append(int(y_source_list[sample_idx]))
                 y_counterfactual_list.append(int(y_source_list[sample_idx]))
-                prediction = self.student(
-                    x_list[-1].unsqueeze(0).to(self.device)
-                ).argmax()
-
-                print("In cfkd create dataset!")
-                if prediction == int(y_counterfactual_list[-1]):
-                    print("This can not be a false counterfactual!")
-                    import pdb
-
-                    pdb.set_trace()
-                    quit()
-
-                else:
-                    print([int(prediction), int(y_counterfactual_list[-1])])
 
                 sample_names.append(sample_name)
                 sample_idx += 1

@@ -239,7 +239,7 @@ def get_dataloader(
         dataloader = DataLoader(
             dataset,
             batch_size=getattr(training_config, mode + "_batch_size"),
-            num_workers=8,
+            num_workers=0,
             shuffle=bool(mode == "train"),
         )
 
@@ -247,7 +247,7 @@ def get_dataloader(
         dataloader = DataLoader(
             dataset,
             batch_size=batch_size,
-            num_workers=8,
+            num_workers=0,
             shuffle=bool(mode == "train"),
         )
 

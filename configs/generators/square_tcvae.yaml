@@ -31,7 +31,7 @@ beta_annealing: True
 dp_prob: 0.3
 
 # Data
-base_path : '/home/space/datasets/peal/peal_runs/square/betavae'
+base_path : '<PEAL_RUNS>/square/betavae'
 data : '<PEAL_BASE>/configs/data/square.yaml'
 height: 64
 width: 64

@@ -4,8 +4,10 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
+import torchvision
 from torchvision.transforms import ToTensor
-from peal.data.datasets import SymbolicDataset
+
+from peal.data.datasets import SymbolicDataset, Image2ClassDataset, DataConfig
 from peal.generators.interfaces import Generator
 
 
@@ -302,3 +304,31 @@ class CircleDataset(SymbolicDataset):
             flip_rates.append(flip_rate)
 
         return np.mean(flip_rates)
+
+
+class MnistDataset(Image2ClassDataset):
+    def __init__(self, config : DataConfig, **kwargs):
+        if not os.path.exists(config.dataset_path):
+            mnist_dataset_train = torchvision.datasets.MNIST(
+                root=config.dataset_path + "_train_raw", train=True, download=True, transform=None
+            )
+            img_dir = os.path.join(config.dataset_path, "imgs")
+            idxs = np.zeros([10])
+            Path(img_dir).mkdir(parents=True, exist_ok=True)
+            for i in range(len(mnist_dataset_train)):
+                img, label = mnist_dataset_train[i]
+                if not os.path.exists(f"{img_dir}/{label}"):
+                    os.makedirs(f"{img_dir}/{label}")
+
+                img.save(f"{img_dir}/{label}/{idxs[label]}.png")
+                idxs[label] += 1
+
+            mnist_dataset_val = torchvision.datasets.MNIST(
+                root=config.dataset_path + "_val_raw", train=False, download=True, transform=None
+            )
+            for i in range(len(mnist_dataset_val)):
+                img, label = mnist_dataset_val[i]
+                img.save(f"{img_dir}/{label}/{idxs[label]}.png")
+                idxs[label] += 1
+
+        super(MnistDataset, self).__init__(config=config, **kwargs)

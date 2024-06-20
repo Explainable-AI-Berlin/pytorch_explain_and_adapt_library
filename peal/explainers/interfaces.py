@@ -14,8 +14,15 @@ class ExplainerConfig(BaseModel):
     The category of the config.
     """
     category: str = 'explainer'
+    """
+    The directory where the explanations are stored.
+    """
+    explanations_dir: str = 'explanations'
 
 
 class ExplainerInterface:
     def explain_batch(self, batch, **args):
         raise NotImplementedError
+
+    def run(self, dataset, oracle_path, confounder_oracle_path):
+        pass

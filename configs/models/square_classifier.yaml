@@ -1,5 +1,5 @@
 # python train_predictor.py --model_config peal/configs/models/square_classifier.yaml
-'model_path'        : '/home/space/datasets/peal/peal_runs/square/colora_confounding_colorb/classifier_unpoisened'
+'model_path'        : '<PEAL_RUNS>/square/colora_confounding_colorb/classifier_unpoisened'
 'data'              : '<PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_unpoisened.yaml'
 'training'          : '<PEAL_BASE>/configs/training/img_classifier.yaml'
 'architecture'      : '<PEAL_BASE>/configs/architectures/resnet18.yaml'

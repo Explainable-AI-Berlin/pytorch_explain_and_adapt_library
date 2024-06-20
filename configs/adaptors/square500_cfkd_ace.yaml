@@ -14,10 +14,10 @@ explainer                            :  <PEAL_BASE>/configs/explainers/ace_defau
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_unpoisened.yaml
 test_data                            :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_unpoisened.yaml
-student                              :  /home/space/datasets/peal/peal_runs/square/colora_confounding_colorb/classifier_unpoisened/model.cpl
+student                              :  <PEAL_RUNS>/square/colora_confounding_colorb/classifier_unpoisened/model.cpl
 teacher                              :  SegmentationMask
-generator                            :  /home/space/datasets/peal/peal_runs/square/ddpm/config.yaml
-base_dir                             :  /home/space/datasets/peal/peal_runs/square/colora_confounding_colorb/classifier_unpoisened/cfkd_ace
+generator                            :  <PEAL_RUNS>/square/ddpm/config.yaml
+base_dir                             :  <PEAL_RUNS>/square/colora_confounding_colorb/classifier_unpoisened/cfkd_ace
 task:
   criterions:
     ce     : 1.0

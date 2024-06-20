@@ -18,7 +18,7 @@ python3 train_model.py \
 #--model_config "<PEAL_BASE>/configs/models/celeba_vae.yaml" \
 #--model_name "celeba_vae_unpoisened"
 #python3 train_predictor.py \
-#--model_config "<PEAL_BASE>/configs/models/celeba_glow.yaml" \
+#--model_config "<PEAL_BASE>/configs/models/mnist_glow.yaml" \
 #--model_name "celeba_glow_unpoisened"
 python train_diffusion_model.py \
 --generator_config "peal/configs/generators/ace_generator_celeba.yaml"

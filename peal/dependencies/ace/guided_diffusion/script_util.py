@@ -166,6 +166,8 @@ def create_model(
             channel_mult = (1, 2, 3, 4)
         elif image_size == 28:  # for mnist
             channel_mult = (1, 1, 2)
+        elif image_size == 32:  # for mnist
+            channel_mult = (1, 1, 2)
         elif isinstance(image_size, list):
             channel_mult = (1, 1, 2, 3, 4)
         else:

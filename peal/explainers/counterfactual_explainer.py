@@ -10,8 +10,9 @@ from typing import Union
 
 from peal.data.dataset_factory import get_datasets
 from peal.data.datasets import DataConfig
+from peal.generators.generator_factory import get_generator
 from peal.global_utils import load_yaml_config
-from peal.generators.interfaces import InvertibleGenerator, EditCapableGenerator
+from peal.generators.interfaces import InvertibleGenerator, EditCapableGenerator, GeneratorConfig
 from peal.data.interfaces import PealDataset
 from peal.explainers.interfaces import ExplainerInterface, ExplainerConfig
 
@@ -27,6 +28,9 @@ class ACEConfig(ExplainerConfig):
     Options: ['counterfactual', 'lrp']
     """
     explainer_type: str = "ACE"
+    predictor_path: Union[str, type(None)] = None
+    generator_config: Union[type(None), GeneratorConfig] = None
+    data_config: Union[type(None), DataConfig] = None
     attack_iterations: Union[list, int] = [10,50]
     sampling_time_fraction: Union[list, float] = [0.1,0.3]
     dist_l1: Union[list, float] = [1.0, 0.0001]
@@ -84,6 +88,9 @@ class DiffeoCFConfig(ExplainerConfig):
     Options: ['counterfactual', 'lrp']
     """
     explanation_type: str = "DiffeoCFConfig"
+    predictor_path: Union[str, type(None)] = None
+    generator_config: Union[type(None), GeneratorConfig] = None
+    data_config: Union[type(None), DataConfig] = None
     """
     The maximum number of gradients step done for explaining the network
     """
@@ -140,6 +147,9 @@ class TIMEConfig(ExplainerConfig):
     Options: ['counterfactual', 'lrp']
     """
     explainer_type: str = "TIME"
+    predictor_path: Union[str, type(None)] = None
+    generator_config: Union[type(None), GeneratorConfig] = None
+    data_config: Union[type(None), DataConfig] = None
     editing_type: str = "ddpm_inversion"
     sd_model: str = "CompVis/stable-diffusion-v1-4"
     use_negative_guidance_denoise: bool = True
@@ -201,8 +211,8 @@ class PerfectFalseCounterfactualConfig(ExplainerConfig):
     The type of explanation that shall be used.
     """
     explainer_type: str = "PerfectFalseCounterfactual"
-    data: Union[str, DataConfig] = None
-    test_data: Union[str, DataConfig] = None
+    data: Union[type(None), str, DataConfig] = None
+    test_data: Union[type(None), str, DataConfig] = None
 
 
 class CounterfactualExplainer(ExplainerInterface):
@@ -212,14 +222,14 @@ class CounterfactualExplainer(ExplainerInterface):
 
     def __init__(
         self,
-        downstream_model: nn.Module,
-        generator: Union[InvertibleGenerator, EditCapableGenerator],
-        input_type: str,
-        dataset: PealDataset,
-        tracking_level: int = 0,
         explainer_config: Union[
             dict, str, ExplainerConfig
-        ] = "<PEAL_BASE>/configs/explainers/counterfactual_default.yaml",
+        ],
+        downstream_model: nn.Module = None,
+        generator: Union[InvertibleGenerator, EditCapableGenerator] = None,
+        input_type: str = None,
+        dataset: PealDataset = None,
+        tracking_level: int = 0,
         test_data_config: str = None,
     ):
         """
@@ -232,13 +242,28 @@ class CounterfactualExplainer(ExplainerInterface):
             dataset (PealDataset): _description_
             explainer_config (Union[ dict, str ], optional): _description_. Defaults to "/configs/explainers/counterfactual_default.yaml".
         """
-        self.downstream_model = downstream_model
-        self.generator = generator
-        self.classifier_dataset = dataset
         self.explainer_config = load_yaml_config(explainer_config, ExplainerConfig)
         self.device = (
-            "cuda" if next(self.downstream_model.parameters()).is_cuda else "cpu"
+            "cuda" if torch.cuda.is_available() else "cpu"
         )
+        if not downstream_model is None:
+            self.downstream_model = downstream_model
+
+        else:
+            self.downstream_model = torch.load(self.explainer_config.predictor_config.base_path).to(self.device)
+
+        if not generator is None:
+            self.generator = generator
+
+        else:
+            self.generator = get_generator(self.explainer_config.generator_config).to(self.device)
+
+        if not dataset is None:
+            self.classifier_dataset = dataset
+
+        else:
+            self.classifier_dataset = get_datasets(self.explainer_config.data_config)[1]
+
         self.input_type = input_type
         self.tracking_level = tracking_level
         self.loss = torch.nn.CrossEntropyLoss()
@@ -540,7 +565,7 @@ class CounterfactualExplainer(ExplainerInterface):
 
         return batch_out
 
-    def run(self, dataset):
+    def run(self, dataset, oracle_path=None, confounder_oracle_path=None):
         """
         This function runs the explainer.
         """
@@ -549,31 +574,49 @@ class CounterfactualExplainer(ExplainerInterface):
         for idx in range(len(dataset)):
             x, y = dataset[idx]
             y_pred = self.downstream_model(x.unsqueeze(0).to(self.device))[0].argmax()
-            y_target = (y_pred + 1) % dataset.output_size
-            if (
-                not batch is None
-                or len(batch["x_list"]) < self.explainer_config.batch_size
-            ):
-                batch = {
-                    "x_list": x.unsqueeze(0),
-                    "y_target_list": torch.tensor([y_target]),
-                    "y_source_list": torch.tensor([y_pred]),
-                    "idx_list": [idx],
-                }
+            for y_target in range(dataset.output_size):
+                if y_target == y_pred:
+                    continue
 
-            else:
-                batch["x_list"] = torch.cat([batch["x_list"], x.unsqueeze(0)], 0)
-                batch["y_target_list"] = torch.cat(
-                    [batch["y_target_list"], torch.tensor([y_target])], 0
-                )
-                batch["y_source_list"] = torch.cat(
-                    [batch["y_source_list"], torch.tensor([y_pred])], 0
-                )
-                batch["idx_list"].append(idx)
-                batches_out.append(self.explain_batch(batch))
+                if (
+                    batch is None
+                ):
+                    batch = {
+                        "x_list": x.unsqueeze(0),
+                        "y_target_list": torch.tensor([y_target]),
+                        "y_source_list": torch.tensor([y_pred]),
+                        "idx_list": [idx],
+                    }
+
+                else:
+                    batch["x_list"] = torch.cat([batch["x_list"], x.unsqueeze(0)], 0)
+                    batch["y_target_list"] = torch.cat(
+                        [batch["y_target_list"], torch.tensor([y_target])], 0
+                    )
+                    batch["y_source_list"] = torch.cat(
+                        [batch["y_source_list"], torch.tensor([y_pred])], 0
+                    )
+                    batch["idx_list"].append(idx)
+
+                if len(batch["x_list"]) == self.explainer_config.batch_size:
+                    batches_out.append(self.explain_batch(batch))
+                    batch = None
 
         batches_out_dict = {}
         for key in batches_out[0].keys():
             batches_out_dict[key] = torch.cat([batch[key] for batch in batches_out], 0)
 
+        dataset.generate_contrastive_collage(
+            x_counterfactual_list=batches_out_dict['x_counterfactual_list'],
+            y_source_list=batches_out_dict['y_source_list'],
+            y_target_list=batches_out_dict['y_target_list'],
+            x_list=batches_out_dict['x_list'],
+            y_list=batches_out_dict['y_list'],
+            y_target_end_confidence_list=batches_out_dict['y_target_end_confidence_list'],
+            base_path=self.explainer_config.explanations_dir,
+        )
+
         return batches_out_dict
+
+    def human_annotate_counterfactuals(self):
+        pass
