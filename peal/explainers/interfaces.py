@@ -18,6 +18,10 @@ class ExplainerConfig(BaseModel):
     The directory where the explanations are stored.
     """
     explanations_dir: str = 'explanations'
+    """
+    The port the feedback for the explanations shall be given.
+    """
+    port: int = 8000
 
 
 class ExplainerInterface:

@@ -11,17 +11,16 @@ from peal.global_utils import load_yaml_config
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, required=True)
-    parser.add_argument("--dataset_config", type=str, default=None)
     parser.add_argument("--oracle_path", type=str, default=None)
     parser.add_argument("--confounder_oracle_path", type=str, default=None)
     args = parser.parse_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     config = load_yaml_config(args.config)
-    dataset_config = load_yaml_config(args.dataset_config)
 
     explainer = get_explainer(config)
     explanations_dict = explainer.run(args.oracle_path, args.confounder_oracle_path)
+    explainer.human_annotate_counterfactuals(explanations_dict)
 
     if not args.oracle_path is None:
         # evaluate model

@@ -1,21 +1,36 @@
 import copy
 import os
+import shutil
+import threading
+import time
 
 import torch
 import torchvision
+from flask import render_template, Flask, request
 from pydantic import PositiveInt
 
 from torch import nn
 from typing import Union
 
+from tqdm import tqdm
+
 from peal.data.dataset_factory import get_datasets
 from peal.data.datasets import DataConfig
 from peal.generators.generator_factory import get_generator
-from peal.global_utils import load_yaml_config
-from peal.generators.interfaces import InvertibleGenerator, EditCapableGenerator, GeneratorConfig
+from peal.global_utils import (
+    load_yaml_config,
+    get_project_resource_dir,
+    is_port_in_use,
+    dict_to_bar_chart,
+)
+from peal.generators.interfaces import (
+    InvertibleGenerator,
+    EditCapableGenerator,
+    GeneratorConfig,
+)
 from peal.data.interfaces import PealDataset
 from peal.explainers.interfaces import ExplainerInterface, ExplainerConfig
-
+from peal.teachers.human2model_teacher import DataStore
 
 
 class ACEConfig(ExplainerConfig):
@@ -31,8 +46,8 @@ class ACEConfig(ExplainerConfig):
     predictor_path: Union[str, type(None)] = None
     generator: Union[type(None), GeneratorConfig] = None
     data_config: Union[type(None), DataConfig] = None
-    attack_iterations: Union[list, int] = [10,50]
-    sampling_time_fraction: Union[list, float] = [0.1,0.3]
+    attack_iterations: Union[list, int] = [10, 50]
+    sampling_time_fraction: Union[list, float] = [0.1, 0.3]
     dist_l1: Union[list, float] = [1.0, 0.0001]
     dist_l2: Union[list, float] = 0.0
     sampling_inpaint: Union[list, float] = [0.3, 0.1]
@@ -132,6 +147,10 @@ class DiffeoCFConfig(ExplainerConfig):
     """
     img_regularization: float = 0.0
     """
+    The batch size used for the counterfactual search
+    """
+    batch_size: int = 5
+    """
     A dict containing all variables that could not be given with the current config structure
     """
     kwargs: dict = {}
@@ -164,8 +183,8 @@ class TIMEConfig(ExplainerConfig):
         "|<A*01>| |<A*02>| |<A*03>|",
         "|<A*11>| |<A*12>| |<A*13>|",
     ]
-    base_prompt: str = "" # "A photo of a |<C*1>| |<C*2>| |<C*3>|"
-    prompt_connector: str = "" # " that is "
+    base_prompt: str = ""  # "A photo of a |<C*1>| |<C*2>| |<C*3>|"
+    prompt_connector: str = ""  # " that is "
     chunks: int = 1
     chunk: int = 0
     enable_xformers_memory_efficient_attention: bool = True
@@ -190,7 +209,7 @@ class TIMEConfig(ExplainerConfig):
     adam_beta2: float = 0.999
     adam_epsilon: float = 1e-9
     weight_decay: float = 1e-4
-    iterations: int = 100 #1000
+    iterations: int = 100  # 1000
     max_epoch: int = 30
     train_batch_size: int = 64
     image_size: int = 128
@@ -222,9 +241,7 @@ class CounterfactualExplainer(ExplainerInterface):
 
     def __init__(
         self,
-        explainer_config: Union[
-            dict, str, ExplainerConfig
-        ],
+        explainer_config: Union[dict, str, ExplainerConfig],
         downstream_model: nn.Module = None,
         generator: Union[InvertibleGenerator, EditCapableGenerator] = None,
         input_type: str = None,
@@ -243,20 +260,22 @@ class CounterfactualExplainer(ExplainerInterface):
             explainer_config (Union[ dict, str ], optional): _description_. Defaults to "/configs/explainers/counterfactual_default.yaml".
         """
         self.explainer_config = load_yaml_config(explainer_config)
-        self.device = (
-            "cuda" if torch.cuda.is_available() else "cpu"
-        )
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         if not downstream_model is None:
             self.downstream_model = downstream_model
 
         else:
-            self.downstream_model = torch.load(self.explainer_config.predictor_path).to(self.device)
+            self.downstream_model = torch.load(self.explainer_config.predictor_path).to(
+                self.device
+            )
 
         if not generator is None:
             self.generator = generator
 
         else:
-            self.generator = get_generator(self.explainer_config.generator).to(self.device)
+            self.generator = get_generator(self.explainer_config.generator).to(
+                self.device
+            )
 
         if not dataset is None:
             self.classifier_dataset = dataset
@@ -361,7 +380,9 @@ class CounterfactualExplainer(ExplainerInterface):
             """loss += self.explainer_config.log_prob_regularization * torch.mean(
                 self.generator.log_prob_z(latent_code)
             )"""
-            logit_confidences = torch.nn.Softmax(dim=-1)(logits_perturbed).detach().cpu()
+            logit_confidences = (
+                torch.nn.Softmax(dim=-1)(logits_perturbed).detach().cpu()
+            )
             target_confidences = [
                 float(logit_confidences[i][target_classes[i]])
                 for i in range(len(target_classes))
@@ -473,7 +494,8 @@ class CounterfactualExplainer(ExplainerInterface):
             base_path (str, optional): The base path to save the counterfactuals to. Defaults to "collages".
             start_idx (int, optional): The start index for the counterfactuals. Defaults to 0.
             y_target_goal_confidence_in (int, optional): The target confidence for the counterfactuals. Defaults to None.
-            remove_below_threshold (bool, optional): The flag to remove counterfactuals with a confidence below the target confidence. Defaults to True.
+            remove_below_threshold (bool, optional): The flag to remove counterfactuals with a confidence below the
+            target confidence. Defaults to True.
 
         Returns:
             dict: The batch with the counterfactuals added.
@@ -572,19 +594,21 @@ class CounterfactualExplainer(ExplainerInterface):
         batches_out = []
         batch = None
         for idx in range(len(self.classifier_dataset)):
+            if idx > 1:
+                break
+
             x, y = self.classifier_dataset[idx]
             y_pred = self.downstream_model(x.unsqueeze(0).to(self.device))[0].argmax()
             for y_target in range(self.classifier_dataset.output_size[0]):
                 if y_target == y_pred:
                     continue
 
-                if (
-                    batch is None
-                ):
+                if batch is None:
                     batch = {
                         "x_list": x.unsqueeze(0),
                         "y_target_list": torch.tensor([y_target]),
                         "y_source_list": torch.tensor([y_pred]),
+                        "y_list": torch.tensor([y]),
                         "idx_list": [idx],
                     }
 
@@ -596,27 +620,187 @@ class CounterfactualExplainer(ExplainerInterface):
                     batch["y_source_list"] = torch.cat(
                         [batch["y_source_list"], torch.tensor([y_pred])], 0
                     )
+                    batch["y_list"] = torch.cat(
+                        [batch["y_list"], torch.tensor([y])], 0
+                    )
                     batch["idx_list"].append(idx)
 
-                if len(batch["x_list"]) == self.explainer_config.batch_size:
+                if batch["x_list"].shape[0] == self.explainer_config.batch_size:
                     batches_out.append(self.explain_batch(batch))
                     batch = None
 
         batches_out_dict = {}
         for key in batches_out[0].keys():
-            batches_out_dict[key] = torch.cat([batch[key] for batch in batches_out], 0)
+            for batch in batches_out:
+                if isinstance(batch[key][0], torch.Tensor):
+                    elem = torch.stack(batch[key])
+
+                else:
+                    elem = torch.tensor(batch[key])
+
+                if not key in batches_out_dict.keys():
+                    batches_out_dict[key] = elem
+
+                else:
+                    batches_out_dict[key] = torch.cat(
+                        [batches_out_dict[key], elem], 0
+                    )
 
         self.classifier_dataset.generate_contrastive_collage(
-            x_counterfactual_list=batches_out_dict['x_counterfactual_list'],
-            y_source_list=batches_out_dict['y_source_list'],
-            y_target_list=batches_out_dict['y_target_list'],
-            x_list=batches_out_dict['x_list'],
-            y_list=batches_out_dict['y_list'],
-            y_target_end_confidence_list=batches_out_dict['y_target_end_confidence_list'],
+            x_counterfactual_list=list(batches_out_dict["x_counterfactual_list"]),
+            y_source_list=list(batches_out_dict["y_source_list"]),
+            y_target_list=list(batches_out_dict["y_target_list"]),
+            x_list=list(batches_out_dict["x_list"]),
+            y_list=list(batches_out_dict["y_list"]),
+            y_target_end_confidence_list=list(batches_out_dict[
+                "y_target_end_confidence_list"
+            ]),
+            y_target_start_confidence_list=list(torch.zeros([len(batches_out_dict["y_list"])])),
             base_path=self.explainer_config.explanations_dir,
         )
 
         return batches_out_dict
 
-    def human_annotate_counterfactuals(self):
-        pass
+    def human_annotate_counterfactuals(
+        self,
+        collage_path_list,
+        source_class_list=None,
+        target_class_list=None,
+        **kwargs,
+    ):
+        """ """
+        # TODO fix bug with reloading
+        shutil.rmtree("static", ignore_errors=True)
+        os.makedirs("static")
+        shutil.rmtree("templates", ignore_errors=True)
+        shutil.copytree(
+            os.path.join(get_project_resource_dir(), "templates"), "templates"
+        )
+        self.port = self.explainer_config.port
+        while is_port_in_use(self.port):
+            print("port " + str(self.port) + " is occupied!")
+            self.port += 1
+
+        print("Start explainer loop!")
+        #
+        # host_name = "localhost"
+        host_name = "0.0.0.0"
+        app = Flask("feedback_loop")
+
+        self.data = DataStore()
+        self.data.i = 0
+        self.data.collage_paths = []
+        self.data.feedback = []
+
+        app.config.UPLOAD_FOLDER = "static"
+
+        @app.route("/", methods=["GET", "POST"])
+        def index():
+            if request.method == "POST":
+                if request.form["submit_button"] == "Text":
+                    self.data.feedback.append(request.form["user_input"])
+
+                if (
+                    len(self.data.collage_paths) > 0
+                    and len(self.data.collage_paths) > self.data.i
+                ):
+                    collage_path = self.data.collage_paths[self.data.i]
+                    self.data.i += 1
+                    return render_template(
+                        "explainer.html",
+                        form=request.form,
+                        counterfactual_collage=collage_path,
+                    )
+
+                else:
+                    return render_template("information.html")
+
+            elif request.method == "GET":
+                if len(self.data.collage_paths) > 0:
+                    collage_path = self.data.collage_paths[self.data.i]
+                    self.data.i += 1
+                    return render_template(
+                        "explainer.html",
+                        form=request.form,
+                        counterfactual_collage=collage_path,
+                    )
+
+                else:
+                    return render_template("information.html")
+
+        self.thread = threading.Thread(
+            target=lambda: app.run(
+                host=host_name, port=self.port, debug=True, use_reloader=False
+            )
+        )
+        self.thread.start()
+        print("Feedback GUI is active on localhost:" + str(self.port))
+
+        collage_paths_static = []
+        for path in collage_path_list:
+            collage_path_static = os.path.join("static", path.split("/")[-1])
+            shutil.copy(path, collage_path_static)
+            collage_paths_static.append(collage_path_static)
+
+        self.data.collage_paths = collage_paths_static
+
+        with tqdm(range(100000)) as pbar:
+            for it in pbar:
+                if len(self.data.feedback) >= len(self.data.collage_paths):
+                    break
+
+                else:
+                    pbar.set_description(
+                        "Give feedback at localhost:"
+                        + str(self.port)
+                        + ", Current Feedback given: "
+                        + str(len(self.data.feedback))
+                        + "/"
+                        + str(len(self.data.collage_paths))
+                    )
+                    time.sleep(1.0)
+
+        # stop_threads = True
+        # thread.join()
+        feedback = copy.deepcopy(self.data.feedback)
+        with open(
+            os.path.join(self.explainer_config.explanations_dir, "feedback.txt"), "w"
+        ) as f:
+            f.write("\n".join(feedback))
+
+        interpretations_dir = os.path.join(
+            self.explainer_config.explanations_dir, "interpretations"
+        )
+        for source_class in range(self.classifier_dataset.output_size[0]):
+            for target_class in range(
+                source_class + 1, self.classifier_dataset.output_size[0]
+            ):
+                interpretation = {}
+                for idx, elem in enumerate(
+                    zip(feedback, source_class_list, target_class_list)
+                ):
+                    feedback_elem, source_class_elem, target_class_elem = elem
+                    qualifies = (
+                        source_class == source_class_elem
+                        and target_class == target_class_elem
+                    )
+                    qualifies &= (
+                        source_class == target_class_elem
+                        and target_class == source_class_elem
+                    )
+                    if qualifies:
+                        if not feedback_elem in interpretation.keys():
+                            interpretation[feedback_elem] = 1
+
+                        else:
+                            interpretation[feedback_elem] += 1
+
+                dict_to_bar_chart(
+                    interpretation,
+                    os.path.join(
+                        interpretations_dir,
+                        f"{source_class}vs{target_class}.png",
+                    ),
+                )
+
+        return feedback

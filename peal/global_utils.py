@@ -18,6 +18,33 @@ import importlib.util
 from pkg_resources import resource_filename
 
 
+import matplotlib.pyplot as plt
+
+def dict_to_bar_chart(input_dict, name):
+  """
+  Creates a bar chart from a dictionary and saves it as a PNG image.
+
+  Args:
+    interpretation: A dictionary where keys are strings and values are integers.
+    name: The desired filename (without the .png extension) to save the image.
+  """
+
+  # Extract labels and values from the dictionary
+  labels = list(input_dict.keys())
+  values = list(input_dict.values())
+
+  # Create the bar chart
+  plt.bar(labels, values)
+  plt.xlabel("Interpretation")
+  plt.ylabel("Count")
+  plt.title("Interpretation Distribution")
+
+  # Save the chart as a PNG image
+  plt.savefig(f"{name}.png")
+
+  # Clear the plot to avoid affecting subsequent plots
+  plt.clf()
+
 def find_subclasses(base_class, directory):
     subclasses = []
 
