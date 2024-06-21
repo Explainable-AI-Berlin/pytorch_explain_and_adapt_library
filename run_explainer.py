@@ -21,8 +21,7 @@ def main():
     dataset_config = load_yaml_config(args.dataset_config)
 
     explainer = get_explainer(config)
-    dataset = get_datasets(dataset_config)
-    explanations_dict = explainer.run(dataset, args.oracle_path, args.confounder_oracle_path)
+    explanations_dict = explainer.run(args.oracle_path, args.confounder_oracle_path)
 
     if not args.oracle_path is None:
         # evaluate model

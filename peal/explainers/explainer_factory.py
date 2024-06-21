@@ -3,6 +3,7 @@ import os
 
 from typing import Union
 
+from peal.explainers.counterfactual_explainer import CounterfactualExplainer
 from peal.explainers.interfaces import (
     ExplainerInterface,
 )
@@ -36,23 +37,30 @@ def get_explainer(
     """
     if not isinstance(explainer, ExplainerInterface):
         explainer_config = load_yaml_config(explainer)
-        explainer_class_list = find_subclasses(
-            explainer,
-            os.path.join(get_project_resource_dir(), "peal", "explainers"),
-        )
-        explainer_class_dict = {
-            explainer_class.__name__: explainer_class
-            for explainer_class in explainer_class_list
-        }
-        if (
-            hasattr(explainer_config, "explainer_type")
-            and explainer_config.explainer_type in explainer_class_dict.keys()
-        ):
-            explainer_out = explainer_class_dict[explainer_config.explainer_type](
-                config=explainer_config,
-                device=device,
-                classifier_dataset=classifier_dataset,
+        if explainer_config.explainer_type in ['DiffeoCF', "ACE", "TIME"]:
+            explainer_out = CounterfactualExplainer(
+                explainer_config=explainer_config,
+                dataset=classifier_dataset,
             )
+
+        else:
+            explainer_class_list = find_subclasses(
+                ExplainerInterface,
+                os.path.join(get_project_resource_dir(), "peal", "explainers"),
+            )
+            explainer_class_dict = {
+                explainer_class.__name__: explainer_class
+                for explainer_class in explainer_class_list
+            }
+            if (
+                hasattr(explainer_config, "explainer_type")
+                and explainer_config.explainer_type in explainer_class_dict.keys()
+            ):
+                explainer_out = explainer_class_dict[explainer_config.explainer_type](
+                    config=explainer_config,
+                    device=device,
+                    classifier_dataset=classifier_dataset,
+                )
 
     else:
         explainer_out = explainer

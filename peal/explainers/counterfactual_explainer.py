@@ -29,7 +29,7 @@ class ACEConfig(ExplainerConfig):
     """
     explainer_type: str = "ACE"
     predictor_path: Union[str, type(None)] = None
-    generator_config: Union[type(None), GeneratorConfig] = None
+    generator: Union[type(None), GeneratorConfig] = None
     data_config: Union[type(None), DataConfig] = None
     attack_iterations: Union[list, int] = [10,50]
     sampling_time_fraction: Union[list, float] = [0.1,0.3]
@@ -89,7 +89,7 @@ class DiffeoCFConfig(ExplainerConfig):
     """
     explanation_type: str = "DiffeoCFConfig"
     predictor_path: Union[str, type(None)] = None
-    generator_config: Union[type(None), GeneratorConfig] = None
+    generator: Union[type(None), GeneratorConfig] = None
     data_config: Union[type(None), DataConfig] = None
     """
     The maximum number of gradients step done for explaining the network
@@ -148,7 +148,7 @@ class TIMEConfig(ExplainerConfig):
     """
     explainer_type: str = "TIME"
     predictor_path: Union[str, type(None)] = None
-    generator_config: Union[type(None), GeneratorConfig] = None
+    generator: Union[type(None), GeneratorConfig] = None
     data_config: Union[type(None), DataConfig] = None
     editing_type: str = "ddpm_inversion"
     sd_model: str = "CompVis/stable-diffusion-v1-4"
@@ -242,7 +242,7 @@ class CounterfactualExplainer(ExplainerInterface):
             dataset (PealDataset): _description_
             explainer_config (Union[ dict, str ], optional): _description_. Defaults to "/configs/explainers/counterfactual_default.yaml".
         """
-        self.explainer_config = load_yaml_config(explainer_config, ExplainerConfig)
+        self.explainer_config = load_yaml_config(explainer_config)
         self.device = (
             "cuda" if torch.cuda.is_available() else "cpu"
         )
@@ -250,13 +250,13 @@ class CounterfactualExplainer(ExplainerInterface):
             self.downstream_model = downstream_model
 
         else:
-            self.downstream_model = torch.load(self.explainer_config.predictor_config.base_path).to(self.device)
+            self.downstream_model = torch.load(self.explainer_config.predictor_path).to(self.device)
 
         if not generator is None:
             self.generator = generator
 
         else:
-            self.generator = get_generator(self.explainer_config.generator_config).to(self.device)
+            self.generator = get_generator(self.explainer_config.generator).to(self.device)
 
         if not dataset is None:
             self.classifier_dataset = dataset
@@ -565,16 +565,16 @@ class CounterfactualExplainer(ExplainerInterface):
 
         return batch_out
 
-    def run(self, dataset, oracle_path=None, confounder_oracle_path=None):
+    def run(self, oracle_path=None, confounder_oracle_path=None):
         """
         This function runs the explainer.
         """
         batches_out = []
         batch = None
-        for idx in range(len(dataset)):
-            x, y = dataset[idx]
+        for idx in range(len(self.classifier_dataset)):
+            x, y = self.classifier_dataset[idx]
             y_pred = self.downstream_model(x.unsqueeze(0).to(self.device))[0].argmax()
-            for y_target in range(dataset.output_size):
+            for y_target in range(self.classifier_dataset.output_size[0]):
                 if y_target == y_pred:
                     continue
 
@@ -606,7 +606,7 @@ class CounterfactualExplainer(ExplainerInterface):
         for key in batches_out[0].keys():
             batches_out_dict[key] = torch.cat([batch[key] for batch in batches_out], 0)
 
-        dataset.generate_contrastive_collage(
+        self.classifier_dataset.generate_contrastive_collage(
             x_counterfactual_list=batches_out_dict['x_counterfactual_list'],
             y_source_list=batches_out_dict['y_source_list'],
             y_target_list=batches_out_dict['y_target_list'],

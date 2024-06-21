@@ -24,5 +24,5 @@ class ExplainerInterface:
     def explain_batch(self, batch, **args):
         raise NotImplementedError
 
-    def run(self, dataset, oracle_path, confounder_oracle_path):
+    def run(self, oracle_path=None, confounder_oracle_path=None):
         pass

@@ -175,11 +175,11 @@ def _load_yaml_config(config_path):
 
     if config_path[:len("<PEAL_RUNS>")] == "<PEAL_RUNS>":
         peal_runs = os.environ.get('PEAL_RUNS', "peal_runs")
-        config_path = os.path.join(peal_runs, config_path[len("<PEAL_RUNS>"):])
+        config_path = config_path.replace("<PEAL_RUNS>", peal_runs)
 
     if config_path[:len("<PEAL_DATA>")] == "<PEAL_DATA>":
         peal_data = os.environ.get('PEAL_DATA', "datasets")
-        config_path = os.path.join(peal_data, config_path[len("<PEAL_DATA>"):])
+        config_path = config_path.replace("<PEAL_DATA>", peal_data)
 
     if config_path[-5:] == ".yaml":
         split_path = config_path.split("/")
@@ -203,11 +203,11 @@ def _load_yaml_config(config_path):
             if isinstance(config[key], str):
                 if config[key][:len("<PEAL_RUNS>")] == "<PEAL_RUNS>":
                     peal_runs = os.environ.get('PEAL_RUNS', "peal_runs")
-                    config[key] = os.path.join(peal_runs, config[key][len("<PEAL_RUNS>"):])
+                    config[key] = config[key].replace("<PEAL_RUNS>", peal_runs)
 
                 if config[key][:len("<PEAL_DATA>")] == "<PEAL_DATA>":
                     peal_data = os.environ.get('PEAL_DATA', "datasets")
-                    config[key] = os.path.join(peal_data, config[key][len("<PEAL_DATA>"):])
+                    config[key] = config[key].replace("<PEAL_DATA>", peal_data)
 
                 if config[key][-5:] == ".yaml":
                     config[key] = _load_yaml_config(config[key])
@@ -247,7 +247,7 @@ def get_config_model(config_data):
     return config_model
 
 
-def load_yaml_config(config_path, config_model=None):
+def load_yaml_config(config_path, config_model=None, return_namespace=True):
     config_data = _load_yaml_config(config_path)
     if (
         config_model is None
@@ -257,17 +257,14 @@ def load_yaml_config(config_path, config_model=None):
     ):
         config_model = get_config_model(config_data)
 
-    if config_model is None and isinstance(config_data, dict):
+    if config_model is None and isinstance(config_data, dict) and return_namespace:
         config = types.SimpleNamespace(**config_data)
 
-    elif isinstance(config_data, dict):
-        """
-        # TODO this is very very bad style!
-        try:
-            return config_model(**config_data)
-        except Exception:
-            return types.SimpleNamespace(**config_data)
-        """
+    elif not config_model is None and isinstance(config_data, dict):
+        for key in config_data.keys():
+            if isinstance(config_data[key], dict):
+                config_data[key] = load_yaml_config(config_data[key], return_namespace=False)
+
         config = config_model(**config_data)
 
     else:
