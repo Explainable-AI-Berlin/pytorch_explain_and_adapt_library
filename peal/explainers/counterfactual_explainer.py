@@ -3,6 +3,7 @@ import os
 import shutil
 import threading
 import time
+from pathlib import Path
 
 import torch
 import torchvision
@@ -46,14 +47,14 @@ class ACEConfig(ExplainerConfig):
     predictor_path: Union[str, type(None)] = None
     generator: Union[type(None), GeneratorConfig] = None
     data_config: Union[type(None), DataConfig] = None
-    attack_iterations: Union[list, int] = [10, 50]
-    sampling_time_fraction: Union[list, float] = [0.1, 0.3]
+    attack_iterations: Union[list, int] = [30, 50]
+    sampling_time_fraction: Union[list, float] = [0.2, 0.3]
     dist_l1: Union[list, float] = [1.0, 0.0001]
     dist_l2: Union[list, float] = 0.0
     sampling_inpaint: Union[list, float] = [0.3, 0.1]
     sampling_dilation: Union[list, int] = 17
     timestep_respacing: Union[list, int] = 50
-    attempts: int = 5
+    attempts: int = 2
     clip_denoised: bool = True  # Clipping noise
     batch_size: int = 32  # Batch size
     gpu: str = "0"  # GPU index, should only be 1 gpu
@@ -117,7 +118,7 @@ class DiffeoCFConfig(ExplainerConfig):
     """
     The learning rate used for finding the counterfactual
     """
-    learning_rate: float = 0.01
+    learning_rate: float = 0.0001
     """
     The desired target confidence.
     Consider the tradeoff between minimality and clarity of counterfactual
@@ -246,7 +247,7 @@ class CounterfactualExplainer(ExplainerInterface):
         generator: Union[InvertibleGenerator, EditCapableGenerator] = None,
         input_type: str = None,
         dataset: PealDataset = None,
-        tracking_level: int = 0,
+        tracking_level: int = None,
         test_data_config: str = None,
     ):
         """
@@ -277,6 +278,19 @@ class CounterfactualExplainer(ExplainerInterface):
                 self.device
             )
 
+        if self.explainer_config.validate_generator:
+            if not os.path.exists(self.explainer_config.explanations_dir):
+                os.makedirs(self.explainer_config.explanations_dir)
+
+            x = self.generator.sample_x(self.explainer_config.batch_size)
+            torchvision.utils.save_image(
+                x,
+                os.path.join(
+                    self.explainer_config.explanations_dir,
+                    "generator_validation.png",
+                ),
+            )
+
         if not dataset is None:
             self.classifier_dataset = dataset
 
@@ -284,7 +298,12 @@ class CounterfactualExplainer(ExplainerInterface):
             self.classifier_dataset = get_datasets(self.explainer_config.data_config)[1]
 
         self.input_type = input_type
-        self.tracking_level = tracking_level
+        if not tracking_level is None:
+            self.tracking_level = tracking_level
+
+        else:
+            self.tracking_level = self.explainer_config.tracking_level
+
         self.loss = torch.nn.CrossEntropyLoss()
 
         if isinstance(self.explainer_config, PerfectFalseCounterfactualConfig):
@@ -430,7 +449,7 @@ class CounterfactualExplainer(ExplainerInterface):
         counterfactual = self.classifier_dataset.project_from_pytorch_default(
             counterfactual
         )
-        logits = self.downstream_model(img)
+        logits = self.downstream_model(counterfactual.to(self.device))
         logit_confidences = torch.nn.Softmax(dim=-1)(logits).detach().cpu()
         target_confidences = [
             float(logit_confidences[i][target_classes[i]])
@@ -591,14 +610,23 @@ class CounterfactualExplainer(ExplainerInterface):
         """
         This function runs the explainer.
         """
+        if not os.path.exists(self.explainer_config.explanations_dir):
+            os.makedirs(self.explainer_config.explanations_dir)
+
         batches_out = []
         batch = None
+        collage_idx = 0
         for idx in range(len(self.classifier_dataset)):
-            if idx > 1:
+            if (
+                not self.explainer_config.max_samples is None
+                and collage_idx >= self.explainer_config.max_samples
+            ):
                 break
 
             x, y = self.classifier_dataset[idx]
-            y_pred = self.downstream_model(x.unsqueeze(0).to(self.device))[0].argmax()
+            y_logits = self.downstream_model(x.unsqueeze(0).to(self.device))[0]
+            y_pred = y_logits.argmax()
+            y_confidence = torch.nn.Softmax(dim=-1)(y_logits)
             for y_target in range(self.classifier_dataset.output_size[0]):
                 if y_target == y_pred:
                     continue
@@ -609,6 +637,9 @@ class CounterfactualExplainer(ExplainerInterface):
                         "y_target_list": torch.tensor([y_target]),
                         "y_source_list": torch.tensor([y_pred]),
                         "y_list": torch.tensor([y]),
+                        "y_target_start_confidence_list": torch.tensor(
+                            [y_confidence[y_target]]
+                        ),
                         "idx_list": [idx],
                     }
 
@@ -620,62 +651,51 @@ class CounterfactualExplainer(ExplainerInterface):
                     batch["y_source_list"] = torch.cat(
                         [batch["y_source_list"], torch.tensor([y_pred])], 0
                     )
-                    batch["y_list"] = torch.cat(
-                        [batch["y_list"], torch.tensor([y])], 0
+                    batch["y_list"] = torch.cat([batch["y_list"], torch.tensor([y])], 0)
+                    batch["y_target_start_confidence_list"] = torch.cat(
+                        [
+                            batch["y_target_start_confidence_list"],
+                            torch.tensor([y_confidence[y_target]]),
+                        ],
+                        0,
                     )
                     batch["idx_list"].append(idx)
 
                 if batch["x_list"].shape[0] == self.explainer_config.batch_size:
-                    batches_out.append(self.explain_batch(batch))
+                    batches_out.append(
+                        self.explain_batch(
+                            batch,
+                            base_path=os.path.join(
+                                self.explainer_config.explanations_dir, "collages"
+                            ),
+                            start_idx=collage_idx,
+                        )
+                    )
+                    collage_idx += len(batches_out[-1]["x_list"])
                     batch = None
 
         batches_out_dict = {}
         for key in batches_out[0].keys():
             for batch in batches_out:
-                if isinstance(batch[key][0], torch.Tensor):
-                    elem = torch.stack(batch[key])
-
-                else:
-                    elem = torch.tensor(batch[key])
-
                 if not key in batches_out_dict.keys():
-                    batches_out_dict[key] = elem
+                    batches_out_dict[key] = batch[key]
 
                 else:
-                    batches_out_dict[key] = torch.cat(
-                        [batches_out_dict[key], elem], 0
-                    )
-
-        self.classifier_dataset.generate_contrastive_collage(
-            x_counterfactual_list=list(batches_out_dict["x_counterfactual_list"]),
-            y_source_list=list(batches_out_dict["y_source_list"]),
-            y_target_list=list(batches_out_dict["y_target_list"]),
-            x_list=list(batches_out_dict["x_list"]),
-            y_list=list(batches_out_dict["y_list"]),
-            y_target_end_confidence_list=list(batches_out_dict[
-                "y_target_end_confidence_list"
-            ]),
-            y_target_start_confidence_list=list(torch.zeros([len(batches_out_dict["y_list"])])),
-            base_path=self.explainer_config.explanations_dir,
-        )
+                    batches_out_dict[key] += batch[key]
 
         return batches_out_dict
 
     def human_annotate_counterfactuals(
         self,
         collage_path_list,
-        source_class_list=None,
-        target_class_list=None,
+        y_source_list=None,
+        y_target_list=None,
         **kwargs,
     ):
         """ """
         # TODO fix bug with reloading
         shutil.rmtree("static", ignore_errors=True)
         os.makedirs("static")
-        shutil.rmtree("templates", ignore_errors=True)
-        shutil.copytree(
-            os.path.join(get_project_resource_dir(), "templates"), "templates"
-        )
         self.port = self.explainer_config.port
         while is_port_in_use(self.port):
             print("port " + str(self.port) + " is occupied!")
@@ -739,7 +759,14 @@ class CounterfactualExplainer(ExplainerInterface):
         collage_paths_static = []
         for path in collage_path_list:
             collage_path_static = os.path.join("static", path.split("/")[-1])
-            shutil.copy(path, collage_path_static)
+            try:
+                shutil.copy(path, collage_path_static)
+
+            except Exception:
+                import pdb
+
+                pdb.set_trace()
+
             collage_paths_static.append(collage_path_static)
 
         self.data.collage_paths = collage_paths_static
@@ -768,23 +795,30 @@ class CounterfactualExplainer(ExplainerInterface):
         ) as f:
             f.write("\n".join(feedback))
 
+        return feedback
+
+    def visualize_interpretations(self, feedback, y_source_list, y_target_list):
+        if isinstance(feedback, str):
+            with open(feedback, "r") as f:
+                s = f.read()
+                feedback = s.split("\n")
+
         interpretations_dir = os.path.join(
             self.explainer_config.explanations_dir, "interpretations"
         )
+        Path(interpretations_dir).mkdir(parents=True, exist_ok=True)
         for source_class in range(self.classifier_dataset.output_size[0]):
             for target_class in range(
                 source_class + 1, self.classifier_dataset.output_size[0]
             ):
                 interpretation = {}
-                for idx, elem in enumerate(
-                    zip(feedback, source_class_list, target_class_list)
-                ):
+                for idx, elem in enumerate(zip(feedback, y_source_list, y_target_list)):
                     feedback_elem, source_class_elem, target_class_elem = elem
                     qualifies = (
                         source_class == source_class_elem
                         and target_class == target_class_elem
                     )
-                    qualifies &= (
+                    qualifies = qualifies or (
                         source_class == target_class_elem
                         and target_class == source_class_elem
                     )
@@ -799,8 +833,6 @@ class CounterfactualExplainer(ExplainerInterface):
                     interpretation,
                     os.path.join(
                         interpretations_dir,
-                        f"{source_class}vs{target_class}.png",
+                        f"{source_class}vs{target_class}",
                     ),
                 )
-
-        return feedback

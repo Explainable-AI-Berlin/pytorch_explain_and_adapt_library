@@ -1,3 +1,5 @@
+from typing import Union
+
 from pydantic import BaseModel
 
 
@@ -22,6 +24,9 @@ class ExplainerConfig(BaseModel):
     The port the feedback for the explanations shall be given.
     """
     port: int = 8000
+    tracking_level: int = 2
+    validate_generator: bool = False
+    max_samples: Union[int, None] = None
 
 
 class ExplainerInterface:

@@ -134,7 +134,7 @@ class GlowGenerator(InvertibleGenerator):
         n_channel = copy.deepcopy(self.config.data.input_size[0])
         input_size = copy.deepcopy(self.config.data.input_size[1])
 
-        for i in range(self.n_block - 1):
+        for i in range(self.config.n_block - 1):
             input_size //= 2
             n_channel *= 2
 

@@ -149,8 +149,9 @@ class CFKDConfig(AdaptorConfig):
     attribution_threshold: float = 2.0
     """
     What batch_size is used for creating the counterfactuals?
+    If use_confusion_matrix is deativated always use an even batch_size!!!
     """
-    batch_size: PositiveInt = None
+    batch_size: PositiveInt = 2
     """
     The number validation runs used for evaluating CFKD.
     """
@@ -362,6 +363,8 @@ class CFKDConfig(AdaptorConfig):
         self.max_test_batches = max_test_batches if not max_test_batches is None else self.max_test_batches
         self.tracking_level = tracking_level if not tracking_level is None else self.tracking_level
         self.counterfactual_type = counterfactual_type if not counterfactual_type is None else self.counterfactual_type
+        if not self.use_confusion_matrix:
+            assert self.batch_size % 2 == 0, "Batch size must be even when using deterministic CFKD!"
         self.kwargs = kwargs
 
 
@@ -696,9 +699,6 @@ class CounterfactualKnowledgeDistillation(Adaptor):
         else:
             cm_idx = 1
 
-        print("[int(y), y_source, y_target, y_target_start_confidence]")
-        print("[int(y), y_source, y_target, y_target_start_confidence]")
-        print("[int(y), y_source, y_target, y_target_start_confidence]")
         while not sample_idx >= self.adaptor_config.batch_size:
             if self.adaptor_config.use_confusion_matrix:
                 cm_idx = error_distribution.sample()

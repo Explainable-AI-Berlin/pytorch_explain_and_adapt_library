@@ -1,7 +1,7 @@
 import argparse
 import torch
 
-#from peal.explainers.explainer_factory import get_explainer
+# from peal.explainers.explainer_factory import get_explainer
 
 from peal.data.dataset_factory import get_datasets
 from peal.explainers.explainer_factory import get_explainer
@@ -20,7 +20,10 @@ def main():
 
     explainer = get_explainer(config)
     explanations_dict = explainer.run(args.oracle_path, args.confounder_oracle_path)
-    explainer.human_annotate_counterfactuals(explanations_dict)
+    feedback = explainer.human_annotate_counterfactuals(**explanations_dict)
+    feedback = explainer.visualize_interpretations(
+        feedback, explanations_dict["y_source_list"], explanations_dict["y_target_list"]
+    )
 
     if not args.oracle_path is None:
         # evaluate model
@@ -31,5 +34,6 @@ def main():
         # evaluate model when confounder is predicted by changing task config
         confounder_oracle = torch.load(args.confounder_oracle_path, map_location=device)
         # evaluate the explanations with the confounder oracle
+
 
 main()

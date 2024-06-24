@@ -223,6 +223,7 @@ def _load_yaml_config(config_path):
                 config_path = os.path.abspath(os.path.join("..", *split_path))
                 config_path = config_path.replace("<PEAL_BASE>", "peal")
                 config = open_config(config_path)
+
             else:
                 raise e
 
