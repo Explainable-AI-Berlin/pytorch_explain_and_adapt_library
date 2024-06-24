@@ -1,3 +1,5 @@
+from typing import Union
+
 from pydantic import BaseModel
 
 
@@ -14,8 +16,22 @@ class ExplainerConfig(BaseModel):
     The category of the config.
     """
     category: str = 'explainer'
+    """
+    The directory where the explanations are stored.
+    """
+    explanations_dir: str = 'explanations'
+    """
+    The port the feedback for the explanations shall be given.
+    """
+    port: int = 8000
+    tracking_level: int = 2
+    validate_generator: bool = False
+    max_samples: Union[int, None] = None
 
 
 class ExplainerInterface:
     def explain_batch(self, batch, **args):
         raise NotImplementedError
+
+    def run(self, oracle_path=None, confounder_oracle_path=None):
+        pass

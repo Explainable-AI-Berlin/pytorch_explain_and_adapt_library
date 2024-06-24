@@ -1,5 +1,5 @@
 # python train_predictor.py --model_config peal/configs/models/Smiling_confounding_copyrighttag_celeba_classifier_poisened096_unregularized.yaml
-'model_path'        : '/home/space/datasets/peal/peal_runs/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened096'
+'model_path'        : '<PEAL_RUNS>/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened096'
 'data'              : '<PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba_poisened096.yaml'
 'training'          : '<PEAL_BASE>/configs/training/img_classifier.yaml'
 'architecture'      : '<PEAL_BASE>/configs/architectures/resnet18.yaml'

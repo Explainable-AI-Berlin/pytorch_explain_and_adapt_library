@@ -39,7 +39,13 @@ parser.add_argument("--lr", default=1e-4, type=float, help="learning rate")
 parser.add_argument("--img_size", default=64, type=int, help="image size")
 parser.add_argument("--temp", default=0.7, type=float, help="temperature of sampling")
 parser.add_argument("--n_sample", default=20, type=int, help="number of samples")
-parser.add_argument("--base_path", default="glow_run", metavar="PATH", type=str, help="Path to image directory")
+parser.add_argument(
+    "--base_path",
+    default="glow_run",
+    metavar="PATH",
+    type=str,
+    help="Path to image directory",
+)
 
 
 def sample_data(path, batch_size, image_size):
@@ -104,7 +110,7 @@ def train(args, model, optimizer, model_single):
     else:
         dataset = args.train_dataloader
 
-    n_bins = 2.0 ** args.n_bits
+    n_bins = 2.0**args.n_bits
 
     z_sample = []
     z_shapes = calc_z_shapes(3, args.img_size, args.n_flow, args.n_block)
@@ -159,22 +165,26 @@ def train(args, model, optimizer, model_single):
             pbar.set_description(
                 f"Loss: {loss.item():.5f}; logP: {log_p.item():.5f}; logdet: {log_det.item():.5f}; lr: {warmup_lr:.7f}"
             )
-            args.writer.add_scalar("Loss", loss.item(), i)
-            args.writer.add_scalar("logP", log_p.item(), i)
-            args.writer.add_scalar("logdet", log_det.item(), i)
+            args.writer.add_scalar("Loss", loss.detach().item(), i)
+            args.writer.add_scalar("logP", log_p.detach().item(), i)
+            args.writer.add_scalar("logdet", log_det.detach().item(), i)
 
             if i % 100 == 0:
                 with torch.no_grad():
-                    img_samples = model_single.reverse(z_sample).data / 2 + 0.5
+                    img_samples = model_single.reverse(z_sample).data.detach() / 2 + 0.5
                     utils.save_image(
                         img_samples.cpu(),
-                        os.path.join(args.base_path, "outputs", f"{str(i + 1).zfill(6)}.png"),
+                        os.path.join(
+                            args.base_path, "outputs", f"{str(i + 1).zfill(6)}.png"
+                        ),
                         normalize=True,
                         nrow=10,
-                        #range=(-0.5, 0.5),
+                        # range=(-0.5, 0.5),
                     )
                     fid.update(
-                        torch.tensor(255 * torch.clamp(img_samples, 0 , 1), dtype=torch.uint8),
+                        torch.tensor(
+                            255 * torch.clamp(img_samples, 0, 1), dtype=torch.uint8
+                        ),
                         real=False,
                     )
                     fid_score = float(fid.compute())
@@ -182,14 +192,24 @@ def train(args, model, optimizer, model_single):
 
             if i % 10000 == 0:
                 torch.save(
-                    model.state_dict(), os.path.join(args.base_path, "checkpoint", f"model_{str(i + 1).zfill(6)}.pt")
+                    model_single.state_dict(),
+                    os.path.join(
+                        args.base_path, "checkpoint", f"model_{str(i + 1).zfill(6)}.pt"
+                    ),
                 )
                 torch.save(
-                    model.state_dict(), os.path.join(args.base_path, f"final.pt")
+                    model_single.state_dict(), os.path.join(args.base_path, f"final.pt")
+                )
+                model_single.load_state_dict(
+                    torch.load(os.path.join(args.base_path, "final.pt")),
                 )
                 torch.save(
-                    optimizer.state_dict(), os.path.join(args.base_path, "checkpoint", f"optim_{str(i + 1).zfill(6)}.pt")
+                    optimizer.state_dict(),
+                    os.path.join(
+                        args.base_path, "checkpoint", f"optim_{str(i + 1).zfill(6)}.pt"
+                    ),
                 )
+
 
 def training(args=None):
     if args is None:
@@ -211,6 +231,7 @@ def training(args=None):
     Path(os.path.join(args.base_path, "outputs")).mkdir(parents=True, exist_ok=True)
     Path(os.path.join(args.base_path, "checkpoint")).mkdir(parents=True, exist_ok=True)
     train(args, model, optimizer, model_single)
+
 
 if __name__ == "__main__":
     training()

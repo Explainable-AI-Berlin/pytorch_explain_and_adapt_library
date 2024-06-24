@@ -1,5 +1,5 @@
-dataset_origin_path     : /home/space/datasets/peal/datasets/celeba
-dataset_path            : /home/space/datasets/peal/datasets/celeba_copyrighttag
+dataset_origin_path     : <PEAL_DATA>/celeba
+dataset_path            : <PEAL_DATA>/celeba_copyrighttag
 num_samples             : 202599
 input_type              : image
 input_size              : [3, 512, 512]

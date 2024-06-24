@@ -2,4 +2,4 @@
 generator_type: 'GlowGenerator'
 category: 'generator'
 data : '<PEAL_BASE>/configs/data/square.yaml'
-base_path: '/home/space/datasets/peal/peal_runs/square/glow'
+base_path: '<PEAL_RUNS>/square/glow'

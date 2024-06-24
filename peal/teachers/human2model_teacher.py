@@ -25,10 +25,6 @@ class Human2ModelTeacher(TeacherInterface):
         # TODO fix bug with reloading
         shutil.rmtree("static", ignore_errors=True)
         os.makedirs("static")
-        shutil.rmtree("templates", ignore_errors=True)
-        shutil.copytree(
-            os.path.join(get_project_resource_dir(), "templates"), "templates"
-        )
         self.port = port
         while is_port_in_use(self.port):
             print("port " + str(self.port) + " is occupied!")

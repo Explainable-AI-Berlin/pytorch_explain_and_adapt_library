@@ -1,5 +1,5 @@
 dataset_class           : square
-dataset_path            : /home/space/datasets/peal/datasets/square
+dataset_path            : <PEAL_DATA>/square
 num_samples             : 16000
 input_type              : image
 input_size              : [3, 512, 512]

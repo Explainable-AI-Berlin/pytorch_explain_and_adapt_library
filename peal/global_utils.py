@@ -18,6 +18,33 @@ import importlib.util
 from pkg_resources import resource_filename
 
 
+import matplotlib.pyplot as plt
+
+def dict_to_bar_chart(input_dict, name):
+  """
+  Creates a bar chart from a dictionary and saves it as a PNG image.
+
+  Args:
+    interpretation: A dictionary where keys are strings and values are integers.
+    name: The desired filename (without the .png extension) to save the image.
+  """
+
+  # Extract labels and values from the dictionary
+  labels = list(input_dict.keys())
+  values = list(input_dict.values())
+
+  # Create the bar chart
+  plt.bar(labels, values)
+  plt.xlabel("Interpretation")
+  plt.ylabel("Count")
+  plt.title("Interpretation Distribution")
+
+  # Save the chart as a PNG image
+  plt.savefig(f"{name}.png")
+
+  # Clear the plot to avoid affecting subsequent plots
+  plt.clf()
+
 def find_subclasses(base_class, directory):
     subclasses = []
 
@@ -173,7 +200,15 @@ def _load_yaml_config(config_path):
         # config_path is already a config object
         return config_path
 
-    elif config_path[-5:] == ".yaml":
+    if config_path[:len("<PEAL_RUNS>")] == "<PEAL_RUNS>":
+        peal_runs = os.environ.get('PEAL_RUNS', "peal_runs")
+        config_path = config_path.replace("<PEAL_RUNS>", peal_runs)
+
+    if config_path[:len("<PEAL_DATA>")] == "<PEAL_DATA>":
+        peal_data = os.environ.get('PEAL_DATA', "datasets")
+        config_path = config_path.replace("<PEAL_DATA>", peal_data)
+
+    if config_path[-5:] == ".yaml":
         split_path = config_path.split("/")
         if split_path[0] == "<PEAL_BASE>":
             config_path = os.path.join(get_project_resource_dir(), *split_path[1:])
@@ -188,14 +223,22 @@ def _load_yaml_config(config_path):
                 config_path = os.path.abspath(os.path.join("..", *split_path))
                 config_path = config_path.replace("<PEAL_BASE>", "peal")
                 config = open_config(config_path)
+
             else:
                 raise e
 
         for key in config.keys():
-            if isinstance(config[key], str) and config[key][-5:] == ".yaml":
-                # TODO can this be made interoperable with windows again?
-                # config[key] = _load_yaml_config(os.path.join(*config[key].split("/")))
-                config[key] = _load_yaml_config(config[key])
+            if isinstance(config[key], str):
+                if config[key][:len("<PEAL_RUNS>")] == "<PEAL_RUNS>":
+                    peal_runs = os.environ.get('PEAL_RUNS', "peal_runs")
+                    config[key] = config[key].replace("<PEAL_RUNS>", peal_runs)
+
+                if config[key][:len("<PEAL_DATA>")] == "<PEAL_DATA>":
+                    peal_data = os.environ.get('PEAL_DATA', "datasets")
+                    config[key] = config[key].replace("<PEAL_DATA>", peal_data)
+
+                if config[key][-5:] == ".yaml":
+                    config[key] = _load_yaml_config(config[key])
 
         return config
 
@@ -232,7 +275,7 @@ def get_config_model(config_data):
     return config_model
 
 
-def load_yaml_config(config_path, config_model=None):
+def load_yaml_config(config_path, config_model=None, return_namespace=True):
     config_data = _load_yaml_config(config_path)
     if (
         config_model is None
@@ -242,17 +285,14 @@ def load_yaml_config(config_path, config_model=None):
     ):
         config_model = get_config_model(config_data)
 
-    if config_model is None and isinstance(config_data, dict):
+    if config_model is None and isinstance(config_data, dict) and return_namespace:
         config = types.SimpleNamespace(**config_data)
 
-    elif isinstance(config_data, dict):
-        """
-        # TODO this is very very bad style!
-        try:
-            return config_model(**config_data)
-        except Exception:
-            return types.SimpleNamespace(**config_data)
-        """
+    elif not config_model is None and isinstance(config_data, dict):
+        for key in config_data.keys():
+            if isinstance(config_data[key], dict):
+                config_data[key] = load_yaml_config(config_data[key], return_namespace=False)
+
         config = config_model(**config_data)
 
     else:

@@ -65,9 +65,15 @@ class GlowGenerator(InvertibleGenerator):
         ).to(device)
         print('initializing generator done!')
         if os.path.exists(os.path.join(self.config.base_path, "final.pt")):
+            print('load weights!')
+            print('load weights!')
+            print('load weights!')
             self.glow.load_state_dict(
-                torch.load(os.path.join(self.config.base_path, "final.pt")), strict=False
+                torch.load(os.path.join(self.config.base_path, "final.pt")),
             )
+            print('weights loaded!')
+            print('weights loaded!')
+            print('weights loaded!')
 
         self.train_dataset, self.val_dataset, _ = get_datasets(self.config.data)
         self.dataset = self.val_dataset
@@ -128,7 +134,7 @@ class GlowGenerator(InvertibleGenerator):
         n_channel = copy.deepcopy(self.config.data.input_size[0])
         input_size = copy.deepcopy(self.config.data.input_size[1])
 
-        for i in range(self.n_block - 1):
+        for i in range(self.config.n_block - 1):
             input_size //= 2
             n_channel *= 2
 

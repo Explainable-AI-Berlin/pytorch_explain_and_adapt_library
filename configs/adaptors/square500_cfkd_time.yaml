@@ -1,7 +1,7 @@
 # python run_cfkd.py --adaptor_config "<PEAL_BASE>/configs/adaptors/square500_cfkd_time.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
-batch_size                           :  1 #5
+batch_size                           :  6
 tracking_level                       :  2
 min_train_samples                    :  400
 finetune_iterations                  :  0
@@ -14,10 +14,10 @@ explainer                            :  <PEAL_BASE>/configs/explainers/time_defa
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_unpoisened.yaml
 test_data                            :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_unpoisened.yaml
-student                              :  /home/space/datasets/peal/peal_runs/square/colora_confounding_colorb/classifier_unpoisened/model.cpl
+student                              :  <PEAL_RUNS>/square/colora_confounding_colorb/classifier_unpoisened/model.cpl
 teacher                              :  SegmentationMask
-generator                            :  /home/space/datasets/peal/peal_runs/square/stable_diffusion/config.yaml
-base_dir                             :  /home/space/datasets/peal/peal_runs/square/colora_confounding_colorb/classifier_unpoisened/cfkd_time
+generator                            :  <PEAL_RUNS>/square/stable_diffusion/config.yaml
+base_dir                             :  <PEAL_RUNS>/square/colora_confounding_colorb/classifier_unpoisened/cfkd_time
 task:
   criterions:
     ce     : 1.0

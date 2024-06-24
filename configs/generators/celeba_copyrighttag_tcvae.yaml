@@ -22,7 +22,7 @@ z_dim: 1024
 mlp_width: 10 #4
 mlp_depth: 5 #2
 #savedir : 'peal_runs/dive_tcvae'
-base_path : '/home/space/datasets/peal/peal_runs/celeba_copyrighttag/tcvae3'
+base_path : '<PEAL_RUNS>/celeba_copyrighttag/tcvae3'
 
 # TCVAE
 beta: 0.001 # the idea is to be able to interpolate while getting good reconstructions
@@ -51,7 +51,7 @@ diversity_weight: 1
 n_samples: 10
 fisher_samples: 0
 
-#teacher: '/home/space/datasets/peal/peal_runs/Smiling_confounding_copyrighttag_celeba/classifier_unpoisened/model.cpl'
-#student: '/home/space/datasets/peal/peal_runs/Smiling_confounding_copyrighttag_celeba/classifier_poisened100/model.cpl'
+#teacher: '<PEAL_RUNS>/Smiling_confounding_copyrighttag_celeba/classifier_unpoisened/model.cpl'
+#student: '<PEAL_RUNS>/Smiling_confounding_copyrighttag_celeba/classifier_poisened100/model.cpl'
 
 #generator_path: 'peal_runs/dive'

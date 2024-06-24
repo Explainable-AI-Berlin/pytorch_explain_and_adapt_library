@@ -259,7 +259,12 @@ class DDPM(EditCapableGenerator):
             # a2_0 = a_min + 0 * (a_max - a_min) / (explainer_config.attempts - 1)
             # a2_0 = a_min + 1 * (a_max - a_min) / (explainer_config.attempts - 1)
             # a2_0 = a_min + 2 * (a_max - a_min) / (explainer_config.attempts - 1)
-            multiplier = idx / (explainer_config.attempts - 1)
+            if explainer_config.attempts > 1:
+                multiplier = idx / (explainer_config.attempts - 1)
+
+            else:
+                multiplier = 0.5
+
             args.attack_iterations = int(
                 explainer_config.attack_iterations
                 if not isinstance(explainer_config.attack_iterations, list)
@@ -312,10 +317,10 @@ class DDPM(EditCapableGenerator):
                 explainer_config.sampling_inpaint
                 if not isinstance(explainer_config.sampling_inpaint, list)
                 else float(
-                    explainer_config.sampling_time_fraction[0]
+                    explainer_config.sampling_inpaint[0]
                     - (
-                        explainer_config.sampling_time_fraction[0]
-                        - explainer_config.sampling_time_fraction[1]
+                        explainer_config.sampling_inpaint[0]
+                        - explainer_config.sampling_inpaint[1]
                     )
                     * multiplier
                 )

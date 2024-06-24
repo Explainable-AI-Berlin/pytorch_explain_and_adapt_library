@@ -277,10 +277,12 @@ class StableDiffusion(EditCapableGenerator):
             )
             self.editor = DDPMInversion(ddpm_inversion_config)
             embedding_files = [
-                os.path.join(base_path, "explainer", "context", "context_embedding"),
                 os.path.join(base_path, "explainer", "class0", "class_token0"),
                 os.path.join(base_path, "explainer", "class1", "class_token1"),
             ]
+            if explainer_config.learn_dataset_embedding:
+                embedding_files = [os.path.join(base_path, "explainer", "context", "context_embedding")] + embedding_files
+
             load_tokens_and_embeddings(sd_model=self.editor.pipe, files=embedding_files)
 
         else:

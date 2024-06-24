@@ -2,7 +2,7 @@
 generator_type: 'GlowGenerator'
 category: 'generator'
 data : '<PEAL_BASE>/configs/data/celeba_copyrighttag.yaml'
-base_path: '/home/space/datasets/peal/peal_runs/celeba_copyrighttag/glow'
+base_path: '<PEAL_RUNS>/celeba_copyrighttag/glow'
 img_size: 128
 lr: 1e-6
 n_block: 5
