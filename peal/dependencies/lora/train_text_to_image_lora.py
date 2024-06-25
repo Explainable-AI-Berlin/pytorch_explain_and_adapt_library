@@ -64,6 +64,7 @@ from diffusers.utils.hub_utils import load_or_create_model_card, populate_model_
 from diffusers.utils.import_utils import is_xformers_available
 from diffusers.utils.torch_utils import is_compiled_module
 
+from peal.data.datasets import Image2MixedDataset, Image2ClassDataset
 from peal.global_utils import embed_numberstring
 
 # Will error if the minimal version of diffusers is not installed. Remove at your own risks.
@@ -892,25 +893,32 @@ def lora_finetune(args=None):
 
     real_images = torch.stack(real_images, dim=0).to(accelerator.device) * 0.5 + 0.5
     fid.update(torch.tensor(255 * real_images, dtype=torch.uint8), real=True)
-    if len(args.train_dataset.task_config.y_selection) >= 2:
-        target_idx0 = args.train_dataset.attributes.index(args.train_dataset.task_config.y_selection[0])
-        target_idx1 = args.train_dataset.attributes.index(args.train_dataset.task_config.y_selection[1])
-        pos0 = args.train_dataset.attributes_positive[target_idx0]
-        pos1 = args.train_dataset.attributes_positive[target_idx1]
-        neg0 = args.train_dataset.attributes_negative[target_idx0]
-        neg1 = args.train_dataset.attributes_negative[target_idx1]
-        prompt = [neg0 + " " + neg1, neg0 + " " + pos1, pos0 + " " + neg1, pos0 + " " + pos1]
-
-    else:
-        if len(args.train_dataset.task_config.y_selection) > 0:
-            target_idx = args.train_dataset.attributes.index(args.train_dataset.task_config.y_selection[0])
+    if isinstance(args.train_dataset, Image2MixedDataset):
+        if len(args.train_dataset.task_config.y_selection) >= 2:
+            target_idx0 = args.train_dataset.attributes.index(args.train_dataset.task_config.y_selection[0])
+            target_idx1 = args.train_dataset.attributes.index(args.train_dataset.task_config.y_selection[1])
+            pos0 = args.train_dataset.attributes_positive[target_idx0]
+            pos1 = args.train_dataset.attributes_positive[target_idx1]
+            neg0 = args.train_dataset.attributes_negative[target_idx0]
+            neg1 = args.train_dataset.attributes_negative[target_idx1]
+            prompt = [neg0 + " " + neg1, neg0 + " " + pos1, pos0 + " " + neg1, pos0 + " " + pos1]
 
         else:
-            target_idx = 0
+            if len(args.train_dataset.task_config.y_selection) > 0:
+                target_idx = args.train_dataset.attributes.index(args.train_dataset.task_config.y_selection[0])
 
-        prompts_a = [args.train_dataset.attributes_positive[target_idx]]
-        prompts_b = [args.train_dataset.attributes_negative[target_idx]]
-        prompt = 2 * prompts_a + 2 * prompts_b
+            else:
+                target_idx = 0
+
+            prompts_a = [args.train_dataset.attributes_positive[target_idx]]
+            prompts_b = [args.train_dataset.attributes_negative[target_idx]]
+            prompt = 2 * prompts_a + 2 * prompts_b
+
+    elif isinstance(args.train_dataset, Image2ClassDataset):
+        prompt = args.train_dataset.idx_to_name
+
+    else:
+        prompt = []
 
     prompt = 2 * [""] + prompt
     images = pipeline(prompt).images
@@ -918,13 +926,13 @@ def lora_finetune(args=None):
     images_torch_resized = torchvision.transforms.Resize(real_images.shape[-2:])(
         images_torch
     )
-    concatenated_imgs = torch.cat([real_images[:6].cpu(), images_torch_resized], dim=0)
+    concatenated_imgs = torch.cat([real_images[:len(prompt)].cpu(), images_torch_resized], dim=0)
     output_dir = os.path.join(args.base_path, "outputs")
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     torchvision.utils.save_image(
         concatenated_imgs,
         os.path.join(output_dir, "start.png"),
-        nrow=6,
+        nrow=len(prompt),
     )
 
     fid.update(
@@ -1126,12 +1134,12 @@ def lora_finetune(args=None):
                             images_torch
                         )
                         concatenated_imgs = torch.cat(
-                            [real_images[:6].cpu(), images_torch_resized], dim=0
+                            [real_images[:len(prompt)].cpu(), images_torch_resized], dim=0
                         )
                         torchvision.utils.save_image(
                             concatenated_imgs,
                             os.path.join(output_dir, embed_numberstring(global_step) + ".png"),
-                            nrow=6,
+                            nrow=len(prompt),
                         )
 
                         fid.update(

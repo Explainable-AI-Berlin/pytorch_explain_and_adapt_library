@@ -6,7 +6,7 @@ tracking_level                       :  1
 min_train_samples                    :  400
 finetune_iterations                  :  1
 max_validation_samples               :  100
-continuous_learning                  :  "finetune"
+continuous_learning                  :  "retrain"
 replace_model                        :  True
 use_visualization                    :  False #True
 calculate_group_accuracies           :  True

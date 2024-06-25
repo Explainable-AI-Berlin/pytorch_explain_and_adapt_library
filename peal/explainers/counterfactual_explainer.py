@@ -631,6 +631,9 @@ class CounterfactualExplainer(ExplainerInterface):
                 if y_target == y_pred:
                     continue
 
+                if not ((y_pred == 4 or y_pred == 9) and (y_target == 4 or y_target == 9)):
+                    continue
+
                 if batch is None:
                     batch = {
                         "x_list": x.unsqueeze(0),

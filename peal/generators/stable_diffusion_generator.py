@@ -49,7 +49,7 @@ class StableDiffusionConfig(GeneratorConfig):
     """
     generator_type: str = "StableDiffusion"
     base_path: str = "/home/space/datasets/peal/peal_runs/stable_diffusion"
-    full_args: Union[None, dict] = None
+    #full_args: Union[None, dict] = None
     """
     The config of the data.
     """
@@ -240,7 +240,7 @@ class StableDiffusion(EditCapableGenerator):
             embedding_files = []
 
         # TODO how to extend this for multiclass??
-        for class_idx in range(2):
+        for class_idx in range(self.generator_dataset.data_config.output_size[0]):
             class_token_path = os.path.join(
                 base_path, "explainer", "class" + str(class_idx), "class_token" + str(class_idx)
             )
@@ -276,10 +276,10 @@ class StableDiffusion(EditCapableGenerator):
                 explainer_config.guidance_scale_denoising[0]
             )
             self.editor = DDPMInversion(ddpm_inversion_config)
-            embedding_files = [
-                os.path.join(base_path, "explainer", "class0", "class_token0"),
-                os.path.join(base_path, "explainer", "class1", "class_token1"),
-            ]
+            embedding_files = []
+            for class_idx in range(self.generator_dataset.data_config.output_size[0]):
+                embedding_files.append(os.path.join(base_path, "explainer", "class0", "class_token" + str(class_idx)))
+
             if explainer_config.learn_dataset_embedding:
                 embedding_files = [os.path.join(base_path, "explainer", "context", "context_embedding")] + embedding_files
 

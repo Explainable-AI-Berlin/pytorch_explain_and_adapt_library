@@ -884,6 +884,7 @@ class Image2ClassDataset(ImageDataset):
         self.return_dict = return_dict
         self.urls = []
         self.idx_to_name = os.listdir(self.root_dir)
+        self.string_description_enabled = False
 
         self.idx_to_name.sort()
         for target_str in self.idx_to_name:
@@ -932,6 +933,21 @@ class Image2ClassDataset(ImageDataset):
     def disable_hints(self):
         self.urls = copy.deepcopy(self.all_urls)
         self.hints_enabled = False
+
+    def enable_string_description(self):
+        self.string_description_enabled = True
+
+    def disable_string_description(self):
+        self.string_description_enabled = False
+
+    def enable_tokens(self, tokenizer):
+        self.string_description_enabled_buffer = self.string_description_enabled
+        self.enable_string_description()
+        self.tokenizer = tokenizer
+
+    def disable_tokens(self):
+        self.string_description_enabled = self.string_description_enabled_buffer
+        self.tokenizer = None
 
     @property
     def output_size(self):
@@ -991,22 +1007,30 @@ class Image2ClassDataset(ImageDataset):
 
         # target = torch.zeros([len(self.idx_to_name)], dtype=torch.float32)
         # target[self.idx_to_name.index(target_str)] = 1.0
+        return_dict = {}
         target = torch.tensor(self.idx_to_name.index(target_str))
+        return_dict["target"] = target
 
-        if not self.hints_enabled:
-            if self.return_dict:
-                return img, {}  # TODO {"target": target}
-
-            else:
-                return img, target
-
-        else:
-            # TODO how to apply same randomized transformation?
+        if self.hints_enabled:
             mask = Image.open(os.path.join(self.mask_dir, file))
             torch.set_rng_state(state)
             mask = self.transform(mask)
-            if self.return_dict:
-                return img, {}  # TODO  {"target": target, "mask": mask}
+            return_dict["mask"] = mask
 
-            else:
-                return img, (target, mask)
+        if self.string_description_enabled:
+            return_dict["description"] = target_str
+
+            if self.tokenizer is not None:
+                return_dict["tokens"] = torch.tensor(self.tokenizer(
+                    return_dict["description"],
+                    max_length=self.tokenizer.model_max_length,
+                    padding="max_length",
+                    truncation=True,
+                    return_tensors="pt",
+                ).input_ids)
+
+        if self.return_dict:
+            return img, return_dict
+
+        else:
+            return img, tuple(return_dict.values())
