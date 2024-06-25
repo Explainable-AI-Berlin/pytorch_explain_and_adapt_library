@@ -240,7 +240,7 @@ class StableDiffusion(EditCapableGenerator):
             embedding_files = []
 
         # TODO how to extend this for multiclass??
-        for class_idx in range(self.generator_dataset.data_config.output_size[0]):
+        for class_idx in range(self.generator_dataset.config.output_size[0]):
             class_token_path = os.path.join(
                 base_path, "explainer", "class" + str(class_idx), "class_token" + str(class_idx)
             )
@@ -277,7 +277,7 @@ class StableDiffusion(EditCapableGenerator):
             )
             self.editor = DDPMInversion(ddpm_inversion_config)
             embedding_files = []
-            for class_idx in range(self.generator_dataset.data_config.output_size[0]):
+            for class_idx in range(self.generator_dataset.config.output_size[0]):
                 embedding_files.append(os.path.join(base_path, "explainer", "class0", "class_token" + str(class_idx)))
 
             if explainer_config.learn_dataset_embedding:
