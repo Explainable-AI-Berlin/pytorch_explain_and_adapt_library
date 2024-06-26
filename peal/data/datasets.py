@@ -587,7 +587,7 @@ class Image2MixedDataset(ImageDataset):
 
         self.transform = transform
         self.task_config = task_config
-        self.hints_enabled = False
+            self.hints_enabled = False
         self.groups_enabled = False
         self.idx_enabled = False
         self.url_enabled = False

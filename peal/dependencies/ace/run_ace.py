@@ -389,7 +389,7 @@ def main(args=None):
         if args.attack_joint
         and not (args.attack_joint_checkpoint or args.attack_joint_shortcut)
         else classifier,
-        "loss_fn": None,  # we can implement here a custom loss fn
+        "loss_fn": args.loss_fn,  # we can implement here a custom loss fn
         "dist_fn": dist_fn,
         "eps": args.attack_epsilon / 255,
         "nb_iter": args.attack_iterations,

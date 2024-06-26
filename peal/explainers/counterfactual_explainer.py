@@ -44,6 +44,7 @@ class ACEConfig(ExplainerConfig):
     Options: ['counterfactual', 'lrp']
     """
     explainer_type: str = "ACE"
+    loss_fn: Union[type(None), str] = None
     predictor_path: Union[str, type(None)] = None
     generator: Union[type(None), GeneratorConfig] = None
     data_config: Union[type(None), DataConfig] = None
@@ -499,7 +500,7 @@ class CounterfactualExplainer(ExplainerInterface):
         batch: dict,
         base_path: str = "collages",
         start_idx: int = 0,
-        y_target_goal_confidence_in: int = None,
+        y_target_goal_confidence_in: float = None,
         remove_below_threshold: bool = True,
         pbar=None,
         mode="",
@@ -629,9 +630,6 @@ class CounterfactualExplainer(ExplainerInterface):
             y_confidence = torch.nn.Softmax(dim=-1)(y_logits)
             for y_target in range(self.classifier_dataset.output_size[0]):
                 if y_target == y_pred:
-                    continue
-
-                if not ((y_pred == 4 or y_pred == 9) and (y_target == 4 or y_target == 9)):
                     continue
 
                 if batch is None:

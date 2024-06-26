@@ -11,3 +11,4 @@ sampling_time_fraction: 0.5
 dist_l1: 0.0
 attempts: 1
 max_samples: 100
+loss_fn: "MSE"
