@@ -1,11 +1,11 @@
-# python run_cfkd.py --adaptor_config "<PEAL_BASE>/configs/adaptors/square500x100_cfkd_perfect_false_counterfactuals.yaml"
+# python run_cfkd.py --adaptor_config "<PEAL_BASE>/configs/adaptors/square500x100_cfkd_perfect_false_counterfactuals_mask.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  6
-tracking_level                       :  0
-min_train_samples                    :  6400
+tracking_level                       :  1
+min_train_samples                    :  400
 finetune_iterations                  :  1
-max_validation_samples               :  800
+max_validation_samples               :  100
 continuous_learning                  :  "retrain"
 replace_model                        :  True
 use_visualization                    :  False #True
@@ -15,9 +15,9 @@ training                             :  <PEAL_BASE>/configs/training/img_finetun
 data                                 :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_poisened100.yaml
 test_data                            :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_unpoisened.yaml
 student                              :  <PEAL_RUNS>/square/colora_confounding_colorb/classifier_poisened100/model.cpl
-teacher                              :  <PEAL_RUNS>/square/colora_confounding_colorb/classifier_unpoisened/model.cpl
-generator                            :  <PEAL_RUNS>/square/stable_diffusion/config.yaml
-base_dir                             :  <PEAL_RUNS>/square/colora_confounding_colorb/classifier_poisened100/cfkd_perfect_false_counterfactuals
+teacher                              :  SegmentationMask
+generator                            :  <PEAL_RUNS>/square/ddpm/config.yaml
+base_dir                             :  <PEAL_RUNS>/square/colora_confounding_colorb/classifier_poisened100/cfkd_perfect_false_counterfactuals_mask
 task:
   criterions:
     ce     : 1.0

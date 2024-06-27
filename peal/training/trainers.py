@@ -78,6 +78,7 @@ class TrainingConfig(BaseModel):
     dataset_size / batch_size
     """
     steps_per_epoch: Union[type(None), PositiveInt] = None
+    concatenate_batches: bool = False
     """
     A dict containing all variables that could not be given with the current config structure
     """
@@ -420,7 +421,12 @@ class ModelTrainer:
             else:
                 source_distibution = None
 
-            X, y = sample
+            try:
+                X, y = sample
+
+            except Exception:
+                import pdb; pdb.set_trace()
+
             # TODO this is a dirty fix!!!
             if isinstance(y, list) or isinstance(y, tuple):
                 y = y[0]
