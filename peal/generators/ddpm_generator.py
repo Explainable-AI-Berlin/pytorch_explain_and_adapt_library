@@ -291,6 +291,8 @@ class DDPM(EditCapableGenerator):
                     * multiplier
                 )
             )
+            print("args.sampling_time_fraction")
+            print(args.sampling_time_fraction)
             args.dist_l1 = float(
                 explainer_config.dist_l1
                 if not isinstance(explainer_config.dist_l1, list)
@@ -325,6 +327,8 @@ class DDPM(EditCapableGenerator):
                     * multiplier
                 )
             )
+            print("args.sampling_inpaint")
+            print(args.sampling_inpaint)
             args.__dict__.update(
                 {
                     k: v

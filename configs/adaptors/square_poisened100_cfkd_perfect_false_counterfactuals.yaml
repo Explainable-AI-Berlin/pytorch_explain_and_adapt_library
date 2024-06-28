@@ -1,34 +1,26 @@
-# python run_cfkd.py --adaptor_config "<PEAL_BASE>/configs/adaptors/square500x100_cfkd_ace.yaml"
+# python run_cfkd.py --adaptor_config "<PEAL_BASE>/configs/adaptors/square_poisened100_cfkd_perfect_false_counterfactuals.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  6
-tracking_level                       :  2
-min_train_samples                    :  400VF
+tracking_level                       :  0
+min_train_samples                    :  6400
 finetune_iterations                  :  1
-max_validation_samples               :  100
-continuous_learning                  :  "finetune"
+max_validation_samples               :  800
+continuous_learning                  :  "retrain"
 replace_model                        :  True
 use_visualization                    :  False #True
 calculate_group_accuracies           :  True
-explainer                            :
-  explainer_type : ACE
-  category : explainer
-  sampling_time_fraction: 0.3
-  attack_iterations: 100
-  dist_l1: 0.00001
-  sampling_inpaint: 0.0
-  y_target_goal_confidence: 0.9999
+explainer                            :  <PEAL_BASE>/configs/explainers/perfect_false_counterfactuals.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_poisened100.yaml
 test_data                            :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_unpoisened.yaml
 student                              :  <PEAL_RUNS>/square/colora_confounding_colorb/regularized0/classifier_poisened100/model.cpl
-teacher                              :  <PEAL_RUNS>/square/colora_confounding_colorb/regularized0/classifier_unpoisened/model.cpl
-generator                            :  <PEAL_RUNS>/square/ddpm/config.yaml
-base_dir                             :  <PEAL_RUNS>/square/colora_confounding_colorb/regularized0/classifier_poisened100/cfkd_ace
+teacher                              :  SegmentationMask
+base_dir                             :  <PEAL_RUNS>/square/colora_confounding_colorb/regularized0/classifier_poisened100/cfkd_perfect_false_counterfactuals_strongly_regularized
 task:
   criterions:
     ce     : 1.0
-    l2     : 1.0
+    l2     : 100.0
   output_type             : singleclass
   output_channels         : 2
   y_selection             : [ClassA]

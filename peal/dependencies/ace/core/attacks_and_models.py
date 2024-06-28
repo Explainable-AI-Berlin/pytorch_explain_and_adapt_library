@@ -467,7 +467,7 @@ def get_attack(attack, use_checkpoint, use_shortcut=False):
                 x_adv -= mask.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1) * grad.sign() * self.step
                 x_adv = projection_fn(x, x_adv)
                 pred = torch.nn.functional.softmax(self.classifier.classifier(x_adv), -1)
-                print(str(i) + ": " + str(float(pred[0, y[0]])))
+                print(str(i) + ": " + str([float(pred[j, y[j]]) for j in range(x_adv.shape[0])]))
                 for j in range(x_adv.shape[0]):
                     if pred[j, int(y[j])] > self.y_target_goal_confidence:
                         mask[j] = 0

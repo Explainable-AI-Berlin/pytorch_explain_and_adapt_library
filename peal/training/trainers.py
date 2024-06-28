@@ -43,7 +43,7 @@ class TrainingConfig(BaseModel):
     """
     The dropout rate the model is trained with.
     """
-    dropout: float = 0.0
+    dropout: float = 0.5
     """
     Logs how many steps the model was trained with already.
     """
