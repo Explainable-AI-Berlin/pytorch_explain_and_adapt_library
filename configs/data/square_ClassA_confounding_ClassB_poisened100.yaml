@@ -1,4 +1,4 @@
-dataset_class           : square
+dataset_class           : SquareDataset
 dataset_path            : <PEAL_DATA>/square
 num_samples             : 8000
 split                   : [0.8,1.0]

@@ -32,6 +32,7 @@ from peal.generators.interfaces import (
 from peal.data.interfaces import PealDataset
 from peal.explainers.interfaces import ExplainerInterface, ExplainerConfig
 from peal.teachers.human2model_teacher import DataStore
+from peal.training.trainers import PredictorConfig
 
 
 class ACEConfig(ExplainerConfig):
@@ -55,6 +56,7 @@ class ACEConfig(ExplainerConfig):
     sampling_inpaint: Union[list, float] = 0.2
     sampling_dilation: Union[list, int] = 17
     timestep_respacing: Union[list, int] = 50
+    distilled_classifier: Union[type(None), str] = None
     attempts: int = 1
     clip_denoised: bool = True  # Clipping noise
     batch_size: int = 32  # Batch size
@@ -586,7 +588,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 for sample_idx in range(len(batch[key])):
                     if (
                         batch["y_target_end_confidence_list"][sample_idx]
-                        >= target_confidence_goal
+                        >= 0.5
                     ):
                         batch_out[key].append(batch[key][sample_idx])
 

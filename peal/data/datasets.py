@@ -299,6 +299,8 @@ class ImageDataset(PealDataset):
         y_original_teacher_list=None,
         y_counterfactual_teacher_list=None,
         feedback_list=None,
+        hint_list=None,
+        idx_to_info=None,
         **kwargs: dict,
     ) -> tuple:
         Path(base_path).mkdir(parents=True, exist_ok=True)
@@ -348,9 +350,10 @@ class ImageDataset(PealDataset):
                 + str(int(y_source_list[i]))
                 + " -> "
                 + str(int(y_target_list[i]))
+                + "\n"
             )
             title_string += (
-                ", Target: "
+                "Confidence: "
                 + str(
                     round(
                         float(y_target_start_confidence_list[i]),
@@ -359,7 +362,10 @@ class ImageDataset(PealDataset):
                 )
                 + " -> "
             )
-            title_string += str(round(float(y_target_end_confidence_list[i]), 2))
+            title_string += str(round(float(y_target_end_confidence_list[i]), 2)) + "\n"
+            if not hint_list is None and not idx_to_info is None:
+                title_string += idx_to_info(x_list[i], x_counterfactual_list[i], hint_list[i]) + "\n"
+
             if not feedback_list is None:
                 title_string += (
                     ", Teacher: "

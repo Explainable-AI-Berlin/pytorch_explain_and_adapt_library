@@ -1,16 +1,16 @@
 import argparse
 
 from peal.global_utils import load_yaml_config, add_class_arguments, integrate_arguments
-from peal.training.trainers import ModelTrainer, ModelConfig
+from peal.training.trainers import ModelTrainer, PredictorConfig
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_config", type=str, required=True)
-    add_class_arguments(parser, ModelConfig)
+    add_class_arguments(parser, PredictorConfig)
     args = parser.parse_args()
 
-    model_config = load_yaml_config(args.model_config, ModelConfig)
+    model_config = load_yaml_config(args.model_config, PredictorConfig)
     integrate_arguments(args, model_config, exclude=["model_config"])
 
     model_trainer = ModelTrainer(model_config)

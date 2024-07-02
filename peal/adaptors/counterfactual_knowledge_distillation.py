@@ -1020,11 +1020,12 @@ class CounterfactualKnowledgeDistillation(Adaptor):
                 )
             )
         )
-        try:
+        if num_true_1sided + num_false_1sided > 0:
             fa_1sided = num_true_1sided / (num_true_1sided + num_false_1sided)
 
-        except Exception:
-            import pdb; pdb.set_trace()
+        else:
+            fa_1sided = -1
+
         fa_absolute = num_true_1sided / num_samples
 
         feedback_stats = {

@@ -87,15 +87,10 @@ class TrainingConfig(BaseModel):
 
 
 
-class ModelConfig:
+class PredictorConfig:
     """
     The config template for a model.
     """
-
-    """
-    The config of the architecture of the model.
-    """
-    architecture: Union[ArchitectureConfig, types.SimpleNamespace]
     """
     The config of the training of the model.
     """
@@ -104,6 +99,10 @@ class ModelConfig:
     The config of the task the model shall solve.
     """
     task: TaskConfig
+    """
+    The config of the architecture of the model.
+    """
+    architecture: Union[ArchitectureConfig, types.SimpleNamespace, type(None)] = None
     """
     The config of the data used for training the model.
     """
