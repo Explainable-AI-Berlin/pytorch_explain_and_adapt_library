@@ -134,10 +134,6 @@ class DataConfig(BaseModel):
     """
     crop_size: Union[type(None), int] = None
     """
-    The type of confounder present in the dataset.
-    """
-    confounding: Union[type(None), str] = None
-    """
     The path of the original dataset.
     """
     dataset_origin_path: Union[type(None), str] = None

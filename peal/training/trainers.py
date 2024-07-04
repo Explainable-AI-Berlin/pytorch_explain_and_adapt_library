@@ -130,18 +130,19 @@ class PredictorConfig:
 
     def __init__(
         self,
-        architecture: Union[dict, ArchitectureConfig],
         training: Union[dict, TrainingConfig],
         task: Union[dict, TaskConfig],
+        architecture: Union[dict, ArchitectureConfig] = None,
         data: Union[dict, DataConfig] = None,
         model_path: str = None,
         model_type: str = None,
         **kwargs
     ):
-        if isinstance(architecture, ArchitectureConfig):
-            self.architecture = architecture
+        if isinstance(architecture, dict):
+            self.architecture = ArchitectureConfig(**architecture)
 
-        self.architecture = ArchitectureConfig(**architecture)
+        else:
+            self.architecture = architecture
 
         self.training = (
             training

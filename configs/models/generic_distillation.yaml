@@ -5,3 +5,4 @@
     'l2'     : 1.0
   'output_type'             : 'singleclass'
   'output_channels'         : 2
+  'y_selection'             : ['prediction']

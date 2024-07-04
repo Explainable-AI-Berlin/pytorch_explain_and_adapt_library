@@ -38,7 +38,7 @@ from typing import Union
 
 from peal.generators.interfaces import GeneratorConfig
 from peal.data.datasets import DataConfig
-from peal.training.trainers import ModelTrainer
+from peal.training.trainers import ModelTrainer, PredictorConfig
 
 
 class DDPMConfig(GeneratorConfig):
@@ -229,14 +229,14 @@ class DDPM(EditCapableGenerator):
         )
         train_loop.run_loop(self.config, writer)
 
-    def distill_classifier(self, explainer_config, base_path, classifier):
+    def distill_classifier(self, explainer_config, base_path, classifier, classifier_dataset):
         class_predictions_path = os.path.join(base_path, "explainer", "predictions.csv")
         Path(os.path.join(base_path, "explainer")).mkdir(exist_ok=True, parents=True)
         if not os.path.exists(class_predictions_path):
-            self.classifier_dataset.enable_url()
+            classifier_dataset.enable_url()
             prediction_args = types.SimpleNamespace(
                 batch_size=32,
-                dataset=self.classifier_dataset,
+                dataset=classifier_dataset,
                 classifier=classifier,
                 label_path=class_predictions_path,
                 partition="train",
@@ -244,14 +244,20 @@ class DDPM(EditCapableGenerator):
                 max_samples=explainer_config.max_samples,
             )
             get_predictions(prediction_args)
-            self.classifier_dataset.disable_url()
+            classifier_dataset.disable_url()
 
-        generator_dataset_config = copy.deepcopy(self.classifier_dataset.config)
-        generator_dataset_config.split = [0.9, 1.0]
+        distilled_dataset_config = copy.deepcopy(classifier_dataset.config)
+        distilled_dataset_config.split = [0.9, 1.0]
+        distilled_dataset_config.confounding_factors = None
+        distilled_dataset_config.confounder_probability = None
         classifier_dataset_train, classifier_dataset_val, _ = get_datasets(
-            config=generator_dataset_config, data_dir=class_predictions_path
+            config=distilled_dataset_config, data_dir=class_predictions_path
         )
-        self.classifier_distilled = torch.clone(classifier)
+        distilled_classifier_config = load_yaml_config(explainer_config.distilled_classifier, PredictorConfig)
+        distilled_classifier_config.data = distilled_dataset_config
+        explainer_config.distilled_classifier = distilled_classifier_config
+        classifier_dataset_train.task_config = explainer_config.distilled_classifier.task
+        self.classifier_distilled = copy.deepcopy(classifier)
         distillation_trainer = ModelTrainer(
             config=explainer_config.distilled_classifier,
             model=self.classifier_distilled,
@@ -278,7 +284,7 @@ class DDPM(EditCapableGenerator):
         if not explainer_config.distilled_classifier is None and not os.path.exists(
             os.path.join(base_path, "explainer", "distilled_classifier", "model.cpl")
         ):
-            self.distill_classifier(explainer_config, base_path, classifier)
+            self.distill_classifier(explainer_config, base_path, classifier, classifier_dataset)
 
         dataset = [
             (
