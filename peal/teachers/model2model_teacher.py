@@ -55,15 +55,19 @@ class Model2ModelTeacher(TeacherInterface):
                 < 0.01
             ):
                 print("End confidences are not matching!")
-                feedback.append("missmatch")
+                feedback.append("confidence missmatch!")
 
             elif (
                 self.counterfactual_type == "1sided"
                 and y_list[idx] != y_source_list[idx]
-                or pred_original != y_list[idx]
-                or y_target_end_confidence_list[idx] < 0.5
             ):
-                feedback.append("ood")
+                feedback.append("student originally wrong!")
+
+            elif pred_original != y_list[idx]:
+                feedback.append("teacher originally wrong!")
+
+            elif y_target_end_confidence_list[idx] < 0.5:
+                feedback.append("student not swapped!")
 
             else:
                 if pred_original != pred_counterfactual:
@@ -78,16 +82,7 @@ class Model2ModelTeacher(TeacherInterface):
                         .cpu()
                         .argmax(-1)
                     )
-                    print("In teacher!")
-                    if prediction == int(y_counterfactual):
-                        print("This can not be a false counterfactual!")
-                        import pdb
-
-                        pdb.set_trace()
-
-                    else:
-                        print([int(prediction), int(y_counterfactual)])
-
+                    print([int(prediction), int(y_counterfactual)])
                     feedback.append("false")
 
             teacher_original.append(pred_original)

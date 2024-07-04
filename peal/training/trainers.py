@@ -13,11 +13,12 @@ from pydantic import BaseModel, PositiveInt
 from typing import Union
 
 from peal.data.datasets import DataConfig
+from peal.dependencies.attacks.attacks import PGD_L2
 from peal.global_utils import (
     orthogonal_initialization,
     move_to_device,
     load_yaml_config,
-    save_yaml_config,
+    save_yaml_config, reset_weights, requires_grad_,
 )
 from peal.training.loggers import log_images_to_writer
 from peal.training.loggers import Logger
@@ -43,7 +44,7 @@ class TrainingConfig(BaseModel):
     """
     The dropout rate the model is trained with.
     """
-    dropout: float = 0.0
+    dropout: float = 0.5
     """
     Logs how many steps the model was trained with already.
     """
@@ -78,6 +79,13 @@ class TrainingConfig(BaseModel):
     dataset_size / batch_size
     """
     steps_per_epoch: Union[type(None), PositiveInt] = None
+    concatenate_batches: bool = False
+    adv_training: bool = False
+    input_noise_std: float = 0.1
+    num_noise_vec: int = 1
+    no_grad_attack: bool = False
+    attack_epsilon: float = 1.0
+    attack_num_steps: int = 5
     """
     A dict containing all variables that could not be given with the current config structure
     """
@@ -86,15 +94,10 @@ class TrainingConfig(BaseModel):
 
 
 
-class ModelConfig:
+class PredictorConfig:
     """
     The config template for a model.
     """
-
-    """
-    The config of the architecture of the model.
-    """
-    architecture: Union[ArchitectureConfig, types.SimpleNamespace]
     """
     The config of the training of the model.
     """
@@ -103,6 +106,10 @@ class ModelConfig:
     The config of the task the model shall solve.
     """
     task: TaskConfig
+    """
+    The config of the architecture of the model.
+    """
+    architecture: Union[ArchitectureConfig, types.SimpleNamespace, type(None)] = None
     """
     The config of the data used for training the model.
     """
@@ -130,18 +137,19 @@ class ModelConfig:
 
     def __init__(
         self,
-        architecture: Union[dict, ArchitectureConfig],
         training: Union[dict, TrainingConfig],
         task: Union[dict, TaskConfig],
+        architecture: Union[dict, ArchitectureConfig] = None,
         data: Union[dict, DataConfig] = None,
         model_path: str = None,
         model_type: str = None,
         **kwargs
     ):
-        if isinstance(architecture, ArchitectureConfig):
-            self.architecture = architecture
+        if isinstance(architecture, dict):
+            self.architecture = ArchitectureConfig(**architecture)
 
-        self.architecture = ArchitectureConfig(**architecture)
+        else:
+            self.architecture = architecture
 
         self.training = (
             training
@@ -394,6 +402,13 @@ class ModelTrainer:
         self.log_frequency = log_frequency
         self.regularization_level = 0
 
+        if self.config.training.adv_training:
+            self.attacker = PGD_L2(
+                steps=self.config.training.attack_num_steps,
+                device=torch.device(self.device),
+                max_norm=self.config.training.attack_epsilon,
+            )
+
     def run_epoch(self, dataloader, mode="train", pbar=None):
         """ """
         sources = {}
@@ -420,11 +435,16 @@ class ModelTrainer:
             else:
                 source_distibution = None
 
-            X, y = sample
+            try:
+                X, y = sample
+
+            except Exception:
+                import pdb; pdb.set_trace()
+
             # TODO this is a dirty fix!!!
             if isinstance(y, list) or isinstance(y, tuple):
                 y = y[0]
-
+                    
             #
             if self.unit_test_train_loop and batch_idx >= 2:
                 break
@@ -433,9 +453,27 @@ class ModelTrainer:
                 X = self.logger.test_X
                 y = self.logger.test_y
 
+            X = move_to_device(X, self.device)
+
+            if self.config.training.adv_training:
+                noise = torch.randn_like(X, device=self.device) * self.config.training.input_noise_std
+
+                requires_grad_(self.model, False)
+                self.model.eval()
+                X = self.attacker.attack(
+                    self.model,
+                    X,
+                    y.to(self.device),
+                    noise=noise,
+                    num_noise_vectors=self.config.training.num_noise_vec,
+                    no_grad=self.config.training.no_grad_attack
+                )
+                self.model.train()
+                requires_grad_(self.model, True)
+
             self.optimizer.zero_grad()
             # Compute prediction and loss
-            pred = self.model(move_to_device(X, self.device))
+            pred = self.model(X)
             loss = torch.tensor(0.0).to(self.device)
             loss_logs = {}
             for criterion in self.config.task.criterions.keys():
@@ -489,11 +527,18 @@ class ModelTrainer:
     def fit(self, continue_training=False, is_initialized=False):
         """ """
         print("Training Config: " + str(self.config))
-        if (
-            not continue_training
-            and "orthogonality" in self.config.task.criterions.keys()
-        ):
-            orthogonal_initialization(self.model)
+        if not continue_training:
+            if "orthogonality" in self.config.task.criterions.keys():
+                orthogonal_initialization(self.model)
+
+            else:
+                print('reset weights!!!')
+                print('reset weights!!!')
+                print('reset weights!!!')
+                print('reset weights!!!')
+                print('reset weights!!!')
+                print('reset weights!!!')
+                orthogonal_initialization(self.model)
 
         if not is_initialized:
             shutil.rmtree(self.model_path, ignore_errors=True)

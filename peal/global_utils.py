@@ -352,3 +352,15 @@ def orthogonal_initialization(model):
             parameter.data = torch.randn(parameter.shape).to(parameter.device)
         else:
             torch.nn.init.orthogonal_(parameter)
+
+
+def reset_weights(model):
+    """
+    Resets all weights in the model recursively using reset_parameters
+    """
+    for parameter_idx, parameter in enumerate(model.parameters()):
+        if len(parameter.shape) == 2:
+            parameter.data = torch.nn.init.xavier_uniform_(parameter)
+
+        else:
+            parameter.data = torch.zeros_like(parameter.data)

@@ -885,7 +885,7 @@ class SquareDatasetGenerator:
                     self.data_config.dataset_path + "_inverse", "imgs", sample_name
                 )
             )
-            mask = np.ones([64, 64, 3], dtype=np.uint8) * color_b
+            mask = np.zeros([64, 64, 3], dtype=np.uint8)
             mask[position_x : position_x + 8, position_y : position_y + 8] = 255
             img_mask = Image.fromarray(mask)
             img_mask.save(
@@ -922,6 +922,7 @@ class SquareDatasetGenerator:
             ]
             lines_out_inverse.append(",".join(attributes_inverse))
             if (sample_idx + 1) % 100 == 0:
+                print(sample_idx)
                 open(
                     os.path.join(self.data_config.dataset_path, "data.csv"), "w"
                 ).write("\n".join(lines_out))

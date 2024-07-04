@@ -463,7 +463,7 @@ class CounterfactualKnowledgeDistillation(Adaptor):
             ),
             device=self.device,
             classifier_dataset=self.val_dataloader.dataset,
-        ).to(self.device)
+        )
 
         self.output_size = (
             self.adaptor_config.task.output_channels
@@ -495,7 +495,7 @@ class CounterfactualKnowledgeDistillation(Adaptor):
             transform=self.val_dataloader.dataset.transform,
         )
 
-        if teacher[:5] == "human" or teacher == "SegmentationMask":
+        if teacher[:5] == "human":
             assert self.adaptor_config.tracking_level > 0, "Tracking level too low!"
 
         self.explainer = CounterfactualExplainer(
@@ -514,12 +514,12 @@ class CounterfactualKnowledgeDistillation(Adaptor):
             "y_target_end_confidence_list",
             "x_list",
             "y_list",
+            "x_attribution_list",
         ]
 
         if self.adaptor_config.tracking_level > 0:
             self.tracked_keys.extend(
                 [
-                    "x_attribution_list",
                     "y_target_start_confidence_list",
                     "z_difference_list",
                     "collage_path_list",
@@ -554,7 +554,10 @@ class CounterfactualKnowledgeDistillation(Adaptor):
         self.validation_data_config.data.split = [0.0, 1.0]
 
     def initialize_run(self):
-        if self.overwrite or not os.path.exists(
+        if self.overwrite:
+            shutil.rmtree(self.base_dir, ignore_errors=True)
+
+        if not os.path.exists(
             os.path.join(self.base_dir, "0", "validation_tracked_values.npz")
         ):
             assert self.adaptor_config.current_iteration == 0
@@ -1017,7 +1020,12 @@ class CounterfactualKnowledgeDistillation(Adaptor):
                 )
             )
         )
-        fa_1sided = num_true_1sided / (num_true_1sided + num_false_1sided)
+        if num_true_1sided + num_false_1sided > 0:
+            fa_1sided = num_true_1sided / (num_true_1sided + num_false_1sided)
+
+        else:
+            fa_1sided = -1
+
         fa_absolute = num_true_1sided / num_samples
 
         feedback_stats = {
@@ -1411,7 +1419,8 @@ class CounterfactualKnowledgeDistillation(Adaptor):
                     max_validation_samples=self.adaptor_config.max_validation_samples,
                     min_start_target_percentile=self.adaptor_config.min_start_target_percentile,
                 )
-                # torch.nn.functional.softmax(self.student(validation_tracked_values_current['x_counterfactual_list'][i].unsqueeze(0).to('cuda')).squeeze(0))[validation_tracked_values_current['y_target_list'][i]]
+                # torch.nn.functional.softmax(self.student(validation_tracked_values_current['x_counterfactual_list'][i]
+                # .unsqueeze(0).to('cuda')).squeeze(0))[validation_tracked_values_current['y_target_list'][i]]
                 if validation_tracked_values is None:
                     validation_tracked_values = validation_tracked_values_current
 

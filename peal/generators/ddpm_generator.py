@@ -3,6 +3,8 @@ import random
 import types
 import shutil
 import copy
+from pathlib import Path
+
 import torch
 import io
 import blobfile as bf
@@ -13,6 +15,7 @@ from types import SimpleNamespace
 
 from torch.utils.tensorboard import SummaryWriter
 
+from peal.dependencies.time.get_predictions import get_predictions
 from peal.generators.interfaces import EditCapableGenerator
 from peal.global_utils import load_yaml_config
 from peal.dependencies.ace.run_ace import main as ace_main
@@ -35,6 +38,7 @@ from typing import Union
 
 from peal.generators.interfaces import GeneratorConfig
 from peal.data.datasets import DataConfig
+from peal.training.trainers import ModelTrainer, PredictorConfig
 
 
 class DDPMConfig(GeneratorConfig):
@@ -126,6 +130,7 @@ def load_state_dict(path, **kwargs):
 class DDPM(EditCapableGenerator):
     def __init__(self, config, model_dir=None, device="cpu", classifier_dataset=None):
         super().__init__()
+        self.classifier_distilled = None
         self.config = load_yaml_config(config)
 
         self.dataset = get_datasets(self.config.data)[0]
@@ -225,6 +230,45 @@ class DDPM(EditCapableGenerator):
         )
         train_loop.run_loop(self.config, writer)
 
+    def distill_classifier(self, explainer_config, base_path, classifier, classifier_dataset):
+        class_predictions_path = os.path.join(base_path, "explainer", "predictions.csv")
+        Path(os.path.join(base_path, "explainer")).mkdir(exist_ok=True, parents=True)
+        if not os.path.exists(class_predictions_path):
+            classifier_dataset.enable_url()
+            prediction_args = types.SimpleNamespace(
+                batch_size=32,
+                dataset=classifier_dataset,
+                classifier=classifier,
+                label_path=class_predictions_path,
+                partition="train",
+                label_query=0,
+                max_samples=explainer_config.max_samples,
+            )
+            get_predictions(prediction_args)
+            classifier_dataset.disable_url()
+
+        distilled_dataset_config = copy.deepcopy(classifier_dataset.config)
+        distilled_dataset_config.split = [0.9, 1.0]
+        distilled_dataset_config.confounding_factors = None
+        distilled_dataset_config.confounder_probability = None
+        classifier_dataset_train, classifier_dataset_val, _ = get_datasets(
+            config=distilled_dataset_config, data_dir=class_predictions_path
+        )
+        distilled_classifier_config = load_yaml_config(explainer_config.distilled_classifier, PredictorConfig)
+        distilled_classifier_config.data = distilled_dataset_config
+        explainer_config.distilled_classifier = distilled_classifier_config
+        classifier_dataset_train.task_config = explainer_config.distilled_classifier.task
+        self.classifier_distilled = copy.deepcopy(classifier)
+        distillation_trainer = ModelTrainer(
+            config=explainer_config.distilled_classifier,
+            model=self.classifier_distilled,
+            datasource=(classifier_dataset_train, classifier_dataset_val),
+            model_path=os.path.join(
+                base_path, "explainer", "distilled_classifier"
+            )
+        )
+        distillation_trainer.fit()
+
     def edit(
         self,
         x_in: torch.Tensor,
@@ -238,6 +282,17 @@ class DDPM(EditCapableGenerator):
         mode="",
         base_path="",
     ):
+        if not explainer_config.distilled_classifier is None:
+            if not os.path.exists(
+                os.path.join(base_path, "explainer", "distilled_classifier", "model.cpl")
+            ):
+                self.distill_classifier(explainer_config, base_path, classifier, classifier_dataset)
+
+            gradient_classifier = self.classifier_distilled
+
+        else:
+            gradient_classifier = classifier
+
         dataset = [
             (
                 torch.zeros([len(x_in)], dtype=torch.long),
@@ -291,6 +346,8 @@ class DDPM(EditCapableGenerator):
                     * multiplier
                 )
             )
+            print("args.sampling_time_fraction")
+            print(args.sampling_time_fraction)
             args.dist_l1 = float(
                 explainer_config.dist_l1
                 if not isinstance(explainer_config.dist_l1, list)
@@ -325,6 +382,8 @@ class DDPM(EditCapableGenerator):
                     * multiplier
                 )
             )
+            print("args.sampling_inpaint")
+            print(args.sampling_inpaint)
             args.__dict__.update(
                 {
                     k: v
@@ -337,7 +396,7 @@ class DDPM(EditCapableGenerator):
             args.classifier_dataset = classifier_dataset
             args.generator_dataset = self.dataset
             args.model_path = os.path.join(self.model_dir, "final.pt")
-            args.classifier = classifier
+            args.classifier = gradient_classifier
             args.diffusion = self.diffusion
             args.model = self.model
             #

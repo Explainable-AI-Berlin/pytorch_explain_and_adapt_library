@@ -8,5 +8,5 @@ output_type             : multiclass
 output_size             : [8]
 downsize                : Resize
 delimiter               : ","
-confounder_probability  : 0.0
+confounder_probability  : 0.1
 confounding_factors     : [ClassA, ClassB]

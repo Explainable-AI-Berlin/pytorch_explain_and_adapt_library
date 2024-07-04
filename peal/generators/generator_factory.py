@@ -42,6 +42,7 @@ def get_generator(
     elif not (
         isinstance(generator, InvertibleGenerator)
         or isinstance(generator, EditCapableGenerator)
+        or generator is None
     ):
         generator_config = load_yaml_config(generator)
         generator_class_list = find_subclasses(
@@ -65,6 +66,7 @@ def get_generator(
     else:
         generator_out = generator
 
-    generator_out.eval()
+    if not generator_out is None:
+        generator_out.eval().to(device)
 
     return generator_out

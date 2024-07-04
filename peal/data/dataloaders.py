@@ -192,19 +192,41 @@ class DataloaderMixer(DataLoader):
         return DataIterator(self)
 
     def sample(self):
-        if not self.priorities is None:
-            idx = int(np.random.multinomial(1, self.priorities).argmax())
+        if not hasattr(self.train_config, "concatenate_batches") or not self.train_config.concatenate_batches:
+            if not self.priorities is None:
+                idx = int(np.random.multinomial(1, self.priorities).argmax())
+
+            else:
+                idx = 0
+
+            item = next(self.iterators[idx], "STOP")
+            if isinstance(item, str) and item == "STOP":
+                self.iterators[idx] = iter(self.dataloaders[idx])
+                item = next(self.iterators[idx])
+
+            if self.return_src:
+                item = (item, idx)
 
         else:
-            idx = 0
+            items = []
+            for idx in range(len(self.iterators)):
+                item = next(self.iterators[idx], "STOP")
+                if isinstance(item, str) and item == "STOP":
+                    self.iterators[idx] = iter(self.dataloaders[idx])
+                    item = next(self.iterators[idx])
 
-        item = next(self.iterators[idx], "STOP")
-        if isinstance(item, str) and item == "STOP":
-            self.iterators[idx] = iter(self.dataloaders[idx])
-            item = next(self.iterators[idx])
+                items.append(item)
 
-        if self.return_src:
-            item = (item, idx)
+            item = items[0]
+            if isinstance(item[1], tuple) or isinstance(item[1], list):
+                item[1] = item[1][0]
+
+            for it in items[1:]:
+                for i in range(len(item)):
+                    item[i] = torch.cat([item[i], it[i]], dim=0)
+
+            if self.return_src:
+                item = (item, 0)
 
         return item
 

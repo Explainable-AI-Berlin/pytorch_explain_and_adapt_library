@@ -7,7 +7,8 @@ import torch
 import torchvision
 from torchvision.transforms import ToTensor
 
-from peal.data.datasets import SymbolicDataset, Image2ClassDataset, DataConfig
+from peal.data.dataset_generators import SquareDatasetGenerator
+from peal.data.datasets import SymbolicDataset, Image2ClassDataset, DataConfig, Image2MixedDataset
 from peal.generators.interfaces import Generator
 
 
@@ -332,3 +333,54 @@ class MnistDataset(Image2ClassDataset):
                 idxs[label] += 1
 
         super(MnistDataset, self).__init__(config=config, **kwargs)
+
+
+class SquareDataset(Image2MixedDataset):
+    def __init__(self, config : DataConfig, **kwargs):
+        if not os.path.exists(config.dataset_path):
+            cdg = SquareDatasetGenerator(data_config=config)
+            cdg.generate_dataset()
+
+        super(SquareDataset, self).__init__(config=config, **kwargs)
+
+    def check_foreground(self, x, hint):
+        intensity_foreground = torch.sum(hint * x) / torch.sum(hint)
+        return intensity_foreground
+
+    def check_background(self, x, hint):
+        intensity_background = torch.sum((1 - hint) * x) / torch.sum(1 - hint)
+        return intensity_background
+
+    def generate_contrastive_collage(
+        self,
+        x_list: list,
+        x_counterfactual_list: list,
+        y_target_list: list,
+        y_source_list: list,
+        y_list: list,
+        y_target_start_confidence_list: list,
+        y_target_end_confidence_list: list,
+        base_path: str,
+        idx_to_info=None,
+        **kwargs: dict,
+    ):
+        if idx_to_info is None:
+            def idx_to_info(x, x_counterfactual, hint):
+                s = "Foreground: " + str(round(float(self.check_foreground(x, hint)), 3)) + " -> "
+                s += str(round(float(self.check_foreground(x_counterfactual, hint)), 3)) + ", "
+                s += "Background: " + str(round(float(self.check_background(x, hint)), 3)) + " -> "
+                s += str(round(float(self.check_background(x_counterfactual, hint)), 3))
+                return s
+
+        return super().generate_contrastive_collage(
+            x_list=x_list,
+            x_counterfactual_list=x_counterfactual_list,
+            y_target_list=y_target_list,
+            y_source_list=y_source_list,
+            y_list=y_list,
+            y_target_start_confidence_list=y_target_start_confidence_list,
+            y_target_end_confidence_list=y_target_end_confidence_list,
+            base_path=base_path,
+            idx_to_info=idx_to_info,
+            **kwargs,
+        )

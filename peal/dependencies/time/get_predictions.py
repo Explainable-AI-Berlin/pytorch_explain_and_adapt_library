@@ -95,7 +95,12 @@ def get_predictions(args=None):
             img, lab, img_file = sample
 
         else:
-            img, (lab, img_file) = sample
+            img, y = sample
+            if len(y) == 2:
+                (lab, img_file) = y
+
+            elif len(y) == 3:
+                (lab, hint, img_file) = y
 
         img = img.to(device)
         lab = lab.to(device)

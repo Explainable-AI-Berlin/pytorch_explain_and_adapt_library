@@ -181,59 +181,63 @@ def filter_fn(
         pe = attack.perturb(x, target)
 
     # generates masks
-    mask, dil_mask = generate_mask(x, pe, dilation)
-    boolmask = (dil_mask < inpaint).float()
+    if not inpaint == 0.0:
+        mask, dil_mask = generate_mask(x, pe, dilation)
+        boolmask = (dil_mask < inpaint).float()
 
-    if not generator_dataset is None and not classifier_dataset is None:
-        ce = generator_dataset.project_from_pytorch_default(
-            classifier_dataset.project_to_pytorch_default(pe.detach())
-        )
-        orig = generator_dataset.project_from_pytorch_default(
-            classifier_dataset.project_to_pytorch_default(x.detach())
-        )
-
-    else:
-        ce = (pe.detach() - 0.5) / 0.5
-        orig = (x.detach() - 0.5) / 0.5
-
-    noises = None
-    noise_fn = torch.randn_like if stochastic else torch.zeros_like
-
-    for idx, t in enumerate(indices):
-        # filter the with the diffusion model
-        t = torch.tensor([t] * ce.size(0), device=ce.device)
-
-        if idx == 0:
-            ce = diffusion.q_sample(ce, t, noise=noise_fn(ce))
-            noise_x = ce.clone().detach()
-
-        if inpaint != 0:
-            ce = ce * (1 - boolmask) + boolmask * diffusion.q_sample(
-                orig, t, noise=noise_fn(ce)
+        if not generator_dataset is None and not classifier_dataset is None:
+            ce = generator_dataset.project_from_pytorch_default(
+                classifier_dataset.project_to_pytorch_default(pe.detach())
+            )
+            orig = generator_dataset.project_from_pytorch_default(
+                classifier_dataset.project_to_pytorch_default(x.detach())
             )
 
-        out = diffusion.p_mean_variance(model, ce, t, clip_denoised=True)
+        else:
+            ce = (pe.detach() - 0.5) / 0.5
+            orig = (x.detach() - 0.5) / 0.5
 
-        ce = out["mean"]
+        noise_fn = torch.randn_like if stochastic else torch.zeros_like
 
-        if stochastic and (idx != (steps - 1)):
-            noise = torch.randn_like(ce)
-            ce += torch.exp(0.5 * out["log_variance"]) * noise
+        for idx, t in enumerate(indices):
+            # filter the with the diffusion model
+            t = torch.tensor([t] * ce.size(0), device=ce.device)
 
-    ce = ce * (1 - boolmask) + boolmask * orig
-    if not generator_dataset is None and not classifier_dataset is None:
-        ce = classifier_dataset.project_from_pytorch_default(
-            generator_dataset.project_to_pytorch_default(ce.detach())
-        ).clamp(0, 1)
-        noise_x = classifier_dataset.project_from_pytorch_default(
-            generator_dataset.project_to_pytorch_default(noise_x.detach())
-        ).clamp(0, 1)
+            if idx == 0:
+                ce = diffusion.q_sample(ce, t, noise=noise_fn(ce))
+                noise_x = ce.clone().detach()
+
+            if inpaint != 0:
+                ce = ce * (1 - boolmask) + boolmask * diffusion.q_sample(
+                    orig, t, noise=noise_fn(ce)
+                )
+
+            out = diffusion.p_mean_variance(model, ce, t, clip_denoised=True)
+
+            ce = out["mean"]
+
+            if stochastic and (idx != (steps - 1)):
+                noise = torch.randn_like(ce)
+                ce += torch.exp(0.5 * out["log_variance"]) * noise
+
+        ce = ce * (1 - boolmask) + boolmask * orig
+        if not generator_dataset is None and not classifier_dataset is None:
+            ce = classifier_dataset.project_from_pytorch_default(
+                generator_dataset.project_to_pytorch_default(ce.detach())
+            ).clamp(0, 1)
+            noise_x = classifier_dataset.project_from_pytorch_default(
+                generator_dataset.project_to_pytorch_default(noise_x.detach())
+            ).clamp(0, 1)
+
+        else:
+            ce = ((ce * 0.5) + 0.5).clamp(0, 1)
+            noise_x = ((noise_x * 0.5) + 0.5).clamp(0, 1)
 
     else:
-        ce = ((ce * 0.5) + 0.5).clamp(0, 1)
-        noise_x = ((noise_x * 0.5) + 0.5).clamp(0, 1)
+        ce = pe
+        mask = torch.ones_like(ce)
+        noise_x = torch.zeros_like(ce)
 
-    #return ce, pe, noise_x, mask
     return ce, pe, noise_x, mask
 
 
@@ -389,7 +393,7 @@ def main(args=None):
         if args.attack_joint
         and not (args.attack_joint_checkpoint or args.attack_joint_shortcut)
         else classifier,
-        "loss_fn": None,  # we can implement here a custom loss fn
+        "loss_fn": args.loss_fn,  # we can implement here a custom loss fn
         "dist_fn": dist_fn,
         "eps": args.attack_epsilon / 255,
         "nb_iter": args.attack_iterations,

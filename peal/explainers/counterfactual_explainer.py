@@ -32,6 +32,7 @@ from peal.generators.interfaces import (
 from peal.data.interfaces import PealDataset
 from peal.explainers.interfaces import ExplainerInterface, ExplainerConfig
 from peal.teachers.human2model_teacher import DataStore
+from peal.training.trainers import PredictorConfig
 
 
 class ACEConfig(ExplainerConfig):
@@ -44,17 +45,19 @@ class ACEConfig(ExplainerConfig):
     Options: ['counterfactual', 'lrp']
     """
     explainer_type: str = "ACE"
+    loss_fn: Union[type(None), str] = None
     predictor_path: Union[str, type(None)] = None
     generator: Union[type(None), GeneratorConfig] = None
     data_config: Union[type(None), DataConfig] = None
-    attack_iterations: Union[list, int] = [30, 50]
-    sampling_time_fraction: Union[list, float] = [0.2, 0.3]
-    dist_l1: Union[list, float] = [1.0, 0.0001]
+    attack_iterations: Union[list, int] = 100
+    sampling_time_fraction: Union[list, float] = 0.3
+    dist_l1: Union[list, float] = 0.0001
     dist_l2: Union[list, float] = 0.0
-    sampling_inpaint: Union[list, float] = [0.3, 0.1]
+    sampling_inpaint: Union[list, float] = 0.2
     sampling_dilation: Union[list, int] = 17
     timestep_respacing: Union[list, int] = 50
-    attempts: int = 2
+    distilled_classifier: Union[type(None), str] = None
+    attempts: int = 1
     clip_denoised: bool = True  # Clipping noise
     batch_size: int = 32  # Batch size
     gpu: str = "0"  # GPU index, should only be 1 gpu
@@ -91,7 +94,7 @@ class ACEConfig(ExplainerConfig):
     chunks: int = 1  # Chunking for spliting the CE generation into multiple gpus
     chunk: int = 0  # current chunk (between 0 and chunks - 1)
     merge_chunks: bool = False  # to merge all chunked results
-    y_target_goal_confidence: float = 0.65
+    y_target_goal_confidence: float = 1.1
 
 
 class DiffeoCFConfig(ExplainerConfig):
@@ -270,7 +273,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 self.device
             )
 
-        if not generator is None:
+        if not generator is None or isinstance(self.explainer_config, PerfectFalseCounterfactualConfig):
             self.generator = generator
 
         else:
@@ -499,7 +502,7 @@ class CounterfactualExplainer(ExplainerInterface):
         batch: dict,
         base_path: str = "collages",
         start_idx: int = 0,
-        y_target_goal_confidence_in: int = None,
+        y_target_goal_confidence_in: float = None,
         remove_below_threshold: bool = True,
         pbar=None,
         mode="",
@@ -585,7 +588,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 for sample_idx in range(len(batch[key])):
                     if (
                         batch["y_target_end_confidence_list"][sample_idx]
-                        >= target_confidence_goal
+                        >= 0.5
                     ):
                         batch_out[key].append(batch[key][sample_idx])
 
@@ -603,6 +606,13 @@ class CounterfactualExplainer(ExplainerInterface):
                 start_idx=start_idx,
                 **batch_out,
             )
+
+        else:
+            x_attribution_list = []
+            for i in range(len(batch_out["x_counterfactual_list"])):
+                x_attribution_list.append(torch.abs(batch_out["x_counterfactual_list"][i] - batch_out["x_list"][i]))
+
+            batch_out["x_attribution_list"] = x_attribution_list
 
         return batch_out
 

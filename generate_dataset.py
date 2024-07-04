@@ -18,7 +18,7 @@ def main():
         cdg = ConfounderDatasetGenerator(**config.__dict__, data_config=config)
         cdg.generate_dataset()
 
-    elif config.dataset_class == "square":
+    elif config.dataset_class == "SquareDataset":
         cdg = SquareDatasetGenerator(data_config=config)
         cdg.generate_dataset()
 

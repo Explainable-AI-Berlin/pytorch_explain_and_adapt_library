@@ -6,4 +6,4 @@ data_config: <PEAL_BASE>/configs/data/mnist.yaml
 generator: <PEAL_RUNS>/mnist/glow/config.yaml
 validate_generator: True
 explanations_dir: <PEAL_RUNS>/mnist/natural_classifier/diffeocf_explanations
-max_samples: 100
+max_samples: 10
