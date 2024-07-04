@@ -130,6 +130,7 @@ def load_state_dict(path, **kwargs):
 class DDPM(EditCapableGenerator):
     def __init__(self, config, model_dir=None, device="cpu", classifier_dataset=None):
         super().__init__()
+        self.classifier_distilled = None
         self.config = load_yaml_config(config)
 
         self.dataset = get_datasets(self.config.data)[0]
@@ -263,7 +264,7 @@ class DDPM(EditCapableGenerator):
             model=self.classifier_distilled,
             datasource=(classifier_dataset_train, classifier_dataset_val),
             model_path=os.path.join(
-                base_path, "explainer", "finetuned_model"
+                base_path, "explainer", "distilled_classifier"
             )
         )
         distillation_trainer.fit()
@@ -281,10 +282,16 @@ class DDPM(EditCapableGenerator):
         mode="",
         base_path="",
     ):
-        if not explainer_config.distilled_classifier is None and not os.path.exists(
-            os.path.join(base_path, "explainer", "distilled_classifier", "model.cpl")
-        ):
-            self.distill_classifier(explainer_config, base_path, classifier, classifier_dataset)
+        if not explainer_config.distilled_classifier is None:
+            if not os.path.exists(
+                os.path.join(base_path, "explainer", "distilled_classifier", "model.cpl")
+            ):
+                self.distill_classifier(explainer_config, base_path, classifier, classifier_dataset)
+
+            gradient_classifier = self.classifier_distilled
+
+        else:
+            gradient_classifier = classifier
 
         dataset = [
             (
@@ -389,7 +396,7 @@ class DDPM(EditCapableGenerator):
             args.classifier_dataset = classifier_dataset
             args.generator_dataset = self.dataset
             args.model_path = os.path.join(self.model_dir, "final.pt")
-            args.classifier = classifier
+            args.classifier = gradient_classifier
             args.diffusion = self.diffusion
             args.model = self.model
             #

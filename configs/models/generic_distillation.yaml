@@ -1,4 +1,4 @@
-'training'          : '<PEAL_BASE>/configs/training/img_classifier.yaml'
+'training'          : '<PEAL_BASE>/configs/training/adversarially_robust.yaml'
 'task':
   'criterions':
     'ce'     : 1.0
