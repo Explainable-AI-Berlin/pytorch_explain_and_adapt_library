@@ -407,7 +407,7 @@ class DDPM(EditCapableGenerator):
             preds = torch.nn.Softmax(dim=-1)(
                 classifier(x_counterfactuals_current.to(device)).detach().cpu()
             )
-            print("preds_final: " + str(list(preds)))
+            print("preds_final: " + str([float(preds[i][target_classes[i]]) for i in range(len(target_classes))]))
             y_target_end_confidence_current = torch.zeros([x_in.shape[0]])
             for i in range(x_in.shape[0]):
                 y_target_end_confidence_current[i] = preds[i, target_classes[i]]

@@ -638,6 +638,9 @@ class CounterfactualKnowledgeDistillation(Adaptor):
                     worst_group_accuracy,
                     self.adaptor_config.current_iteration,
                 )
+                print("group_accuracies: " + str(group_accuracies))
+                print("group_distribution: " + str(group_distribution))
+                print("worst_group_accuracy: " + str(worst_group_accuracy))
 
             writer.add_scalar(
                 "test_accuracy", test_accuracy, self.adaptor_config.current_iteration
