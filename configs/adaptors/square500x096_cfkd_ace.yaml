@@ -14,10 +14,11 @@ explainer                            :
   explainer_type : ACE
   category : explainer
   sampling_time_fraction: 0.3
-  attack_iterations: 50
-  dist_l1: 0.00001
-  sampling_inpaint: 0.1
-  y_target_goal_confidence: 1.1
+  attack_iterations: 150
+  dist_l1: 0.0
+  sampling_inpaint: 0.0
+  y_target_goal_confidence: 0.9
+  distilled_classifier: <PEAL_BASE>/configs/models/generic_distillation.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_poisened096.yaml
 test_data                            :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_unpoisened.yaml
@@ -28,7 +29,7 @@ base_dir                             :  <PEAL_RUNS>/square/colora_confounding_co
 task:
   criterions:
     ce     : 1.0
-    l2     : 1.0
+    l2     : 100.0
   output_type             : singleclass
   output_channels         : 2
   y_selection             : [ClassA]

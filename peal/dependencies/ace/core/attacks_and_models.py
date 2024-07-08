@@ -78,7 +78,7 @@ class Attack:
         dist_schedule="none",
         binary=False,
         y_target_goal_confidence=0.65,
-        predictor=None,
+        original_predictor=None,
     ):
         """
         :param predict: classification model
@@ -104,7 +104,7 @@ class Attack:
         self.set_dist_schedule(dist_schedule)
         self.binary = binary
         self.y_target_goal_confidence = y_target_goal_confidence
-        self.predictor = predictor
+        self.original_predictor = original_predictor
 
     def set_dist_schedule(self, schedule):
         """
@@ -471,14 +471,23 @@ def get_attack(attack, use_checkpoint, use_shortcut=False):
                 #x_adv_candidate = projection_fn(x, x_adv_candidate)
                 pred = torch.nn.functional.softmax(self.classifier.classifier(x_adv_candidate), -1)
                 for j in range(x_adv.shape[0]):
-                    if pred[j, int(y[j])] > self.y_target_goal_confidence:
-                        mask[j] = 0
-
-                    elif pred_old[j, int(y[j])] <= pred[j, int(y[j])]:
+                    if pred_old[j, int(y[j])] <= pred[j, int(y[j])]:
                         x_adv[j] = x_adv_candidate[j]
                         pred_old[j] = pred[j]
 
                 print(str(i) + ": " + str([float(pred_old[j, y[j]]) for j in range(x_adv.shape[0])]))
+
+                if not self.original_predictor is None:
+                    pred_original = torch.nn.functional.softmax(self.original_predictor(x_adv), -1)
+
+                else:
+                    pred_original = pred_old
+
+                for j in range(x_adv.shape[0]):
+                    if pred_original[j, int(y[j])] > self.y_target_goal_confidence:
+                        mask[j] = 0
+
+                print(str(i) + ": " + str([float(pred_original[j, y[j]]) for j in range(x_adv.shape[0])]))
 
                 if mask.sum() == 0:
                     break

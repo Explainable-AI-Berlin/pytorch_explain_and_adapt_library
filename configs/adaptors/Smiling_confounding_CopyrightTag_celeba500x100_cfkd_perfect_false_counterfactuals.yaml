@@ -3,6 +3,7 @@ adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  10
 finetune_iterations                  :  1
+tracking_level                       :  3
 min_train_samples                    :  400
 max_validation_samples               :  100
 continuous_learning                  :  "finetuning"
@@ -15,7 +16,7 @@ data                                 :  <PEAL_BASE>/configs/data/Smiling_confoun
 test_data                            :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba.yaml
 student                              :  <PEAL_RUNS>/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened100/model.cpl
 teacher                              :  <PEAL_RUNS>/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened050/model.cpl
-base_dir                             :  <PEAL_RUNS>/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened100/cfkd_perfect_false_counterfactuals500_new
+base_dir                             :  <PEAL_RUNS>/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened100/cfkd_perfect_false_counterfactuals500_new2
 task:
   criterions:
     ce     : 1.0

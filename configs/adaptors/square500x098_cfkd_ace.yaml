@@ -1,11 +1,11 @@
-# python run_cfkd.py --adaptor_config "<PEAL_BASE>/configs/adaptors/square500x100_cfkd_ace.yaml"
+# python run_cfkd.py --adaptor_config "<PEAL_BASE>/configs/adaptors/square500x098_cfkd_ace.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  6
 tracking_level                       :  2
-min_train_samples                    :  800
+min_train_samples                    :  400
 finetune_iterations                  :  1
-max_validation_samples               :  200
+max_validation_samples               :  100
 continuous_learning                  :  "finetune"
 replace_model                        :  True
 use_visualization                    :  False #True
@@ -20,12 +20,12 @@ explainer                            :
   y_target_goal_confidence: 0.9
   distilled_classifier: <PEAL_BASE>/configs/models/generic_distillation.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
-data                                 :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_poisened100.yaml
+data                                 :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_poisened098.yaml
 test_data                            :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_unpoisened.yaml
-student                              :  <PEAL_RUNS>/square/colora_confounding_colorb/regularized0/classifier_poisened100/model.cpl
+student                              :  <PEAL_RUNS>/square/colora_confounding_colorb/regularized0/classifier_poisened098/model.cpl
 teacher                              :  SegmentationMask
 generator                            :  <PEAL_RUNS>/square/ddpm/config.yaml
-base_dir                             :  <PEAL_RUNS>/square/colora_confounding_colorb/regularized0/classifier_poisened100/cfkd_ace_new
+base_dir                             :  <PEAL_RUNS>/square/colora_confounding_colorb/regularized0/classifier_poisened098/cfkd_ace
 task:
   criterions:
     ce     : 1.0

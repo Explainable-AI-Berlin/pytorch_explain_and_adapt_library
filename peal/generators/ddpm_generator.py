@@ -397,6 +397,7 @@ class DDPM(EditCapableGenerator):
             args.generator_dataset = self.dataset
             args.model_path = os.path.join(self.model_dir, "final.pt")
             args.classifier = gradient_classifier
+            args.original_classifier = classifier
             args.diffusion = self.diffusion
             args.model = self.model
             #
