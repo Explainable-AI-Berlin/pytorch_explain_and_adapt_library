@@ -503,7 +503,7 @@ class CounterfactualKnowledgeDistillation(Adaptor):
             generator=self.generator,
             input_type=self.adaptor_config.data.input_type,
             explainer_config=self.adaptor_config.explainer,
-            dataset=self.val_dataloader.dataset,
+            datasets=[self.train_dataloader.dataset, self.val_dataloader.dataset],
             tracking_level=self.adaptor_config.tracking_level,
         )
         self.logits_to_prediction = lambda logits: logits.argmax(-1)
@@ -547,6 +547,7 @@ class CounterfactualKnowledgeDistillation(Adaptor):
         self.data_config.data.output_size = self.train_dataloader.dataset.output_size
         self.data_config.data.delimiter = ","
         self.data_config.data.num_samples = self.adaptor_config.min_train_samples
+        self.data_config.data.dataset_class = None
         self.validation_data_config = copy.deepcopy(self.data_config)
         self.validation_data_config.data.num_samples = (
             self.adaptor_config.max_validation_samples

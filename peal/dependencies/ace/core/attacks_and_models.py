@@ -471,7 +471,7 @@ def get_attack(attack, use_checkpoint, use_shortcut=False):
                 #x_adv_candidate = projection_fn(x, x_adv_candidate)
                 pred = torch.nn.functional.softmax(self.classifier.classifier(x_adv_candidate), -1)
                 for j in range(x_adv.shape[0]):
-                    if pred_old[j, int(y[j])] <= pred[j, int(y[j])]:
+                    if pred_old[j, int(y[j])] <= pred[j, int(y[j])] and mask[j] == 1:
                         x_adv[j] = x_adv_candidate[j]
                         pred_old[j] = pred[j]
 

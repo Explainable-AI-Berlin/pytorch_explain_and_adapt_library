@@ -18,14 +18,20 @@ from peal.global_utils import (
     orthogonal_initialization,
     move_to_device,
     load_yaml_config,
-    save_yaml_config, reset_weights, requires_grad_,
+    save_yaml_config,
+    reset_weights,
+    requires_grad_,
 )
 from peal.training.loggers import log_images_to_writer
 from peal.training.loggers import Logger
 from peal.training.criterions import get_criterions
 from peal.data.dataloaders import create_dataloaders_from_datasource
 from peal.generators.interfaces import Generator
-from peal.architectures.downstream_models import SequentialModel, ArchitectureConfig, TaskConfig
+from peal.architectures.downstream_models import (
+    SequentialModel,
+    ArchitectureConfig,
+    TaskConfig,
+)
 
 
 class TrainingConfig(BaseModel):
@@ -84,7 +90,7 @@ class TrainingConfig(BaseModel):
     input_noise_std: float = 0.1
     num_noise_vec: int = 1
     no_grad_attack: bool = False
-    attack_epsilon: float = 1.0
+    attack_epsilon: float = 2.0
     attack_num_steps: int = 5
     """
     A dict containing all variables that could not be given with the current config structure
@@ -92,12 +98,11 @@ class TrainingConfig(BaseModel):
     kwargs: dict = {}
 
 
-
-
 class PredictorConfig:
     """
     The config template for a model.
     """
+
     """
     The config of the training of the model.
     """
@@ -175,14 +180,19 @@ class PredictorConfig:
         self.kwargs = kwargs
 
 
-
 def calculate_test_accuracy(
-    model, test_dataloader, device, calculate_group_accuracies=False, max_test_batches=None
+    model,
+    test_dataloader,
+    device,
+    calculate_group_accuracies=False,
+    max_test_batches=None,
 ):
     # determine the test accuracy of the student
     correct = 0
     num_samples = 0
-    pbar = tqdm(total=int(test_dataloader.dataset.__len__() / test_dataloader.batch_size))
+    pbar = tqdm(
+        total=int(test_dataloader.dataset.__len__() / test_dataloader.batch_size)
+    )
     if calculate_group_accuracies:
         test_dataloader.dataset.enable_groups()
         return_dict_buffer = bool(test_dataloader.dataset.return_dict)
@@ -290,7 +300,10 @@ class ModelTrainer:
 
             if isinstance(self.config.architecture, ArchitectureConfig):
                 self.model = SequentialModel(
-                    self.config.architecture, input_channels, output_channels, self.config.training.dropout
+                    self.config.architecture,
+                    input_channels,
+                    output_channels,
+                    self.config.training.dropout,
                 )
 
         else:
@@ -332,7 +345,7 @@ class ModelTrainer:
 
                 param_list = param_list_trained
 
-            print('trainable parameters: ', len(param_list))
+            print("trainable parameters: ", len(param_list))
             if self.config.training.optimizer == "sgd":
                 self.optimizer = torch.optim.SGD(
                     param_list, lr=self.config.training.learning_rate
@@ -355,7 +368,9 @@ class ModelTrainer:
                     weight_decay = 0.01
 
                 self.optimizer = torch.optim.AdamW(
-                    param_list, lr=self.config.training.learning_rate, weight_decay=weight_decay
+                    param_list,
+                    lr=self.config.training.learning_rate,
+                    weight_decay=weight_decay,
                 )
 
             else:
@@ -439,12 +454,14 @@ class ModelTrainer:
                 X, y = sample
 
             except Exception:
-                import pdb; pdb.set_trace()
+                import pdb
+
+                pdb.set_trace()
 
             # TODO this is a dirty fix!!!
             if isinstance(y, list) or isinstance(y, tuple):
                 y = y[0]
-                    
+
             #
             if self.unit_test_train_loop and batch_idx >= 2:
                 break
@@ -456,7 +473,10 @@ class ModelTrainer:
             X = move_to_device(X, self.device)
 
             if self.config.training.adv_training:
-                noise = torch.randn_like(X, device=self.device) * self.config.training.input_noise_std
+                noise = (
+                    torch.randn_like(X, device=self.device)
+                    * self.config.training.input_noise_std
+                )
 
                 requires_grad_(self.model, False)
                 self.model.eval()
@@ -466,7 +486,7 @@ class ModelTrainer:
                     y.to(self.device),
                     noise=noise,
                     num_noise_vectors=self.config.training.num_noise_vec,
-                    no_grad=self.config.training.no_grad_attack
+                    no_grad=self.config.training.no_grad_attack,
                 )
                 self.model.train()
                 requires_grad_(self.model, True)
@@ -532,17 +552,19 @@ class ModelTrainer:
                 orthogonal_initialization(self.model)
 
             else:
-                print('reset weights!!!')
-                print('reset weights!!!')
-                print('reset weights!!!')
-                print('reset weights!!!')
-                print('reset weights!!!')
-                print('reset weights!!!')
+                print("reset weights!!!")
+                print("reset weights!!!")
+                print("reset weights!!!")
+                print("reset weights!!!")
+                print("reset weights!!!")
+                print("reset weights!!!")
                 orthogonal_initialization(self.model)
 
         if not is_initialized:
             shutil.rmtree(self.model_path, ignore_errors=True)
-            Path(os.path.join(self.model_path, "logs")).mkdir(parents=True, exist_ok=True)
+            Path(os.path.join(self.model_path, "logs")).mkdir(
+                parents=True, exist_ok=True
+            )
             print(os.path.join(self.model_path, "logs"))
             print(os.path.join(self.model_path, "logs"))
             print(os.path.join(self.model_path, "logs"))
@@ -556,8 +578,12 @@ class ModelTrainer:
 
             log_images_to_writer(self.train_dataloader, self.logger.writer, "train")
             log_images_to_writer(
-                self.val_dataloaders[0], self.logger.writer, "validation"
+                self.val_dataloaders[0], self.logger.writer, "validation0_"
             )
+            if len(self.val_dataloaders) > 1:
+                log_images_to_writer(
+                    self.val_dataloaders[1], self.logger.writer, "validation1_"
+                )
 
             self.config.is_loaded = True
             save_yaml_config(self.config, os.path.join(self.model_path, "config.yaml"))

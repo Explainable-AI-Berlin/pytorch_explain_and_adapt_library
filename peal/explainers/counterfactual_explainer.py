@@ -245,13 +245,13 @@ class CounterfactualExplainer(ExplainerInterface):
 
     def __init__(
         self,
-        explainer_config: Union[dict, str, ExplainerConfig],
-        downstream_model: nn.Module = None,
-        generator: Union[InvertibleGenerator, EditCapableGenerator] = None,
-        input_type: str = None,
-        dataset: PealDataset = None,
-        tracking_level: int = None,
-        test_data_config: str = None,
+            explainer_config: Union[dict, str, ExplainerConfig],
+            downstream_model: nn.Module = None,
+            generator: Union[InvertibleGenerator, EditCapableGenerator] = None,
+            input_type: str = None,
+            datasets: list = None,
+            tracking_level: int = None,
+            test_data_config: str = None,
     ):
         """
         This class implements the counterfactual explanation method
@@ -260,7 +260,7 @@ class CounterfactualExplainer(ExplainerInterface):
             downstream_model (nn.Module): _description_
             generator (InvertibleGenerator): _description_
             input_type (str): _description_
-            dataset (PealDataset): _description_
+            datasets (list[PealDataset]): _description_
             explainer_config (Union[ dict, str ], optional): _description_. Defaults to "/configs/explainers/counterfactual_default.yaml".
         """
         self.explainer_config = load_yaml_config(explainer_config)
@@ -294,11 +294,11 @@ class CounterfactualExplainer(ExplainerInterface):
                 ),
             )
 
-        if not dataset is None:
-            self.classifier_dataset = dataset
+        if not datasets is None:
+            self.classifier_datasets = datasets
 
         else:
-            self.classifier_dataset = get_datasets(self.explainer_config.data_config)[1]
+            self.classifier_datasets = get_datasets(self.explainer_config.data_config)[:1]
 
         self.input_type = input_type
         if not tracking_level is None:
@@ -310,7 +310,7 @@ class CounterfactualExplainer(ExplainerInterface):
         self.loss = torch.nn.CrossEntropyLoss()
 
         if isinstance(self.explainer_config, PerfectFalseCounterfactualConfig):
-            inverse_config = copy.deepcopy(self.classifier_dataset.config)
+            inverse_config = copy.deepcopy(self.classifier_datasets[1].config)
             inverse_config.dataset_path += "_inverse"
             inverse_datasets = get_datasets(inverse_config)
             self.inverse_datasets = {}
@@ -320,7 +320,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 self.inverse_datasets["test"] = inverse_datasets[2]
 
             if not test_data_config is None:
-                inverse_test_config = copy.deepcopy(self.classifier_dataset.config)
+                inverse_test_config = copy.deepcopy(self.classifier_datasets[1].config)
                 inverse_test_config.dataset_path += "_inverse"
                 self.inverse_datasets["test"] = get_datasets(inverse_test_config)[-1]
 
@@ -337,7 +337,7 @@ class CounterfactualExplainer(ExplainerInterface):
             _type_: _description_
         """
         x = torch.clone(x_in)
-        x = self.classifier_dataset.project_to_pytorch_default(x)
+        x = self.classifier_datasets[1].project_to_pytorch_default(x)
         x = self.generator.dataset.project_from_pytorch_default(x)
         x = torchvision.transforms.Resize(self.generator.config.data.input_size[1:])(x)
         v_original = self.generator.encode(x.to(self.device))
@@ -377,9 +377,9 @@ class CounterfactualExplainer(ExplainerInterface):
 
             img = self.generator.dataset.project_to_pytorch_default(img)
             img = torchvision.transforms.Resize(
-                self.classifier_dataset.config.input_size[1:]
+                self.classifier_datasets[1].config.input_size[1:]
             )(img)
-            img = self.classifier_dataset.project_from_pytorch_default(img)
+            img = self.classifier_datasets[1].project_from_pytorch_default(img)
 
             logits_perturbed = self.downstream_model(
                 img + self.explainer_config.img_noise_injection * torch.randn_like(img)
@@ -447,9 +447,9 @@ class CounterfactualExplainer(ExplainerInterface):
             counterfactual
         )
         counterfactual = torchvision.transforms.Resize(
-            self.classifier_dataset.config.input_size[1:]
+            self.classifier_datasets[1].config.input_size[1:]
         )(counterfactual)
-        counterfactual = self.classifier_dataset.project_from_pytorch_default(
+        counterfactual = self.classifier_datasets[1].project_from_pytorch_default(
             counterfactual
         )
         logits = self.downstream_model(counterfactual.to(self.device))
@@ -518,6 +518,9 @@ class CounterfactualExplainer(ExplainerInterface):
             y_target_goal_confidence_in (int, optional): The target confidence for the counterfactuals. Defaults to None.
             remove_below_threshold (bool, optional): The flag to remove counterfactuals with a confidence below the
             target confidence. Defaults to True.
+            explainer_path:
+            mode:
+            pbar:
 
         Returns:
             dict: The batch with the counterfactuals added.
@@ -577,7 +580,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 explainer_config=self.explainer_config,
                 pbar=pbar,
                 mode=mode,
-                classifier_dataset=self.classifier_dataset,
+                classifier_datasets=self.classifier_datasets,
                 base_path=explainer_path,
             )
 
@@ -599,7 +602,7 @@ class CounterfactualExplainer(ExplainerInterface):
             (
                 batch_out["x_attribution_list"],
                 batch_out["collage_path_list"],
-            ) = self.classifier_dataset.generate_contrastive_collage(
+            ) = self.classifier_datasets[1].generate_contrastive_collage(
                 target_confidence_goal=target_confidence_goal,
                 base_path=base_path,
                 classifier=self.downstream_model,
@@ -626,18 +629,18 @@ class CounterfactualExplainer(ExplainerInterface):
         batches_out = []
         batch = None
         collage_idx = 0
-        for idx in range(len(self.classifier_dataset)):
+        for idx in range(len(self.classifier_datasets[1])):
             if (
                 not self.explainer_config.max_samples is None
                 and collage_idx >= self.explainer_config.max_samples
             ):
                 break
 
-            x, y = self.classifier_dataset[idx]
+            x, y = self.classifier_datasets[1][idx]
             y_logits = self.downstream_model(x.unsqueeze(0).to(self.device))[0]
             y_pred = y_logits.argmax()
             y_confidence = torch.nn.Softmax(dim=-1)(y_logits)
-            for y_target in range(self.classifier_dataset.output_size[0]):
+            for y_target in range(self.classifier_datasets[1].output_size[0]):
                 if y_target == y_pred:
                     continue
 
@@ -817,9 +820,9 @@ class CounterfactualExplainer(ExplainerInterface):
             self.explainer_config.explanations_dir, "interpretations"
         )
         Path(interpretations_dir).mkdir(parents=True, exist_ok=True)
-        for source_class in range(self.classifier_dataset.output_size[0]):
+        for source_class in range(self.classifier_datasets[1].output_size[0]):
             for target_class in range(
-                source_class + 1, self.classifier_dataset.output_size[0]
+                source_class + 1, self.classifier_datasets[1].output_size[0]
             ):
                 interpretation = {}
                 for idx, elem in enumerate(zip(feedback, y_source_list, y_target_list)):

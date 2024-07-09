@@ -145,6 +145,7 @@ class DDPM(EditCapableGenerator):
         self.counterfactual_path = os.path.join(self.model_dir, "counterfactuals_test")
 
         self.model, self.diffusion = create_model_and_diffusion(**self.config.__dict__)
+        self.device = device
         self.model.to(device)
         self.model_path = os.path.join(self.model_dir, "final.pt")
         if os.path.exists(self.model_path):
@@ -230,39 +231,43 @@ class DDPM(EditCapableGenerator):
         )
         train_loop.run_loop(self.config, writer)
 
-    def distill_classifier(self, explainer_config, base_path, classifier, classifier_dataset):
-        class_predictions_path = os.path.join(base_path, "explainer", "predictions.csv")
-        Path(os.path.join(base_path, "explainer")).mkdir(exist_ok=True, parents=True)
-        if not os.path.exists(class_predictions_path):
-            classifier_dataset.enable_url()
-            prediction_args = types.SimpleNamespace(
-                batch_size=32,
-                dataset=classifier_dataset,
-                classifier=classifier,
-                label_path=class_predictions_path,
-                partition="train",
-                label_query=0,
-                max_samples=explainer_config.max_samples,
-            )
-            get_predictions(prediction_args)
-            classifier_dataset.disable_url()
+    def distill_classifier(self, explainer_config, base_path, classifier, classifier_datasets):
+        distillation_datasets = []
+        for i in range(2):
+            class_predictions_path = os.path.join(base_path, "explainer", str(i) + "predictions.csv")
+            Path(os.path.join(base_path, "explainer")).mkdir(exist_ok=True, parents=True)
+            if not os.path.exists(class_predictions_path):
+                classifier_datasets[i].enable_url()
+                prediction_args = types.SimpleNamespace(
+                    batch_size=32,
+                    dataset=classifier_datasets[i],
+                    classifier=classifier,
+                    label_path=class_predictions_path,
+                    partition="train",
+                    label_query=0,
+                    max_samples=explainer_config.max_samples,
+                )
+                get_predictions(prediction_args)
+                classifier_datasets[i].disable_url()
 
-        distilled_dataset_config = copy.deepcopy(classifier_dataset.config)
-        distilled_dataset_config.split = [0.9, 1.0]
-        distilled_dataset_config.confounding_factors = None
-        distilled_dataset_config.confounder_probability = None
-        classifier_dataset_train, classifier_dataset_val, _ = get_datasets(
-            config=distilled_dataset_config, data_dir=class_predictions_path
-        )
-        distilled_classifier_config = load_yaml_config(explainer_config.distilled_classifier, PredictorConfig)
-        distilled_classifier_config.data = distilled_dataset_config
-        explainer_config.distilled_classifier = distilled_classifier_config
-        classifier_dataset_train.task_config = explainer_config.distilled_classifier.task
+            distilled_dataset_config = copy.deepcopy(classifier_datasets[i].config)
+            distilled_dataset_config.split = [1.0, 1.0] if i == 0 else [0.0, 1.0]
+            distilled_dataset_config.confounding_factors = None
+            distilled_dataset_config.confounder_probability = None
+            distilled_dataset_config.dataset_class = None
+            distillation_datasets.append(get_datasets(
+                config=distilled_dataset_config, data_dir=class_predictions_path
+            )[i])
+            distilled_classifier_config = load_yaml_config(explainer_config.distilled_classifier, PredictorConfig)
+            distilled_classifier_config.data = distilled_dataset_config
+            explainer_config.distilled_classifier = distilled_classifier_config
+            distillation_datasets[i].task_config = explainer_config.distilled_classifier.task
+
         self.classifier_distilled = copy.deepcopy(classifier)
         distillation_trainer = ModelTrainer(
             config=explainer_config.distilled_classifier,
             model=self.classifier_distilled,
-            datasource=(classifier_dataset_train, classifier_dataset_val),
+            datasource=distillation_datasets,
             model_path=os.path.join(
                 base_path, "explainer", "distilled_classifier"
             )
@@ -277,16 +282,18 @@ class DDPM(EditCapableGenerator):
         target_classes: torch.Tensor,
         classifier: nn.Module,
         explainer_config: ACEConfig,
-        classifier_dataset: PealDataset,
+        classifier_datasets: list,
         pbar=None,
-        mode="",
-        base_path="",
+        base_path : str="",
+        mode : str="",
     ):
         if not explainer_config.distilled_classifier is None:
-            if not os.path.exists(
-                os.path.join(base_path, "explainer", "distilled_classifier", "model.cpl")
-            ):
-                self.distill_classifier(explainer_config, base_path, classifier, classifier_dataset)
+            distilled_path = os.path.join(base_path, "explainer", "distilled_classifier", "model.cpl")
+            if not os.path.exists(distilled_path):
+                self.distill_classifier(explainer_config, base_path, classifier, classifier_datasets)
+
+            else:
+                self.classifier_distilled = torch.load(distilled_path, map_location=self.device)
 
             gradient_classifier = self.classifier_distilled
 
@@ -393,7 +400,7 @@ class DDPM(EditCapableGenerator):
             )
             args.timestep_respacing = explainer_config.timestep_respacing
             args.dataset = dataset
-            args.classifier_dataset = classifier_dataset
+            args.classifier_dataset = classifier_datasets[1]
             args.generator_dataset = self.dataset
             args.model_path = os.path.join(self.model_dir, "final.pt")
             args.classifier = gradient_classifier
