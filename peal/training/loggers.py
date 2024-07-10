@@ -171,9 +171,9 @@ class Logger:
             )
             if not pbar is None:
                 pbar.stored_values[mode + "_accuracy"] = accuracy
-                pbar.stored_values[
-                    mode + "_predicted_classes"
-                ] = predictions_one_hot.mean(0).cpu()[:2]
+                pbar.stored_values[mode + "_predicted_classes"] = (
+                    predictions_one_hot.mean(0).cpu()[:2]
+                )
                 pbar.stored_values[mode + "_targets"] = targets_one_hot.mean(0).cpu()[
                     :2
                 ]
@@ -271,7 +271,14 @@ class Logger:
 
 
 def log_images_to_writer(dataloader, writer, tag="train"):
-    if isinstance(dataloader, DataloaderMixer):
+    dataloader_mixer_treatment = isinstance(dataloader, DataloaderMixer)
+    if dataloader_mixer_treatment:
+        dataloader_mixer_treatment &= (
+            not hasattr(dataloader.train_config, "concatenate_batches")
+            or not dataloader.train_config.concatenate_batches
+        )
+
+    if dataloader_mixer_treatment:
         iterator = iter(dataloader.dataloaders[0])
 
     else:
@@ -279,16 +286,23 @@ def log_images_to_writer(dataloader, writer, tag="train"):
 
     for i in range(3):
         if i == 1:
-            if isinstance(dataloader, DataloaderMixer):
+            if dataloader_mixer_treatment:
                 iterator = iter(dataloader.dataloaders[0])
 
             else:
                 iterator = iter(dataloader)
 
-        if i == 2 and isinstance(dataloader, DataloaderMixer) and len(dataloader.dataloaders) > 1:
+        if (
+            i == 2
+            and dataloader_mixer_treatment
+            and len(dataloader.dataloaders) > 1
+        ):
             iterator = iter(dataloader.dataloaders[1])
 
         sample_train_imgs, sample_train_y = next(iterator)
+
+        if isinstance(sample_train_imgs, list):
+            sample_train_imgs, sample_train_y = sample_train_imgs
 
         if hasattr(dataloader.dataset, "project_to_pytorch_default"):
             sample_train_imgs = dataloader.dataset.project_to_pytorch_default(
@@ -307,9 +321,12 @@ def log_images_to_writer(dataloader, writer, tag="train"):
                 list(map(lambda x: int(x), list(sample_train_y)))
             )
 
-        writer.add_image(
-            sample_batch_label_str,
-            torchvision.utils.make_grid(
-                sample_train_imgs, sample_train_imgs.shape[0]
-            ),
-        )
+        try:
+            writer.add_image(
+                sample_batch_label_str,
+                torchvision.utils.make_grid(sample_train_imgs, sample_train_imgs.shape[0]),
+            )
+
+        except Exception as e:
+            import pdb; pdb.set_trace()
+            print(e)

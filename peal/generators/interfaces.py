@@ -107,22 +107,24 @@ class InvertibleGenerator(Generator):
 class EditCapableGenerator(Generator):
     def edit(
         self,
-        x_in: torch.Tensor,
-        target_confidence_goal: float,
-        source_classes: torch.Tensor,
-        target_classes: torch.Tensor,
-        classifier: nn.Module,
-        explainer_config: ExplainerConfig,
-        classifier_dataset,
-        pbar=None,
-        mode="",
-        base_path="",
+            x_in: torch.Tensor,
+            target_confidence_goal: float,
+            source_classes: torch.Tensor,
+            target_classes: torch.Tensor,
+            classifier: nn.Module,
+            explainer_config: ExplainerConfig,
+            classifier_datasets: list,
+            pbar: object = None,
+            mode: object = "",
+            base_path: object = "",
     ) -> Tuple[
         list[torch.Tensor], list[torch.Tensor], list[torch.Tensor], list[torch.Tensor]
     ]:
         """
         This function edits the input to match the target confidence goal and target classes
         Args:
+            classifier_datasets:
+            explainer_config:
             base_path:
             x_in: The input
             target_confidence_goal: The target confidence goal

@@ -2,8 +2,9 @@ import argparse
 import torch
 import os
 
+from peal.architectures.predictors import TaskConfig
 from peal.data.datasets import DataConfig
-from peal.training.trainers import TrainingConfig, TaskConfig
+from peal.training.trainers import TrainingConfig
 from peal.data.dataloaders import create_dataloaders_from_datasource
 from peal.global_utils import load_yaml_config
 from peal.training.trainers import calculate_test_accuracy

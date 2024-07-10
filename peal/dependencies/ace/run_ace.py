@@ -402,7 +402,7 @@ def main(args=None):
         and not isinstance(classifier, SequentialModel),
         "step": args.attack_step / 255,
         "y_target_goal_confidence": args.y_target_goal_confidence,
-        "predictor": classifier,
+        "original_predictor": args.original_classifier if hasattr(args, "original_classifier") else None,
     }
 
     attack = get_attack(
