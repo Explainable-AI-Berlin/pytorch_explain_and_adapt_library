@@ -4,8 +4,12 @@ import os
 from torchvision import transforms
 from torchvision.transforms import ToTensor
 
-from peal.architectures.downstream_models import TaskConfig
-from peal.global_utils import load_yaml_config, get_project_resource_dir
+from peal.architectures.predictors import TaskConfig
+from peal.global_utils import (
+    load_yaml_config,
+    get_project_resource_dir,
+    find_subclasses,
+)
 from peal.data.transformations import (
     CircularCut,
     Padding,
@@ -22,7 +26,6 @@ from peal.data.datasets import (
 )
 from peal.data.interfaces import PealDataset
 from peal.data.datasets import DataConfig
-from peal.global_utils import find_subclasses
 
 
 def get_datasets(

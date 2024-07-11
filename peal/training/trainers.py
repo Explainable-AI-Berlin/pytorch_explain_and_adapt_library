@@ -27,7 +27,7 @@ from peal.training.loggers import Logger
 from peal.training.criterions import get_criterions
 from peal.data.dataloaders import create_dataloaders_from_datasource
 from peal.generators.interfaces import Generator
-from peal.architectures.downstream_models import (
+from peal.architectures.predictors import (
     SequentialModel,
     ArchitectureConfig,
     TaskConfig,

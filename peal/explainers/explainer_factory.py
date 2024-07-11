@@ -18,7 +18,7 @@ from peal.training.trainers import ModelTrainer
 def get_explainer(
     explainer: Union[ExplainerInterface, str, dict],
     device: Union[str, torch.device] = "cuda",
-    classifier_dataset=None,
+    predictor_datasets=None,
 ) -> ExplainerInterface:
     """
     This function returns a explainer.
@@ -26,7 +26,7 @@ def get_explainer(
     Args:
         explainer (Union[Invertibleexplainer, str, dict]): The explainer to use.
         data_config (Union[str, dict]): The data config.
-        classifier_train_dataloader (torch.utils.data.DataLoader): The train dataloader of the classifier.
+        predictor_train_dataloader (torch.utils.data.DataLoader): The train dataloader of the predictor.
         dataloaders_val (torch.utils.data.DataLoader): The validation dataloader.
         base_dir (str): The base directory.
         gigabyte_vram (float): The amount of VRAM to use.
@@ -40,7 +40,7 @@ def get_explainer(
         if explainer_config.explainer_type in ['DiffeoCF', "ACE", "TIME"]:
             explainer_out = CounterfactualExplainer(
                 explainer_config=explainer_config,
-                dataset=classifier_dataset,
+                datasets=predictor_datasets,
             )
 
         else:
@@ -59,7 +59,7 @@ def get_explainer(
                 explainer_out = explainer_class_dict[explainer_config.explainer_type](
                     config=explainer_config,
                     device=device,
-                    classifier_dataset=classifier_dataset,
+                    predictor_dataset=predictor_datasets,
                 )
 
     else:

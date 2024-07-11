@@ -128,9 +128,9 @@ def load_state_dict(path, **kwargs):
 
 
 class DDPM(EditCapableGenerator):
-    def __init__(self, config, model_dir=None, device="cpu", classifier_dataset=None):
+    def __init__(self, config, model_dir=None, device="cpu", predictor_dataset=None):
         super().__init__()
-        self.classifier_distilled = None
+        self.predictor_distilled = None
         self.config = load_yaml_config(config)
 
         self.dataset = get_datasets(self.config.data)[0]
@@ -231,26 +231,26 @@ class DDPM(EditCapableGenerator):
         )
         train_loop.run_loop(self.config, writer)
 
-    def distill_classifier(self, explainer_config, base_path, classifier, classifier_datasets):
+    def distill_predictor(self, explainer_config, base_path, predictor, predictor_datasets):
         distillation_datasets = []
         for i in range(2):
             class_predictions_path = os.path.join(base_path, "explainer", str(i) + "predictions.csv")
             Path(os.path.join(base_path, "explainer")).mkdir(exist_ok=True, parents=True)
             if not os.path.exists(class_predictions_path):
-                classifier_datasets[i].enable_url()
+                predictor_datasets[i].enable_url()
                 prediction_args = types.SimpleNamespace(
                     batch_size=32,
-                    dataset=classifier_datasets[i],
-                    classifier=classifier,
+                    dataset=predictor_datasets[i],
+                    classifier=predictor,
                     label_path=class_predictions_path,
                     partition="train",
                     label_query=0,
                     max_samples=explainer_config.max_samples,
                 )
                 get_predictions(prediction_args)
-                classifier_datasets[i].disable_url()
+                predictor_datasets[i].disable_url()
 
-            distilled_dataset_config = copy.deepcopy(classifier_datasets[i].config)
+            distilled_dataset_config = copy.deepcopy(predictor_datasets[i].config)
             distilled_dataset_config.split = [1.0, 1.0] if i == 0 else [0.0, 1.0]
             distilled_dataset_config.confounding_factors = None
             distilled_dataset_config.confounder_probability = None
@@ -258,18 +258,18 @@ class DDPM(EditCapableGenerator):
             distillation_datasets.append(get_datasets(
                 config=distilled_dataset_config, data_dir=class_predictions_path
             )[i])
-            distilled_classifier_config = load_yaml_config(explainer_config.distilled_classifier, PredictorConfig)
-            distilled_classifier_config.data = distilled_dataset_config
-            explainer_config.distilled_classifier = distilled_classifier_config
-            distillation_datasets[i].task_config = explainer_config.distilled_classifier.task
+            distilled_predictor_config = load_yaml_config(explainer_config.distilled_predictor, PredictorConfig)
+            distilled_predictor_config.data = distilled_dataset_config
+            explainer_config.distilled_predictor = distilled_predictor_config
+            distillation_datasets[i].task_config = explainer_config.distilled_predictor.task
 
-        self.classifier_distilled = copy.deepcopy(classifier)
+        self.predictor_distilled = copy.deepcopy(predictor)
         distillation_trainer = ModelTrainer(
-            config=explainer_config.distilled_classifier,
-            model=self.classifier_distilled,
+            config=explainer_config.distilled_predictor,
+            model=self.predictor_distilled,
             datasource=distillation_datasets,
             model_path=os.path.join(
-                base_path, "explainer", "distilled_classifier"
+                base_path, "explainer", "distilled_predictor"
             )
         )
         distillation_trainer.fit()
@@ -280,25 +280,25 @@ class DDPM(EditCapableGenerator):
         target_confidence_goal: float,
         source_classes: torch.Tensor,
         target_classes: torch.Tensor,
-        classifier: nn.Module,
+        predictor: nn.Module,
         explainer_config: ACEConfig,
-        classifier_datasets: list,
+        predictor_datasets: list,
         pbar=None,
         base_path : str="",
         mode : str="",
     ):
-        if not explainer_config.distilled_classifier is None:
-            distilled_path = os.path.join(base_path, "explainer", "distilled_classifier", "model.cpl")
+        if not explainer_config.distilled_predictor is None:
+            distilled_path = os.path.join(base_path, "explainer", "distilled_predictor", "model.cpl")
             if not os.path.exists(distilled_path):
-                self.distill_classifier(explainer_config, base_path, classifier, classifier_datasets)
+                self.distill_predictor(explainer_config, base_path, predictor, predictor_datasets)
 
             else:
-                self.classifier_distilled = torch.load(distilled_path, map_location=self.device)
+                self.predictor_distilled = torch.load(distilled_path, map_location=self.device)
 
-            gradient_classifier = self.classifier_distilled
+            gradient_predictor = self.predictor_distilled
 
         else:
-            gradient_classifier = classifier
+            gradient_predictor = predictor
 
         dataset = [
             (
@@ -400,20 +400,20 @@ class DDPM(EditCapableGenerator):
             )
             args.timestep_respacing = explainer_config.timestep_respacing
             args.dataset = dataset
-            args.classifier_dataset = classifier_datasets[1]
+            args.predictor_dataset = predictor_datasets[1]
             args.generator_dataset = self.dataset
             args.model_path = os.path.join(self.model_dir, "final.pt")
-            args.classifier = gradient_classifier
-            args.original_classifier = classifier
+            args.classifier = gradient_predictor
+            args.original_classifier = predictor
             args.diffusion = self.diffusion
             args.model = self.model
             #
             x_counterfactuals_current = ace_main(args=args)
             x_counterfactuals_current = torch.cat(x_counterfactuals_current, dim=0)
 
-            device = [p for p in classifier.parameters()][0].device
+            device = [p for p in predictor.parameters()][0].device
             preds = torch.nn.Softmax(dim=-1)(
-                classifier(x_counterfactuals_current.to(device)).detach().cpu()
+                predictor(x_counterfactuals_current.to(device)).detach().cpu()
             )
             print("preds_final: " + str([float(preds[i][target_classes[i]]) for i in range(len(target_classes))]))
             y_target_end_confidence_current = torch.zeros([x_in.shape[0]])
