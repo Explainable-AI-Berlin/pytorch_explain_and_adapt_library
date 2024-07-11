@@ -141,6 +141,7 @@ class DataConfig(BaseModel):
     The path of the original dataset.
     """
     inverse: Union[type(None), str] = None
+    has_hints: bool = False
 
 
 class SymbolicDataset(PealDataset):

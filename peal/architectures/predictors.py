@@ -12,6 +12,8 @@ from peal.architectures.module_blocks import (
     VGGBlock,
     create_cnn_layer, ResnetConfig, FCConfig, VGGConfig, TransformerConfig,
 )
+from peal.global_utils import load_yaml_config
+
 
 class TaskConfig(BaseModel):
     """
@@ -113,6 +115,18 @@ class ArchitectureConfig:
             else:
                 self.layers.append(layer[0])
 
+def get_predictor(predictor, device="cpu"):
+    if isinstance(predictor, torch.nn.Module):
+        return predictor, None
+
+    elif isinstance(predictor, str) and predictor[-4:] == ".cpl":
+        return torch.load(predictor, map_location=device), None
+
+    else:
+        predictor_config = load_yaml_config(predictor)
+        model_path = os.path.join(predictor_config.model_path, "model.cpl")
+        predictor_out = torch.load(model_path, map_location=device)
+        return predictor_out, predictor_config
 
 
 def load_model(

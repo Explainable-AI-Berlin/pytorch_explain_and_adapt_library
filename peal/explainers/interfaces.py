@@ -35,3 +35,9 @@ class ExplainerInterface:
 
     def run(self, oracle_path=None, confounder_oracle_path=None):
         pass
+
+    def human_annotate_explanations(self, param):
+        pass
+
+    def visualize_interpretations(self, feedback, param, param1):
+        pass

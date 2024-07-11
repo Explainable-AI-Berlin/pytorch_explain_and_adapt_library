@@ -19,7 +19,7 @@ from peal.training.trainers import ModelTrainer
 def get_generator(
     generator: Union[InvertibleGenerator, str, dict],
     device: Union[str, torch.device] = "cuda",
-    classifier_dataset=None,
+    predictor_dataset=None,
 ) -> InvertibleGenerator:
     """
     This function returns a generator.
@@ -27,7 +27,7 @@ def get_generator(
     Args:
         generator (Union[InvertibleGenerator, str, dict]): The generator to use.
         data_config (Union[str, dict]): The data config.
-        classifier_train_dataloader (torch.utils.data.DataLoader): The train dataloader of the classifier.
+        predictor_train_dataloader (torch.utils.data.DataLoader): The train dataloader of the predictor.
         dataloaders_val (torch.utils.data.DataLoader): The validation dataloader.
         base_dir (str): The base directory.
         gigabyte_vram (float): The amount of VRAM to use.
@@ -60,7 +60,7 @@ def get_generator(
             generator_out = generator_class_dict[generator_config.generator_type](
                 config=generator_config,
                 device=device,
-                classifier_dataset=classifier_dataset,
+                predictor_dataset=predictor_dataset,
             )
 
     else:

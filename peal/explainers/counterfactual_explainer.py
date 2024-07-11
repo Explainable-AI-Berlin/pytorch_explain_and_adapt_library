@@ -3,6 +3,7 @@ import os
 import shutil
 import threading
 import time
+import types
 from pathlib import Path
 
 import torch
@@ -15,6 +16,7 @@ from typing import Union
 
 from tqdm import tqdm
 
+from peal.architectures.predictors import get_predictor, TaskConfig
 from peal.data.dataset_factory import get_datasets
 from peal.data.datasets import DataConfig
 from peal.generators.generator_factory import get_generator
@@ -46,7 +48,7 @@ class ACEConfig(ExplainerConfig):
     """
     explainer_type: str = "ACE"
     loss_fn: Union[type(None), str] = None
-    predictor_path: Union[str, type(None)] = None
+    predictor: Union[str, type(None), dict] = None
     generator: Union[type(None), GeneratorConfig] = None
     data_config: Union[type(None), DataConfig] = None
     attack_iterations: Union[list, int] = 100
@@ -56,7 +58,7 @@ class ACEConfig(ExplainerConfig):
     sampling_inpaint: Union[list, float] = 0.2
     sampling_dilation: Union[list, int] = 17
     timestep_respacing: Union[list, int] = 50
-    distilled_classifier: Union[type(None), str] = None
+    distilled_predictor: Union[type(None), str] = None
     attempts: int = 1
     clip_denoised: bool = True  # Clipping noise
     batch_size: int = 32  # Batch size
@@ -198,7 +200,7 @@ class TIMEConfig(ExplainerConfig):
     p: float = 0.93
     l2: float = 0.0
     inference_batch_size: int = 1
-    classifier_image_size: int = 128
+    predictor_image_size: int = 128
     recover: bool = False
     num_samples: int = 9999999999999999
     merge_chunks: bool = False
@@ -244,9 +246,9 @@ class CounterfactualExplainer(ExplainerInterface):
     """
 
     def __init__(
-        self,
+            self,
             explainer_config: Union[dict, str, ExplainerConfig],
-            downstream_model: nn.Module = None,
+            predictor: nn.Module = None,
             generator: Union[InvertibleGenerator, EditCapableGenerator] = None,
             input_type: str = None,
             datasets: list = None,
@@ -257,21 +259,18 @@ class CounterfactualExplainer(ExplainerInterface):
         This class implements the counterfactual explanation method
 
         Args:
-            downstream_model (nn.Module): _description_
+            explainer_config (Union[ dict, str ], optional): _description_. .
+            predictor (nn.Module): _description_
             generator (InvertibleGenerator): _description_
             input_type (str): _description_
             datasets (list[PealDataset]): _description_
-            explainer_config (Union[ dict, str ], optional): _description_. Defaults to "/configs/explainers/counterfactual_default.yaml".
         """
         self.explainer_config = load_yaml_config(explainer_config)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        if not downstream_model is None:
-            self.downstream_model = downstream_model
+        if predictor is None:
+            predictor = explainer_config.predictor
 
-        else:
-            self.downstream_model = torch.load(self.explainer_config.predictor_path).to(
-                self.device
-            )
+        self.predictor, self.predictor_config = get_predictor(predictor, self.device)
 
         if not generator is None or isinstance(self.explainer_config, PerfectFalseCounterfactualConfig):
             self.generator = generator
@@ -295,10 +294,26 @@ class CounterfactualExplainer(ExplainerInterface):
             )
 
         if not datasets is None:
-            self.classifier_datasets = datasets
+            self.predictor_datasets = datasets
 
         else:
-            self.classifier_datasets = get_datasets(self.explainer_config.data_config)[:1]
+            if not self.explainer_config.data_config is None:
+                data_config = self.explainer_config.data_config
+
+            elif not self.predictor_config is None:
+                data_config = self.predictor_config.data
+
+            else:
+                print("No data config found!")
+                raise ValueError
+
+            if not self.predictor_config is None:
+                task_config = TaskConfig(**self.predictor_config.task)
+
+            else:
+                task_config = None
+
+            self.predictor_datasets = get_datasets(data_config, task_config=task_config)[:2]
 
         self.input_type = input_type
         if not tracking_level is None:
@@ -310,7 +325,7 @@ class CounterfactualExplainer(ExplainerInterface):
         self.loss = torch.nn.CrossEntropyLoss()
 
         if isinstance(self.explainer_config, PerfectFalseCounterfactualConfig):
-            inverse_config = copy.deepcopy(self.classifier_datasets[1].config)
+            inverse_config = copy.deepcopy(self.predictor_datasets[1].config)
             inverse_config.dataset_path += "_inverse"
             inverse_datasets = get_datasets(inverse_config)
             self.inverse_datasets = {}
@@ -320,12 +335,12 @@ class CounterfactualExplainer(ExplainerInterface):
                 self.inverse_datasets["test"] = inverse_datasets[2]
 
             if not test_data_config is None:
-                inverse_test_config = copy.deepcopy(self.classifier_datasets[1].config)
+                inverse_test_config = copy.deepcopy(self.predictor_datasets[1].config)
                 inverse_test_config.dataset_path += "_inverse"
                 self.inverse_datasets["test"] = get_datasets(inverse_test_config)[-1]
 
     def gradient_based_counterfactual(
-        self, x_in, target_confidence_goal, target_classes, pbar=None, mode=""
+            self, x_in, target_confidence_goal, target_classes, pbar=None, mode=""
     ):
         """
         This function generates a counterfactual for a given batch of inputs.
@@ -337,7 +352,7 @@ class CounterfactualExplainer(ExplainerInterface):
             _type_: _description_
         """
         x = torch.clone(x_in)
-        x = self.classifier_datasets[1].project_to_pytorch_default(x)
+        x = self.predictor_datasets[1].project_to_pytorch_default(x)
         x = self.generator.dataset.project_from_pytorch_default(x)
         x = torchvision.transforms.Resize(self.generator.config.data.input_size[1:])(x)
         v_original = self.generator.encode(x.to(self.device))
@@ -364,8 +379,8 @@ class CounterfactualExplainer(ExplainerInterface):
         for i in range(self.explainer_config.gradient_steps):
             if self.explainer_config.use_masking:
                 mask = (
-                    torch.tensor(target_confidences).to(self.device)
-                    < target_confidence_goal
+                        torch.tensor(target_confidences).to(self.device)
+                        < target_confidence_goal
                 )
                 if torch.sum(mask) == 0.0:
                     break
@@ -377,11 +392,11 @@ class CounterfactualExplainer(ExplainerInterface):
 
             img = self.generator.dataset.project_to_pytorch_default(img)
             img = torchvision.transforms.Resize(
-                self.classifier_datasets[1].config.input_size[1:]
+                self.predictor_datasets[1].config.input_size[1:]
             )(img)
-            img = self.classifier_datasets[1].project_from_pytorch_default(img)
+            img = self.predictor_datasets[1].project_from_pytorch_default(img)
 
-            logits_perturbed = self.downstream_model(
+            logits_perturbed = self.predictor(
                 img + self.explainer_config.img_noise_injection * torch.randn_like(img)
             )
             loss = self.loss(logits_perturbed, target_classes.to(self.device))
@@ -447,12 +462,12 @@ class CounterfactualExplainer(ExplainerInterface):
             counterfactual
         )
         counterfactual = torchvision.transforms.Resize(
-            self.classifier_datasets[1].config.input_size[1:]
+            self.predictor_datasets[1].config.input_size[1:]
         )(counterfactual)
-        counterfactual = self.classifier_datasets[1].project_from_pytorch_default(
+        counterfactual = self.predictor_datasets[1].project_from_pytorch_default(
             counterfactual
         )
-        logits = self.downstream_model(counterfactual.to(self.device))
+        logits = self.predictor(counterfactual.to(self.device))
         logit_confidences = torch.nn.Softmax(dim=-1)(logits).detach().cpu()
         target_confidences = [
             float(logit_confidences[i][target_classes[i]])
@@ -488,7 +503,7 @@ class CounterfactualExplainer(ExplainerInterface):
             x_counterfactual = self.inverse_datasets[mode][idx][0]
             x_counterfactual_list.append(x_counterfactual)
             preds = torch.nn.Softmax()(
-                self.downstream_model(x_counterfactual.unsqueeze(0).to(self.device))
+                self.predictor(x_counterfactual.unsqueeze(0).to(self.device))
                 .detach()
                 .cpu()
             )
@@ -498,15 +513,15 @@ class CounterfactualExplainer(ExplainerInterface):
         return x_counterfactual_list, z_difference_list, y_target_end_confidence_list
 
     def explain_batch(
-        self,
-        batch: dict,
-        base_path: str = "collages",
-        start_idx: int = 0,
-        y_target_goal_confidence_in: float = None,
-        remove_below_threshold: bool = True,
-        pbar=None,
-        mode="",
-        explainer_path=None,
+            self,
+            batch: dict,
+            base_path: str = "collages",
+            start_idx: int = 0,
+            y_target_goal_confidence_in: float = None,
+            remove_below_threshold: bool = True,
+            pbar=None,
+            mode="",
+            explainer_path=None,
     ) -> dict:
         """
         This function generates a counterfactual for a given batch of inputs.
@@ -576,11 +591,11 @@ class CounterfactualExplainer(ExplainerInterface):
                 target_confidence_goal=target_confidence_goal,
                 target_classes=torch.tensor(batch["y_target_list"]),
                 source_classes=torch.tensor(batch["y_source_list"]),
-                classifier=self.downstream_model,
+                predictor=self.predictor,
                 explainer_config=self.explainer_config,
                 pbar=pbar,
                 mode=mode,
-                classifier_datasets=self.classifier_datasets,
+                predictor_datasets=self.predictor_datasets,
                 base_path=explainer_path,
             )
 
@@ -590,8 +605,8 @@ class CounterfactualExplainer(ExplainerInterface):
                 batch_out[key] = []
                 for sample_idx in range(len(batch[key])):
                     if (
-                        batch["y_target_end_confidence_list"][sample_idx]
-                        >= 0.5
+                            batch["y_target_end_confidence_list"][sample_idx]
+                            >= 0.5
                     ):
                         batch_out[key].append(batch[key][sample_idx])
 
@@ -602,10 +617,10 @@ class CounterfactualExplainer(ExplainerInterface):
             (
                 batch_out["x_attribution_list"],
                 batch_out["collage_path_list"],
-            ) = self.classifier_datasets[1].generate_contrastive_collage(
+            ) = self.predictor_datasets[1].generate_contrastive_collage(
                 target_confidence_goal=target_confidence_goal,
                 base_path=base_path,
-                classifier=self.downstream_model,
+                predictor=self.predictor,
                 start_idx=start_idx,
                 **batch_out,
             )
@@ -629,18 +644,27 @@ class CounterfactualExplainer(ExplainerInterface):
         batches_out = []
         batch = None
         collage_idx = 0
-        for idx in range(len(self.classifier_datasets[1])):
+        if self.predictor_datasets[1].config.has_hints:
+            self.predictor_datasets[1].enable_hints()
+
+        for idx in range(len(self.predictor_datasets[1])):
             if (
-                not self.explainer_config.max_samples is None
-                and collage_idx >= self.explainer_config.max_samples
+                    not self.explainer_config.max_samples is None
+                    and collage_idx >= self.explainer_config.max_samples
             ):
                 break
 
-            x, y = self.classifier_datasets[1][idx]
-            y_logits = self.downstream_model(x.unsqueeze(0).to(self.device))[0]
+            x, y = self.predictor_datasets[1][idx]
+            if self.predictor_datasets[1].hints_enabled:
+                y, hint = y
+
+            else:
+                hint = None
+
+            y_logits = self.predictor(x.unsqueeze(0).to(self.device))[0]
             y_pred = y_logits.argmax()
             y_confidence = torch.nn.Softmax(dim=-1)(y_logits)
-            for y_target in range(self.classifier_datasets[1].output_size[0]):
+            for y_target in range(self.predictor_datasets[1].output_size):
                 if y_target == y_pred:
                     continue
 
@@ -655,6 +679,8 @@ class CounterfactualExplainer(ExplainerInterface):
                         ),
                         "idx_list": [idx],
                     }
+                    if not hint is None:
+                        batch["hint_list"] = [hint]
 
                 else:
                     batch["x_list"] = torch.cat([batch["x_list"], x.unsqueeze(0)], 0)
@@ -673,6 +699,8 @@ class CounterfactualExplainer(ExplainerInterface):
                         0,
                     )
                     batch["idx_list"].append(idx)
+                    if not hint is None:
+                        batch["hint_list"].append(hint)
 
                 if batch["x_list"].shape[0] == self.explainer_config.batch_size:
                     batches_out.append(
@@ -698,12 +726,12 @@ class CounterfactualExplainer(ExplainerInterface):
 
         return batches_out_dict
 
-    def human_annotate_counterfactuals(
-        self,
-        collage_path_list,
-        y_source_list=None,
-        y_target_list=None,
-        **kwargs,
+    def human_annotate_explanations(
+            self,
+            collage_path_list,
+            y_source_list=None,
+            y_target_list=None,
+            **kwargs,
     ):
         """ """
         # TODO fix bug with reloading
@@ -734,8 +762,8 @@ class CounterfactualExplainer(ExplainerInterface):
                     self.data.feedback.append(request.form["user_input"])
 
                 if (
-                    len(self.data.collage_paths) > 0
-                    and len(self.data.collage_paths) > self.data.i
+                        len(self.data.collage_paths) > 0
+                        and len(self.data.collage_paths) > self.data.i
                 ):
                     collage_path = self.data.collage_paths[self.data.i]
                     self.data.i += 1
@@ -804,7 +832,7 @@ class CounterfactualExplainer(ExplainerInterface):
         # thread.join()
         feedback = copy.deepcopy(self.data.feedback)
         with open(
-            os.path.join(self.explainer_config.explanations_dir, "feedback.txt"), "w"
+                os.path.join(self.explainer_config.explanations_dir, "feedback.txt"), "w"
         ) as f:
             f.write("\n".join(feedback))
 
@@ -820,20 +848,20 @@ class CounterfactualExplainer(ExplainerInterface):
             self.explainer_config.explanations_dir, "interpretations"
         )
         Path(interpretations_dir).mkdir(parents=True, exist_ok=True)
-        for source_class in range(self.classifier_datasets[1].output_size[0]):
+        for source_class in range(self.predictor_datasets[1].output_size):
             for target_class in range(
-                source_class + 1, self.classifier_datasets[1].output_size[0]
+                    source_class + 1, self.predictor_datasets[1].output_size
             ):
                 interpretation = {}
                 for idx, elem in enumerate(zip(feedback, y_source_list, y_target_list)):
                     feedback_elem, source_class_elem, target_class_elem = elem
                     qualifies = (
-                        source_class == source_class_elem
-                        and target_class == target_class_elem
+                            source_class == source_class_elem
+                            and target_class == target_class_elem
                     )
                     qualifies = qualifies or (
-                        source_class == target_class_elem
-                        and target_class == source_class_elem
+                            source_class == target_class_elem
+                            and target_class == source_class_elem
                     )
                     if qualifies:
                         if not feedback_elem in interpretation.keys():

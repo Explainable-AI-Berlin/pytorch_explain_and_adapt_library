@@ -1,9 +1,6 @@
 import argparse
 import torch
 
-# from peal.explainers.explainer_factory import get_explainer
-
-from peal.data.dataset_factory import get_datasets
 from peal.explainers.explainer_factory import get_explainer
 from peal.global_utils import load_yaml_config
 
@@ -20,7 +17,7 @@ def main():
 
     explainer = get_explainer(config)
     explanations_dict = explainer.run(args.oracle_path, args.confounder_oracle_path)
-    feedback = explainer.human_annotate_counterfactuals(**explanations_dict)
+    feedback = explainer.human_annotate_explanations(**explanations_dict)
     feedback = explainer.visualize_interpretations(
         feedback, explanations_dict["y_source_list"], explanations_dict["y_target_list"]
     )
