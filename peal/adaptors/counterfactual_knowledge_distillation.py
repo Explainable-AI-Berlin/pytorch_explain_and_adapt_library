@@ -26,7 +26,10 @@ from peal.data.dataloaders import (
     create_dataloaders_from_datasource,
 )
 from peal.training.trainers import ModelTrainer, calculate_test_accuracy
-from peal.explainers.counterfactual_explainer import CounterfactualExplainer, PerfectFalseCounterfactualConfig
+from peal.explainers.counterfactual_explainer import (
+    CounterfactualExplainer,
+    PerfectFalseCounterfactualConfig,
+)
 from peal.visualization.model_comparison import (
     create_comparison,
 )
@@ -46,6 +49,7 @@ from peal.explainers.interfaces import ExplainerConfig
 from peal.explainers.counterfactual_explainer import ACEConfig
 from peal.adaptors.interfaces import AdaptorConfig, Adaptor
 from peal.global_utils import get_config_model
+
 
 class CFKDConfig(AdaptorConfig):
     """
@@ -300,9 +304,13 @@ class CFKDConfig(AdaptorConfig):
         self.teacher = teacher if not teacher is None else self.teacher
         self.base_dir = base_dir if not base_dir is None else self.base_dir
         self.batch_size = batch_size if not batch_size is None else self.batch_size
-        self.validation_runs = validation_runs if not validation_runs is None else self.validation_runs
+        self.validation_runs = (
+            validation_runs if not validation_runs is None else self.validation_runs
+        )
         self.calculate_group_accuracies = (
-            calculate_group_accuracies if not calculate_group_accuracies is None else self.calculate_group_accuracies
+            calculate_group_accuracies
+            if not calculate_group_accuracies is None
+            else self.calculate_group_accuracies
         )
         self.gigabyte_vram = (
             gigabyte_vram if not gigabyte_vram is None else self.gigabyte_vram
@@ -321,7 +329,9 @@ class CFKDConfig(AdaptorConfig):
             else self.continuous_learning
         )
         self.attribution_threshold = (
-            attribution_threshold if not attribution_threshold is None else self.attribution_threshold
+            attribution_threshold
+            if not attribution_threshold is None
+            else self.attribution_threshold
         )
         self.min_start_target_percentile = (
             min_start_target_percentile
@@ -359,14 +369,27 @@ class CFKDConfig(AdaptorConfig):
             else self.current_iteration
         )
         self.overwrite = overwrite if not overwrite is None else self.overwrite
-        self.use_visualization = use_visualization if not use_visualization is None else self.use_visualization
-        self.max_test_batches = max_test_batches if not max_test_batches is None else self.max_test_batches
-        self.tracking_level = tracking_level if not tracking_level is None else self.tracking_level
-        self.counterfactual_type = counterfactual_type if not counterfactual_type is None else self.counterfactual_type
+        self.use_visualization = (
+            use_visualization
+            if not use_visualization is None
+            else self.use_visualization
+        )
+        self.max_test_batches = (
+            max_test_batches if not max_test_batches is None else self.max_test_batches
+        )
+        self.tracking_level = (
+            tracking_level if not tracking_level is None else self.tracking_level
+        )
+        self.counterfactual_type = (
+            counterfactual_type
+            if not counterfactual_type is None
+            else self.counterfactual_type
+        )
         if not self.use_confusion_matrix:
-            assert self.batch_size % 2 == 0, "Batch size must be even when using deterministic CFKD!"
+            assert (
+                self.batch_size % 2 == 0
+            ), "Batch size must be even when using deterministic CFKD!"
         self.kwargs = kwargs
-
 
 
 class CounterfactualKnowledgeDistillation(Adaptor):
@@ -462,7 +485,7 @@ class CounterfactualKnowledgeDistillation(Adaptor):
                 generator if not generator is None else self.adaptor_config.generator
             ),
             device=self.device,
-            classifier_dataset=self.val_dataloader.dataset,
+            predictor_dataset=self.val_dataloader.dataset,
         )
 
         self.output_size = (
@@ -499,7 +522,7 @@ class CounterfactualKnowledgeDistillation(Adaptor):
             assert self.adaptor_config.tracking_level > 0, "Tracking level too low!"
 
         self.explainer = CounterfactualExplainer(
-            downstream_model=self.student,
+            predictor=self.student,
             generator=self.generator,
             input_type=self.adaptor_config.data.input_type,
             explainer_config=self.adaptor_config.explainer,
@@ -1308,7 +1331,10 @@ class CounterfactualKnowledgeDistillation(Adaptor):
                     0.5 * (attribute[1][1] + attribute[1][0]),
                 )
 
+        tracking_level_buffer = self.explainer.tracking_level
+        self.explainer.tracking_level = 0
         img_success = create_comparison(
+            explainer=self.explainer,
             dataset=self.test_dataloader.dataset,
             criterions=criterions,
             columns={
@@ -1316,21 +1342,30 @@ class CounterfactualKnowledgeDistillation(Adaptor):
                     "cf",
                     self.original_student,
                     "uncorrected",
+                    os.path.join(self.adaptor_config.base_dir, "0"),
                 ],
-                "CFKD\ncorrected": ["cf", self.student, "cfkd"],
+                "CFKD\ncorrected": [
+                    "cf",
+                    self.student,
+                    "cfkd",
+                    os.path.join(
+                        self.adaptor_config.base_dir,
+                        str(self.adaptor_config.current_iteration),
+                    ),
+                ],
             },
             score_reference_idx=1,
-            generator=self.generator,
             device=self.device,
-            explainer_config=explainer_config,
             checkbox_dict_in=checkbox_dict,
             batch_size=self.adaptor_config.batch_size,
+            max_samples=100,
         )
         for path in paths:
             img_success.save(path.replace(".png", "_success.png"))
             print("Saved: " + path.replace(".png", "_success.png"))
 
         img = create_comparison(
+            explainer=self.explainer,
             dataset=self.test_dataloader.dataset,
             criterions=criterions,
             columns={
@@ -1338,15 +1373,27 @@ class CounterfactualKnowledgeDistillation(Adaptor):
                     "cf",
                     self.original_student,
                     "uncorrected",
+                    self.explainer,
+                    os.path.join(self.adaptor_config.base_dir, "0"),
                 ],
-                "CFKD\ncorrected": ["cf", self.student, "cfkd"],
+                "CFKD\ncorrected": [
+                    "cf",
+                    self.student,
+                    "cfkd",
+                    self.explainer,
+                    os.path.join(
+                        self.adaptor_config.base_dir,
+                        str(self.adaptor_config.current_iteration),
+                    ),
+                ],
             },
             score_reference_idx=1,
-            generator=self.generator,
             device=self.device,
-            explainer_config=self.adaptor_config.explainer,
             batch_size=self.adaptor_config.batch_size,
+            max_samples=100,
         )
+        self.explainer.predictor = self.student
+        self.explainer.tracking_level = tracking_level_buffer
 
         for path in paths:
             img.save(path)

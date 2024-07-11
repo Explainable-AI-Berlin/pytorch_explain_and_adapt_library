@@ -73,7 +73,9 @@ def embed_text_in_image(text, width, height):
         "/usr/share/fonts/truetype/freefont/FreeMono.ttf", size=10
     )"""
     font = ImageFont.load_default()
-    w, h = draw.textsize(text, font)
+    bbox = font.getbbox(text)
+    w = bbox[2] - bbox[0]
+    h = bbox[3] - bbox[1]
 
     # calculate x,y cordinate for text
     x = (image.width - w) / 2
