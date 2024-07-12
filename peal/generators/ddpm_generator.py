@@ -3,6 +3,7 @@ import random
 import types
 import shutil
 import copy
+from datetime import datetime
 from pathlib import Path
 
 import torch
@@ -165,7 +166,13 @@ class DDPM(EditCapableGenerator):
     def train_model(
         self,
     ):
-        shutil.rmtree(self.model_dir, ignore_errors=True)
+        if os.path.exists(self.model_dir):
+            shutil.move(
+                self.model_dir,
+                self.model_dir
+                + "_old_"
+                + datetime.now().strftime("%Y%m%d_%H%M%S"),
+            )
 
         # dist_util.setup_dist(self.config.gpus)
         logger.configure(dir=self.model_dir)

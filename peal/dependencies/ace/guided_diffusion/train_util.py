@@ -4,6 +4,7 @@ import os
 import glob
 import copy
 import shutil
+from datetime import datetime
 
 import torch
 import yaml
@@ -187,7 +188,15 @@ class TrainLoop:
         )
         pbar.num_steps = self.data.dataloader.train_config.steps_per_epoch
         pbar.config = config
-        shutil.rmtree(self.model_dir, ignore_errors=True)
+
+        if os.path.exists(self.model_dir):
+            shutil.move(
+                self.model_dir,
+                self.model_dir
+                + "_old_"
+                + datetime.now().strftime("%Y%m%d_%H%M%S"),
+            )
+
         os.makedirs(os.path.join(self.model_dir, "ema"), exist_ok=True)
         os.makedirs(os.path.join(self.model_dir, "model"), exist_ok=True)
         os.makedirs(os.path.join(self.model_dir, "optimizer"), exist_ok=True)

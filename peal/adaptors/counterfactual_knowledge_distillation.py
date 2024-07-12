@@ -1,4 +1,6 @@
 import os
+from datetime import datetime
+
 import torch
 import copy
 import shutil
@@ -579,14 +581,20 @@ class CounterfactualKnowledgeDistillation(Adaptor):
 
     def initialize_run(self):
         if self.overwrite:
-            shutil.rmtree(self.base_dir, ignore_errors=True)
+            # move from self.base_dir to self.base_dir + "_old_" + {date}_{timestamp}
+            if os.path.exists(self.base_dir):
+                shutil.move(
+                    self.base_dir,
+                    self.base_dir
+                    + "_old_"
+                    + datetime.now().strftime("%Y%m%d_%H%M%S"),
+                )
 
         if not os.path.exists(
             os.path.join(self.base_dir, "0", "validation_tracked_values.npz")
         ):
             assert self.adaptor_config.current_iteration == 0
             print("Create base_dir in: " + str(self.base_dir))
-            # shutil.rmtree(self.base_dir, ignore_errors=True)
             Path(self.base_dir).mkdir(parents=True, exist_ok=True)
             writer = SummaryWriter(os.path.join(self.base_dir, "logs"))
             log_images_to_writer(self.train_dataloader, writer, "train0")
@@ -812,10 +820,15 @@ class CounterfactualKnowledgeDistillation(Adaptor):
         collage_base_path = os.path.join(
             self.base_dir, str(finetune_iteration), "collages"
         )
-        shutil.rmtree(
-            collage_base_path,
-            ignore_errors=True,
-        )
+        if os.path.exists(collage_base_path):
+            # move from self.base_dir to self.base_dir + "_old_" + {date}_{timestamp}
+            shutil.move(
+                collage_base_path,
+                collage_base_path
+                + "_old_"
+                + datetime.now().strftime("%Y%m%d_%H%M%S")
+            )
+
         Path(collage_base_path).mkdir(parents=True, exist_ok=True)
 
         tracked_values = {key: [] for key in tracked_keys}
@@ -1165,10 +1178,20 @@ class CounterfactualKnowledgeDistillation(Adaptor):
                 "model.cpl",
             )
         ):
-            shutil.rmtree(
-                os.path.join(self.base_dir, str(finetune_iteration), "finetuned_model"),
-                ignore_errors=True,
-            )
+            if os.path.exists(
+                os.path.join(self.base_dir, str(finetune_iteration), "finetuned_model")
+            ):
+                # move from self.base_dir to self.base_dir + "_old_" + {date}_{timestamp}
+                shutil.move(
+                    os.path.join(self.base_dir, str(finetune_iteration), "finetuned_model"),
+                    os.path.join(
+                        self.base_dir,
+                        str(finetune_iteration),
+                        "finetuned_model_old_"
+                        + datetime.now().strftime("%Y%m%d_%H%M%S"),
+                    ),
+                )
+
             Path(
                 os.path.join(self.base_dir, str(finetune_iteration), "finetuned_model")
             ).mkdir(parents=True, exist_ok=True)
@@ -1373,14 +1396,12 @@ class CounterfactualKnowledgeDistillation(Adaptor):
                     "cf",
                     self.original_student,
                     "uncorrected",
-                    self.explainer,
                     os.path.join(self.adaptor_config.base_dir, "0"),
                 ],
                 "CFKD\ncorrected": [
                     "cf",
                     self.student,
                     "cfkd",
-                    self.explainer,
                     os.path.join(
                         self.adaptor_config.base_dir,
                         str(self.adaptor_config.current_iteration),
@@ -1515,15 +1536,15 @@ class CounterfactualKnowledgeDistillation(Adaptor):
             self.explainer.explainer_config = original_explainer_config
             if self.adaptor_config.validation_runs > 1:
                 self.datastack.dataset._initialize_performance_metrics()
-                validation_stats["distance_to_manifold"] = (
-                    self.datastack.dataset.distribution_distance(
-                        x_counterfactual_collection
-                    )
+                validation_stats[
+                    "distance_to_manifold"
+                ] = self.datastack.dataset.distribution_distance(
+                    x_counterfactual_collection
                 )
-                validation_stats["pairwise_distance"] = (
-                    self.datastack.dataset.pair_wise_distance(
-                        x_list_collection, x_counterfactual_collection
-                    )
+                validation_stats[
+                    "pairwise_distance"
+                ] = self.datastack.dataset.pair_wise_distance(
+                    x_list_collection, x_counterfactual_collection
                 )
                 validation_stats["diversity"] = self.datastack.dataset.variance(
                     x_counterfactual_collection
