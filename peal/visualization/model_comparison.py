@@ -34,18 +34,13 @@ def get_explanation(
     description,
     scores,
     checkbox_dict,
-    generator,
-    dataset,
-    score_reference_idx,
-    explainer_config=None,
-    counterfactual_explainer=None,
+    explainer,
     batch_size=1,
 ):
-    explanation_type, model, target_key = description
+    explanation_type, model, target_key, base_path = description
     lrp_target = checkbox_dict[target_key]
-    if explanation_type == "lrp":
-        lrp_explainer = LRPExplainer(downstream_model=model, num_classes=2)
-        lrp_heatmap, lrp_overlay, prediction = lrp_explainer.explain_batch(
+    if isinstance(explainer, LRPExplainer):
+        lrp_heatmap, lrp_overlay, prediction = explainer.explain_batch(
             X, lrp_target
         )
         lrp_heatmap = lrp_heatmap.cpu()
@@ -59,9 +54,9 @@ def get_explanation(
         )
         return [lrp_heatmap, lrp_overlay], lrp_scores
 
-    elif explanation_type == "cf":
+    elif isinstance(explainer, CounterfactualExplainer):
         cfkd_target = torch.abs(lrp_target - 1)
-        if explainer_config is None:
+        """if explainer_config is None:
             student_cfkd_counterfactual_explainer = CounterfactualExplainer(
                 downstream_model=model,
                 generator=generator,
@@ -76,7 +71,7 @@ def get_explanation(
                 explainer_config=explainer_config,
                 input_type="image",
                 dataset=dataset,
-            )
+            )"""
 
         current_idx = 0
         while current_idx < X.shape[0]:
@@ -89,16 +84,16 @@ def get_explanation(
                 "y_target_start_confidence_list": torch.zeros([batch_size]),
             }
             student_cfkd_counterfactual_explanation = (
-                student_cfkd_counterfactual_explainer.explain_batch(
-                    batch, remove_below_threshold=False
+                explainer.explain_batch(
+                    batch, remove_below_threshold=False, base_path=base_path
                 )
             )
-            cfkd_counterfactual = torch.stack(student_cfkd_counterfactual_explanation[
-                "x_counterfactual_list"
-            ]).cpu()
-            cfkd_heatmap = torch.stack(student_cfkd_counterfactual_explanation[
-                "x_attribution_list"
-            ]).cpu()
+            cfkd_counterfactual = torch.stack(
+                student_cfkd_counterfactual_explanation["x_counterfactual_list"]
+            ).cpu()
+            cfkd_heatmap = torch.stack(
+                student_cfkd_counterfactual_explanation["x_attribution_list"]
+            ).cpu()
             scores_before = scores[current_idx : current_idx + batch_size]
             scores_after = torch.abs(
                 torch.abs(
@@ -137,14 +132,13 @@ def get_explanation(
 
 
 def create_comparison(
+    explainer,
     dataset,
     criterions,
     columns,
     score_reference_idx,
-    generator,
     device,
     max_samples=100000000,
-    explainer_config=None,
     checkbox_dict_in=None,
     batch_size=1,
 ):
@@ -159,15 +153,19 @@ def create_comparison(
 
     else:
         checkbox_dict = checkbox_dict_in
-        samples = torch.zeros([checkbox_dict['class'].shape[0]] + list(dataset[0][0].shape))
-        sample_idxs = torch.zeros([checkbox_dict['class'].shape[0]])
-        checkbox_criterions = torch.zeros([checkbox_dict['class'].shape[0], len(criterions.keys())])
+        samples = torch.zeros(
+            [checkbox_dict["class"].shape[0]] + list(dataset[0][0].shape)
+        )
+        sample_idxs = torch.zeros([checkbox_dict["class"].shape[0]])
+        checkbox_criterions = torch.zeros(
+            [checkbox_dict["class"].shape[0], len(criterions.keys())]
+        )
         for i, criterion in enumerate(criterions.keys()):
             for j in range(checkbox_criterions.shape[0]):
                 checkbox_criterions[j][i] = checkbox_dict[criterion][j]
 
         for key in columns.keys():
-            scores_dict[key] = torch.zeros(checkbox_dict['class'].shape[0])
+            scores_dict[key] = torch.zeros(checkbox_dict["class"].shape[0])
 
     with tqdm(range(50, 50 + min(max_samples, len(dataset) - 50))) as pbar:
         for i in pbar:
@@ -191,27 +189,34 @@ def create_comparison(
                 else:
                     sample_idxs[list(current_results)] += 1
 
-                pbar.set_description("num_samples: " + str(torch.sum(sample_idxs != -1)))
+                pbar.set_description(
+                    "num_samples: " + str(torch.sum(sample_idxs != -1))
+                )
 
             else:
-                for i in range(checkbox_dict['class'].shape[0]):
-                    if sample_idxs[i] == 0 and torch.sum(current_results == checkbox_criterions[i]) == len(checkbox_criterions[i]):
+                for i in range(checkbox_dict["class"].shape[0]):
+                    if sample_idxs[i] == 0 and torch.sum(
+                        current_results == checkbox_criterions[i]
+                    ) == len(checkbox_criterions[i]):
                         sample_idxs[i] = 1
                         samples[i] = X
                         for key in columns.keys():
                             scores = torch.nn.Softmax()(
-                                columns[key][1](X.unsqueeze(0).to(device)).squeeze(0).cpu()
+                                columns[key][1](X.unsqueeze(0).to(device))
+                                .squeeze(0)
+                                .cpu()
                             )
                             scores_dict[key][i] = scores[score_reference_idx]
 
                         break
 
-                if torch.sum(sample_idxs) == checkbox_dict['class'].shape[0]:
+                if torch.sum(sample_idxs) == checkbox_dict["class"].shape[0]:
                     break
 
     if checkbox_dict_in is None:
         X = samples.reshape(
-            [2 ** len(criterions.keys())] + list(samples.shape[len(criterions.keys()) :])
+            [2 ** len(criterions.keys())]
+            + list(samples.shape[len(criterions.keys()) :])
         )
         sample_idxs = sample_idxs.flatten()
         sample_idxs_str = list(
@@ -228,15 +233,13 @@ def create_comparison(
     image_dicts = {}
     image_dicts["Image"] = [X, sample_idxs_str]
     for key in columns.keys():
+        explainer.predictor = columns[key][1]
         image_dicts[key] = get_explanation(
             X.cpu(),
             columns[key],
             scores_dict[key],
             checkbox_dict,
-            generator,
-            dataset=dataset,
-            score_reference_idx=score_reference_idx,
-            explainer_config=explainer_config,
+            explainer=explainer,
             batch_size=batch_size,
         )
 

@@ -3,13 +3,13 @@ adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  2
 max_test_batches                     :  1
-tracking_level                       :  2
+tracking_level                       :  3
 min_train_samples                    :  400
-finetune_iterations                  :  5
+finetune_iterations                  :  1
 max_validation_samples               :  100
-continuous_learning                  :  "finetune"
+continuous_learning                  :  "retrain"
 replace_model                        :  True
-use_visualization                    :  False #True
+use_visualization                    :  True
 calculate_group_accuracies           :  True
 explainer                            :
   explainer_type : ACE

@@ -111,9 +111,9 @@ class EditCapableGenerator(Generator):
             target_confidence_goal: float,
             source_classes: torch.Tensor,
             target_classes: torch.Tensor,
-            classifier: nn.Module,
+            predictor: nn.Module,
             explainer_config: ExplainerConfig,
-            classifier_datasets: list,
+            predictor_datasets: list,
             pbar: object = None,
             mode: object = "",
             base_path: object = "",
@@ -123,14 +123,14 @@ class EditCapableGenerator(Generator):
         """
         This function edits the input to match the target confidence goal and target classes
         Args:
-            classifier_datasets:
+            predictor_datasets:
             explainer_config:
             base_path:
             x_in: The input
             target_confidence_goal: The target confidence goal
             source_classes: The source classes
             target_classes: The target classes
-            classifier: The classifier according to which the confidence is measured
+            predictor: The predictor according to which the confidence is measured
             pbar: A progress bar
             mode: The mode of the edit. This is used to determine the edit method
 

@@ -3,6 +3,8 @@ import shutil
 import copy
 import random
 import argparse
+from datetime import datetime
+
 import numpy as np
 import os.path as osp
 import io
@@ -260,7 +262,15 @@ def main(args=None):
     normal_steps = int(args.sampling_time_fraction * int(args.diffusion_steps))
 
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
-    shutil.rmtree(args.output_path, ignore_errors=True)
+
+    if os.path.exists(args.output_path):
+        shutil.move(
+            args.output_path,
+            args.output_path
+            + "_old_"
+            + datetime.now().strftime("%Y%m%d_%H%M%S"),
+        )
+
     os.makedirs(osp.join(args.output_path, "Results"), exist_ok=True)
 
     # ========================================

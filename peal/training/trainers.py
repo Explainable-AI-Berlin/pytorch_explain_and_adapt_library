@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import torch
 import os
 import types
@@ -561,7 +563,14 @@ class ModelTrainer:
                 orthogonal_initialization(self.model)
 
         if not is_initialized:
-            shutil.rmtree(self.model_path, ignore_errors=True)
+            if os.path.exists(self.model_path):
+                shutil.move(
+                    self.model_path,
+                    self.model_path
+                    + "_old_"
+                    + datetime.now().strftime("%Y%m%d_%H%M%S"),
+                )
+
             Path(os.path.join(self.model_path, "logs")).mkdir(
                 parents=True, exist_ok=True
             )

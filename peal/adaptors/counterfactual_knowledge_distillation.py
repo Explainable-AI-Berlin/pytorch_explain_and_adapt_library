@@ -1,4 +1,6 @@
 import os
+from datetime import datetime
+
 import torch
 import copy
 import shutil
@@ -26,7 +28,10 @@ from peal.data.dataloaders import (
     create_dataloaders_from_datasource,
 )
 from peal.training.trainers import ModelTrainer, calculate_test_accuracy
-from peal.explainers.counterfactual_explainer import CounterfactualExplainer, PerfectFalseCounterfactualConfig
+from peal.explainers.counterfactual_explainer import (
+    CounterfactualExplainer,
+    PerfectFalseCounterfactualConfig,
+)
 from peal.visualization.model_comparison import (
     create_comparison,
 )
@@ -46,6 +51,7 @@ from peal.explainers.interfaces import ExplainerConfig
 from peal.explainers.counterfactual_explainer import ACEConfig
 from peal.adaptors.interfaces import AdaptorConfig, Adaptor
 from peal.global_utils import get_config_model
+
 
 class CFKDConfig(AdaptorConfig):
     """
@@ -300,9 +306,13 @@ class CFKDConfig(AdaptorConfig):
         self.teacher = teacher if not teacher is None else self.teacher
         self.base_dir = base_dir if not base_dir is None else self.base_dir
         self.batch_size = batch_size if not batch_size is None else self.batch_size
-        self.validation_runs = validation_runs if not validation_runs is None else self.validation_runs
+        self.validation_runs = (
+            validation_runs if not validation_runs is None else self.validation_runs
+        )
         self.calculate_group_accuracies = (
-            calculate_group_accuracies if not calculate_group_accuracies is None else self.calculate_group_accuracies
+            calculate_group_accuracies
+            if not calculate_group_accuracies is None
+            else self.calculate_group_accuracies
         )
         self.gigabyte_vram = (
             gigabyte_vram if not gigabyte_vram is None else self.gigabyte_vram
@@ -321,7 +331,9 @@ class CFKDConfig(AdaptorConfig):
             else self.continuous_learning
         )
         self.attribution_threshold = (
-            attribution_threshold if not attribution_threshold is None else self.attribution_threshold
+            attribution_threshold
+            if not attribution_threshold is None
+            else self.attribution_threshold
         )
         self.min_start_target_percentile = (
             min_start_target_percentile
@@ -359,14 +371,27 @@ class CFKDConfig(AdaptorConfig):
             else self.current_iteration
         )
         self.overwrite = overwrite if not overwrite is None else self.overwrite
-        self.use_visualization = use_visualization if not use_visualization is None else self.use_visualization
-        self.max_test_batches = max_test_batches if not max_test_batches is None else self.max_test_batches
-        self.tracking_level = tracking_level if not tracking_level is None else self.tracking_level
-        self.counterfactual_type = counterfactual_type if not counterfactual_type is None else self.counterfactual_type
+        self.use_visualization = (
+            use_visualization
+            if not use_visualization is None
+            else self.use_visualization
+        )
+        self.max_test_batches = (
+            max_test_batches if not max_test_batches is None else self.max_test_batches
+        )
+        self.tracking_level = (
+            tracking_level if not tracking_level is None else self.tracking_level
+        )
+        self.counterfactual_type = (
+            counterfactual_type
+            if not counterfactual_type is None
+            else self.counterfactual_type
+        )
         if not self.use_confusion_matrix:
-            assert self.batch_size % 2 == 0, "Batch size must be even when using deterministic CFKD!"
+            assert (
+                self.batch_size % 2 == 0
+            ), "Batch size must be even when using deterministic CFKD!"
         self.kwargs = kwargs
-
 
 
 class CounterfactualKnowledgeDistillation(Adaptor):
@@ -462,7 +487,7 @@ class CounterfactualKnowledgeDistillation(Adaptor):
                 generator if not generator is None else self.adaptor_config.generator
             ),
             device=self.device,
-            classifier_dataset=self.val_dataloader.dataset,
+            predictor_dataset=self.val_dataloader.dataset,
         )
 
         self.output_size = (
@@ -499,7 +524,7 @@ class CounterfactualKnowledgeDistillation(Adaptor):
             assert self.adaptor_config.tracking_level > 0, "Tracking level too low!"
 
         self.explainer = CounterfactualExplainer(
-            downstream_model=self.student,
+            predictor=self.student,
             generator=self.generator,
             input_type=self.adaptor_config.data.input_type,
             explainer_config=self.adaptor_config.explainer,
@@ -556,14 +581,20 @@ class CounterfactualKnowledgeDistillation(Adaptor):
 
     def initialize_run(self):
         if self.overwrite:
-            shutil.rmtree(self.base_dir, ignore_errors=True)
+            # move from self.base_dir to self.base_dir + "_old_" + {date}_{timestamp}
+            if os.path.exists(self.base_dir):
+                shutil.move(
+                    self.base_dir,
+                    self.base_dir
+                    + "_old_"
+                    + datetime.now().strftime("%Y%m%d_%H%M%S"),
+                )
 
         if not os.path.exists(
             os.path.join(self.base_dir, "0", "validation_tracked_values.npz")
         ):
             assert self.adaptor_config.current_iteration == 0
             print("Create base_dir in: " + str(self.base_dir))
-            # shutil.rmtree(self.base_dir, ignore_errors=True)
             Path(self.base_dir).mkdir(parents=True, exist_ok=True)
             writer = SummaryWriter(os.path.join(self.base_dir, "logs"))
             log_images_to_writer(self.train_dataloader, writer, "train0")
@@ -789,10 +820,15 @@ class CounterfactualKnowledgeDistillation(Adaptor):
         collage_base_path = os.path.join(
             self.base_dir, str(finetune_iteration), "collages"
         )
-        shutil.rmtree(
-            collage_base_path,
-            ignore_errors=True,
-        )
+        if os.path.exists(collage_base_path):
+            # move from self.base_dir to self.base_dir + "_old_" + {date}_{timestamp}
+            shutil.move(
+                collage_base_path,
+                collage_base_path
+                + "_old_"
+                + datetime.now().strftime("%Y%m%d_%H%M%S")
+            )
+
         Path(collage_base_path).mkdir(parents=True, exist_ok=True)
 
         tracked_values = {key: [] for key in tracked_keys}
@@ -1142,10 +1178,20 @@ class CounterfactualKnowledgeDistillation(Adaptor):
                 "model.cpl",
             )
         ):
-            shutil.rmtree(
-                os.path.join(self.base_dir, str(finetune_iteration), "finetuned_model"),
-                ignore_errors=True,
-            )
+            if os.path.exists(
+                os.path.join(self.base_dir, str(finetune_iteration), "finetuned_model")
+            ):
+                # move from self.base_dir to self.base_dir + "_old_" + {date}_{timestamp}
+                shutil.move(
+                    os.path.join(self.base_dir, str(finetune_iteration), "finetuned_model"),
+                    os.path.join(
+                        self.base_dir,
+                        str(finetune_iteration),
+                        "finetuned_model_old_"
+                        + datetime.now().strftime("%Y%m%d_%H%M%S"),
+                    ),
+                )
+
             Path(
                 os.path.join(self.base_dir, str(finetune_iteration), "finetuned_model")
             ).mkdir(parents=True, exist_ok=True)
@@ -1308,7 +1354,10 @@ class CounterfactualKnowledgeDistillation(Adaptor):
                     0.5 * (attribute[1][1] + attribute[1][0]),
                 )
 
+        tracking_level_buffer = self.explainer.tracking_level
+        self.explainer.tracking_level = 0
         img_success = create_comparison(
+            explainer=self.explainer,
             dataset=self.test_dataloader.dataset,
             criterions=criterions,
             columns={
@@ -1316,21 +1365,30 @@ class CounterfactualKnowledgeDistillation(Adaptor):
                     "cf",
                     self.original_student,
                     "uncorrected",
+                    os.path.join(self.adaptor_config.base_dir, "0"),
                 ],
-                "CFKD\ncorrected": ["cf", self.student, "cfkd"],
+                "CFKD\ncorrected": [
+                    "cf",
+                    self.student,
+                    "cfkd",
+                    os.path.join(
+                        self.adaptor_config.base_dir,
+                        str(self.adaptor_config.current_iteration),
+                    ),
+                ],
             },
             score_reference_idx=1,
-            generator=self.generator,
             device=self.device,
-            explainer_config=explainer_config,
             checkbox_dict_in=checkbox_dict,
             batch_size=self.adaptor_config.batch_size,
+            max_samples=100,
         )
         for path in paths:
             img_success.save(path.replace(".png", "_success.png"))
             print("Saved: " + path.replace(".png", "_success.png"))
 
         img = create_comparison(
+            explainer=self.explainer,
             dataset=self.test_dataloader.dataset,
             criterions=criterions,
             columns={
@@ -1338,15 +1396,25 @@ class CounterfactualKnowledgeDistillation(Adaptor):
                     "cf",
                     self.original_student,
                     "uncorrected",
+                    os.path.join(self.adaptor_config.base_dir, "0"),
                 ],
-                "CFKD\ncorrected": ["cf", self.student, "cfkd"],
+                "CFKD\ncorrected": [
+                    "cf",
+                    self.student,
+                    "cfkd",
+                    os.path.join(
+                        self.adaptor_config.base_dir,
+                        str(self.adaptor_config.current_iteration),
+                    ),
+                ],
             },
             score_reference_idx=1,
-            generator=self.generator,
             device=self.device,
-            explainer_config=self.adaptor_config.explainer,
             batch_size=self.adaptor_config.batch_size,
+            max_samples=100,
         )
+        self.explainer.predictor = self.student
+        self.explainer.tracking_level = tracking_level_buffer
 
         for path in paths:
             img.save(path)
@@ -1468,15 +1536,15 @@ class CounterfactualKnowledgeDistillation(Adaptor):
             self.explainer.explainer_config = original_explainer_config
             if self.adaptor_config.validation_runs > 1:
                 self.datastack.dataset._initialize_performance_metrics()
-                validation_stats["distance_to_manifold"] = (
-                    self.datastack.dataset.distribution_distance(
-                        x_counterfactual_collection
-                    )
+                validation_stats[
+                    "distance_to_manifold"
+                ] = self.datastack.dataset.distribution_distance(
+                    x_counterfactual_collection
                 )
-                validation_stats["pairwise_distance"] = (
-                    self.datastack.dataset.pair_wise_distance(
-                        x_list_collection, x_counterfactual_collection
-                    )
+                validation_stats[
+                    "pairwise_distance"
+                ] = self.datastack.dataset.pair_wise_distance(
+                    x_list_collection, x_counterfactual_collection
                 )
                 validation_stats["diversity"] = self.datastack.dataset.variance(
                     x_counterfactual_collection

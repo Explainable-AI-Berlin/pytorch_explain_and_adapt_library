@@ -2,6 +2,8 @@ import os
 import json
 import shutil
 import random
+from datetime import datetime
+
 import numpy as np
 import pandas as pd
 
@@ -212,7 +214,12 @@ class MNISTConfounderDatasetGenerator:
 
     def generate_dataset(self):
         """ """
-        shutil.rmtree(self.dataset_dir, ignore_errors=True)
+        if os.path.exists(self.dataset_dir):
+            # move self.dataset_dir to self.dataset_dir + "_old_ + {datestamp}
+            shutil.move(
+                self.dataset_dir,
+                self.dataset_dir + "_old_" + datetime.now().strftime("%Y%m%d_%H%M%S"),
+            )
         os.makedirs(self.dataset_dir)
         os.makedirs(os.path.join(self.dataset_dir, "imgs"))
         os.makedirs(os.path.join(self.dataset_dir, "masks"))
@@ -316,8 +323,18 @@ class ConfounderDatasetGenerator:
 
     def generate_dataset(self):
         """ """
-        shutil.rmtree(self.dataset_dir, ignore_errors=True)
-        shutil.rmtree(self.dataset_dir + "_inverse", ignore_errors=True)
+        if os.path.exists(self.dataset_dir):
+            datestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            # move self.dataset_dir to self.dataset_dir + "_old_ + {datestamp}
+            shutil.move(
+                self.dataset_dir,
+                self.dataset_dir + "_old_" + datestamp,
+            )
+            shutil.move(
+                self.dataset_dir + "_inverse",
+                self.dataset_dir + "_old_" + datestamp + "_inverse",
+            )
+
         os.makedirs(self.dataset_dir)
         os.makedirs(os.path.join(self.dataset_dir, "imgs"))
         os.makedirs(os.path.join(self.dataset_dir + "_inverse", "imgs"))
@@ -810,8 +827,18 @@ class SquareDatasetGenerator:
 
     def generate_dataset(self):
         """ """
-        shutil.rmtree(self.data_config.dataset_path, ignore_errors=True)
-        shutil.rmtree(self.data_config.dataset_path + "_inverse", ignore_errors=True)
+        if os.path.exists(self.data_config.dataset_path):
+            datestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            # move self.dataset_dir to self.dataset_dir + "_old_ + {datestamp}
+            shutil.move(
+                self.data_config.dataset_path,
+                self.data_config.dataset_path + "_old_" + datestamp,
+            )
+            shutil.move(
+                self.data_config.dataset_path + "_inverse",
+                self.data_config.dataset_path + "_old_" + datestamp + "_inverse",
+            )
+
         os.makedirs(self.data_config.dataset_path)
         os.makedirs(os.path.join(self.data_config.dataset_path, "imgs"))
         os.makedirs(os.path.join(self.data_config.dataset_path, "masks"))

@@ -3,6 +3,7 @@ import random
 import types
 import shutil
 import copy
+from datetime import datetime
 from pathlib import Path
 
 import torch
@@ -165,7 +166,13 @@ class DDPM(EditCapableGenerator):
     def train_model(
         self,
     ):
-        shutil.rmtree(self.model_dir, ignore_errors=True)
+        if os.path.exists(self.model_dir):
+            shutil.move(
+                self.model_dir,
+                self.model_dir
+                + "_old_"
+                + datetime.now().strftime("%Y%m%d_%H%M%S"),
+            )
 
         # dist_util.setup_dist(self.config.gpus)
         logger.configure(dir=self.model_dir)
@@ -263,16 +270,17 @@ class DDPM(EditCapableGenerator):
             explainer_config.distilled_predictor = distilled_predictor_config
             distillation_datasets[i].task_config = explainer_config.distilled_predictor.task
 
-        self.predictor_distilled = copy.deepcopy(predictor)
+        predictor_distilled = copy.deepcopy(predictor)
         distillation_trainer = ModelTrainer(
             config=explainer_config.distilled_predictor,
-            model=self.predictor_distilled,
+            model=predictor_distilled,
             datasource=distillation_datasets,
             model_path=os.path.join(
                 base_path, "explainer", "distilled_predictor"
             )
         )
         distillation_trainer.fit()
+        return predictor_distilled
 
     def edit(
         self,
@@ -290,12 +298,10 @@ class DDPM(EditCapableGenerator):
         if not explainer_config.distilled_predictor is None:
             distilled_path = os.path.join(base_path, "explainer", "distilled_predictor", "model.cpl")
             if not os.path.exists(distilled_path):
-                self.distill_predictor(explainer_config, base_path, predictor, predictor_datasets)
+                gradient_predictor = self.distill_predictor(explainer_config, base_path, predictor, predictor_datasets)
 
             else:
-                self.predictor_distilled = torch.load(distilled_path, map_location=self.device)
-
-            gradient_predictor = self.predictor_distilled
+                gradient_predictor = torch.load(distilled_path, map_location=self.device)
 
         else:
             gradient_predictor = predictor
