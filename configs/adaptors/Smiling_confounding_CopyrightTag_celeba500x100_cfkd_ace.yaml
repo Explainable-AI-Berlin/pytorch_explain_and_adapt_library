@@ -16,7 +16,7 @@ explainer                            :
   category : explainer
   sampling_time_fraction: 0.3
   attack_iterations: 3 #150
-  dist_l1: 0.0
+  dist_l1: 0.00001
   sampling_inpaint: 0.0
   y_target_goal_confidence: 0.8
   #distilled_classifier: <PEAL_BASE>/configs/models/generic_distillation.yaml
@@ -26,7 +26,7 @@ test_data                            :  <PEAL_BASE>/configs/data/Smiling_confoun
 student                              :  <PEAL_RUNS>/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened100/model.cpl
 teacher                              :  <PEAL_RUNS>/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened050/model.cpl
 generator                            :  <PEAL_RUNS>/celeba_copyrighttag/ddpm/config.yaml
-base_dir                             :  <PEAL_RUNS>/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened100/cfkd_ace_new
+base_dir                             :  <PEAL_RUNS>/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened100/cfkd_ace
 task:
   criterions:
     ce     : 1.0
