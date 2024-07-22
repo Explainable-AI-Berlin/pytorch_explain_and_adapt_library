@@ -16,7 +16,7 @@ data                                 :  <PEAL_BASE>/configs/data/square_ClassA_c
 test_data                            :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_unpoisened.yaml
 student                              :  <PEAL_RUNS>/square/colora_confounding_colorb/regularized0/classifier_poisened100/model.cpl
 teacher                              :  SegmentationMask
-base_dir                             :  <PEAL_RUNS>/square/colora_confounding_colorb/regularized0/classifier_poisened100/cfkd_perfect_false_counterfactuals_strongly_regularized
+base_dir                             :  <PEAL_RUNS>/square/colora_confounding_colorb/regularized0/classifier_poisened100/cfkd_perfect_false_counterfactuals
 task:
   criterions:
     ce     : 1.0
