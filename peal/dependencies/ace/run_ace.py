@@ -263,15 +263,16 @@ def main(args=None):
 
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 
-    if os.path.exists(args.output_path):
-        shutil.move(
-            args.output_path,
-            args.output_path
-            + "_old_"
-            + datetime.now().strftime("%Y%m%d_%H%M%S"),
-        )
+    if args.save_images:
+        if os.path.exists(args.output_path):
+            shutil.move(
+                args.output_path,
+                args.output_path
+                + "_old_"
+                + datetime.now().strftime("%Y%m%d_%H%M%S"),
+            )
 
-    os.makedirs(osp.join(args.output_path, "Results"), exist_ok=True)
+        os.makedirs(osp.join(args.output_path, "Results"), exist_ok=True)
 
     # ========================================
     # Set seeds

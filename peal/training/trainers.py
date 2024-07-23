@@ -92,7 +92,7 @@ class TrainingConfig(BaseModel):
     input_noise_std: float = 0.1
     num_noise_vec: int = 1
     no_grad_attack: bool = False
-    attack_epsilon: float = 2.0
+    attack_epsilon: float = 1.0
     attack_num_steps: int = 5
     """
     A dict containing all variables that could not be given with the current config structure
