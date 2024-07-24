@@ -102,7 +102,7 @@ class DataConfig(BaseModel):
     A pair of known confounding factors, one usually being the target.
     This knowledge helps for controlled sampling of confounders for experiments.
     """
-    confounding_factors: list[str] = []
+    confounding_factors: Union[type(None), list[str]] = []
     """
     The correlation strength of the target and the confounding variable.
     """

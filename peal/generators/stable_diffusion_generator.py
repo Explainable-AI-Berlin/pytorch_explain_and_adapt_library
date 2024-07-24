@@ -35,7 +35,7 @@ from typing import Union
 
 from peal.generators.interfaces import GeneratorConfig
 from peal.data.datasets import DataConfig
-from peal.architectures.downstream_models import TaskConfig
+from peal.architectures.predictors import TaskConfig
 
 
 class StableDiffusionConfig(GeneratorConfig):
