@@ -601,12 +601,6 @@ class CounterfactualKnowledgeDistillation(Adaptor):
             log_images_to_writer(self.val_dataloader, writer, "validation0")
             log_images_to_writer(self.test_dataloader, writer, "test")
 
-            if self.output_size == 2 and self.adaptor_config.use_visualization:
-                print("visualize progress!!!")
-                self.visualize_progress(
-                    [os.path.join(self.base_dir, "visualization.png")]
-                )
-
             test_accuracy = calculate_test_accuracy(
                 self.student,
                 self.test_dataloader,
@@ -685,6 +679,12 @@ class CounterfactualKnowledgeDistillation(Adaptor):
                         validation_stats[key],
                         self.adaptor_config.current_iteration,
                     )
+
+            if self.output_size == 2 and self.adaptor_config.use_visualization:
+                print("visualize progress!!!")
+                self.visualize_progress(
+                    [os.path.join(self.base_dir, "visualization.png")]
+                )
 
             self.adaptor_config.test_accuracies = [test_accuracy]
 
