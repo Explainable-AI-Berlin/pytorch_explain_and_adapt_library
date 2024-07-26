@@ -4,7 +4,7 @@ category                             :  "adaptor"
 batch_size                           :  2
 tracking_level                       :  3
 min_train_samples                    :  400
-finetune_iterations                  :  0
+finetune_iterations                  :  1
 max_validation_samples               :  100
 continuous_learning                  :  "finetune"
 replace_model                        :  True
@@ -25,7 +25,7 @@ test_data                            :  <PEAL_BASE>/configs/data/Male_confoundin
 student                              :  <PEAL_RUNS>/celeba/Male_confounding_Blond_Hair/unregularized0/classifier_natural/model.cpl
 teacher                              :  human@8000
 generator                            :  <PEAL_RUNS>/celeba/ddpm/config.yaml
-base_dir                             :  <PEAL_RUNS>/celeba/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened100/cfkd_ace
+base_dir                             :  <PEAL_RUNS>/celeba/Male_confounding_Blond_Hair/unregularized0/classifier_natural/cfkd_ace
 task:
   criterions:
     ce     : 1.0
