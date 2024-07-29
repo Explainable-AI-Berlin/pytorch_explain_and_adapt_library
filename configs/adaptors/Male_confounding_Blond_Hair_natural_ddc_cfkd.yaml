@@ -1,4 +1,4 @@
-# python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba500x100_cfkd_ace.yaml"
+# python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Male_confounding_Blond_Hair_natural_ddc_cfkd.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  2
@@ -14,22 +14,22 @@ explainer                            :
   explainer_type : ACE
   category : explainer
   sampling_time_fraction: 0.3
-  attack_iterations: 150
+  attack_iterations: 50
   dist_l1: 0.00001
   sampling_inpaint: 0.5
   y_target_goal_confidence: 0.8
   distilled_predictor: <PEAL_BASE>/configs/models/generic_distillation.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
-data                                 :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba500_poisened100.yaml
-test_data                            :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba.yaml
-student                              :  <PEAL_RUNS>/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened100/model.cpl
-teacher                              :  <PEAL_RUNS>/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened050/model.cpl
-generator                            :  <PEAL_RUNS>/celeba_copyrighttag/ddpm/config.yaml
-base_dir                             :  <PEAL_RUNS>/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened100/cfkd_ace
+data                                 :  <PEAL_BASE>/configs/data/Male_confounding_Blond_Hair_celeba_natural.yaml
+test_data                            :  <PEAL_BASE>/configs/data/Male_confounding_Blond_Hair_celeba_natural.yaml
+student                              :  <PEAL_RUNS>/celeba/Male_confounding_Blond_Hair/unregularized0/classifier_natural/model.cpl
+teacher                              :  human@8000
+generator                            :  <PEAL_RUNS>/celeba/ddpm/config.yaml
+base_dir                             :  <PEAL_RUNS>/celeba/Male_confounding_Blond_Hair/unregularized0/classifier_natural/cfkd_ace
 task:
   criterions:
     ce     : 1.0
     l2     : 100.0
   output_type             : singleclass
   output_channels         : 2
-  y_selection             : [Smiling]
+  y_selection             : [Male]

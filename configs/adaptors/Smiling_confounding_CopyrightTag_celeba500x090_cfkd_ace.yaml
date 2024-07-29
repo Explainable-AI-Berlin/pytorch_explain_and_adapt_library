@@ -1,4 +1,4 @@
-# python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba500x100_cfkd_ace.yaml"
+# python run_cfkd.py --adaptor_config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba500x090_cfkd_ace.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  2
@@ -6,7 +6,7 @@ tracking_level                       :  3
 min_train_samples                    :  400
 finetune_iterations                  :  1
 max_validation_samples               :  100
-continuous_learning                  :  "finetune"
+continuous_learning                  :  "retrain"
 replace_model                        :  True
 use_visualization                    :  True
 calculate_group_accuracies           :  True
@@ -16,16 +16,16 @@ explainer                            :
   sampling_time_fraction: 0.3
   attack_iterations: 150
   dist_l1: 0.00001
-  sampling_inpaint: 0.5
+  sampling_inpaint: 0.0
   y_target_goal_confidence: 0.8
   distilled_predictor: <PEAL_BASE>/configs/models/generic_distillation.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
-data                                 :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba500_poisened100.yaml
+data                                 :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba500_poisened090.yaml
 test_data                            :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba.yaml
-student                              :  <PEAL_RUNS>/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened100/model.cpl
+student                              :  <PEAL_RUNS>/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened090/model.cpl
 teacher                              :  <PEAL_RUNS>/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened050/model.cpl
 generator                            :  <PEAL_RUNS>/celeba_copyrighttag/ddpm/config.yaml
-base_dir                             :  <PEAL_RUNS>/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened100/cfkd_ace
+base_dir                             :  <PEAL_RUNS>/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened090/cfkd_ace
 task:
   criterions:
     ce     : 1.0

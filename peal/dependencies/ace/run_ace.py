@@ -46,7 +46,7 @@ from peal.dependencies.ace.core.attacks_and_models import (
 from peal.dependencies.ace.models import get_classifier
 
 from peal.data.interfaces import PealDataset
-from peal.architectures.downstream_models import SequentialModel
+from peal.architectures.predictors import SequentialModel
 
 import matplotlib
 
@@ -263,15 +263,16 @@ def main(args=None):
 
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 
-    if os.path.exists(args.output_path):
-        shutil.move(
-            args.output_path,
-            args.output_path
-            + "_old_"
-            + datetime.now().strftime("%Y%m%d_%H%M%S"),
-        )
+    if args.save_images:
+        if os.path.exists(args.output_path):
+            shutil.move(
+                args.output_path,
+                args.output_path
+                + "_old_"
+                + datetime.now().strftime("%Y%m%d_%H%M%S"),
+            )
 
-    os.makedirs(osp.join(args.output_path, "Results"), exist_ok=True)
+        os.makedirs(osp.join(args.output_path, "Results"), exist_ok=True)
 
     # ========================================
     # Set seeds

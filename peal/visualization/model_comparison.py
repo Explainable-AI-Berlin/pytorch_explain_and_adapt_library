@@ -85,7 +85,7 @@ def get_explanation(
             }
             student_cfkd_counterfactual_explanation = (
                 explainer.explain_batch(
-                    batch, remove_below_threshold=False, base_path=base_path
+                    batch, remove_below_threshold=False, explainer_path=base_path
                 )
             )
             cfkd_counterfactual = torch.stack(

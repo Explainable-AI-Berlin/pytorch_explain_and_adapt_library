@@ -601,12 +601,6 @@ class CounterfactualKnowledgeDistillation(Adaptor):
             log_images_to_writer(self.val_dataloader, writer, "validation0")
             log_images_to_writer(self.test_dataloader, writer, "test")
 
-            if self.output_size == 2 and self.adaptor_config.use_visualization:
-                print("visualize progress!!!")
-                self.visualize_progress(
-                    [os.path.join(self.base_dir, "visualization.png")]
-                )
-
             test_accuracy = calculate_test_accuracy(
                 self.student,
                 self.test_dataloader,
@@ -685,6 +679,12 @@ class CounterfactualKnowledgeDistillation(Adaptor):
                         validation_stats[key],
                         self.adaptor_config.current_iteration,
                     )
+
+            if self.output_size == 2 and self.adaptor_config.use_visualization:
+                print("visualize progress!!!")
+                self.visualize_progress(
+                    [os.path.join(self.base_dir, "visualization.png")]
+                )
 
             self.adaptor_config.test_accuracies = [test_accuracy]
 
@@ -1634,13 +1634,16 @@ class CounterfactualKnowledgeDistillation(Adaptor):
             while os.path.exists(get_collage_path(idx)):
                 collage_path_list.extend(os.listdir(get_collage_path(idx)))
                 idx += 1
+                # TODO this is a bug, but currently not used
+                if idx == 1:
+                    break
 
             validation_tracked_values["collage_path_list"] = list(
                 map(
                     lambda x: os.path.join(
                         self.base_dir,
                         str(finetune_iteration),
-                        "validation_collages",
+                        "validation_collages0",
                         x,
                     ),
                     collage_path_list,

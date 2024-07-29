@@ -58,7 +58,7 @@ class ACEConfig(ExplainerConfig):
     sampling_inpaint: Union[list, float] = 0.2
     sampling_dilation: Union[list, int] = 17
     timestep_respacing: Union[list, int] = 50
-    distilled_predictor: Union[type(None), str] = None
+    distilled_predictor: Union[type(None), str, dict] = None
     attempts: int = 1
     clip_denoised: bool = True  # Clipping noise
     batch_size: int = 32  # Batch size
