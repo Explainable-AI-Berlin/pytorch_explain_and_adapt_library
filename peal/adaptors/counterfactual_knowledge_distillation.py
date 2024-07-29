@@ -1634,13 +1634,16 @@ class CounterfactualKnowledgeDistillation(Adaptor):
             while os.path.exists(get_collage_path(idx)):
                 collage_path_list.extend(os.listdir(get_collage_path(idx)))
                 idx += 1
+                # TODO this is a bug, but currently not used
+                if idx == 1:
+                    break
 
             validation_tracked_values["collage_path_list"] = list(
                 map(
                     lambda x: os.path.join(
                         self.base_dir,
                         str(finetune_iteration),
-                        "validation_collages",
+                        "validation_collages0",
                         x,
                     ),
                     collage_path_list,
