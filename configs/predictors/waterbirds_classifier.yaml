@@ -1,0 +1,13 @@
+# python train_predictor.py --model_config <PEAL_BASE>/configs/predictors/waterbirds_classifier.yaml
+model_path        : <PEAL_RUNS>/waterbirds/classifier_natural
+training          : <PEAL_BASE>/configs/training/img_classifier.yaml
+architecture      : <PEAL_BASE>/configs/architectures/resnet18.yaml
+data              : <PEAL_BASE>/configs/data/follicles.yaml
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  y_selection             : [y]
+  x_selection             : [""]
+  output_channels         : 2

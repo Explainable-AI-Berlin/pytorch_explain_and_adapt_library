@@ -188,7 +188,7 @@ def resnet50(**kwargs):
 
 def load_state_dict(model, fname):
     """
-    Set parameters converted from Caffe models authors of VGGFace2 provide.
+    Set parameters converted from Caffe predictors authors of VGGFace2 provide.
     See https://www.robots.ox.ac.uk/~vgg/data/vgg_face2/.
     Arguments:
         model: model

@@ -18,7 +18,7 @@ explainer                            :
   dist_l1: 0.00001
   sampling_inpaint: 0.0
   y_target_goal_confidence: 0.8
-  distilled_predictor: <PEAL_BASE>/configs/models/generic_distillation.yaml
+  distilled_predictor: <PEAL_BASE>/configs/predictors/generic_distillation.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba500_poisened090.yaml
 test_data                            :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba.yaml

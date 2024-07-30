@@ -43,7 +43,7 @@ def parse_json(data_dir, config, mode, set_negative_to_zero=True):
 
 
 def parse_csv(
-    data_dir, config, mode, key_type="idx", set_negative_to_zero=True, delimiter=","
+    data_dir, config, mode, key_type="idx", set_negative_to_zero=True, delimiter=",",
 ):
     """
     _summary_
@@ -65,8 +65,15 @@ def parse_csv(
         raw_data = raw_data[1:]
 
     attributes = raw_data[0].split(delimiter)
+
+    if config.img_name_idx is None:
+        key_idx = 0
+
+    else:
+        key_idx = config.img_name_idx
+
     if key_type == "name":
-        attributes = attributes[1:]
+        attributes = attributes[key_idx+1:]
 
     raw_data = raw_data[1:]
     while "" in raw_data:
@@ -79,8 +86,8 @@ def parse_csv(
             key = str(idx)
 
         elif key_type == "name":
-            key = instance_attributes[0]
-            instance_attributes = instance_attributes[1:]
+            key = instance_attributes[key_idx]
+            instance_attributes = instance_attributes[key_idx+1:]
 
         while "" in instance_attributes:
             instance_attributes.remove("")

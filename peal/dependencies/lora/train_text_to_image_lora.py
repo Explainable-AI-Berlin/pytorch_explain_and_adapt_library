@@ -121,20 +121,20 @@ def parse_args():
         type=str,
         default=None,
         required=True,
-        help="Path to pretrained model or model identifier from huggingface.co/models.",
+        help="Path to pretrained model or model identifier from huggingface.co/predictors.",
     )
     parser.add_argument(
         "--revision",
         type=str,
         default=None,
         required=False,
-        help="Revision of pretrained model identifier from huggingface.co/models.",
+        help="Revision of pretrained model identifier from huggingface.co/predictors.",
     )
     parser.add_argument(
         "--variant",
         type=str,
         default=None,
-        help="Variant of the model files of the pretrained model identifier from huggingface.co/models, 'e.g.' fp16",
+        help="Variant of the model files of the pretrained model identifier from huggingface.co/predictors, 'e.g.' fp16",
     )
     parser.add_argument(
         "--dataset_name",
@@ -214,7 +214,7 @@ def parse_args():
         "--cache_dir",
         type=str,
         default=None,
-        help="The directory where the downloaded models and datasets will be stored.",
+        help="The directory where the downloaded predictors and datasets will be stored.",
     )
     parser.add_argument(
         "--seed", type=int, default=None, help="A seed for reproducible training."
@@ -526,7 +526,7 @@ def lora_finetune(args=None):
             ).repo_id
 
     if not hasattr(args, "pipeline"):
-        # Load scheduler, tokenizer and models.
+        # Load scheduler, tokenizer and predictors.
         tokenizer = CLIPTokenizer.from_pretrained(
             args.sd_model, subfolder="tokenizer", revision=args.revision
         )
@@ -555,7 +555,7 @@ def lora_finetune(args=None):
         args.sd_model, subfolder="scheduler"
     )
 
-    # freeze parameters of models to save more memory
+    # freeze parameters of predictors to save more memory
     unet.requires_grad_(False)
     vae.requires_grad_(False)
     text_encoder.requires_grad_(False)

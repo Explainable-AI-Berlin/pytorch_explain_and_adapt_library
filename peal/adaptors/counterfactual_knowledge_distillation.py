@@ -422,7 +422,7 @@ class CounterfactualKnowledgeDistillation(Adaptor):
             output_size (int, optional): The output size of the student model. Defaults to None.
             generator (Union, optional):
                 The generator that is used for CFKD.
-                Defaults to "<PEAL_BASE>/configs/models/default_generator.yaml".
+                Defaults to "<PEAL_BASE>/configs/predictors/default_generator.yaml".
             base_dir (Union, optional):
                 The base directory for the run.
                 Defaults to os.path.join("peal_runs", "counterfactual_knowledge_distillation").

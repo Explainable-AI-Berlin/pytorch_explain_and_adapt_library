@@ -13,4 +13,4 @@ dist_l1: 0.0
 max_samples: 2
 batch_size: 2
 y_target_goal_confidence: 0.8
-#distilled_classifier: <PEAL_BASE>/configs/models/generic_distillation.yaml
+#distilled_classifier: <PEAL_BASE>/configs/predictors/generic_distillation.yaml

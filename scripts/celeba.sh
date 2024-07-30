@@ -15,10 +15,10 @@ python3 train_model.py \
 --data.confounder_probability 1.0 \
 --data.num_samples 7000
 #python3 train_predictor.py \
-#--model_config "<PEAL_BASE>/configs/models/celeba_vae.yaml" \
+#--model_config "<PEAL_BASE>/configs/predictors/celeba_vae.yaml" \
 #--model_name "celeba_vae_unpoisened"
 #python3 train_predictor.py \
-#--model_config "<PEAL_BASE>/configs/models/mnist_glow.yaml" \
+#--model_config "<PEAL_BASE>/configs/predictors/mnist_glow.yaml" \
 #--model_name "celeba_glow_unpoisened"
 python train_diffusion_model.py \
 --generator_config "peal/configs/generators/ace_generator_celeba.yaml"

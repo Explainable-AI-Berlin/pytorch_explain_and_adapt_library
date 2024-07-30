@@ -18,7 +18,7 @@ explainer                            :
   dist_l1: 0.0
   sampling_inpaint: 0.0
   y_target_goal_confidence: 0.9
-  distilled_classifier: <PEAL_BASE>/configs/models/generic_distillation.yaml
+  distilled_classifier: <PEAL_BASE>/configs/predictors/generic_distillation.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_poisened090.yaml
 test_data                            :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_unpoisened.yaml

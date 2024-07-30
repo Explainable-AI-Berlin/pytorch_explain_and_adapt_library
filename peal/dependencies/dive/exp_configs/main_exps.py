@@ -213,7 +213,7 @@ EXP_GROUPS = {
                           "n_samples": 10 * ngpu,
                           "fisher_samples": 0,
 
-                          # Pretrained models and paths
+                          # Pretrained predictors and paths
                           "dataset_val": "celeba",
                           "labels_path": "celeba_meta_explanations/list_eval_unbiased.csv",
                           "generator_path": 'pretrained_models/dive',

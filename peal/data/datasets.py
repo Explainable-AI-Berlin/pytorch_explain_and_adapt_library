@@ -141,6 +141,8 @@ class DataConfig(BaseModel):
     The path of the original dataset.
     """
     inverse: Union[type(None), str] = None
+    label_rel_path: str = "data.csv"
+    img_name_idx: int = 0
     has_hints: bool = False
 
 
@@ -410,7 +412,7 @@ class ImageDataset(PealDataset):
             )
 
         data = "ImgPath,Class\n" + "\n".join([",".join(map(str, x)) for x in data])
-        with open(os.path.join(output_dir, "data.csv"), "w") as f:
+        with open(os.path.join(output_dir, self.config.label_rel_path), "w") as f:
             f.write(data)
 
     def track_generator_performance(
@@ -600,7 +602,7 @@ class Image2MixedDataset(ImageDataset):
         # TODO
         # self.config.class_ratios = None
         if data_dir is None:
-            data_dir = os.path.join(self.root_dir, "data.csv")
+            data_dir = os.path.join(self.root_dir, self.config.label_rel_path)
 
         if not config.delimiter is None:
             delimiter = config.delimiter
