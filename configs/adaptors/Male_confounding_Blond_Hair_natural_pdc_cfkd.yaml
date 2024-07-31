@@ -1,4 +1,4 @@
-# python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Male_confounding_Blond_Hair_natural_ddc_cfkd.yaml"
+# python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Male_confounding_Blond_Hair_natural_pdc_cfkd.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  2
@@ -25,7 +25,7 @@ test_data                            :  <PEAL_BASE>/configs/data/Male_confoundin
 student                              :  <PEAL_RUNS>/celeba/Male_confounding_Blond_Hair/unregularized0/classifier_natural/model.cpl
 teacher                              :  human@8000
 generator                            :  <PEAL_RUNS>/celeba/ddpm/config.yaml
-base_dir                             :  <PEAL_RUNS>/celeba/Male_confounding_Blond_Hair/unregularized0/classifier_natural/cfkd_ace
+base_dir                             :  <PEAL_RUNS>/celeba/Male_confounding_Blond_Hair/unregularized0/classifier_natural/pdc_cfkd
 task:
   criterions:
     ce     : 1.0

@@ -1,22 +1,23 @@
-# python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square_poisened090_cfkd_perfect_false_counterfactuals.yaml"
+# python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x092_cfkd_perfect_false_counterfactuals_mask.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  6
 tracking_level                       :  0
-min_train_samples                    :  6400
+min_train_samples                    :  900
 finetune_iterations                  :  1
-max_validation_samples               :  800
-continuous_learning                  :  "retrain"
+max_validation_samples               :  100
+continuous_learning                  :  "finetune"
 replace_model                        :  True
 use_visualization                    :  False #True
 calculate_group_accuracies           :  True
 explainer                            :  <PEAL_BASE>/configs/explainers/perfect_false_counterfactuals.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
-data                                 :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_poisened090.yaml
+data                                 :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_poisened092.yaml
 test_data                            :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_unpoisened.yaml
-student                              :  <PEAL_RUNS>/square/colora_confounding_colorb/regularized0/classifier_poisened090/model.cpl
+student                              :  <PEAL_RUNS>/square/colora_confounding_colorb/regularized0/classifier_poisened092/model.cpl
 teacher                              :  SegmentationMask
-base_dir                             :  <PEAL_RUNS>/square/colora_confounding_colorb/regularized0/classifier_poisened090/cfkd_perfect_false_counterfactuals
+generator                            :  <PEAL_RUNS>/square/ddpm/config.yaml
+base_dir                             :  <PEAL_RUNS>/square/colora_confounding_colorb/regularized0/classifier_poisened092/cfkd_perfect_false_counterfactuals_mask1000
 task:
   criterions:
     ce     : 1.0

@@ -143,6 +143,7 @@ def parse_csv(
                 data[key] = instances_tensor
 
         keys = list(data.keys())
+        random.shuffle(keys)
         if mode == "train":
             keys_out = keys[: int(len(keys) * config.split[0])]
 
