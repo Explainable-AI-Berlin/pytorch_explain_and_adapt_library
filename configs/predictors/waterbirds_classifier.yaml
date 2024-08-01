@@ -1,4 +1,4 @@
-# python train_predictor.py --model_config <PEAL_BASE>/configs/predictors/waterbirds_classifier.yaml
+# python train_predictor.py --model_config "<PEAL_BASE>/configs/predictors/waterbirds_classifier.yaml"
 model_path        : <PEAL_RUNS>/waterbirds/classifier_natural
 training          : <PEAL_BASE>/configs/training/img_classifier.yaml
 architecture      : <PEAL_BASE>/configs/architectures/resnet18.yaml

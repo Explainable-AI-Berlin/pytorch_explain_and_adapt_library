@@ -143,20 +143,26 @@ def parse_csv(
                 data[key] = instances_tensor
 
         keys = list(data.keys())
-        random.shuffle(keys)
-        if mode == "train":
-            keys_out = keys[: int(len(keys) * config.split[0])]
+        if len(config.split) == 2:
+            random.shuffle(keys)
+            if mode == "train":
+                keys_out = keys[: int(len(keys) * config.split[0])]
 
-        elif mode == "val":
-            keys_out = keys[
-                int(len(keys) * config.split[0]) : int(len(keys) * config.split[1])
-            ]
+            elif mode == "val":
+                keys_out = keys[
+                    int(len(keys) * config.split[0]) : int(len(keys) * config.split[1])
+                ]
 
-        elif mode == "test":
-            keys_out = keys[int(len(keys) * config.split[1]) :]
+            elif mode == "test":
+                keys_out = keys[int(len(keys) * config.split[1]) :]
+
+            else:
+                keys_out = keys
 
         else:
-            keys_out = keys
+            mode_to_int = {"train": 0, "val": 1, "test": 2}
+            mode_idx = attributes.index("split")
+            keys_out = list(filter(lambda key: data[key][mode_idx] == mode_to_int[mode], keys))
 
     keys_out.sort()
     random.seed(0)

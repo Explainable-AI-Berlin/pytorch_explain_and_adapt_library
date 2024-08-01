@@ -212,7 +212,7 @@ def get_datasets(
         data_dir=data_dir,
     )
     # TODO this is super dirty!!!
-    if test_config.split[1] == 1.0:
+    if len(test_config.split) == 2 and test_config.split[1] == 1.0:
         test_data = val_data
 
     else:
