@@ -10,14 +10,23 @@ continuous_learning                  :  "finetune"
 replace_model                        :  True
 use_visualization                    :  False #True
 calculate_group_accuracies           :  True
-explainer                            :  <PEAL_BASE>/configs/explainers/pdc_default.yaml
+explainer:
+  attack_iterations: 150
+  attack_step: 3.0
+  category: explainer
+  dist_l1: 1.0e-05
+  distilled_predictor: <PEAL_BASE>/configs/predictors/generic_distillation.yaml
+  explainer_type: ACE
+  sampling_inpaint: 0.9
+  sampling_time_fraction: 0.4
+  y_target_goal_confidence: 0.8
 training                             :  <PEAL_BASE>/configs/training/img_classifier.yaml
 data                                 :  <PEAL_BASE>/configs/data/Young_confounding_Smiling_celeba_poisened090.yaml
 test_data                            :  <PEAL_BASE>/configs/data/Young_confounding_Smiling_celeba.yaml
 student                              :  <PEAL_RUNS>/celeba/Young_confounding_Smiling/regularized0/classifier_poisened090/model.cpl
 teacher                              :  <PEAL_RUNS>/celeba/Young_confounding_Smiling/regularized0/classifier_poisened050/model.cpl
 generator                            :  <PEAL_RUNS>/celeba/ddpm/config.yaml
-base_dir                             :  <PEAL_RUNS>/Young_confounding_Smiling_celeba/classifier_poisened090/pdc_cfkd
+base_dir                             :  <PEAL_RUNS>/celeba/Young_confounding_Smiling/regularized0/classifier_poisened090/pdc_cfkd
 task:
   criterions:
     ce     : 1.0

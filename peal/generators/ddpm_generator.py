@@ -259,6 +259,7 @@ class DDPM(EditCapableGenerator):
 
             distilled_dataset_config = copy.deepcopy(predictor_datasets[i].config)
             distilled_dataset_config.split = [1.0, 1.0] if i == 0 else [0.0, 1.0]
+            distilled_dataset_config.img_name_idx = 0
             distilled_dataset_config.confounding_factors = None
             distilled_dataset_config.confounder_probability = None
             distilled_dataset_config.dataset_class = None

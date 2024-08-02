@@ -10,7 +10,15 @@ continuous_learning                  :  "finetune"
 replace_model                        :  True
 use_visualization                    :  False #True
 calculate_group_accuracies           :  True
-explainer                            :  <PEAL_BASE>/configs/explainers/pdc_default.yaml
+explainer:
+  explainer_type : ACE
+  attack_iterations: 300
+  attack_step: 10.0
+  category: explainer
+  dist_l1: 1.0e-06
+  distilled_predictor: <PEAL_BASE>/configs/predictors/generic_distillation.yaml
+  sampling_inpaint: 0.5
+  y_target_goal_confidence: 1.1
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_poisened100.yaml
 test_data                            :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_unpoisened.yaml

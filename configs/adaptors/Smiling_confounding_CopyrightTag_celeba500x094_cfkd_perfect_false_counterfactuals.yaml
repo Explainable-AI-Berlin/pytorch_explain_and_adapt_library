@@ -1,7 +1,7 @@
-# python run_cfkd.py --adaptor_config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba500x094_cfkd_perfect_false_counterfactuals.yaml"
+# python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba500x094_cfkd_perfect_false_counterfactuals.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
-batch_size                           :  5
+batch_size                           :  10
 finetune_iterations                  :  1
 min_train_samples                    :  400
 max_validation_samples               :  100
@@ -20,8 +20,7 @@ base_dir                             :  <PEAL_RUNS>/Smiling_confounding_copyrigh
 task:
   criterions:
     ce     : 1.0
-    l1     : 10000.0
-    l2     : 1.0
+    l1     : 100.0
   output_type             : singleclass
   output_channels         : 2
   y_selection             : [Smiling]

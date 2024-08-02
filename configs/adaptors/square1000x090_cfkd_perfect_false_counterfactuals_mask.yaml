@@ -1,12 +1,12 @@
 # python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x090_cfkd_perfect_false_counterfactuals_mask.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
-batch_size                           :  6
+batch_size                           :  10
 tracking_level                       :  0
 min_train_samples                    :  900
 finetune_iterations                  :  1
 max_validation_samples               :  100
-continuous_learning                  :  "retrain"
+continuous_learning                  :  "finetune"
 replace_model                        :  True
 use_visualization                    :  False #True
 calculate_group_accuracies           :  True
