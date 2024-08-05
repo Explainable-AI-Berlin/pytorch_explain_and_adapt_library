@@ -1,7 +1,7 @@
-# python run_cfkd.py --adaptor_config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba500x096_cfkd_perfect_false_counterfactuals.yaml"
+# python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba500x096_cfkd_perfect_false_counterfactuals.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
-batch_size                           :  5
+batch_size                           :  10
 finetune_iterations                  :  1
 min_train_samples                    :  400
 max_validation_samples               :  100
@@ -13,15 +13,13 @@ explainer                            :  <PEAL_BASE>/configs/explainers/perfect_f
 training                             :  <PEAL_BASE>/configs/training/img_classifier.yaml
 data                                 :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba500_poisened096.yaml
 test_data                            :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba.yaml
-student                              :  <PEAL_RUNS>/Smiling_confounding_copyrighttag_celeba/classifier_poisened096/model.cpl
-teacher                              :  <PEAL_RUNS>/Smiling_confounding_copyrighttag_celeba/classifier_unpoisened/model.cpl
-generator                            :  <PEAL_RUNS>/ddpm_CopyrightTag_celeba_1000/config.yaml
-base_dir                             :  <PEAL_RUNS>/Smiling_confounding_copyrighttag_celeba/classifier_poisened096/cfkd_perfect_false_counterfactuals500
+student                              :  <PEAL_RUNS>/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened096/model.cpl
+teacher                              :  <PEAL_RUNS>/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened050/model.cpl
+base_dir                             :  <PEAL_RUNS>/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened096/cfkd_perfect_false_counterfactuals500
 task:
   criterions:
     ce     : 1.0
-    l1     : 10000.0
-    l2     : 1.0
+    l1     : 100.0
   output_type             : singleclass
   output_channels         : 2
   y_selection             : [Smiling]

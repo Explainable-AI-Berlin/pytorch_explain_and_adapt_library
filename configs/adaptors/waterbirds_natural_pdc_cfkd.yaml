@@ -5,6 +5,7 @@ batch_size                           :  2
 tracking_level                       :  3
 min_train_samples                    :  400
 finetune_iterations                  :  1
+max_test_batches                     :  1
 max_validation_samples               :  4
 continuous_learning                  :  "finetune"
 replace_model                        :  True

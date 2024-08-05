@@ -10,12 +10,12 @@ continuous_learning                  :  "finetune"
 replace_model                        :  True
 use_visualization                    :  False #True
 calculate_group_accuracies           :  True
-explainer                            :  <PEAL_BASE>/configs/explainers/pdc_default.yaml
+explainer                            :  <PEAL_BASE>/configs/explainers/square_pdc.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_poisened092.yaml
 test_data                            :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_unpoisened.yaml
 student                              :  <PEAL_RUNS>/square/colora_confounding_colorb/regularized0/classifier_poisened092/model.cpl
-teacher                              :  SegmentationMask
+teacher                              :  <PEAL_RUNS>/square/colora_confounding_colorb/regularized0/classifier_unpoisened/model.cpl
 generator                            :  <PEAL_RUNS>/square/ddpm/config.yaml
 base_dir                             :  <PEAL_RUNS>/square/colora_confounding_colorb/regularized0/classifier_poisened092/pdc_cfkd
 task:
