@@ -1355,7 +1355,7 @@ class CounterfactualKnowledgeDistillation(Adaptor):
                 )
 
         tracking_level_buffer = self.explainer.tracking_level
-        self.explainer.tracking_level = 0
+        self.explainer.tracking_level = 0.5
         img_success = create_comparison(
             explainer=self.explainer,
             dataset=self.test_dataloader.dataset,

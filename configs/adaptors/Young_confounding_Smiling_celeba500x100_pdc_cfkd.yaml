@@ -10,7 +10,7 @@ continuous_learning                  :  "finetune"
 replace_model                        :  True
 use_visualization                    :  False #True
 calculate_group_accuracies           :  True
-explainer                            :  <PEAL_BASE>/configs/explainers/pdc_default.yaml
+explainer                            :  <PEAL_BASE>/configs/explainers/Young_vs_Smiling_pdc.yaml
 training                             :  <PEAL_BASE>/configs/training/img_classifier.yaml
 data                                 :  <PEAL_BASE>/configs/data/Young_confounding_Smiling_celeba_poisened100.yaml
 test_data                            :  <PEAL_BASE>/configs/data/Young_confounding_Smiling_celeba.yaml

@@ -6,19 +6,12 @@ tracking_level                       :  3
 min_train_samples                    :  400
 finetune_iterations                  :  1
 max_validation_samples               :  100
+max_test_batches                     :  1
 continuous_learning                  :  "finetune"
 replace_model                        :  True
 use_visualization                    :  True
 calculate_group_accuracies           :  True
-explainer                            :
-  explainer_type : ACE
-  category : explainer
-  sampling_time_fraction: 0.3
-  attack_iterations: 50
-  dist_l1: 0.00001
-  sampling_inpaint: 0.5
-  y_target_goal_confidence: 0.8
-  distilled_predictor: <PEAL_BASE>/configs/predictors/generic_distillation.yaml
+explainer                            : <PEAL_BASE>/configs/explainers/Young_vs_Smiling_pdc.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/Male_confounding_Blond_Hair_celeba_natural.yaml
 test_data                            :  <PEAL_BASE>/configs/data/Male_confounding_Blond_Hair_celeba_natural.yaml

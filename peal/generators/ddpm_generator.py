@@ -270,6 +270,7 @@ class DDPM(EditCapableGenerator):
             distilled_predictor_config.data = distilled_dataset_config
             explainer_config.distilled_predictor = distilled_predictor_config
             distillation_datasets[i].task_config = explainer_config.distilled_predictor.task
+            distillation_datasets[i].task_config.x_selection = predictor_datasets[i].task_config.x_selection
 
         predictor_distilled = copy.deepcopy(predictor)
         distillation_trainer = ModelTrainer(

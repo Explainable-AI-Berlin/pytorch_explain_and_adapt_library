@@ -10,16 +10,7 @@ continuous_learning                  :  "finetune"
 replace_model                        :  True
 use_visualization                    :  False #True
 calculate_group_accuracies           :  True
-explainer:
-  attack_iterations: 150
-  attack_step: 3.0
-  category: explainer
-  dist_l1: 1.0e-05
-  distilled_predictor: <PEAL_BASE>/configs/predictors/generic_distillation.yaml
-  explainer_type: ACE
-  sampling_inpaint: 0.9
-  sampling_time_fraction: 0.4
-  y_target_goal_confidence: 0.8
+explainer                            :  <PEAL_BASE>/configs/explainers/Young_vs_Smiling_pdc.yaml
 training                             :  <PEAL_BASE>/configs/training/img_classifier.yaml
 data                                 :  <PEAL_BASE>/configs/data/Young_confounding_Smiling_celeba_poisened090.yaml
 test_data                            :  <PEAL_BASE>/configs/data/Young_confounding_Smiling_celeba.yaml

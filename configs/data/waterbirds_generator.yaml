@@ -1,5 +1,5 @@
 dataset_path            : <PEAL_DATA>/waterbirds
-split                   : [0.8, 0.9]
+split                   : [1.0, 1.0]
 input_type              : image
 input_size              : [3, 256, 256]
 output_type             : multiclass

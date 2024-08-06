@@ -94,6 +94,7 @@ class TrainingConfig(BaseModel):
     no_grad_attack: bool = False
     attack_epsilon: float = 1.0
     attack_num_steps: int = 5
+    train_on_test: bool = False
     """
     A dict containing all variables that could not be given with the current config structure
     """
@@ -317,10 +318,12 @@ class ModelTrainer:
         (
             self.train_dataloader,
             self.val_dataloaders,
-            _,
+            test_dataloader,
         ) = create_dataloaders_from_datasource(
             config=self.config, datasource=datasource
         )
+        if self.config.training.train_on_test:
+            self.train_dataloader = test_dataloader
 
         if isinstance(self.val_dataloaders, tuple):
             self.val_dataloaders = list(self.val_dataloaders)
