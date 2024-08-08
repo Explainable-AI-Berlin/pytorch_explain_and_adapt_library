@@ -1,4 +1,4 @@
-# python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x092_pdc_cfkd.yaml"
+# <PEAL_RUNS>/square2
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  6
