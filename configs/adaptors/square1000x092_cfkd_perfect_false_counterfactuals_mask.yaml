@@ -14,9 +14,9 @@ explainer                            :  <PEAL_BASE>/configs/explainers/perfect_f
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_poisened092.yaml
 test_data                            :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_unpoisened.yaml
-student                              :  <PEAL_RUNS>/square2/colora_confounding_colorb/regularized0/classifier_poisened092/model.cpl
+student                              :  $PEAL_RUNS/square2/colora_confounding_colorb/regularized0/classifier_poisened092/model.cpl
 teacher                              :  SegmentationMask
-base_dir                             :  <PEAL_RUNS>/square2/colora_confounding_colorb/regularized0/classifier_poisened092/cfkd_perfect_false_counterfactuals_mask1000
+base_dir                             :  $PEAL_RUNS/square2/colora_confounding_colorb/regularized0/classifier_poisened092/cfkd_perfect_false_counterfactuals_mask1000
 task:
   criterions:
     ce     : 1.0

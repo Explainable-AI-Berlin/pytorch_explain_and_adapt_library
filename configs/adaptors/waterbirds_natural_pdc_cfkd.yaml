@@ -15,10 +15,10 @@ explainer                            :  <PEAL_BASE>/configs/explainers/pdc_defau
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/waterbirds.yaml
 test_data                            :  <PEAL_BASE>/configs/data/waterbirds.yaml
-student                              :  <PEAL_RUNS>/waterbirds/classifier_natural/model.cpl
+student                              :  $PEAL_RUNS/waterbirds/classifier_natural/model.cpl
 teacher                              :  human@8000
-generator                            :  <PEAL_RUNS>/waterbirds/ddpm/config.yaml
-base_dir                             :  <PEAL_RUNS>/waterbirds/classifier_natural/pdc_cfkd
+generator                            :  $PEAL_RUNS/waterbirds/ddpm/config.yaml
+base_dir                             :  $PEAL_RUNS/waterbirds/classifier_natural/pdc_cfkd
 task:
   criterions:
     ce     : 1.0

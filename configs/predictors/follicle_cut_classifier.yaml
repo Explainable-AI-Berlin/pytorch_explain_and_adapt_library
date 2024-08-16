@@ -1,5 +1,5 @@
-# python train_predictor.py --model_config <PEAL_BASE>/configs/predictors/follicle_cut_classifier.yaml
-model_path        : <PEAL_RUNS>/follicles_cut/regularized0
+# python train_predictor.py --config "<PEAL_BASE>/configs/predictors/follicle_cut_classifier.yaml"
+model_path        : $PEAL_RUNS/follicles_cut/regularized0
 training          : <PEAL_BASE>/configs/training/img_classifier.yaml
 architecture      : <PEAL_BASE>/configs/architectures/resnet18.yaml
 data              : <PEAL_BASE>/configs/data/follicles.yaml

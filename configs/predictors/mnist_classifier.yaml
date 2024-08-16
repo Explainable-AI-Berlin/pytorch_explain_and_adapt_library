@@ -1,5 +1,5 @@
-# python train_predictor.py --model_config "<PEAL_BASE>/configs/predictors/mnist_classifier.yaml"
-model_path        : <PEAL_RUNS>/mnist/natural_classifier
+# python train_predictor.py --config "<PEAL_BASE>/configs/predictors/mnist_classifier.yaml"
+model_path        : $PEAL_RUNS/mnist/natural_classifier
 training          : <PEAL_BASE>/configs/training/img_classifier.yaml
 architecture      : <PEAL_BASE>/configs/architectures/resnet18.yaml
 data              : <PEAL_BASE>/configs/data/mnist.yaml

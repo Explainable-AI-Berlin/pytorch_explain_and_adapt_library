@@ -1,8 +1,8 @@
 # python train_generator.py --config "<PEAL_BASE>/configs/generators/follicle_tcvae.yaml"
 generator_type : DiveTCVAE
 category : generator
-base_path : <PEAL_RUNS>/follicles_cut/tcvae
-savedir : <PEAL_RUNS>/follicles_cut/tcvae
+base_path : $PEAL_RUNS/follicles_cut/tcvae
+savedir : $PEAL_RUNS/follicles_cut/tcvae
 data: "<PEAL_BASE>/configs/data/follicles_generator.yaml"
 height: 256
 width: 256

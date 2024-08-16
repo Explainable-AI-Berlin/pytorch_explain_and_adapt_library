@@ -15,10 +15,10 @@ explainer                            : <PEAL_BASE>/configs/explainers/Young_vs_S
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/Male_confounding_Blond_Hair_celeba_natural.yaml
 test_data                            :  <PEAL_BASE>/configs/data/Male_confounding_Blond_Hair_celeba_natural.yaml
-student                              :  <PEAL_RUNS>/celeba/Male_confounding_Blond_Hair/unregularized0/classifier_natural/model.cpl
+student                              :  $PEAL_RUNS/celeba/Male_confounding_Blond_Hair/unregularized0/classifier_natural/model.cpl
 teacher                              :  human@8000
-generator                            :  <PEAL_RUNS>/celeba/ddpm/config.yaml
-base_dir                             :  <PEAL_RUNS>/celeba/Male_confounding_Blond_Hair/unregularized0/classifier_natural/pdc_cfkd
+generator                            :  $PEAL_RUNS/celeba/ddpm/config.yaml
+base_dir                             :  $PEAL_RUNS/celeba/Male_confounding_Blond_Hair/unregularized0/classifier_natural/pdc_cfkd
 task:
   criterions:
     ce     : 1.0

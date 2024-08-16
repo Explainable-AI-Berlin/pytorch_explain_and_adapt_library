@@ -2,7 +2,7 @@
 category: generator
 generator_type: StableDiffusion
 data: "<PEAL_BASE>/configs/data/celeba_stable_diffusion.yaml"
-base_path : <PEAL_RUNS>/celeba/stable_diffusion
+base_path : $PEAL_RUNS/celeba/stable_diffusion
 task_config:
   criterions:
     bce     : 1.0

@@ -1,5 +1,5 @@
-# python train_predictor.py --model_config "<PEAL_BASE>/configs/predictors/waterbirds_classifier_unpoisened.yaml"
-model_path        : <PEAL_RUNS>/waterbirds/classifier_unpoisened
+# python train_predictor.py --config "<PEAL_BASE>/configs/predictors/waterbirds_classifier_unpoisened.yaml"
+model_path        : $PEAL_RUNS/waterbirds/classifier_unpoisened
 training          : <PEAL_BASE>/configs/training/img_classifier_train_on_test.yaml
 architecture      : <PEAL_BASE>/configs/architectures/resnet18.yaml
 data              : <PEAL_BASE>/configs/data/waterbirds.yaml

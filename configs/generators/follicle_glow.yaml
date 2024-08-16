@@ -2,7 +2,7 @@
 generator_type: 'GlowGenerator'
 category: 'generator'
 data : '<PEAL_BASE>/configs/data/follicles.yaml'
-base_path: '<PEAL_RUNS>/follicles_cut/glow'
+base_path: '$PEAL_RUNS/follicles_cut/glow'
 img_size: 128
 lr: 1e-6
 n_block: 5

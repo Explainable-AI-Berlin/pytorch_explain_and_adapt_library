@@ -1,10 +1,10 @@
 # python -W ignore run_explainer.py --config "<PEAL_BASE>/configs/explainers/square_ace.yaml"
 explainer_type : ACE
 category : explainer
-predictor: <PEAL_RUNS>/square/colora_confounding_colorb/regularized0/classifier_unpoisened/config.yaml
-generator: <PEAL_RUNS>/square/ddpm/config.yaml
+predictor: $PEAL_RUNS/square/colora_confounding_colorb/regularized0/classifier_unpoisened/config.yaml
+generator: $PEAL_RUNS/square/ddpm/config.yaml
 validate_generator: False
-explanations_dir: <PEAL_RUNS>/square/colora_confounding_colorb/regularized0/classifier_unpoisened/ace_explanations
+explanations_dir: $PEAL_RUNS/square/colora_confounding_colorb/regularized0/classifier_unpoisened/ace_explanations
 attack_iterations: 100
 sampling_time_fraction: 0.3
 sampling_inpaint: 0.0

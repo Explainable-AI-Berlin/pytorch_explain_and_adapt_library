@@ -22,10 +22,10 @@ explainer                            :
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_poisened090.yaml
 test_data                            :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_unpoisened.yaml
-student                              :  <PEAL_RUNS>/square/colora_confounding_colorb/regularized0/classifier_poisened090/model.cpl
+student                              :  $PEAL_RUNS/square/colora_confounding_colorb/regularized0/classifier_poisened090/model.cpl
 teacher                              :  SegmentationMask
-generator                            :  <PEAL_RUNS>/square/ddpm/config.yaml
-base_dir                             :  <PEAL_RUNS>/square/colora_confounding_colorb/regularized0/classifier_poisened090/cfkd_ace
+generator                            :  $PEAL_RUNS/square/ddpm/config.yaml
+base_dir                             :  $PEAL_RUNS/square/colora_confounding_colorb/regularized0/classifier_poisened090/cfkd_ace
 task:
   criterions:
     ce     : 1.0

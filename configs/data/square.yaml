@@ -1,5 +1,6 @@
+# python generate_dataset.py --config configs/data/square.yaml
 dataset_class           : SquareDataset
-dataset_path            : <PEAL_DATA>/square2
+dataset_path            : $PEAL_DATA/square2
 num_samples             : 16000
 input_type              : image
 input_size              : [3, 64, 64]

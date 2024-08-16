@@ -1,4 +1,4 @@
-# <PEAL_RUNS>/square2
+# $PEAL_RUNS/square2
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  6
@@ -14,10 +14,10 @@ explainer                            :  <PEAL_BASE>/configs/explainers/square_pd
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_poisened092.yaml
 test_data                            :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_unpoisened.yaml
-student                              :  <PEAL_RUNS>/square/colora_confounding_colorb/regularized0/classifier_poisened092/model.cpl
-teacher                              :  <PEAL_RUNS>/square/colora_confounding_colorb/regularized0/classifier_unpoisened/model.cpl
-generator                            :  <PEAL_RUNS>/square/ddpm/config.yaml
-base_dir                             :  <PEAL_RUNS>/square/colora_confounding_colorb/regularized0/classifier_poisened092/pdc_cfkd
+student                              :  $PEAL_RUNS/square/colora_confounding_colorb/regularized0/classifier_poisened092/model.cpl
+teacher                              :  $PEAL_RUNS/square/colora_confounding_colorb/regularized0/classifier_unpoisened/model.cpl
+generator                            :  $PEAL_RUNS/square/ddpm/config.yaml
+base_dir                             :  $PEAL_RUNS/square/colora_confounding_colorb/regularized0/classifier_poisened092/pdc_cfkd
 task:
   criterions:
     ce     : 1.0

@@ -1,7 +1,7 @@
 # python train_generator.py --config "<PEAL_BASE>/configs/generators/waterbirds_ddpm.yaml"
 generator_type : DDPM
 category : generator
-base_path : <PEAL_RUNS>/waterbirds/ddpm
+base_path : $PEAL_RUNS/waterbirds/ddpm
 data: "<PEAL_BASE>/configs/data/waterbirds_generator.yaml"
 image_size: 256
 batch_size: 5
