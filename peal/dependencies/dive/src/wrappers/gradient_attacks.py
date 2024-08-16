@@ -56,7 +56,7 @@ class GradientAttack(torch.nn.Module):
         Args:
             exp_dict (dict): hyperparameter dictionary
             savedir (str): root path to experiment directory
-            data_path (str): root path to datasets and pretrained models
+            data_path (str): root path to datasets and pretrained predictors
         """
         super().__init__()
         self.exp_dict = exp_dict

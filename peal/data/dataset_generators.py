@@ -850,6 +850,9 @@ class SquareDatasetGenerator:
         lines_out_inverse = [
             "Name,ClassA,ClassB,ClassC,ClassD,ColorA,ColorB,PositionX,PositionY"
         ]
+        SIZE_INNER = 8
+        SIZE_BORDER = 2
+        SIZE_ADDED = SIZE_INNER + 2 * SIZE_BORDER
 
         for sample_idx in range(self.data_config.num_samples):
             if sample_idx % 2 == 0:
@@ -868,30 +871,49 @@ class SquareDatasetGenerator:
                 class_b = 0
                 color_b = np.random.randint(0, 128)
 
+            num_positions = 64 - SIZE_ADDED
             if int(sample_idx / 4) % 2 == 0:
                 class_c = 1
-                position_x = np.random.randint(28, 56)
+                position_x = np.random.randint(int(num_positions / 2), num_positions)
 
             else:
                 class_c = 0
-                position_x = np.random.randint(0, 28)
+                position_x = np.random.randint(0, int(num_positions / 2))
 
             if int(sample_idx / 8) % 2 == 0:
                 class_d = 1
-                position_y = np.random.randint(28, 56)
+                position_y = np.random.randint(int(num_positions / 2), num_positions)
 
             else:
                 class_d = 0
-                position_y = np.random.randint(0, 28)
+                position_y = np.random.randint(0, int(num_positions / 2))
 
             sample_name = embed_numberstring(sample_idx, 8) + ".png"
             img = np.ones([64, 64, 3], dtype=np.float32) * color_b
             noise = np.random.randn(*img.shape) * 10
             img_base = np.clip(img + noise, 0, 255)
             img = np.copy(img_base)
-            img[position_x : position_x + 8, position_y : position_y + 8] = np.clip(
+            img[
+                position_x : position_x + SIZE_ADDED,
+                position_y : position_y + SIZE_ADDED,
+            ] = np.clip(
+                127
+                + noise[
+                    position_x : position_x + SIZE_ADDED,
+                    position_y : position_y + SIZE_ADDED,
+                ],
+                0,
+                255,
+            )
+            img[
+                position_x + SIZE_BORDER: position_x + SIZE_ADDED - SIZE_BORDER,
+                position_y + SIZE_BORDER : position_y + SIZE_ADDED - SIZE_BORDER,
+            ] = np.clip(
                 color_a
-                + noise[position_x : position_x + 8, position_y : position_y + 8],
+                + noise[
+                    position_x + SIZE_BORDER : position_x + SIZE_ADDED - SIZE_BORDER,
+                    position_y + SIZE_BORDER : position_y + SIZE_ADDED - SIZE_BORDER,
+                ],
                 0,
                 255,
             )
@@ -899,10 +921,26 @@ class SquareDatasetGenerator:
             img.save(os.path.join(self.data_config.dataset_path, "imgs", sample_name))
             img_inverse = np.abs(img_base - 255)
             img_inverse[
-                position_x : position_x + 8, position_y : position_y + 8
+                position_x : position_x + SIZE_ADDED,
+                position_y : position_y + SIZE_ADDED,
+            ] = np.clip(
+                127
+                - noise[
+                    position_x : position_x + SIZE_ADDED,
+                    position_y : position_y + SIZE_ADDED,
+                ],
+                0,
+                255,
+            )
+            img_inverse[
+                position_x + SIZE_BORDER : position_x + SIZE_ADDED - SIZE_BORDER,
+                position_y + SIZE_BORDER : position_y + SIZE_ADDED - SIZE_BORDER,
             ] = np.clip(
                 color_a
-                - noise[position_x : position_x + 8, position_y : position_y + 8],
+                - noise[
+                    position_x + SIZE_BORDER : position_x + SIZE_ADDED - SIZE_BORDER,
+                    position_y + SIZE_BORDER : position_y + SIZE_ADDED - SIZE_BORDER,
+                ],
                 0,
                 255,
             )
@@ -913,7 +951,10 @@ class SquareDatasetGenerator:
                 )
             )
             mask = np.zeros([64, 64, 3], dtype=np.uint8)
-            mask[position_x : position_x + 8, position_y : position_y + 8] = 255
+            mask[
+                position_x + SIZE_BORDER : position_x + SIZE_ADDED - SIZE_BORDER,
+                position_y + SIZE_BORDER : position_y + SIZE_ADDED - SIZE_BORDER,
+            ] = 255
             img_mask = Image.fromarray(mask)
             img_mask.save(
                 os.path.join(self.data_config.dataset_path, "masks", sample_name)

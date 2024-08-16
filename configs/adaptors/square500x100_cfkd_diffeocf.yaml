@@ -14,10 +14,10 @@ explainer                            :  <PEAL_BASE>/configs/explainers/diffeocf_
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_poisened100.yaml
 test_data                            :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_unpoisened.yaml
-student                              :  <PEAL_RUNS>/square/colora_confounding_colorb/classifier_poisened100/model.cpl
+student                              :  $PEAL_RUNS/square/colora_confounding_colorb/classifier_poisened100/model.cpl
 teacher                              :  SegmentationMask
-generator                            :  <PEAL_RUNS>/square/glow/config.yaml
-base_dir                             :  <PEAL_RUNS>/square/colora_confounding_colorb/classifier_poisened100/cfkd_diffeocf
+generator                            :  $PEAL_RUNS/square/glow/config.yaml
+base_dir                             :  $PEAL_RUNS/square/colora_confounding_colorb/classifier_poisened100/cfkd_diffeocf
 task:
   criterions:
     ce     : 1.0

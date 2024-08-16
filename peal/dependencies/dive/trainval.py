@@ -120,7 +120,7 @@ if __name__ == "__main__":
     parser.add_argument('-nw', '--num_workers', type=int, default=0,
                         help="DataLoader number of workers")
     parser.add_argument('-dr', '--dataroot', type=str, default="./data",
-                        help="Path to datasets and pretrained models")
+                        help="Path to datasets and pretrained predictors")
     parser.add_argument("-r", "--reset",  default=0, type=int)
     parser.add_argument("-ei", "--exp_id", default=None)
     parser.add_argument("-j", "--run_jobs", type=str, default="0", 

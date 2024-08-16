@@ -13,10 +13,10 @@ explainer                            :  <PEAL_BASE>/configs/explainers/perfect_f
 training                             :  <PEAL_BASE>/configs/training/img_classifier.yaml
 data                                 :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba500_poisened098.yaml
 test_data                            :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba.yaml
-student                              :  <PEAL_RUNS>/Smiling_confounding_copyrighttag_celeba/classifier_poisened098/model.cpl
-teacher                              :  <PEAL_RUNS>/Smiling_confounding_copyrighttag_celeba/classifier_unpoisened/model.cpl
-generator                            :  <PEAL_RUNS>/ddpm_CopyrightTag_celeba_1000/config.yaml
-base_dir                             :  <PEAL_RUNS>/Smiling_confounding_copyrighttag_celeba/classifier_poisened098/cfkd_perfect_false_counterfactuals500
+student                              :  $PEAL_RUNS/Smiling_confounding_copyrighttag_celeba/classifier_poisened098/model.cpl
+teacher                              :  $PEAL_RUNS/Smiling_confounding_copyrighttag_celeba/classifier_unpoisened/model.cpl
+generator                            :  $PEAL_RUNS/ddpm_CopyrightTag_celeba_1000/config.yaml
+base_dir                             :  $PEAL_RUNS/Smiling_confounding_copyrighttag_celeba/classifier_poisened098/cfkd_perfect_false_counterfactuals500
 task:
   criterions:
     ce     : 1.0

@@ -1,11 +1,11 @@
 # python -W ignore run_explainer.py --config "<PEAL_BASE>/configs/explainers/mnist_time.yaml"
 explainer_type : DiffeoCF
 category : explainer
-predictor_path: <PEAL_RUNS>/mnist/natural_classifier/model.cpl
+predictor_path: $PEAL_RUNS/mnist/natural_classifier/model.cpl
 data_config: <PEAL_BASE>/configs/data/mnist.yaml
-generator: <PEAL_RUNS>/mnist/stable_diffusion/config.yaml
+generator: $PEAL_RUNS/mnist/stable_diffusion/config.yaml
 validate_generator: True
-explanations_dir: <PEAL_RUNS>/mnist/natural_classifier/time_explanations
+explanations_dir: $PEAL_RUNS/mnist/natural_classifier/time_explanations
 max_samples: 10
 class_custom_token: [
     "|<A*01>| |<A*02>| |<A*03>|",

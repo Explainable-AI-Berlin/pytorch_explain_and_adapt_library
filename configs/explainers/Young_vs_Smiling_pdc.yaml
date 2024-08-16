@@ -1,0 +1,9 @@
+attack_iterations: 150
+attack_step: 3.0
+category: explainer
+dist_l1: 1.0e-05
+distilled_predictor: <PEAL_BASE>/configs/predictors/generic_distillation.yaml
+explainer_type: ACE
+sampling_inpaint: 0.9
+sampling_time_fraction: 0.4
+y_target_goal_confidence: 0.8

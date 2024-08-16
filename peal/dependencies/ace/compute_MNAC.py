@@ -26,7 +26,7 @@ def arguments():
     parser = argparse.ArgumentParser(description="FVA arguments.")
     parser.add_argument("--gpu", default="0", type=str, help="GPU id")
     parser.add_argument(
-        "--oracle-path", default="models/oracle.pth", type=str, help="Oracle path"
+        "--oracle-path", default="predictors/oracle.pth", type=str, help="Oracle path"
     )
     parser.add_argument("--output-path", required=True, type=str, help="Results Path")
     parser.add_argument("--exp-name", required=True, type=str, help="Experiment Name")

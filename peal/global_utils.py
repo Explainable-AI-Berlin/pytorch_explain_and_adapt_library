@@ -200,13 +200,13 @@ def _load_yaml_config(config_path):
         # config_path is already a config object
         return config_path
 
-    if config_path[:len("<PEAL_RUNS>")] == "<PEAL_RUNS>":
+    if config_path[:len("$PEAL_RUNS")] == "$PEAL_RUNS":
         peal_runs = os.environ.get('PEAL_RUNS', "peal_runs")
-        config_path = config_path.replace("<PEAL_RUNS>", peal_runs)
+        config_path = config_path.replace("$PEAL_RUNS", peal_runs)
 
-    if config_path[:len("<PEAL_DATA>")] == "<PEAL_DATA>":
+    if config_path[:len("$PEAL_DATA")] == "$PEAL_DATA":
         peal_data = os.environ.get('PEAL_DATA', "datasets")
-        config_path = config_path.replace("<PEAL_DATA>", peal_data)
+        config_path = config_path.replace("$PEAL_DATA", peal_data)
 
     if config_path[-5:] == ".yaml":
         split_path = config_path.split("/")
@@ -229,13 +229,13 @@ def _load_yaml_config(config_path):
 
         for key in config.keys():
             if isinstance(config[key], str):
-                if config[key][:len("<PEAL_RUNS>")] == "<PEAL_RUNS>":
+                if config[key][:len("$PEAL_RUNS")] == "$PEAL_RUNS":
                     peal_runs = os.environ.get('PEAL_RUNS', "peal_runs")
-                    config[key] = config[key].replace("<PEAL_RUNS>", peal_runs)
+                    config[key] = config[key].replace("$PEAL_RUNS", peal_runs)
 
-                if config[key][:len("<PEAL_DATA>")] == "<PEAL_DATA>":
+                if config[key][:len("$PEAL_DATA")] == "$PEAL_DATA":
                     peal_data = os.environ.get('PEAL_DATA', "datasets")
-                    config[key] = config[key].replace("<PEAL_DATA>", peal_data)
+                    config[key] = config[key].replace("$PEAL_DATA", peal_data)
 
                 if config[key][-5:] == ".yaml":
                     config[key] = _load_yaml_config(config[key])

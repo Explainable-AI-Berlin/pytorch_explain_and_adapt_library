@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from peal.dependencies.dive.src.models import get_model
 from peal.dependencies.dive.src.wrappers.base_wrapper import BaseWrapper
 
-# from models import get_model
+# from predictors import get_model
 # from base_wrapper import BaseWrapper
 
 from tqdm import tqdm

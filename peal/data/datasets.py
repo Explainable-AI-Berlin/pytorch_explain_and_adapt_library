@@ -141,6 +141,8 @@ class DataConfig(BaseModel):
     The path of the original dataset.
     """
     inverse: Union[type(None), str] = None
+    label_rel_path: str = "data.csv"
+    img_name_idx: int = 0
     has_hints: bool = False
 
 
@@ -298,6 +300,7 @@ class ImageDataset(PealDataset):
         feedback_list=None,
         hint_list=None,
         idx_to_info=None,
+        tracking_level=1,
         **kwargs: dict,
     ) -> tuple:
         Path(base_path).mkdir(parents=True, exist_ok=True)
@@ -335,54 +338,59 @@ class ImageDataset(PealDataset):
                 )
 
             heatmap_high_contrast = torch.clamp(heatmap / heatmap.max(), 0.0, 1.0)
-            current_collage = torch.cat(
-                [x_in, counterfactual_rgb, heatmap_high_contrast], -1
-            )
-            current_collage = torchvision.utils.make_grid(current_collage, nrow=3)
-            plt.gcf()
-            plt.imshow(current_collage.permute(1, 2, 0))
-            title_string = (
-                str(int(y_list[i]))
-                + " -> "
-                + str(int(y_source_list[i]))
-                + " -> "
-                + str(int(y_target_list[i]))
-                + "\n"
-            )
-            title_string += (
-                "Confidence: "
-                + str(
-                    round(
-                        float(y_target_start_confidence_list[i]),
-                        2,
-                    )
-                )
-                + " -> "
-            )
-            title_string += str(round(float(y_target_end_confidence_list[i]), 2)) + "\n"
-            if not hint_list is None and not idx_to_info is None:
-                title_string += idx_to_info(x_list[i], x_counterfactual_list[i], hint_list[i]) + "\n"
+            heatmap_list.append(heatmap_high_contrast)
 
-            if not feedback_list is None:
+            if tracking_level >= 1:
+                current_collage = torch.cat(
+                    [x_in, counterfactual_rgb, heatmap_high_contrast], -1
+                )
+                current_collage = torchvision.utils.make_grid(current_collage, nrow=3)
+                plt.gcf()
+                plt.imshow(current_collage.permute(1, 2, 0))
+                title_string = (
+                    str(int(y_list[i]))
+                    + " -> "
+                    + str(int(y_source_list[i]))
+                    + " -> "
+                    + str(int(y_target_list[i]))
+                    + "\n"
+                )
                 title_string += (
-                    ", Teacher: "
-                    + str(int(y_original_teacher_list[i]))
+                    "Confidence: "
+                    + str(
+                        round(
+                            float(y_target_start_confidence_list[i]),
+                            2,
+                        )
+                    )
                     + " -> "
-                    + str(int(y_counterfactual_teacher_list[i]))
-                    + " -> "
-                    + str(feedback_list[i])
                 )
+                title_string += str(round(float(y_target_end_confidence_list[i]), 2)) + "\n"
+                if not hint_list is None and not idx_to_info is None:
+                    title_string += idx_to_info(x_list[i], x_counterfactual_list[i], hint_list[i]) + "\n"
 
-            plt.title(title_string)
-            collage_path = os.path.join(
-                base_path,
-                embed_numberstring(str(start_idx + i)) + "_collage.png",
-            )
-            plt.axis("off")
-            plt.savefig(collage_path)
-            print("Saved collage to " + collage_path)
-            collage_paths.append(collage_path)
-            heatmap_list.append(heatmap)
+                if not feedback_list is None:
+                    title_string += (
+                        ", Teacher: "
+                        + str(int(y_original_teacher_list[i]))
+                        + " -> "
+                        + str(int(y_counterfactual_teacher_list[i]))
+                        + " -> "
+                        + str(feedback_list[i])
+                    )
+
+                plt.title(title_string)
+                collage_path = os.path.join(
+                    base_path,
+                    embed_numberstring(str(start_idx + i)) + "_collage.png",
+                )
+                plt.axis("off")
+                plt.savefig(collage_path)
+                print("Saved collage to " + collage_path)
+                collage_paths.append(collage_path)
+
+            else:
+                collage_paths.append(None)
 
         return heatmap_list, collage_paths
 
@@ -410,7 +418,7 @@ class ImageDataset(PealDataset):
             )
 
         data = "ImgPath,Class\n" + "\n".join([",".join(map(str, x)) for x in data])
-        with open(os.path.join(output_dir, "data.csv"), "w") as f:
+        with open(os.path.join(output_dir, self.config.label_rel_path), "w") as f:
             f.write(data)
 
     def track_generator_performance(
@@ -600,7 +608,7 @@ class Image2MixedDataset(ImageDataset):
         # TODO
         # self.config.class_ratios = None
         if data_dir is None:
-            data_dir = os.path.join(self.root_dir, "data.csv")
+            data_dir = os.path.join(self.root_dir, self.config.label_rel_path)
 
         if not config.delimiter is None:
             delimiter = config.delimiter

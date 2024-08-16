@@ -259,7 +259,7 @@ def main():
     )
 
     # ========================================
-    # load models
+    # load predictors
     # ========================================
 
     print("Loading Model and diffusion model")

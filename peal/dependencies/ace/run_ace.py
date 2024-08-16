@@ -335,7 +335,7 @@ def main(args=None):
         )
 
     # ========================================
-    # load models
+    # load predictors
     # ========================================
 
     # respaced diffusion has the respaced strategy

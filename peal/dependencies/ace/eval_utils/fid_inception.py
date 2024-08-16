@@ -162,7 +162,7 @@ class InceptionV3(nn.Module):
 
 
 def _inception_v3(*args, **kwargs):
-    """Wraps `torchvision.models.inception_v3`
+    """Wraps `torchvision.predictors.inception_v3`
 
     Skips default weight inititialization if supported by torchvision version.
     See https://github.com/mseitzer/pytorch-fid/issues/28.
@@ -322,7 +322,7 @@ class FIDInceptionE_2(torchvision.models.inception.InceptionE):
 
         # Patch: The FID Inception model uses max pooling instead of average
         # pooling. This is likely an error in this specific Inception
-        # implementation, as other Inception models use average pooling here
+        # implementation, as other Inception predictors use average pooling here
         # (which matches the description in the paper).
         branch_pool = F.max_pool2d(x, kernel_size=3, stride=1, padding=1)
         branch_pool = self.branch_pool(branch_pool)

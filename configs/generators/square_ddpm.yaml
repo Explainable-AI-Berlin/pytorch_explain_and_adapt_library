@@ -1,7 +1,7 @@
 # python -W ignore train_generator.py --config "<PEAL_BASE>/configs/generators/square_ddpm.yaml"
 generator_type : DDPM
 category : generator
-base_path : <PEAL_RUNS>/square/ddpm
+base_path : $PEAL_RUNS/square2/ddpm
 data: <PEAL_BASE>/configs/data/square.yaml
 image_size: 64
 batch_size: 10

@@ -189,7 +189,7 @@ class TrainLoop:
         pbar.num_steps = self.data.dataloader.train_config.steps_per_epoch
         pbar.config = config
 
-        if os.path.exists(self.model_dir):
+        if os.path.exists(os.path.join(self.model_dir, "model")):
             shutil.move(
                 self.model_dir,
                 self.model_dir
@@ -206,6 +206,7 @@ class TrainLoop:
 
         else:
             pbar.writer = SummaryWriter(os.path.join(self.model_dir, "logs"))
+
         while (
             not self.lr_anneal_steps
             or self.step + self.resume_step < self.lr_anneal_steps

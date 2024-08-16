@@ -2,7 +2,7 @@
 generator_type: 'GlowGenerator'
 category: 'generator'
 data : '<PEAL_BASE>/configs/data/mnist_generative.yaml'
-base_path: '<PEAL_RUNS>/mnist/glow'
+base_path: '$PEAL_RUNS/mnist/glow'
 img_size: 32
 lr: 1e-5
 n_block: 3

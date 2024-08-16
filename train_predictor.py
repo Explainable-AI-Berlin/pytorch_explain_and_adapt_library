@@ -6,16 +6,16 @@ from peal.training.trainers import ModelTrainer, PredictorConfig
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_config", type=str, required=True)
+    parser.add_argument("--config", type=str, required=True)
     add_class_arguments(parser, PredictorConfig)
     args = parser.parse_args()
 
-    model_config = load_yaml_config(args.model_config, PredictorConfig)
-    integrate_arguments(args, model_config, exclude=["model_config"])
+    config = load_yaml_config(args.config, PredictorConfig)
+    integrate_arguments(args, config, exclude=["config"])
 
-    model_trainer = ModelTrainer(model_config)
+    model_trainer = ModelTrainer(config)
     model_trainer.fit(
-        continue_training=model_config.is_loaded, is_initialized=model_config.is_loaded
+        continue_training=config.is_loaded, is_initialized=config.is_loaded
     )
 
 

@@ -14,10 +14,10 @@ explainer                            :  <PEAL_BASE>/configs/explainers/ace_diver
 training                             :  <PEAL_BASE>/configs/training/img_classifier.yaml
 data                                 :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba500_poisened096.yaml
 test_data                            :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba.yaml
-student                              :  <PEAL_RUNS>/Smiling_confounding_copyrighttag_celeba/classifier_poisened096/model.cpl
-teacher                              :  <PEAL_RUNS>/Smiling_confounding_copyrighttag_celeba/classifier_unpoisened/model.cpl
-generator                            :  <PEAL_RUNS>/ddpm_CopyrightTag_celeba_1000/config.yaml
-base_dir                             :  <PEAL_RUNS>/Smiling_confounding_copyrighttag_celeba/classifier_poisened096/cfkd_ace
+student                              :  $PEAL_RUNS/Smiling_confounding_copyrighttag_celeba/classifier_poisened096/model.cpl
+teacher                              :  $PEAL_RUNS/Smiling_confounding_copyrighttag_celeba/classifier_unpoisened/model.cpl
+generator                            :  $PEAL_RUNS/ddpm_CopyrightTag_celeba_1000/config.yaml
+base_dir                             :  $PEAL_RUNS/Smiling_confounding_copyrighttag_celeba/classifier_poisened096/cfkd_ace
 task:
   criterions:
     ce     : 1.0

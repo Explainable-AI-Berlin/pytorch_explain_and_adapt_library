@@ -9,4 +9,4 @@ sampling_dilation : 17
 timestep_respacing : 50
 attempts : 3
 y_target_goal_confidence: 0.9
-#base_path : <PEAL_RUNS>/ddpm_CopyrightTag_celeba_1000
+#base_path : $PEAL_RUNS/ddpm_CopyrightTag_celeba_1000

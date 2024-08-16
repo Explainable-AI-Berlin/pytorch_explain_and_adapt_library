@@ -1,4 +1,4 @@
-'dataset_path'            : '<PEAL_DATA>/celeba_copyrighttag'
+'dataset_path'            : '$PEAL_DATA/celeba_copyrighttag'
 'num_samples'             : 194000
 'split'                   : [0.8,0.9]
 'input_type'              : 'image'

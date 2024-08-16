@@ -26,7 +26,7 @@ def diffusion_defaults():
 
 def classifier_defaults():
     """
-    Defaults for classifier models.
+    Defaults for classifier predictors.
     """
     return dict(
         image_size=64,

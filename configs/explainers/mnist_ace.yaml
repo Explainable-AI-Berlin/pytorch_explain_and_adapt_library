@@ -1,11 +1,11 @@
 # python -W ignore run_explainer.py --config "<PEAL_BASE>/configs/explainers/mnist_ace.yaml"
 explainer_type : ACE
 category : explainer
-predictor_path: <PEAL_RUNS>/mnist/natural_classifier/model.cpl
+predictor_path: $PEAL_RUNS/mnist/natural_classifier/model.cpl
 data_config: <PEAL_BASE>/configs/data/mnist.yaml
-generator: <PEAL_RUNS>/mnist/ddpm/config.yaml
+generator: $PEAL_RUNS/mnist/ddpm/config.yaml
 validate_generator: False
-explanations_dir: <PEAL_RUNS>/mnist/natural_classifier/ace_explanations
+explanations_dir: $PEAL_RUNS/mnist/natural_classifier/ace_explanations
 attack_iterations: 100
 sampling_time_fraction: 0.5
 dist_l1: 0.0
