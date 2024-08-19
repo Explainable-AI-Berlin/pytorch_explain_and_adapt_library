@@ -301,6 +301,7 @@ class ImageDataset(PealDataset):
         hint_list=None,
         idx_to_info=None,
         tracking_level=1,
+        history_list=None,
         **kwargs: dict,
     ) -> tuple:
         Path(base_path).mkdir(parents=True, exist_ok=True)
@@ -388,6 +389,16 @@ class ImageDataset(PealDataset):
                 plt.savefig(collage_path)
                 print("Saved collage to " + collage_path)
                 collage_paths.append(collage_path)
+                gif_path = os.path.join(
+                    base_path,
+                    embed_numberstring(str(start_idx + i)) + "_collage.gif",
+                )
+                tensor = (history_list[i] * 255).clamp(0, 255).byte()
+                # Convert the tensor to a list of PIL images
+                images = [torchvision.transforms.ToPILImage()(frame) for frame in tensor]
+
+                # Save images as a GIF
+                images[0].save(gif_path, save_all=True, append_images=images[1:], duration=500, loop=0)
 
             else:
                 collage_paths.append(None)

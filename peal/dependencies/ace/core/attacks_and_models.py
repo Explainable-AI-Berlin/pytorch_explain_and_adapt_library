@@ -458,6 +458,7 @@ def get_attack(attack, use_checkpoint, use_shortcut=False):
             projection_fn = (
                 self.linf_norm_proj if self.norm == "linf" else self.l2_norm_proj
             )
+            history = [x_adv.detach().cpu()[idx].unsqueeze(0) for idx in range(x_adv.shape[0])]
 
             mask = torch.ones(x.shape[0]).to(x)
             pred_old = torch.nn.functional.softmax(self.classifier.classifier(x_adv), -1)
@@ -488,11 +489,13 @@ def get_attack(attack, use_checkpoint, use_shortcut=False):
                         mask[j] = 0
 
                 print(str(i) + ": " + str([float(pred_original[j, y[j]]) for j in range(x_adv.shape[0])]))
+                for idx in range(len(history)):
+                    history[idx] = torch.cat((history[idx], x_adv.detach().cpu()[idx].unsqueeze(0)), 0)
 
                 if mask.sum() == 0:
                     break
 
-            return x_adv
+            return x_adv, history
 
     class GradientDescent(BaseAttack):
         """

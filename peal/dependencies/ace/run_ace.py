@@ -180,7 +180,7 @@ def filter_fn(
             ).float(),
         )"""
 
-        pe = attack.perturb(x, target)
+        pe, history = attack.perturb(x, target)
 
     # generates masks
     if not inpaint == 0.0:
@@ -240,7 +240,7 @@ def filter_fn(
         mask = torch.ones_like(ce)
         noise_x = torch.zeros_like(ce)
 
-    return ce, pe, noise_x, mask
+    return ce, pe, noise_x, mask, history
 
 
 # =======================================================
@@ -472,6 +472,7 @@ def main(args=None):
         "pre-explanation": copy.deepcopy(stats),
     }
     counterfactuals = []
+    histories = []
 
     if args.save_images:
         print("Starting Image Generation")
@@ -545,7 +546,7 @@ def main(args=None):
             stats["n"] += lab.size(0)
 
         # sample image from the noisy_img
-        ce, pe, noise, pe_mask = filter_fn(
+        ce, pe, noise, pe_mask, history = filter_fn(
             diffusion=respaced_diffusion,
             attack=attack,
             model=model,
@@ -563,6 +564,7 @@ def main(args=None):
             generator_dataset=args.generator_dataset if hasattr(args, "generator_dataset") else None,
         )
         counterfactuals.append(ce.detach().cpu())
+        histories.extend(history)
         if args.save_images:
             noise = (noise * 255).to(dtype=torch.uint8).detach().cpu()
             import torchvision
@@ -679,7 +681,7 @@ def main(args=None):
         ) as f:
             f.write(str(stats))
 
-    return counterfactuals
+    return counterfactuals, histories
 
 
 if __name__ == "__main__":
