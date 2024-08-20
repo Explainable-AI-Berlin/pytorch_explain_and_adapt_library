@@ -22,6 +22,7 @@ matplotlib.use("Agg")
 
 from pydantic import BaseModel, PositiveInt
 from typing import Union
+from moviepy.editor import ImageSequenceClip
 
 
 class DataConfig(BaseModel):
@@ -389,16 +390,21 @@ class ImageDataset(PealDataset):
                 plt.savefig(collage_path)
                 print("Saved collage to " + collage_path)
                 collage_paths.append(collage_path)
-                gif_path = os.path.join(
+                video_path = os.path.join(
                     base_path,
-                    embed_numberstring(str(start_idx + i)) + "_collage.gif",
+                    embed_numberstring(str(start_idx + i)) + "_collage.mp4",
                 )
                 tensor = (history_list[i] * 255).clamp(0, 255).byte()
                 # Convert the tensor to a list of PIL images
-                images = [torchvision.transforms.ToPILImage()(frame) for frame in tensor]
+                # Convert the tensor to a list of numpy arrays
+                images = [torchvision.transforms.ToPILImage()(frame).convert("RGB") for frame in tensor]
 
-                # Save images as a GIF
-                images[0].save(gif_path, save_all=True, append_images=images[1:], duration=500, loop=0)
+                # Convert the PIL images to numpy arrays
+                images = [np.array(img) for img in images]
+
+                # Create an MP4 video from the image sequence
+                clip = ImageSequenceClip(images, fps=2)
+                clip.write_videofile(video_path, codec="libx264")
 
             else:
                 collage_paths.append(None)

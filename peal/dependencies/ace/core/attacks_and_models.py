@@ -471,10 +471,11 @@ def get_attack(attack, use_checkpoint, use_shortcut=False):
                 x_adv_candidate = torch.clamp(x_adv_candidate, 0, 1)
                 #x_adv_candidate = projection_fn(x, x_adv_candidate)
                 pred = torch.nn.functional.softmax(self.classifier.classifier(x_adv_candidate), -1)
-                for j in range(x_adv.shape[0]):
-                    if pred_old[j, int(y[j])] <= pred[j, int(y[j])] and mask[j] == 1:
-                        x_adv[j] = x_adv_candidate[j]
-                        pred_old[j] = pred[j]
+                for idx in range(x_adv.shape[0]):
+                    if pred_old[idx, int(y[idx])] <= pred[idx, int(y[idx])] and mask[idx] == 1:
+                        x_adv[idx] = x_adv_candidate[idx]
+                        print("Updating" + str(idx) + ": " + str(torch.sum(torch.abs(x_adv[idx] - x[idx]))))
+                        pred_old[idx] = pred[idx]
 
                 print(str(i) + ": " + str([float(pred_old[j, y[j]]) for j in range(x_adv.shape[0])]))
 
@@ -490,7 +491,7 @@ def get_attack(attack, use_checkpoint, use_shortcut=False):
 
                 print(str(i) + ": " + str([float(pred_original[j, y[j]]) for j in range(x_adv.shape[0])]))
                 for idx in range(len(history)):
-                    history[idx] = torch.cat((history[idx], x_adv.detach().cpu()[idx].unsqueeze(0)), 0)
+                    history[idx] = torch.cat((history[idx], x_adv[idx].detach().cpu().unsqueeze(0)), 0)
 
                 if mask.sum() == 0:
                     break
