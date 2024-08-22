@@ -3,5 +3,8 @@ attack_iterations: 300
 attack_step: 3.0
 category: explainer
 distilled_predictor: <PEAL_BASE>/configs/predictors/generic_distillation.yaml
-sampling_inpaint: 0.5
+sampling_inpaint: 0.0
 y_target_goal_confidence: 1.1
+dist_l1: 1.0e-08
+timestep_respacing: 100
+sampling_time_fraction: 0.5

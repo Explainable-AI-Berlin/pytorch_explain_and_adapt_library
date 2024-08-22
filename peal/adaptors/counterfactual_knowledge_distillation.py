@@ -708,6 +708,7 @@ class CounterfactualKnowledgeDistillation(Adaptor):
                     dataset_path=dataset_dir,
                     mixing_ratio=0.5,
                     writer=writer,
+                    finetune_iteration=i,
                 )
 
             if self.adaptor_config.current_iteration > 0:
