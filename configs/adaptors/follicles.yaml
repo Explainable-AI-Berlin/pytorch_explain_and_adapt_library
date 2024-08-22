@@ -1,0 +1,30 @@
+# python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/follicles.yaml"
+adaptor_type                         :  "CFKD"
+category                             :  "adaptor"
+batch_size                           :  2
+tracking_level                       :  3
+min_train_samples                    :  480
+finetune_iterations                  :  1
+max_validation_samples               :  59
+max_test_batches                     :  1
+continuous_learning                  :  "finetune"
+replace_model                        :  True
+use_visualization                    :  True
+calculate_group_accuracies           :  True
+explainer                            :  <PEAL_BASE>/configs/explainers/follicle_pdc.yaml
+training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
+data                                 :  <PEAL_BASE>/configs/data/follicles_hints.yaml
+test_data                            :  <PEAL_BASE>/configs/data/follicles_hints.yaml
+#student                              :  $PEAL_RUNS/follicles_cut/Class_confounding_Size/regularized0/classifier_natural/model.cpl
+student                              :  $PEAL_RUNS/follicles_cut/regularized0/model.cpl
+teacher                              :  SegmentationMask
+generator                            :  $PEAL_RUNS/follicles_cut/ddpm/config.yaml
+#base_dir                             :  $PEAL_RUNS/follicles_cut/Class_confounding_Size/regularized0/classifier_natural/pdc_cfkd
+base_dir                             :  $PEAL_RUNS/follicles_cut/regularized0/pdc_cfkd
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [type]

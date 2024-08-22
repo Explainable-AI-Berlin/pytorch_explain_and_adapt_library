@@ -79,6 +79,11 @@ Set ```adaptor_type="MyAdaptor"``` in ```MyAdaptorConfig```.
 Now ```MyAdaptor``` will be used automatically and configured by ```MyAdaptorConfig``` while initialization.
 
 
+Hint: All configuration is done via Pydantic.
+Hence, the config files can be given as YAML files, but will be parsed as Python objects.
+In this process only the values that are set in the YAML file are overwritten in the Python template, the rest of the values will stay at the default.
+The documentation can be found in the corresponding Python classes in the code.
+
 <!---
 **Installation Instructions:**
 

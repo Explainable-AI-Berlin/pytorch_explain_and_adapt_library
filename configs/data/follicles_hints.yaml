@@ -9,4 +9,4 @@ output_size             : [2]
 invariances             : [rotation, hflipping, vflipping, random_resize10, color_jitter, sharpness]
 confounding_factors     : [type, confounder]
 normalization           : [0.5,0.5]
-has_hints               : False
+has_hints               : True

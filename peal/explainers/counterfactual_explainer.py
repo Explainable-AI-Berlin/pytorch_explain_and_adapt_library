@@ -561,6 +561,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 idx_list=batch["idx_list"],
                 mode=mode,
             )
+            history = None
 
         elif isinstance(self.generator, InvertibleGenerator):
             (
@@ -574,6 +575,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 pbar=pbar,
                 mode=mode,
             )
+            history = None
 
         elif isinstance(self.generator, EditCapableGenerator):
             if explainer_path is None:
@@ -586,6 +588,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 batch["z_difference_list"],
                 batch["y_target_end_confidence_list"],
                 batch["x_list"],
+                batch["history_list"],
             ) = self.generator.edit(
                 x_in=torch.tensor(batch["x_list"]),
                 target_confidence_goal=target_confidence_goal,

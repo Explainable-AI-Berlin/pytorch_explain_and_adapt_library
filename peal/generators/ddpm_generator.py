@@ -416,7 +416,7 @@ class DDPM(EditCapableGenerator):
             args.diffusion = self.diffusion
             args.model = self.model
             #
-            x_counterfactuals_current = ace_main(args=args)
+            x_counterfactuals_current, histories = ace_main(args=args)
             x_counterfactuals_current = torch.cat(x_counterfactuals_current, dim=0)
 
             device = [p for p in predictor.parameters()][0].device
@@ -449,4 +449,5 @@ class DDPM(EditCapableGenerator):
             list(x_in - x_counterfactuals),
             list(y_target_end_confidence),
             list(x_in),
+            list(histories),
         )

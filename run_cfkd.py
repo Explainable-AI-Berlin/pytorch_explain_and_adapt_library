@@ -3,7 +3,7 @@ import argparse
 from peal.adaptors.counterfactual_knowledge_distillation import CFKDConfig
 from peal.global_utils import load_yaml_config, add_class_arguments, integrate_arguments
 from peal.adaptors.counterfactual_knowledge_distillation import (
-    CounterfactualKnowledgeDistillation,
+    CFKD,
 )
 
 
@@ -16,7 +16,7 @@ def main():
     adaptor_config = load_yaml_config(args.config, CFKDConfig)
     integrate_arguments(args, adaptor_config, exclude=["config"])
 
-    cfkd = CounterfactualKnowledgeDistillation(adaptor_config=adaptor_config)
+    cfkd = CFKD(adaptor_config=adaptor_config)
     cfkd.run()
 
 

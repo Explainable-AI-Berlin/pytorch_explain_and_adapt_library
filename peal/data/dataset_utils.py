@@ -43,7 +43,12 @@ def parse_json(data_dir, config, mode, set_negative_to_zero=True):
 
 
 def parse_csv(
-    data_dir, config, mode, key_type="idx", set_negative_to_zero=True, delimiter=",",
+    data_dir,
+    config,
+    mode,
+    key_type="idx",
+    set_negative_to_zero=True,
+    delimiter=",",
 ):
     """
     _summary_
@@ -73,7 +78,7 @@ def parse_csv(
         key_idx = config.img_name_idx
 
     if key_type == "name":
-        attributes = attributes[key_idx+1:]
+        attributes = attributes[key_idx + 1 :]
 
     raw_data = raw_data[1:]
     while "" in raw_data:
@@ -87,7 +92,7 @@ def parse_csv(
 
         elif key_type == "name":
             key = instance_attributes[key_idx]
-            instance_attributes = instance_attributes[key_idx+1:]
+            instance_attributes = instance_attributes[key_idx + 1 :]
 
         while "" in instance_attributes:
             instance_attributes.remove("")
@@ -113,6 +118,7 @@ def parse_csv(
         and len(config.confounding_factors) == 2
         and not config.confounder_probability is None
     ):
+
         def extract_instances_tensor_confounder(idx, line):
             selection_idx1 = attributes.index(config.confounding_factors[0])
             selection_idx2 = attributes.index(config.confounding_factors[1])
@@ -133,6 +139,13 @@ def parse_csv(
         data = {}
         for idx, line in enumerate(raw_data):
             key, instances_tensor = extract_instances_tensor(idx, line)
+            if (
+                config.has_hints
+                and "has_hint" in attributes
+                and not instances_tensor[attributes.index("has_hint")] == 1
+            ):
+                continue
+
             if set_negative_to_zero:
                 data[key] = torch.maximum(
                     torch.zeros_like(instances_tensor),
@@ -144,6 +157,8 @@ def parse_csv(
 
         keys = list(data.keys())
         if len(config.split) == 2:
+            keys.sort()
+            random.seed(0)
             random.shuffle(keys)
             if mode == "train":
                 keys_out = keys[: int(len(keys) * config.split[0])]
@@ -162,7 +177,9 @@ def parse_csv(
         else:
             mode_to_int = {"train": 0, "val": 1, "test": 2}
             mode_idx = attributes.index("split")
-            keys_out = list(filter(lambda key: data[key][mode_idx] == mode_to_int[mode], keys))
+            keys_out = list(
+                filter(lambda key: data[key][mode_idx] == mode_to_int[mode], keys)
+            )
 
     keys_out.sort()
     random.seed(0)
@@ -236,7 +253,9 @@ def process_confounder_data_controlled(
 
     assert (
         np.sum(n_attribute_confounding == max_attribute_confounding) == 4
-    ), "something went wrong with filling up the attributes: " + str(n_attribute_confounding)
+    ), "something went wrong with filling up the attributes: " + str(
+        n_attribute_confounding
+    )
     assert (
         np.sum(n_attribute_confounding) == config.num_samples
     ), "wrong number of samples!"

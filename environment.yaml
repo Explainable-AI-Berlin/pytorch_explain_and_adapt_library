@@ -96,6 +96,7 @@ dependencies:
       - metrohash-python==1.1.3.3
       - ml-collections==0.1.0
       - mpmath==1.3.0
+      - moviepy==1.0.3
       - natsort==8.1.0
       - networkx==3.1
       - numba==0.57.1
