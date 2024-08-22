@@ -1,6 +1,6 @@
 dataset_name            : follicles
 dataset_path            : $PEAL_DATA/follicles
-num_samples             : 701
+num_samples             : 1507
 split                   : [1.0, 1.0]
 input_type              : image
 input_size              : [3, 256, 256]
