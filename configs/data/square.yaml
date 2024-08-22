@@ -9,3 +9,4 @@ output_size             : [8]
 downsize                : Resize
 delimiter               : ","
 normalization           : [0.5,0.5]
+has_hints               : True

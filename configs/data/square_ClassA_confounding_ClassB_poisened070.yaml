@@ -10,3 +10,4 @@ downsize                : Resize
 delimiter               : ","
 confounder_probability  : 0.3
 confounding_factors     : [ClassA, ClassB]
+has_hints               : True

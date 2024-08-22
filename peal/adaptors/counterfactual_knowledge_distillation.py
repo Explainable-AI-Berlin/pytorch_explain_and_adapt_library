@@ -394,7 +394,7 @@ class CFKDConfig(AdaptorConfig):
         self.kwargs = kwargs
 
 
-class CounterfactualKnowledgeDistillation(Adaptor):
+class CFKD(Adaptor):
     """
     This class implements the counterfactual knowledge distillation approach.
     """
@@ -551,7 +551,7 @@ class CounterfactualKnowledgeDistillation(Adaptor):
                 ]
             )
 
-        if teacher == "SegmentationMask":
+        if teacher == "SegmentationMask" or self.adaptor_config.tracking_level > 0:
             self.tracked_keys.append("hint_list")
             self.train_dataloader.dataset.enable_hints()
             self.val_dataloader.dataset.enable_hints()
@@ -716,6 +716,7 @@ class CounterfactualKnowledgeDistillation(Adaptor):
                     os.path.join(self.adaptor_config.base_dir, "model.cpl"),
                     map_location=self.device,
                 )
+                self.explainer.student = self.student
 
         return validation_stats, writer
 
@@ -1292,6 +1293,7 @@ class CounterfactualKnowledgeDistillation(Adaptor):
             ),
             map_location=self.device,
         )
+        self.explainer.student = self.student
 
     def visualize_progress(self, paths):
         task_config_buffer = copy.deepcopy(self.test_dataloader.dataset.task_config)
