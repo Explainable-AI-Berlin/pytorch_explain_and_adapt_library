@@ -84,28 +84,26 @@ Hence, the config files can be given as YAML files, but will be parsed as Python
 In this process only the values that are set in the YAML file are overwritten in the Python template, the rest of the values will stay at the default.
 The documentation can be found in the corresponding Python classes in the code.
 
-<!---
 **Installation Instructions:**
 
 pip install peal
 
 otherwise the project can also be downloaded, a conda or virtualenv environment can be installed based on the requirements.txt (we tested the program for Python 3.9.15) and peal can be used by adding the path to the project to the PYTHONPATH as described in the jupyter notebooks.
 
-**Example Workflow:**
+**Example Workflow CFKD adaptor:**
 
-Assuming you have a ```classifier```, a ```dataloader_train```, a ```dataloader_val``` and number of classes ```N```.
+Assuming you have a predictor ```my_classifier``` and a dataset ```my_dataset```.
 
 ```
-from peal.adaptors import CounterfactualKnowledgeDistillation
+from peal.adaptors.counterfactual_knowledge_distillion import CFKD
 
-cal = CounterfactualKnowledgeDistillation(
-  student = classifier,
-  datasource = (dataloader_train, dataloader_val),
-  output_size = N,
+cfkd = CFKD(
+  student = my_classifier,
+  datasource = my_dataset,
   teacher = 'human@8000'
 )
 
-cal.run()
+fixed_classifier = cfkd.run()
 ```
 
 Then the following happens:
@@ -124,16 +122,24 @@ Then the following happens:
 
 7) If i smaller then the maximum number of finetune iterations go back to 3.
 
-Generally all configs used can be written yourself and the path can be given via the constructor arguments to the components.
 
-Furthermore, the whole library follows the principle of compositionality, so that arbitrary components in the pipeline can be replaced and the pipeline still works.
+**Example Workflow Predictor-distilled counterfactual explainer:**
 
-$PEAL marks the directory peal of the library where the code and the configs are saved.
+Assuming you have a predictor ```my_classifier``` and a dataset ```my_dataset```.
 
-More detailed examples that reproduce the results from the paper can be found in the jupyter notebooks.
+```
+from peal.explainers.counterfactual_explainer import CounterfactualExplainer
 
-The Follicle dataset from the paper and how to work with it is propriertary and can thereby not be disclosed in detail here.
--->
+pdc = CounterfactualExplainer(
+  student = my_classifier,
+  datasource = my_dataset,
+)
+
+explanations, interpretations = pdc.run()
+```
+
+Now in explanations you have the counterfactuals and in interpretations the explanations of the counterfactuals.
+
 
 **Structure of the Project:**
 
