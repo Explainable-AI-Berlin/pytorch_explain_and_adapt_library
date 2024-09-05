@@ -716,7 +716,7 @@ class CFKD(Adaptor):
                     os.path.join(self.adaptor_config.base_dir, "model.cpl"),
                     map_location=self.device,
                 )
-                self.explainer.student = self.student
+                self.explainer.predictor = self.student
 
         return validation_stats, writer
 
@@ -1172,6 +1172,47 @@ class CFKD(Adaptor):
         return dataloader
 
     def finetune_student(self, finetune_iteration, dataset_path, writer):
+        #
+        val_dataset_path = os.path.join(
+            self.base_dir, str(finetune_iteration), "validation_dataset"
+        )
+        _, dataloader_val, _ = create_dataloaders_from_datasource(
+            config=self.validation_data_config,
+            datasource=val_dataset_path,
+        )
+        self.dataloaders_val[1] = dataloader_val
+        log_images_to_writer(
+            dataloader_val, writer, "validation_" + str(finetune_iteration)
+        )
+
+        #
+        mixing_ratio = min(0.5, 1 - self.feedback_accuracy)
+        writer.add_scalar("mixing_ratio", mixing_ratio, finetune_iteration)
+        if not hasattr(self, "dataloader_mixer"):
+            self.dataloader_mixer = DataloaderMixer(
+                self.adaptor_config.training, self.train_dataloader
+            )
+
+        self.dataloader_mixer = self.add_dataset_to_dataloader_mixer(
+            dataloader_old=self.dataloader_mixer,
+            dataset_path=dataset_path,
+            mixing_ratio=mixing_ratio,
+            writer=writer,
+            finetune_iteration=finetune_iteration,
+        )
+
+        y_list_dataset = [
+            self.dataloader_mixer.dataloaders[0].dataset[idx][1]
+            for idx in range(len(self.dataloader_mixer.dataloaders[0].dataset))
+        ]
+        for c in range(self.output_size):
+            writer.add_scalar(
+                "class_ratio_" + str(c),
+                np.sum((torch.tensor(y_list_dataset) == c).numpy())
+                / len(y_list_dataset),
+                finetune_iteration,
+            )
+
         if self.overwrite or not os.path.exists(
             os.path.join(
                 self.base_dir,
@@ -1197,47 +1238,6 @@ class CFKD(Adaptor):
             Path(
                 os.path.join(self.base_dir, str(finetune_iteration), "finetuned_model")
             ).mkdir(parents=True, exist_ok=True)
-
-            #
-            val_dataset_path = os.path.join(
-                self.base_dir, str(finetune_iteration), "validation_dataset"
-            )
-            _, dataloader_val, _ = create_dataloaders_from_datasource(
-                config=self.validation_data_config,
-                datasource=val_dataset_path,
-            )
-            self.dataloaders_val[1] = dataloader_val
-            log_images_to_writer(
-                dataloader_val, writer, "validation_" + str(finetune_iteration)
-            )
-
-            #
-            mixing_ratio = min(0.5, 1 - self.feedback_accuracy)
-            writer.add_scalar("mixing_ratio", mixing_ratio, finetune_iteration)
-            if not hasattr(self, "dataloader_mixer"):
-                self.dataloader_mixer = DataloaderMixer(
-                    self.adaptor_config.training, self.train_dataloader
-                )
-
-            self.dataloader_mixer = self.add_dataset_to_dataloader_mixer(
-                dataloader_old=self.dataloader_mixer,
-                dataset_path=dataset_path,
-                mixing_ratio=mixing_ratio,
-                writer=writer,
-                finetune_iteration=finetune_iteration,
-            )
-
-            y_list_dataset = [
-                self.dataloader_mixer.dataloaders[0].dataset[idx][1]
-                for idx in range(len(self.dataloader_mixer.dataloaders[0].dataset))
-            ]
-            for c in range(self.output_size):
-                writer.add_scalar(
-                    "class_ratio_" + str(c),
-                    np.sum((torch.tensor(y_list_dataset) == c).numpy())
-                    / len(y_list_dataset),
-                    finetune_iteration,
-                )
 
             if self.adaptor_config.continuous_learning == "retrain":
 
@@ -1293,7 +1293,7 @@ class CFKD(Adaptor):
             ),
             map_location=self.device,
         )
-        self.explainer.student = self.student
+        self.explainer.predictor = self.student
 
     def visualize_progress(self, paths):
         task_config_buffer = copy.deepcopy(self.test_dataloader.dataset.task_config)
@@ -1803,7 +1803,7 @@ class CFKD(Adaptor):
                     ]
                 )
 
-            if (
+            """if (
                 self.adaptor_config.replacement_strategy == "delayed"
                 and self.adaptor_config.replace_model
             ):
@@ -1823,7 +1823,9 @@ class CFKD(Adaptor):
                 self.adaptor_config.replace_model = True
 
             else:
-                self.adaptor_config.replace_model = False
+                self.adaptor_config.replace_model = False"""
+
+            torch.save(self.student, os.path.join(self.base_dir, "model.cpl"))
 
             self.adaptor_config.current_iteration = (
                 self.adaptor_config.current_iteration + 1

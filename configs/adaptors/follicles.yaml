@@ -15,12 +15,10 @@ explainer                            :  <PEAL_BASE>/configs/explainers/follicle_
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/follicles_hints.yaml
 test_data                            :  <PEAL_BASE>/configs/data/follicles_hints.yaml
-#student                              :  $PEAL_RUNS/follicles_cut/Class_confounding_Size/regularized0/classifier_natural/model.cpl
-student                              :  $PEAL_RUNS/follicles_cut/regularized0/model.cpl
+student                              :  $PEAL_RUNS/follicles_cut/Class_confounding_Size/regularized0/classifier_natural/model.cpl
 teacher                              :  SegmentationMask
 generator                            :  $PEAL_RUNS/follicles_cut/ddpm/config.yaml
-#base_dir                             :  $PEAL_RUNS/follicles_cut/Class_confounding_Size/regularized0/classifier_natural/pdc_cfkd
-base_dir                             :  $PEAL_RUNS/follicles_cut/regularized0/pdc_cfkd
+base_dir                             :  $PEAL_RUNS/follicles_cut/Class_confounding_Size/regularized0/classifier_natural/pdc_cfkd
 task:
   criterions:
     ce     : 1.0
