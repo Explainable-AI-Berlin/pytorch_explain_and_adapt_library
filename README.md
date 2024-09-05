@@ -43,7 +43,7 @@ Trains a predictor (either a singleclass classifier, a multiclass classifier, a 
 Existing predictor config files can be found in configs/predictors.
 In order to replicate most experiments from the papers one needs to train a student predictor and a teacher predictor.
 Trained predictors will appear in $PEAL_RUNS.
-A full, documented overview over the parameters that can be set by predictors so far can be found in ```peal.architectures.PredictorConfig```.
+A full, documented overview over the parameters that can be set by predictors so far can be found in ```peal.training.trainers.PredictorConfig```.
 
 ```python train_generator.py --config "<PATH_TO_CONFIG>"```
 Trains a generative model based on a generator config file.
