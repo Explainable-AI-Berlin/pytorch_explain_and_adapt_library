@@ -137,12 +137,13 @@ def parse_csv(
 
     else:
         data = {}
+        n = [0,0]
         for idx, line in enumerate(raw_data):
             key, instances_tensor = extract_instances_tensor(idx, line)
             if (
                 config.has_hints
-                and "has_hint" in attributes
-                and not instances_tensor[attributes.index("has_hint")] == 1
+                and "has_mask" in attributes
+                and not instances_tensor[attributes.index("has_mask")] == 1
             ):
                 continue
 
