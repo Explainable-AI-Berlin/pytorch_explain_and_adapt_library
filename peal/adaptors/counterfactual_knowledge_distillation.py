@@ -590,16 +590,28 @@ class CFKD(Adaptor):
                     + datetime.now().strftime("%Y%m%d_%H%M%S"),
                 )
 
-        if not os.path.exists(
-            os.path.join(self.base_dir, "0", "validation_tracked_values.npz")
-        ):
-            assert self.adaptor_config.current_iteration == 0
-            print("Create base_dir in: " + str(self.base_dir))
-            Path(self.base_dir).mkdir(parents=True, exist_ok=True)
-            writer = SummaryWriter(os.path.join(self.base_dir, "logs"))
-            log_images_to_writer(self.train_dataloader, writer, "train0")
-            log_images_to_writer(self.val_dataloader, writer, "validation0")
-            log_images_to_writer(self.test_dataloader, writer, "test")
+        log_dir = os.path.join(self.base_dir, "logs")
+        if not os.path.exists(log_dir):
+            Path(log_dir).mkdir(parents=True, exist_ok=True)
+            writer = SummaryWriter(log_dir)
+
+            hints_enabled_buffer = self.val_dataloader.dataset.hints_enabled
+            if hints_enabled_buffer:
+                self.val_dataloader.dataset.disable_hints()
+
+            val_accuracy = calculate_test_accuracy(
+                self.student,
+                self.val_dataloader,
+                self.device,
+                False,
+                self.adaptor_config.max_test_batches,
+            )
+            print("val_accuracy: " + str(val_accuracy))
+            writer.add_scalar(
+                "val_accuracy", val_accuracy, self.adaptor_config.current_iteration
+            )
+            if hints_enabled_buffer:
+                self.val_dataloader.dataset.enable_hints()
 
             test_accuracy = calculate_test_accuracy(
                 self.student,
@@ -608,6 +620,43 @@ class CFKD(Adaptor):
                 self.adaptor_config.calculate_group_accuracies,
                 self.adaptor_config.max_test_batches,
             )
+
+            if self.adaptor_config.calculate_group_accuracies:
+                (
+                    test_accuracy,
+                    group_accuracies,
+                    group_distribution,
+                    groups,
+                    worst_group_accuracy,
+                ) = test_accuracy
+                for idx in range(len(group_accuracies)):
+                    writer.add_scalar(
+                        "test_group_accuracy_" + str(idx),
+                        group_accuracies[idx],
+                        self.adaptor_config.current_iteration,
+                    )
+                    writer.add_scalar(
+                        "test_group_distribution_" + str(idx),
+                        group_distribution[idx],
+                        self.adaptor_config.current_iteration,
+                    )
+
+                writer.add_scalar(
+                    "test_worst_group_accuracy",
+                    worst_group_accuracy,
+                    self.adaptor_config.current_iteration,
+                )
+                print("group_accuracies: " + str(group_accuracies))
+                print("group_distribution: " + str(group_distribution))
+                print("group_numbers: " + str(groups))
+                print("worst_group_accuracy: " + str(worst_group_accuracy))
+
+            writer.add_scalar(
+                "test_accuracy", test_accuracy, self.adaptor_config.current_iteration
+            )
+            log_images_to_writer(self.train_dataloader, writer, "train0")
+            log_images_to_writer(self.val_dataloader, writer, "validation0")
+            log_images_to_writer(self.test_dataloader, writer, "test")
 
             if (
                 isinstance(self.val_dataloader.dataset, ImageDataset)
@@ -630,8 +679,15 @@ class CFKD(Adaptor):
                         )
                     )
                     print("Generator performance: " + str(generator_performance))
-
                     self.adaptor_config.generator_performance = generator_performance
+
+        else:
+            writer = SummaryWriter(log_dir)
+
+        if not os.path.exists(
+            os.path.join(self.base_dir, "0", "validation_tracked_values.npz")
+        ):
+            assert self.adaptor_config.current_iteration == 0
 
             save_yaml_config(
                 self.adaptor_config, os.path.join(self.base_dir, "config.yaml")
@@ -640,37 +696,6 @@ class CFKD(Adaptor):
             with open(os.path.join(self.base_dir, "platform.txt"), "w") as f:
                 f.write(platform.node())
 
-            if self.adaptor_config.calculate_group_accuracies:
-                (
-                    test_accuracy,
-                    group_accuracies,
-                    group_distribution,
-                    worst_group_accuracy,
-                ) = test_accuracy
-                for idx in range(len(group_accuracies)):
-                    writer.add_scalar(
-                        "test_group_accuracy_" + str(idx),
-                        group_accuracies[idx],
-                        self.adaptor_config.current_iteration,
-                    )
-                    writer.add_scalar(
-                        "test_group_distribution_" + str(idx),
-                        group_distribution[idx],
-                        self.adaptor_config.current_iteration,
-                    )
-
-                writer.add_scalar(
-                    "test_worst_group_accuracy",
-                    worst_group_accuracy,
-                    self.adaptor_config.current_iteration,
-                )
-                print("group_accuracies: " + str(group_accuracies))
-                print("group_distribution: " + str(group_distribution))
-                print("worst_group_accuracy: " + str(worst_group_accuracy))
-
-            writer.add_scalar(
-                "test_accuracy", test_accuracy, self.adaptor_config.current_iteration
-            )
             validation_stats = self.retrieve_validation_stats(finetune_iteration=0)
             for key in validation_stats.keys():
                 if isinstance(validation_stats[key], float):
@@ -797,6 +822,10 @@ class CFKD(Adaptor):
 
                 sample_idx += 1
                 print([int(y), y_source, y_target, y_target_start_confidence])
+
+            else:
+                #import pdb; pdb.set_trace()
+                pass
 
         x_batch = torch.stack(x_batch)
         y_target_batch = torch.stack(y_target_batch)
@@ -1745,6 +1774,24 @@ class CFKD(Adaptor):
                 writer=writer,
             )
 
+            hints_enabled_buffer = self.val_dataloader.dataset.hints_enabled
+            if hints_enabled_buffer:
+                self.val_dataloader.dataset.disable_hints()
+
+            val_accuracy = calculate_test_accuracy(
+                self.student,
+                self.val_dataloader,
+                self.device,
+                False,
+                self.adaptor_config.max_test_batches,
+            )
+            print("val_accuracy: " + str(val_accuracy))
+            writer.add_scalar(
+                "val_accuracy", val_accuracy, self.adaptor_config.current_iteration
+            )
+            if hints_enabled_buffer:
+                self.val_dataloader.dataset.enable_hints()
+
             test_accuracy = calculate_test_accuracy(
                 self.student,
                 self.test_dataloader,
@@ -1757,6 +1804,7 @@ class CFKD(Adaptor):
                     test_accuracy,
                     group_accuracies,
                     group_distribution,
+                    groups,
                     worst_group_accuracy,
                 ) = test_accuracy
                 for idx in range(len(group_accuracies)):
@@ -1777,12 +1825,16 @@ class CFKD(Adaptor):
                     finetune_iteration,
                 )
                 print("group_accuracies: " + str(group_accuracies))
+                print("group_distribution: " + str(group_distribution))
+                print("group_sizes: " + str(groups))
+                print("worst_group_accuracy: " + str(worst_group_accuracy))
 
             writer.add_scalar("test_accuracy", test_accuracy, finetune_iteration)
             print("test_accuracy: " + str(test_accuracy))
             validation_stats = self.retrieve_validation_stats(
                 finetune_iteration=finetune_iteration
             )
+
             for key in validation_stats.keys():
                 if isinstance(validation_stats[key], float):
                     writer.add_scalar(

@@ -41,7 +41,7 @@ class Generator(nn.Module):
 
 
 class InvertibleGenerator(Generator):
-    def encode(self, x):
+    def encode(self, x, t=1.0):
         """
         This function encodes a batch of data samples to latent vectors
         Args:
@@ -53,7 +53,7 @@ class InvertibleGenerator(Generator):
         """
         raise NotImplementedError
 
-    def decode(self, z):
+    def decode(self, z, t=1.0):
         """
         This function decodes a batch of latent vectors to data samples
         Args:

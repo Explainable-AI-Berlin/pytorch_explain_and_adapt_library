@@ -29,10 +29,9 @@ class JointClassifierDDPM(torch.nn.Module):
         self.noise_fn = torch.randn_like if stochastic else torch.zeros_like
 
     def forward(self, x):
-        timesteps = list(range(self.steps))[::-1]
-
         x = (x - 0.5) / 0.5
 
+        timesteps = list(range(self.steps))[::-1]
         for idx, t in enumerate(timesteps):
             t = torch.tensor([t] * x.size(0), device=x.device)
 
@@ -387,8 +386,10 @@ class ClassifierDiffusionShortcut(ClassifierDiffusionCheckpointGradients):
 
                 if hasattr(self, "fix_noise") and self.fix_noise:
                     noise = self.noise[idx + 1, ...].unsqueeze(dim=0)
+
                 elif self.stochastic:
                     noise = torch.randn_like(x)
+
                 else:
                     noise = torch.zeros_like(x)
 
