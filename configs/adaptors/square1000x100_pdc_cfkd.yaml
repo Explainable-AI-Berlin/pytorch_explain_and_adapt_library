@@ -4,7 +4,7 @@ category                             :  "adaptor"
 batch_size                           :  6
 tracking_level                       :  3
 min_train_samples                    :  900
-finetune_iterations                  :  3
+finetune_iterations                  :  5
 max_validation_samples               :  100
 continuous_learning                  :  "retrain"
 replace_model                        :  True
@@ -17,7 +17,7 @@ test_data                            :  <PEAL_BASE>/configs/data/square_ClassA_c
 student                              :  $PEAL_RUNS/square2/colora_confounding_colorb/regularized0/classifier_poisened100/model.cpl
 teacher                              :  $PEAL_RUNS/square2/colora_confounding_colorb/regularized0/classifier_unpoisened/model.cpl
 generator                            :  $PEAL_RUNS/square2/ddpm/config.yaml
-base_dir                             :  $PEAL_RUNS/square2/colora_confounding_colorb/regularized0/classifier_poisened100/pdc_cfkd
+base_dir                             :  $PEAL_RUNS/square2/colora_confounding_colorb/regularized0/classifier_poisened100/pdc_cfkd2
 task:
   criterions:
     ce     : 1.0

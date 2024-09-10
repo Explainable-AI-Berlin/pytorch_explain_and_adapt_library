@@ -152,7 +152,7 @@ class CFKDConfig(AdaptorConfig):
     """
     The attribution threshold.
     """
-    attribution_threshold: float = 2.0
+    attribution_threshold: float = 0.001
     """
     What batch_size is used for creating the counterfactuals?
     If use_confusion_matrix is deativated always use an even batch_size!!!
@@ -585,9 +585,7 @@ class CFKD(Adaptor):
             if os.path.exists(self.base_dir):
                 shutil.move(
                     self.base_dir,
-                    self.base_dir
-                    + "_old_"
-                    + datetime.now().strftime("%Y%m%d_%H%M%S"),
+                    self.base_dir + "_old_" + datetime.now().strftime("%Y%m%d_%H%M%S"),
                 )
 
         log_dir = os.path.join(self.base_dir, "logs")
@@ -717,17 +715,27 @@ class CFKD(Adaptor):
             with open(os.path.join(self.base_dir, "platform.txt"), "w") as f:
                 f.write(platform.node())
 
-            writer = SummaryWriter(os.path.join(self.base_dir, "logs"))
+            validation_stats_existed = os.path.exists(
+                os.path.join(self.base_dir, "0", "validation_stats.npz")
+            )
             validation_stats = self.retrieve_validation_stats(
                 finetune_iteration=self.adaptor_config.current_iteration
             )
+            if not validation_stats_existed:
+                for key in validation_stats.keys():
+                    if isinstance(validation_stats[key], float):
+                        writer.add_scalar(
+                            "validation_" + key,
+                            validation_stats[key],
+                            self.adaptor_config.current_iteration,
+                        )
+
             self.dataloader_mixer = DataloaderMixer(
                 self.adaptor_config.training, self.train_dataloader
             )
 
             for i in range(1, self.adaptor_config.current_iteration + 1):
                 dataset_dir = os.path.join(self.base_dir, str(i), "train_dataset")
-                # TODO how to recover mixing_ratio?
                 self.dataloader_mixer = self.add_dataset_to_dataloader_mixer(
                     dataloader_old=self.dataloader_mixer,
                     dataset_path=dataset_dir,
@@ -824,7 +832,7 @@ class CFKD(Adaptor):
                 print([int(y), y_source, y_target, y_target_start_confidence])
 
             else:
-                #import pdb; pdb.set_trace()
+                # import pdb; pdb.set_trace()
                 pass
 
         x_batch = torch.stack(x_batch)
@@ -855,9 +863,7 @@ class CFKD(Adaptor):
             # move from self.base_dir to self.base_dir + "_old_" + {date}_{timestamp}
             shutil.move(
                 collage_base_path,
-                collage_base_path
-                + "_old_"
-                + datetime.now().strftime("%Y%m%d_%H%M%S")
+                collage_base_path + "_old_" + datetime.now().strftime("%Y%m%d_%H%M%S"),
             )
 
         Path(collage_base_path).mkdir(parents=True, exist_ok=True)
@@ -1136,11 +1142,8 @@ class CFKD(Adaptor):
         y_counterfactual_list = []
         sample_names = []
         for sample_idx in range(len(feedback)):
-            if feedback[sample_idx] == "ood":
-                continue
-
-            elif feedback[sample_idx] == "true":
-                """sample_name = (
+            if feedback[sample_idx] == "true":
+                sample_name = (
                     "true_"
                     + str(int(y_source_list[sample_idx]))
                     + "_to_"
@@ -1149,19 +1152,11 @@ class CFKD(Adaptor):
                     + str(sample_idx)
                 )
                 x_list.append(x_counterfactual_list[sample_idx])
-                y_list.append(int(y_target_list[sample_idx]))
+                y_counterfactual_list.append(int(y_target_list[sample_idx]))
                 sample_names.append(sample_name)
-                sample_idx += 1"""
-                continue
+                sample_idx += 1
 
             elif feedback[sample_idx] == "false":
-                prediction = self.student(
-                    x_counterfactual_list[sample_idx].unsqueeze(0).to(self.device)
-                ).argmax()
-                if prediction == int(y_source_list[sample_idx]):
-                    print("This can not be a false counterfactual!")
-                    continue
-
                 sample_name = (
                     "false_"
                     + str(int(y_source_list[sample_idx]))
@@ -1171,7 +1166,6 @@ class CFKD(Adaptor):
                     + str(sample_idx)
                 )
                 x_list.append(x_counterfactual_list[sample_idx])
-                # y_list.append(int(y_source_list[sample_idx]))
                 y_counterfactual_list.append(int(y_source_list[sample_idx]))
 
                 sample_names.append(sample_name)
@@ -1255,7 +1249,9 @@ class CFKD(Adaptor):
             ):
                 # move from self.base_dir to self.base_dir + "_old_" + {date}_{timestamp}
                 shutil.move(
-                    os.path.join(self.base_dir, str(finetune_iteration), "finetuned_model"),
+                    os.path.join(
+                        self.base_dir, str(finetune_iteration), "finetuned_model"
+                    ),
                     os.path.join(
                         self.base_dir,
                         str(finetune_iteration),
@@ -1470,6 +1466,8 @@ class CFKD(Adaptor):
                 for key in validation_tracked_file.keys():
                     validation_stats[key] = torch.tensor(validation_tracked_file[key])
 
+                return validation_stats
+
         validation_values_path = os.path.join(
             self.base_dir, str(finetune_iteration), "validation_tracked_values.npz"
         )
@@ -1568,15 +1566,15 @@ class CFKD(Adaptor):
             self.explainer.explainer_config = original_explainer_config
             if self.adaptor_config.validation_runs > 1:
                 self.datastack.dataset._initialize_performance_metrics()
-                validation_stats[
-                    "distance_to_manifold"
-                ] = self.datastack.dataset.distribution_distance(
-                    x_counterfactual_collection
+                validation_stats["distance_to_manifold"] = (
+                    self.datastack.dataset.distribution_distance(
+                        x_counterfactual_collection
+                    )
                 )
-                validation_stats[
-                    "pairwise_distance"
-                ] = self.datastack.dataset.pair_wise_distance(
-                    x_list_collection, x_counterfactual_collection
+                validation_stats["pairwise_distance"] = (
+                    self.datastack.dataset.pair_wise_distance(
+                        x_list_collection, x_counterfactual_collection
+                    )
                 )
                 validation_stats["diversity"] = self.datastack.dataset.variance(
                     x_counterfactual_collection

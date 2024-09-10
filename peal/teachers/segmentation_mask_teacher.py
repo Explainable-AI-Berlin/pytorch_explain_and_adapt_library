@@ -63,8 +63,8 @@ class SegmentationMaskTeacher(TeacherInterface):
                 hints = hint_list[idx].float()
                 hints = hints - hints.mean()
                 joint_map = heatmap * hints
-                true_counterfactual_score = joint_map.sum()
-                if true_counterfactual_score > 0:
+                true_counterfactual_score = joint_map.mean()
+                if true_counterfactual_score > self.attribution_threshold:
                     feedback.append("true")
 
                 else:
