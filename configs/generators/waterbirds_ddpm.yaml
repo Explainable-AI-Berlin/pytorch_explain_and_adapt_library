@@ -3,7 +3,7 @@ generator_type : DDPM
 category : generator
 base_path : $PEAL_RUNS/waterbirds/ddpm
 data: "<PEAL_BASE>/configs/data/waterbirds_generator.yaml"
-image_size: 256
+image_size: 128
 batch_size: 5
 max_steps: 10000000
 x_selection: [""]

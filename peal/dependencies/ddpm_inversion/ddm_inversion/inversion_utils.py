@@ -60,7 +60,6 @@ def sample_xts_from_x0(model, x0, num_inference_steps=50):
 
     timesteps = model.scheduler.timesteps.to(model.device)
     t_to_idx = {int(v): k for k, v in enumerate(timesteps)}
-    # xts = torch.zeros((num_inference_steps+1,model.unet.in_channels, model.unet.sample_size, model.unet.sample_size)).to(x0.device)
     xts = torch.zeros([num_inference_steps + 1] + list(x0.shape)).to(x0.device)
     xts[0] = x0
     for t in reversed(timesteps):
@@ -97,7 +96,6 @@ def forward_step(model, model_output, timestep, sample):
 
     # 2. compute alphas, betas
     alpha_prod_t = model.scheduler.alphas_cumprod[timestep]
-    # alpha_prod_t_next = self.scheduler.alphas_cumprod[next_timestep] if next_ltimestep >= 0 else self.scheduler.final_alpha_cumprod
 
     beta_prod_t = 1 - alpha_prod_t
 

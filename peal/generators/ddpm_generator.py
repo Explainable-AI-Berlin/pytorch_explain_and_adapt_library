@@ -17,7 +17,7 @@ from types import SimpleNamespace
 from torch.utils.tensorboard import SummaryWriter
 
 from peal.dependencies.time.get_predictions import get_predictions
-from peal.generators.interfaces import EditCapableGenerator
+from peal.generators.interfaces import EditCapableGenerator, InvertibleGenerator
 from peal.global_utils import load_yaml_config
 from peal.dependencies.ace.run_ace import main as ace_main
 from peal.dependencies.ace.guided_diffusion import logger
@@ -93,14 +93,15 @@ class DDPMConfig(GeneratorConfig):
     output_path: str = "peal_runs/ddpm/outputs"
     gpus: str = ""
     use_hdf5: bool = False
-    learn_sigma : bool = True
-    diffusion_steps : int = 1000
-    noise_schedule : str = "linear"
-    timestep_respacing : str = "50"
-    use_kl : bool = False
-    predict_xstart : bool = False
-    rescale_timesteps : bool = False
-    rescale_learned_sigmas : bool = False
+    learn_sigma: bool = True
+    diffusion_steps: int = 1000
+    noise_schedule: str = "linear"
+    timestep_respacing: str = "50"
+    use_kl: bool = False
+    predict_xstart: bool = False
+    rescale_timesteps: bool = False
+    rescale_learned_sigmas: bool = False
+    stochastic: bool = True
     full_args: dict = {}
     x_selection: Union[list, type(None)] = None
 
@@ -128,7 +129,7 @@ def load_state_dict(path, **kwargs):
     return torch.load(io.BytesIO(data), **kwargs)
 
 
-class DDPM(EditCapableGenerator):
+class DDPM(EditCapableGenerator, InvertibleGenerator):
     def __init__(self, config, model_dir=None, device="cpu", predictor_dataset=None):
         super().__init__()
         self.predictor_distilled = None
@@ -154,6 +155,8 @@ class DDPM(EditCapableGenerator):
                 load_state_dict(self.model_path, map_location=device)
             )
 
+        self.noise_fn = torch.randn_like if self.config.stochastic else torch.zeros_like
+
     def sample_x(self, batch_size=1, renormalize=True):
         sample = self.diffusion.p_sample_loop(
             self.model, [batch_size] + self.config.data.input_size
@@ -163,15 +166,67 @@ class DDPM(EditCapableGenerator):
 
         return sample
 
+    def encode(self, x, t=1.0):
+        respaced_steps = int(t * int(self.config.timestep_respacing))
+        timesteps = list(range(respaced_steps))[::-1]
+        def local_forward(x, t, idx, noise, steps, diffusion, model):
+            out = diffusion.p_mean_variance(model, x, t, clip_denoised=True)
+
+            x = out["mean"]
+
+            if idx != (steps - 1):
+                x += torch.exp(0.5 * out["log_variance"]) * noise
+
+            return x
+
+        for idx, t in enumerate(timesteps):
+            t = torch.tensor([t] * x.size(0), device=x.device)
+
+            if idx == 0:
+                x = self.diffusion.q_sample(x, t, noise=self.noise_fn(x))
+
+            if hasattr(self, "fix_noise") and self.fix_noise:
+                noise = self.noise[idx + 1, ...].unsqueeze(dim=0)
+
+            elif self.config.stochastic:
+                noise = torch.randn_like(x)
+
+            else:
+                noise = torch.zeros_like(x)
+
+            x = local_forward(x, t, idx, noise, respaced_steps, self.diffusion, self.model)
+
+        # TODO why are gradients in ACE scaled???
+        #t = torch.tensor([self.steps - 1] * x.size(0), device=x.device)
+        return x
+
+    def decode(self, z, t=1.0):
+        # TODO test decode function via sampling function
+        respaced_steps = int(t * int(self.config.timestep_respacing))
+        timesteps = list(range(respaced_steps))[::-1]
+        for idx, t in enumerate(timesteps):
+            t = torch.tensor([t] * z.size(0), device=x.device)
+
+            if idx == 0:
+                z = self.diffusion.q_sample(z, t, noise=self.noise_fn(z))
+
+            out = self.diffusion.p_mean_variance(self.model, z, t, clip_denoised=True)
+
+            z = out["mean"]
+
+            if idx != (respaced_steps - 1):
+                if self.config.stochastic:
+                    z += torch.exp(0.5 * out["log_variance"]) * self.noise_fn(z)
+
+        return z
+
     def train_model(
         self,
     ):
         if os.path.exists(self.model_dir):
             shutil.move(
                 self.model_dir,
-                self.model_dir
-                + "_old_"
-                + datetime.now().strftime("%Y%m%d_%H%M%S"),
+                self.model_dir + "_old_" + datetime.now().strftime("%Y%m%d_%H%M%S"),
             )
 
         # dist_util.setup_dist(self.config.gpus)
@@ -238,11 +293,17 @@ class DDPM(EditCapableGenerator):
         )
         train_loop.run_loop(self.config, writer)
 
-    def distill_predictor(self, explainer_config, base_path, predictor, predictor_datasets):
+    def distill_predictor(
+        self, explainer_config, base_path, predictor, predictor_datasets
+    ):
         distillation_datasets = []
         for i in range(2):
-            class_predictions_path = os.path.join(base_path, "explainer", str(i) + "predictions.csv")
-            Path(os.path.join(base_path, "explainer")).mkdir(exist_ok=True, parents=True)
+            class_predictions_path = os.path.join(
+                base_path, "explainer", str(i) + "predictions.csv"
+            )
+            Path(os.path.join(base_path, "explainer")).mkdir(
+                exist_ok=True, parents=True
+            )
             if not os.path.exists(class_predictions_path):
                 predictor_datasets[i].enable_url()
                 prediction_args = types.SimpleNamespace(
@@ -263,23 +324,29 @@ class DDPM(EditCapableGenerator):
             distilled_dataset_config.confounding_factors = None
             distilled_dataset_config.confounder_probability = None
             distilled_dataset_config.dataset_class = None
-            distillation_datasets.append(get_datasets(
-                config=distilled_dataset_config, data_dir=class_predictions_path
-            )[i])
-            distilled_predictor_config = load_yaml_config(explainer_config.distilled_predictor, PredictorConfig)
+            distillation_datasets.append(
+                get_datasets(
+                    config=distilled_dataset_config, data_dir=class_predictions_path
+                )[i]
+            )
+            distilled_predictor_config = load_yaml_config(
+                explainer_config.distilled_predictor, PredictorConfig
+            )
             distilled_predictor_config.data = distilled_dataset_config
             explainer_config.distilled_predictor = distilled_predictor_config
-            distillation_datasets[i].task_config = explainer_config.distilled_predictor.task
-            distillation_datasets[i].task_config.x_selection = predictor_datasets[i].task_config.x_selection
+            distillation_datasets[
+                i
+            ].task_config = explainer_config.distilled_predictor.task
+            distillation_datasets[i].task_config.x_selection = predictor_datasets[
+                i
+            ].task_config.x_selection
 
         predictor_distilled = copy.deepcopy(predictor)
         distillation_trainer = ModelTrainer(
             config=explainer_config.distilled_predictor,
             model=predictor_distilled,
             datasource=distillation_datasets,
-            model_path=os.path.join(
-                base_path, "explainer", "distilled_predictor"
-            )
+            model_path=os.path.join(base_path, "explainer", "distilled_predictor"),
         )
         distillation_trainer.fit()
         return predictor_distilled
@@ -294,16 +361,22 @@ class DDPM(EditCapableGenerator):
         explainer_config: ACEConfig,
         predictor_datasets: list,
         pbar=None,
-        base_path : str="",
-        mode : str="",
+        base_path: str = "",
+        mode: str = "",
     ):
         if not explainer_config.distilled_predictor is None:
-            distilled_path = os.path.join(base_path, "explainer", "distilled_predictor", "model.cpl")
+            distilled_path = os.path.join(
+                base_path, "explainer", "distilled_predictor", "model.cpl"
+            )
             if not os.path.exists(distilled_path):
-                gradient_predictor = self.distill_predictor(explainer_config, base_path, predictor, predictor_datasets)
+                gradient_predictor = self.distill_predictor(
+                    explainer_config, base_path, predictor, predictor_datasets
+                )
 
             else:
-                gradient_predictor = torch.load(distilled_path, map_location=self.device)
+                gradient_predictor = torch.load(
+                    distilled_path, map_location=self.device
+                )
 
         else:
             gradient_predictor = predictor
@@ -423,7 +496,15 @@ class DDPM(EditCapableGenerator):
             preds = torch.nn.Softmax(dim=-1)(
                 predictor(x_counterfactuals_current.to(device)).detach().cpu()
             )
-            print("preds_final: " + str([float(preds[i][target_classes[i]]) for i in range(len(target_classes))]))
+            print(
+                "preds_final: "
+                + str(
+                    [
+                        float(preds[i][target_classes[i]])
+                        for i in range(len(target_classes))
+                    ]
+                )
+            )
             y_target_end_confidence_current = torch.zeros([x_in.shape[0]])
             for i in range(x_in.shape[0]):
                 y_target_end_confidence_current[i] = preds[i, target_classes[i]]

@@ -246,6 +246,7 @@ def calculate_test_accuracy(
             correct / test_dataloader.dataset.__len__(),
             group_accuracies,
             group_distribution,
+            groups[:,1],
             worst_group_accuracy,
         )
 

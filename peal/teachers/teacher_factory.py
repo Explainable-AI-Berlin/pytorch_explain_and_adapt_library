@@ -4,6 +4,7 @@ import torch
 from torch import nn
 from typing import Union
 
+from peal.teachers.baseline_teacher import BaselineTeacher
 from peal.teachers.interfaces import TeacherInterface
 from peal.teachers.model2model_teacher import Model2ModelTeacher
 from peal.teachers.human2model_teacher import Human2ModelTeacher
@@ -57,14 +58,23 @@ def get_teacher(
     elif teacher == "SegmentationMask":
         teacher = SegmentationMaskTeacher(
             adaptor_config.attribution_threshold,
-            dataset,
+            dataset=dataset,
+            tracking_level=tracking_level,
+            counterfactual_type=counterfactual_type,
+        )
+
+    elif teacher[:len("Baseline")] == 'Baseline':
+        teacher = BaselineTeacher(
+            strategy=teacher.split(":")[1],
+            dataset=dataset,
+            tracking_level=tracking_level,
             counterfactual_type=counterfactual_type,
         )
 
     elif teacher[-4:] == ".cpl":
         teacher = Model2ModelTeacher(
             torch.load(teacher, map_location=device),
-            dataset,
+            dataset=dataset,
             tracking_level=tracking_level,
             counterfactual_type=counterfactual_type,
         )

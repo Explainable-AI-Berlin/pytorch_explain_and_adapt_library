@@ -152,7 +152,7 @@ class CFKDConfig(AdaptorConfig):
     """
     The attribution threshold.
     """
-    attribution_threshold: float = 2.0
+    attribution_threshold: float = 0.001
     """
     What batch_size is used for creating the counterfactuals?
     If use_confusion_matrix is deativated always use an even batch_size!!!
@@ -585,21 +585,31 @@ class CFKD(Adaptor):
             if os.path.exists(self.base_dir):
                 shutil.move(
                     self.base_dir,
-                    self.base_dir
-                    + "_old_"
-                    + datetime.now().strftime("%Y%m%d_%H%M%S"),
+                    self.base_dir + "_old_" + datetime.now().strftime("%Y%m%d_%H%M%S"),
                 )
 
-        if not os.path.exists(
-            os.path.join(self.base_dir, "0", "validation_tracked_values.npz")
-        ):
-            assert self.adaptor_config.current_iteration == 0
-            print("Create base_dir in: " + str(self.base_dir))
-            Path(self.base_dir).mkdir(parents=True, exist_ok=True)
-            writer = SummaryWriter(os.path.join(self.base_dir, "logs"))
-            log_images_to_writer(self.train_dataloader, writer, "train0")
-            log_images_to_writer(self.val_dataloader, writer, "validation0")
-            log_images_to_writer(self.test_dataloader, writer, "test")
+        log_dir = os.path.join(self.base_dir, "logs")
+        if not os.path.exists(log_dir):
+            Path(log_dir).mkdir(parents=True, exist_ok=True)
+            writer = SummaryWriter(log_dir)
+
+            hints_enabled_buffer = self.val_dataloader.dataset.hints_enabled
+            if hints_enabled_buffer:
+                self.val_dataloader.dataset.disable_hints()
+
+            val_accuracy = calculate_test_accuracy(
+                self.student,
+                self.val_dataloader,
+                self.device,
+                False,
+                self.adaptor_config.max_test_batches,
+            )
+            print("val_accuracy: " + str(val_accuracy))
+            writer.add_scalar(
+                "val_accuracy", val_accuracy, self.adaptor_config.current_iteration
+            )
+            if hints_enabled_buffer:
+                self.val_dataloader.dataset.enable_hints()
 
             test_accuracy = calculate_test_accuracy(
                 self.student,
@@ -608,6 +618,43 @@ class CFKD(Adaptor):
                 self.adaptor_config.calculate_group_accuracies,
                 self.adaptor_config.max_test_batches,
             )
+
+            if self.adaptor_config.calculate_group_accuracies:
+                (
+                    test_accuracy,
+                    group_accuracies,
+                    group_distribution,
+                    groups,
+                    worst_group_accuracy,
+                ) = test_accuracy
+                for idx in range(len(group_accuracies)):
+                    writer.add_scalar(
+                        "test_group_accuracy_" + str(idx),
+                        group_accuracies[idx],
+                        self.adaptor_config.current_iteration,
+                    )
+                    writer.add_scalar(
+                        "test_group_distribution_" + str(idx),
+                        group_distribution[idx],
+                        self.adaptor_config.current_iteration,
+                    )
+
+                writer.add_scalar(
+                    "test_worst_group_accuracy",
+                    worst_group_accuracy,
+                    self.adaptor_config.current_iteration,
+                )
+                print("group_accuracies: " + str(group_accuracies))
+                print("group_distribution: " + str(group_distribution))
+                print("group_numbers: " + str(groups))
+                print("worst_group_accuracy: " + str(worst_group_accuracy))
+
+            writer.add_scalar(
+                "test_accuracy", test_accuracy, self.adaptor_config.current_iteration
+            )
+            log_images_to_writer(self.train_dataloader, writer, "train0")
+            log_images_to_writer(self.val_dataloader, writer, "validation0")
+            log_images_to_writer(self.test_dataloader, writer, "test")
 
             if (
                 isinstance(self.val_dataloader.dataset, ImageDataset)
@@ -630,8 +677,15 @@ class CFKD(Adaptor):
                         )
                     )
                     print("Generator performance: " + str(generator_performance))
-
                     self.adaptor_config.generator_performance = generator_performance
+
+        else:
+            writer = SummaryWriter(log_dir)
+
+        if not os.path.exists(
+            os.path.join(self.base_dir, "0", "validation_tracked_values.npz")
+        ):
+            assert self.adaptor_config.current_iteration == 0
 
             save_yaml_config(
                 self.adaptor_config, os.path.join(self.base_dir, "config.yaml")
@@ -640,37 +694,6 @@ class CFKD(Adaptor):
             with open(os.path.join(self.base_dir, "platform.txt"), "w") as f:
                 f.write(platform.node())
 
-            if self.adaptor_config.calculate_group_accuracies:
-                (
-                    test_accuracy,
-                    group_accuracies,
-                    group_distribution,
-                    worst_group_accuracy,
-                ) = test_accuracy
-                for idx in range(len(group_accuracies)):
-                    writer.add_scalar(
-                        "test_group_accuracy_" + str(idx),
-                        group_accuracies[idx],
-                        self.adaptor_config.current_iteration,
-                    )
-                    writer.add_scalar(
-                        "test_group_distribution_" + str(idx),
-                        group_distribution[idx],
-                        self.adaptor_config.current_iteration,
-                    )
-
-                writer.add_scalar(
-                    "test_worst_group_accuracy",
-                    worst_group_accuracy,
-                    self.adaptor_config.current_iteration,
-                )
-                print("group_accuracies: " + str(group_accuracies))
-                print("group_distribution: " + str(group_distribution))
-                print("worst_group_accuracy: " + str(worst_group_accuracy))
-
-            writer.add_scalar(
-                "test_accuracy", test_accuracy, self.adaptor_config.current_iteration
-            )
             validation_stats = self.retrieve_validation_stats(finetune_iteration=0)
             for key in validation_stats.keys():
                 if isinstance(validation_stats[key], float):
@@ -692,17 +715,27 @@ class CFKD(Adaptor):
             with open(os.path.join(self.base_dir, "platform.txt"), "w") as f:
                 f.write(platform.node())
 
-            writer = SummaryWriter(os.path.join(self.base_dir, "logs"))
+            validation_stats_existed = os.path.exists(
+                os.path.join(self.base_dir, "0", "validation_stats.npz")
+            )
             validation_stats = self.retrieve_validation_stats(
                 finetune_iteration=self.adaptor_config.current_iteration
             )
+            if not validation_stats_existed:
+                for key in validation_stats.keys():
+                    if isinstance(validation_stats[key], float):
+                        writer.add_scalar(
+                            "validation_" + key,
+                            validation_stats[key],
+                            self.adaptor_config.current_iteration,
+                        )
+
             self.dataloader_mixer = DataloaderMixer(
                 self.adaptor_config.training, self.train_dataloader
             )
 
             for i in range(1, self.adaptor_config.current_iteration + 1):
                 dataset_dir = os.path.join(self.base_dir, str(i), "train_dataset")
-                # TODO how to recover mixing_ratio?
                 self.dataloader_mixer = self.add_dataset_to_dataloader_mixer(
                     dataloader_old=self.dataloader_mixer,
                     dataset_path=dataset_dir,
@@ -716,7 +749,7 @@ class CFKD(Adaptor):
                     os.path.join(self.adaptor_config.base_dir, "model.cpl"),
                     map_location=self.device,
                 )
-                self.explainer.student = self.student
+                self.explainer.predictor = self.student
 
         return validation_stats, writer
 
@@ -798,6 +831,10 @@ class CFKD(Adaptor):
                 sample_idx += 1
                 print([int(y), y_source, y_target, y_target_start_confidence])
 
+            else:
+                # import pdb; pdb.set_trace()
+                pass
+
         x_batch = torch.stack(x_batch)
         y_target_batch = torch.stack(y_target_batch)
         return {
@@ -826,9 +863,7 @@ class CFKD(Adaptor):
             # move from self.base_dir to self.base_dir + "_old_" + {date}_{timestamp}
             shutil.move(
                 collage_base_path,
-                collage_base_path
-                + "_old_"
-                + datetime.now().strftime("%Y%m%d_%H%M%S")
+                collage_base_path + "_old_" + datetime.now().strftime("%Y%m%d_%H%M%S"),
             )
 
         Path(collage_base_path).mkdir(parents=True, exist_ok=True)
@@ -1107,11 +1142,8 @@ class CFKD(Adaptor):
         y_counterfactual_list = []
         sample_names = []
         for sample_idx in range(len(feedback)):
-            if feedback[sample_idx] == "ood":
-                continue
-
-            elif feedback[sample_idx] == "true":
-                """sample_name = (
+            if feedback[sample_idx] == "true":
+                sample_name = (
                     "true_"
                     + str(int(y_source_list[sample_idx]))
                     + "_to_"
@@ -1120,19 +1152,11 @@ class CFKD(Adaptor):
                     + str(sample_idx)
                 )
                 x_list.append(x_counterfactual_list[sample_idx])
-                y_list.append(int(y_target_list[sample_idx]))
+                y_counterfactual_list.append(int(y_target_list[sample_idx]))
                 sample_names.append(sample_name)
-                sample_idx += 1"""
-                continue
+                sample_idx += 1
 
             elif feedback[sample_idx] == "false":
-                prediction = self.student(
-                    x_counterfactual_list[sample_idx].unsqueeze(0).to(self.device)
-                ).argmax()
-                if prediction == int(y_source_list[sample_idx]):
-                    print("This can not be a false counterfactual!")
-                    continue
-
                 sample_name = (
                     "false_"
                     + str(int(y_source_list[sample_idx]))
@@ -1142,7 +1166,6 @@ class CFKD(Adaptor):
                     + str(sample_idx)
                 )
                 x_list.append(x_counterfactual_list[sample_idx])
-                # y_list.append(int(y_source_list[sample_idx]))
                 y_counterfactual_list.append(int(y_source_list[sample_idx]))
 
                 sample_names.append(sample_name)
@@ -1172,6 +1195,47 @@ class CFKD(Adaptor):
         return dataloader
 
     def finetune_student(self, finetune_iteration, dataset_path, writer):
+        #
+        val_dataset_path = os.path.join(
+            self.base_dir, str(finetune_iteration), "validation_dataset"
+        )
+        _, dataloader_val, _ = create_dataloaders_from_datasource(
+            config=self.validation_data_config,
+            datasource=val_dataset_path,
+        )
+        self.dataloaders_val[1] = dataloader_val
+        log_images_to_writer(
+            dataloader_val, writer, "validation_" + str(finetune_iteration)
+        )
+
+        #
+        mixing_ratio = min(0.5, 1 - self.feedback_accuracy)
+        writer.add_scalar("mixing_ratio", mixing_ratio, finetune_iteration)
+        if not hasattr(self, "dataloader_mixer"):
+            self.dataloader_mixer = DataloaderMixer(
+                self.adaptor_config.training, self.train_dataloader
+            )
+
+        self.dataloader_mixer = self.add_dataset_to_dataloader_mixer(
+            dataloader_old=self.dataloader_mixer,
+            dataset_path=dataset_path,
+            mixing_ratio=mixing_ratio,
+            writer=writer,
+            finetune_iteration=finetune_iteration,
+        )
+
+        y_list_dataset = [
+            self.dataloader_mixer.dataloaders[0].dataset[idx][1]
+            for idx in range(len(self.dataloader_mixer.dataloaders[0].dataset))
+        ]
+        for c in range(self.output_size):
+            writer.add_scalar(
+                "class_ratio_" + str(c),
+                np.sum((torch.tensor(y_list_dataset) == c).numpy())
+                / len(y_list_dataset),
+                finetune_iteration,
+            )
+
         if self.overwrite or not os.path.exists(
             os.path.join(
                 self.base_dir,
@@ -1185,7 +1249,9 @@ class CFKD(Adaptor):
             ):
                 # move from self.base_dir to self.base_dir + "_old_" + {date}_{timestamp}
                 shutil.move(
-                    os.path.join(self.base_dir, str(finetune_iteration), "finetuned_model"),
+                    os.path.join(
+                        self.base_dir, str(finetune_iteration), "finetuned_model"
+                    ),
                     os.path.join(
                         self.base_dir,
                         str(finetune_iteration),
@@ -1197,47 +1263,6 @@ class CFKD(Adaptor):
             Path(
                 os.path.join(self.base_dir, str(finetune_iteration), "finetuned_model")
             ).mkdir(parents=True, exist_ok=True)
-
-            #
-            val_dataset_path = os.path.join(
-                self.base_dir, str(finetune_iteration), "validation_dataset"
-            )
-            _, dataloader_val, _ = create_dataloaders_from_datasource(
-                config=self.validation_data_config,
-                datasource=val_dataset_path,
-            )
-            self.dataloaders_val[1] = dataloader_val
-            log_images_to_writer(
-                dataloader_val, writer, "validation_" + str(finetune_iteration)
-            )
-
-            #
-            mixing_ratio = min(0.5, 1 - self.feedback_accuracy)
-            writer.add_scalar("mixing_ratio", mixing_ratio, finetune_iteration)
-            if not hasattr(self, "dataloader_mixer"):
-                self.dataloader_mixer = DataloaderMixer(
-                    self.adaptor_config.training, self.train_dataloader
-                )
-
-            self.dataloader_mixer = self.add_dataset_to_dataloader_mixer(
-                dataloader_old=self.dataloader_mixer,
-                dataset_path=dataset_path,
-                mixing_ratio=mixing_ratio,
-                writer=writer,
-                finetune_iteration=finetune_iteration,
-            )
-
-            y_list_dataset = [
-                self.dataloader_mixer.dataloaders[0].dataset[idx][1]
-                for idx in range(len(self.dataloader_mixer.dataloaders[0].dataset))
-            ]
-            for c in range(self.output_size):
-                writer.add_scalar(
-                    "class_ratio_" + str(c),
-                    np.sum((torch.tensor(y_list_dataset) == c).numpy())
-                    / len(y_list_dataset),
-                    finetune_iteration,
-                )
 
             if self.adaptor_config.continuous_learning == "retrain":
 
@@ -1293,7 +1318,7 @@ class CFKD(Adaptor):
             ),
             map_location=self.device,
         )
-        self.explainer.student = self.student
+        self.explainer.predictor = self.student
 
     def visualize_progress(self, paths):
         task_config_buffer = copy.deepcopy(self.test_dataloader.dataset.task_config)
@@ -1441,6 +1466,8 @@ class CFKD(Adaptor):
                 for key in validation_tracked_file.keys():
                     validation_stats[key] = torch.tensor(validation_tracked_file[key])
 
+                return validation_stats
+
         validation_values_path = os.path.join(
             self.base_dir, str(finetune_iteration), "validation_tracked_values.npz"
         )
@@ -1539,15 +1566,15 @@ class CFKD(Adaptor):
             self.explainer.explainer_config = original_explainer_config
             if self.adaptor_config.validation_runs > 1:
                 self.datastack.dataset._initialize_performance_metrics()
-                validation_stats[
-                    "distance_to_manifold"
-                ] = self.datastack.dataset.distribution_distance(
-                    x_counterfactual_collection
+                validation_stats["distance_to_manifold"] = (
+                    self.datastack.dataset.distribution_distance(
+                        x_counterfactual_collection
+                    )
                 )
-                validation_stats[
-                    "pairwise_distance"
-                ] = self.datastack.dataset.pair_wise_distance(
-                    x_list_collection, x_counterfactual_collection
+                validation_stats["pairwise_distance"] = (
+                    self.datastack.dataset.pair_wise_distance(
+                        x_list_collection, x_counterfactual_collection
+                    )
                 )
                 validation_stats["diversity"] = self.datastack.dataset.variance(
                     x_counterfactual_collection
@@ -1745,6 +1772,24 @@ class CFKD(Adaptor):
                 writer=writer,
             )
 
+            hints_enabled_buffer = self.val_dataloader.dataset.hints_enabled
+            if hints_enabled_buffer:
+                self.val_dataloader.dataset.disable_hints()
+
+            val_accuracy = calculate_test_accuracy(
+                self.student,
+                self.val_dataloader,
+                self.device,
+                False,
+                self.adaptor_config.max_test_batches,
+            )
+            print("val_accuracy: " + str(val_accuracy))
+            writer.add_scalar(
+                "val_accuracy", val_accuracy, self.adaptor_config.current_iteration
+            )
+            if hints_enabled_buffer:
+                self.val_dataloader.dataset.enable_hints()
+
             test_accuracy = calculate_test_accuracy(
                 self.student,
                 self.test_dataloader,
@@ -1757,6 +1802,7 @@ class CFKD(Adaptor):
                     test_accuracy,
                     group_accuracies,
                     group_distribution,
+                    groups,
                     worst_group_accuracy,
                 ) = test_accuracy
                 for idx in range(len(group_accuracies)):
@@ -1777,12 +1823,16 @@ class CFKD(Adaptor):
                     finetune_iteration,
                 )
                 print("group_accuracies: " + str(group_accuracies))
+                print("group_distribution: " + str(group_distribution))
+                print("group_sizes: " + str(groups))
+                print("worst_group_accuracy: " + str(worst_group_accuracy))
 
             writer.add_scalar("test_accuracy", test_accuracy, finetune_iteration)
             print("test_accuracy: " + str(test_accuracy))
             validation_stats = self.retrieve_validation_stats(
                 finetune_iteration=finetune_iteration
             )
+
             for key in validation_stats.keys():
                 if isinstance(validation_stats[key], float):
                     writer.add_scalar(
@@ -1803,7 +1853,7 @@ class CFKD(Adaptor):
                     ]
                 )
 
-            if (
+            """if (
                 self.adaptor_config.replacement_strategy == "delayed"
                 and self.adaptor_config.replace_model
             ):
@@ -1823,7 +1873,9 @@ class CFKD(Adaptor):
                 self.adaptor_config.replace_model = True
 
             else:
-                self.adaptor_config.replace_model = False
+                self.adaptor_config.replace_model = False"""
+
+            torch.save(self.student, os.path.join(self.base_dir, "model.cpl"))
 
             self.adaptor_config.current_iteration = (
                 self.adaptor_config.current_iteration + 1

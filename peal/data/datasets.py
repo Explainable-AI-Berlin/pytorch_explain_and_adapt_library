@@ -811,7 +811,13 @@ class Image2MixedDataset(ImageDataset):
         return_dict = {"x": img_tensor, "y": target}
 
         if self.hints_enabled:
-            mask = Image.open(os.path.join(self.root_dir, "masks", name))
+            if os.path.exists(os.path.join(self.root_dir, "masks", name)):
+                mask = Image.open(os.path.join(self.root_dir, "masks", name))
+
+            else:
+                mask_name = name.split("/")[-1]
+                mask = Image.open(os.path.join(self.root_dir, "masks", mask_name))
+
             torch.set_rng_state(state)
             mask_tensor = self.transform(mask)
             return_dict["hint"] = mask_tensor

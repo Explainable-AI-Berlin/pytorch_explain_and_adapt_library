@@ -16,6 +16,8 @@ from PIL import Image
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.transforms import ToTensor
 
+from peal.dependencies.ddpm_inversion.ddm_inversion.inversion_utils import inversion_forward_process, \
+    inversion_reverse_process
 from peal.editors.ddpm_inversion import DDPMInversionConfig
 from peal.data.dataloaders import get_dataloader
 from peal.data.dataset_factory import get_datasets
@@ -23,7 +25,7 @@ from peal.data.datasets import Image2MixedDataset
 from peal.dependencies.ddpm_inversion.ddpm_inversion import DDPMInversion
 from peal.dependencies.lora.train_text_to_image_lora import lora_finetune
 from peal.dependencies.time.core.utils import load_tokens_and_embeddings
-from peal.generators.interfaces import EditCapableGenerator
+from peal.generators.interfaces import EditCapableGenerator, InvertibleGenerator
 from peal.global_utils import load_yaml_config, embed_numberstring, save_yaml_config
 from peal.dependencies.time.generate_ce import (
     generate_time_counterfactuals,
@@ -109,7 +111,7 @@ class StableDiffusionConfig(GeneratorConfig):
 
 
 
-class StableDiffusion(EditCapableGenerator):
+class StableDiffusion(InvertibleGenerator, EditCapableGenerator):
     def __init__(self, config, classifier_dataset=None, model_dir=None, device="cpu"):
         super().__init__()
         self.config = load_yaml_config(config)
@@ -146,6 +148,102 @@ class StableDiffusion(EditCapableGenerator):
         images = self.pipeline(batch_size * [""]).images
         images_torch = torch.stack([ToTensor()(image) for image in images])
         return images_torch
+
+    def encode(self, x, t=1.0):
+        """
+        respaced_steps = int(t * int(self.config.timestep_respacing))
+        timesteps = list(range(respaced_steps))[::-1]
+        def local_forward(x, t, idx, noise, steps, diffusion, model):
+            out = diffusion.p_mean_variance(model, x, t, clip_denoised=True)
+
+            x = out["mean"]
+
+            if idx != (steps - 1):
+                x += torch.exp(0.5 * out["log_variance"]) * noise
+
+            return x
+
+        for idx, t in enumerate(timesteps):
+            t = torch.tensor([t] * x.size(0), device=x.device)
+
+            if idx == 0:
+                x = self.diffusion.q_sample(x, t, noise=self.noise_fn(x))
+
+            if hasattr(self, "fix_noise") and self.fix_noise:
+                noise = self.noise[idx + 1, ...].unsqueeze(dim=0)
+
+            elif self.config.stochastic:
+                noise = torch.randn_like(x)
+
+            else:
+                noise = torch.zeros_like(x)
+
+            x = local_forward(x, t, idx, noise, respaced_steps, self.diffusion, self.model)
+        """
+
+        # TODO why are gradients in ACE scaled???
+        #t = torch.tensor([self.steps - 1] * x.size(0), device=x.device)
+        x0 = torchvision.transforms.Resize([512, 512])(
+            torch.clone(x).to(self.device)
+        )  # load_512(image_path, *offsets, device)
+
+        # vae encode image
+        w0 = (self.pipe.vae.encode(x0).latent_dist.mode() * 0.18215).float()
+
+        # find Zs and wts - forward process
+        wt, zs, wts = inversion_forward_process(
+            self.pipe,
+            w0,
+            etas=self.config.eta,
+            prompt=x.shape[0]*[""],
+            cfg_scale=self.config.cfg_scale_src,
+            prog_bar=True,
+            num_inference_steps=self.config.num_diffusion_steps,
+        )
+        x = wt, zs, wts
+        return x
+
+    def decode(self, z, t=1.0):
+        # TODO test decode function via sampling function
+        from peal.dependencies.ddpm_inversion.prompt_to_prompt.ptp_classes import AttentionStore
+        controller = AttentionStore()
+        from peal.dependencies.ddpm_inversion.prompt_to_prompt.ptp_utils import (
+            register_attention_control,
+        )
+        register_attention_control(self.pipe, controller)
+        wt, zs, wts = z
+        w0, _ = inversion_reverse_process(
+            self.pipe,
+            xT=wts[self.config.num_diffusion_steps - self.config.skip],
+            etas=self.config.eta,
+            prompts=z.shape[0] * [""],
+            cfg_scales=[self.config.cfg_scale_tar],
+            prog_bar=True,
+            zs=zs[: (self.config.num_diffusion_steps - self.config.skip)],
+            controller=controller,
+            #classifier=classifier_loss,
+        )
+
+        # vae decode image
+        x = self.pipe.vae.decode(1 / 0.18215 * w0).sample
+        """
+        respaced_steps = int(t * int(self.config.timestep_respacing))
+        timesteps = list(range(respaced_steps))[::-1]
+        for idx, t in enumerate(timesteps):
+            t = torch.tensor([t] * x.size(0), device=x.device)
+
+            if idx == 0:
+                x = self.diffusion.q_sample(x, t, noise=self.noise_fn(x))
+
+            out = self.diffusion.p_mean_variance(self.model, x, t, clip_denoised=True)
+
+            x = out["mean"]
+
+            if idx != (respaced_steps - 1):
+                if self.config.stochastic:
+                    x += torch.exp(0.5 * out["log_variance"]) * self.noise_fn(x)"""
+
+        return x
 
     def train_model(
         self,
