@@ -9,6 +9,7 @@ import pandas as pd
 
 from pathlib import Path
 
+import pygame
 import torch
 import torchvision
 from PIL import Image
@@ -281,7 +282,7 @@ class ConfounderDatasetGenerator:
         dataset_name=None,
         label_dir=None,
         delimiter=",",
-        confounding="intensity",
+        confounding="copyrighttag",
         num_samples=None,
         attribute=None,
         data_config=None,
@@ -290,6 +291,9 @@ class ConfounderDatasetGenerator:
         """ """
         self.dataset_origin_path = dataset_origin_path
         self.confounding = confounding
+
+        if confounding is None:
+            self.confounding = data_config.confounding_factors[-1]
 
         if label_dir is None:
             self.label_dir = os.path.join(dataset_origin_path, "data.csv")
@@ -403,6 +407,16 @@ class ConfounderDatasetGenerator:
                 ],
                 axis=0,
             )
+            mask_np = np.array(
+                np.abs(
+                    np.array(copyright_tag_bg, dtype=np.float32) / 255 - 1
+                )
+                * 128,
+                dtype=np.uint8,
+            )
+            np.zeros_like(mask_np)
+            mask_np[134:177, 60:178-60] = 255
+            mask = Image.fromarray(mask_np)
 
         num_samples = (
             self.num_samples if not self.num_samples is None else len(instance_names)
@@ -461,16 +475,13 @@ class ConfounderDatasetGenerator:
                 img = alpha * img_copyrighttag + (1 - alpha) * np.array(img)
                 img_out = Image.fromarray(np.array(img, dtype=np.uint8))
                 if self.confounding == "copyrighttag":
-                    mask = Image.fromarray(
-                        np.array(
-                            np.abs(
-                                np.array(copyright_tag_bg, dtype=np.float32) / 255 - 1
-                            )
-                            * 255,
-                            dtype=np.uint8,
-                        )
-                    )
                     mask.save(os.path.join(self.dataset_dir, "masks", name))
+                    """img_and_mask = np.concatenate(
+                        [np.array(255 * img, dtype=np.uint8), mask_np],
+                        axis=1,
+                    )
+                    img_and_mask_out = Image.fromarray(img_and_mask)
+                    img_and_mask_out.save('tmp.png')"""
 
             if self.confounding == "necklace":
                 img_th = ToTensor()(img).unsqueeze(0)
@@ -512,9 +523,6 @@ class ConfounderDatasetGenerator:
                 )
 
             else:
-                import pdb
-
-                pdb.set_trace()
                 img_out.save(os.path.join(self.dataset_dir, "imgs", name))
 
             sample.append(has_confounder)

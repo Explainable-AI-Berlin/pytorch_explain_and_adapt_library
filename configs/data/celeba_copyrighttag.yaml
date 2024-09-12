@@ -1,10 +1,12 @@
+# python generate_dataset.py --config "<PEAL_BASE>/configs/data/celeba_copyrighttag.yaml"
+dataset_class           : celeba
 dataset_origin_path     : $PEAL_DATA/celeba
-dataset_path            : $PEAL_DATA/celeba_copyrighttag
+dataset_path            : $PEAL_DATA/celeba_copyrighttag2
 num_samples             : 202599
 input_type              : image
 input_size              : [3, 128, 128]
 output_type             : multiclass
 output_size             : [41]
-confounding             : copyrighttag
+confounding_factors     : ['Smiling', 'Confounder']
 delimiter               : ","
 normalization           : [0.5, 0.5]

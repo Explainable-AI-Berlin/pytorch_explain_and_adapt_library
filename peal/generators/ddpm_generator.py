@@ -152,9 +152,13 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         self.model.to(device)
         self.model_path = os.path.join(self.model_dir, "final.pt")
         if os.path.exists(self.model_path):
+            print('load model!!!')
             self.model.load_state_dict(
                 load_state_dict(self.model_path, map_location=device)
             )
+
+        else:
+            print('No model weights yet!!!')
 
         self.noise_fn = torch.randn_like if self.config.stochastic else torch.zeros_like
 
