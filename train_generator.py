@@ -1,6 +1,6 @@
 import argparse
 
-from peal.global_utils import load_yaml_config, add_class_arguments
+from peal.global_utils import load_yaml_config
 from peal.generators.generator_factory import get_generator
 
 

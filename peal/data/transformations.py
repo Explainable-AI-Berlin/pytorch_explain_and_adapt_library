@@ -47,7 +47,8 @@ class Padding(object):
                 int(dif_x / 2),
                 int(dif_y / 2) + dif_y % 2,
                 int(dif_x / 2) + dif_x % 2,
-            ]
+            ],
+            fill=128,
         )
         return padding(sample)
 
@@ -65,7 +66,7 @@ class RandomRotation(object):
         # TODO: fix this
         theta = random.randint(self.min_rotation, self.max_rotation)
         self.last_theta = theta
-        sample = torchvision.transforms.functional.rotate(sample, theta)
+        sample = torchvision.transforms.functional.rotate(sample, theta, fill=0.5)
         #rotation = iaa.Rotate(theta)
         #sample = rotation.augment_image(sample.numpy().transpose([1, 2, 0]))
         #self.last_theta = theta / 180 * math.pi
