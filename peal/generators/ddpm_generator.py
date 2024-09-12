@@ -104,6 +104,7 @@ class DDPMConfig(GeneratorConfig):
     stochastic: bool = True
     full_args: dict = {}
     x_selection: Union[list, type(None)] = None
+    is_trained: bool = False
 
 
 def load_state_dict(path, **kwargs):
@@ -223,12 +224,13 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
     def train_model(
         self,
     ):
-        if os.path.exists(self.model_dir):
+        if not self.config.is_trained and os.path.exists(self.model_dir):
             shutil.move(
                 self.model_dir,
                 self.model_dir + "_old_" + datetime.now().strftime("%Y%m%d_%H%M%S"),
             )
 
+        self.config.is_trained = True
         # dist_util.setup_dist(self.config.gpus)
         logger.configure(dir=self.model_dir)
 
@@ -364,6 +366,10 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         base_path: str = "",
         mode: str = "",
     ):
+        if not self.config.is_trained:
+            print('Model not trained yet. Model will be trained now!')
+            self.train_model()
+            
         if not explainer_config.distilled_predictor is None:
             distilled_path = os.path.join(
                 base_path, "explainer", "distilled_predictor", "model.cpl"
