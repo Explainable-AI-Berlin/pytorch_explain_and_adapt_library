@@ -210,7 +210,7 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         respaced_steps = int(t * int(self.config.timestep_respacing))
         timesteps = list(range(respaced_steps))[::-1]
         for idx, t in enumerate(timesteps):
-            t = torch.tensor([t] * z.size(0), device=x.device)
+            t = torch.tensor([t] * z.size(0), device=z.device)
 
             if idx == 0:
                 z = self.diffusion.q_sample(z, t, noise=self.noise_fn(z))
@@ -372,6 +372,7 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
     ):
         if not self.config.is_trained:
             print('Model not trained yet. Model will be trained now!')
+            import pdb; pdb.set_trace()
             self.train_model()
             
         if not explainer_config.distilled_predictor is None:

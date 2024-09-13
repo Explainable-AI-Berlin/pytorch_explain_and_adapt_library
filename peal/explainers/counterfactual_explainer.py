@@ -38,6 +38,94 @@ from peal.teachers.human2model_teacher import DataStore
 from peal.training.trainers import PredictorConfig, ModelTrainer
 
 
+class PDCConfig(ExplainerConfig):
+    """
+    This class defines the config of a DiffeoCF.
+    """
+
+    """
+    The type of explanation that shall be used.
+    Options: ['counterfactual', 'lrp']
+    """
+    explanation_type: str = "PDCConfig"
+    """
+    The path to the predictor that shall be explained.
+    """
+    predictor_path: Union[str, type(None)] = None
+    """
+    The generator that shall be used for the counterfactual search
+    """
+    generator: Union[type(None), GeneratorConfig] = None
+    """
+    The data config used for the counterfactual search
+    """
+    data_config: Union[type(None), DataConfig] = None
+    """
+    The maximum number of gradients step done for explaining the network
+    """
+    gradient_steps: PositiveInt = 1000
+    """
+    The optimizer used for searching the counterfactual
+    """
+    optimizer: str = "Adam"
+    """
+    The learning rate used for finding the counterfactual
+    """
+    learning_rate: float = 0.0001
+    """
+    The desired target confidence.
+    Consider the tradeoff between minimality and clarity of counterfactual
+    """
+    y_target_goal_confidence: float = 0.9
+    """
+    Whether samples in the current search batch are masked after reaching y_target_goal_confidence
+    or whether they are continued to be updated until the last surpasses the threshhold
+    """
+    use_masking: bool = True
+    """
+    How much noise to inject into the image while passing through it in the forward pass.
+    Helps avoiding adversarial attacks in the case of a weak generator
+    """
+    img_noise_injection: float = 0.01
+    """
+    Regularizing factor of the L1 distance in latent space between the latent code of the
+    original image and the counterfactual
+    """
+    dist_l1: float = 1.0
+    """
+    Keeps the counterfactual in the high density area of the generative model
+    """
+    log_prob_regularization: float = 0.0
+    """
+    Regularization between counterfactual and original in image space to keep similariy high.
+    """
+    img_regularization: float = 0.0
+    """
+    The batch size used for the counterfactual search
+    """
+    batch_size: int = 1
+    """
+    The config for the predictor distillation.
+    """
+    distilled_predictor: Union[type(None), str, dict] = None
+    """
+    The path to either the predictor or its config.
+    """
+    predictor: Union[str, type(None), dict] = None
+    """
+    How deep to go into the latent space for the counterfactual search
+    """
+    sampling_time_fraction: float = 0.3
+    """
+    Whether to encode every iteration again or not.
+    """
+    iterationwise_encoding: bool = True
+    """
+    A dict containing all variables that could not be given with the current config structure
+    """
+    kwargs: dict = {}
+
+
 class ACEConfig(ExplainerConfig):
     """
     This class defines the config of a ACEConfig.
@@ -98,73 +186,6 @@ class ACEConfig(ExplainerConfig):
     chunk: int = 0  # current chunk (between 0 and chunks - 1)
     merge_chunks: bool = False  # to merge all chunked results
     y_target_goal_confidence: float = 1.1
-
-
-class DiffeoCFConfig(ExplainerConfig):
-    """
-    This class defines the config of a DiffeoCF.
-    """
-
-    """
-    The type of explanation that shall be used.
-    Options: ['counterfactual', 'lrp']
-    """
-    explanation_type: str = "DiffeoCFConfig"
-    predictor_path: Union[str, type(None)] = None
-    generator: Union[type(None), GeneratorConfig] = None
-    data_config: Union[type(None), DataConfig] = None
-    """
-    The maximum number of gradients step done for explaining the network
-    """
-    gradient_steps: PositiveInt = 1000
-    """
-    The optimizer used for searching the counterfactual
-    """
-    optimizer: str = "Adam"
-    """
-    The learning rate used for finding the counterfactual
-    """
-    learning_rate: float = 0.0001
-    """
-    The desired target confidence.
-    Consider the tradeoff between minimality and clarity of counterfactual
-    """
-    y_target_goal_confidence: float = 0.9
-    """
-    Whether samples in the current search batch are masked after reaching y_target_goal_confidence
-    or whether they are continued to be updated until the last surpasses the threshhold
-    """
-    use_masking: bool = True
-    """
-    How much noise to inject into the image while passing through it in the forward pass.
-    Helps avoiding adversarial attacks in the case of a weak generator
-    """
-    img_noise_injection: float = 0.01
-    """
-    Regularizing factor of the L1 distance in latent space between the latent code of the
-    original image and the counterfactual
-    """
-    dist_l1: float = 1.0
-    """
-    Keeps the counterfactual in the high density area of the generative model
-    """
-    log_prob_regularization: float = 0.0
-    """
-    Regularization between counterfactual and original in image space to keep similariy high.
-    """
-    img_regularization: float = 0.0
-    """
-    The batch size used for the counterfactual search
-    """
-    batch_size: int = 1
-    distilled_predictor: Union[type(None), str, dict] = None
-    predictor: Union[str, type(None), dict] = None
-    sampling_time_fraction: float = 0.3
-    iterationwise_encoding: bool = True
-    """
-    A dict containing all variables that could not be given with the current config structure
-    """
-    kwargs: dict = {}
 
 
 class TIMEConfig(ExplainerConfig):
@@ -389,9 +410,9 @@ class CounterfactualExplainer(ExplainerInterface):
             )
             distilled_predictor_config.data = distilled_dataset_config
             explainer_config.distilled_predictor = distilled_predictor_config
-            distillation_datasets[
-                i
-            ].task_config = explainer_config.distilled_predictor.task
+            distillation_datasets[i].task_config = (
+                explainer_config.distilled_predictor.task
+            )
             distillation_datasets[i].task_config.x_selection = predictor_datasets[
                 i
             ].task_config.x_selection
@@ -407,7 +428,7 @@ class CounterfactualExplainer(ExplainerInterface):
         return predictor_distilled
 
     def predictor_distilled_counterfactual(
-        self, x_in, target_confidence_goal, y_target, pbar=None, mode=""
+        self, x_in, target_confidence_goal, y_target, pbar=None, mode="", base_path=None
     ):
         """
         This function generates a counterfactual for a given batch of inputs.
@@ -419,8 +440,11 @@ class CounterfactualExplainer(ExplainerInterface):
             _type_: _description_
         """
         if not self.explainer_config.distilled_predictor is None:
+            if base_path is None:
+                base_path = self.explainer_config.explanations_dir
+
             distilled_path = os.path.join(
-                self.explainer_config.explanations_dir,
+                base_path,
                 "explainer",
                 "distilled_predictor",
                 "model.cpl",
@@ -428,7 +452,7 @@ class CounterfactualExplainer(ExplainerInterface):
             if not os.path.exists(distilled_path):
                 gradient_predictor = self.distill_predictor(
                     self.explainer_config,
-                    self.explainer_config.explanations_dir,
+                    base_path,
                     self.predictor,
                     self.predictor_datasets,
                 )
@@ -453,16 +477,21 @@ class CounterfactualExplainer(ExplainerInterface):
 
                 for z_org in z_original:
                     z.append(
-                        nn.Parameter(torch.clone(z_org.detach().cpu()), requires_grad=True)
+                        nn.Parameter(
+                            torch.clone(z_org.detach().cpu()), requires_grad=True
+                        )
                     )
 
             else:
-                z = nn.Parameter(torch.clone(z_original.detach().cpu()), requires_grad=True)
+                z = nn.Parameter(
+                    torch.clone(z_original.detach().cpu()), requires_grad=True
+                )
                 z = [z]
 
         else:
             z_original = x.to(self.device)
             z = nn.Parameter(torch.clone(z_original.detach().cpu()), requires_grad=True)
+            z_original = [z_original]
             z = [z]
 
         if self.explainer_config.optimizer == "Adam":
@@ -472,7 +501,9 @@ class CounterfactualExplainer(ExplainerInterface):
             optimizer = torch.optim.SGD(z, lr=self.explainer_config.learning_rate)
 
         else:
-            raise Exception(self.explainer_config.optimizer + " is not a valid optimizer!")
+            raise Exception(
+                self.explainer_config.optimizer + " is not a valid optimizer!"
+            )
 
         x_adv = x.clone().detach()
         history = [
@@ -525,19 +556,17 @@ class CounterfactualExplainer(ExplainerInterface):
             )
             loss = self.loss(logits_perturbed, y_target.to(self.device))
             l1_losses = []
-            for v_idx in range(len(z_original)):
+            for i in range(len(z_original)):
                 l1_losses.append(
                     torch.mean(
                         torch.abs(
-                            z[v_idx].to(self.device)
-                            - torch.clone(z_original[v_idx]).detach()
+                            z[i].to(self.device)
+                            - torch.clone(z_original[i]).detach()
                         )
                     )
                 )
 
-            loss += self.explainer_config.dist_l1 * torch.mean(
-                torch.stack(l1_losses)
-            )
+            loss += self.explainer_config.dist_l1 * torch.mean(torch.stack(l1_losses))
             if not pbar is None:
                 pbar.set_description(
                     f"Creating {mode} Counterfactuals:"
@@ -679,9 +708,7 @@ class CounterfactualExplainer(ExplainerInterface):
                     )
                 )
 
-            loss += self.explainer_config.dist_l1 * torch.mean(
-                torch.stack(l1_losses)
-            )
+            loss += self.explainer_config.dist_l1 * torch.mean(torch.stack(l1_losses))
             """loss += self.explainer_config.log_prob_regularization * torch.mean(
                 self.generator.log_prob_z(latent_code)
             )"""
@@ -830,7 +857,9 @@ class CounterfactualExplainer(ExplainerInterface):
             )
             history = None
 
-        elif isinstance(self.generator, InvertibleGenerator) and isinstance(self.explainer_config, DiffeoCFConfig):
+        elif isinstance(self.generator, InvertibleGenerator) and isinstance(
+            self.explainer_config, PDCConfig
+        ):
             (
                 batch["x_counterfactual_list"],
                 batch["z_difference_list"],
@@ -841,6 +870,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 y_target=batch["y_target_list"],
                 pbar=pbar,
                 mode=mode,
+                base_path=explainer_path,
             )
             history = None
 
@@ -919,7 +949,8 @@ class CounterfactualExplainer(ExplainerInterface):
             self.predictor_datasets[1].enable_hints()
 
         pbar = tqdm(
-            total=self.explainer_config.max_samples * (
+            total=self.explainer_config.max_samples
+            * (
                 self.explainer_config.gradient_steps
                 if hasattr(self.explainer_config, "gradient_steps")
                 else 1

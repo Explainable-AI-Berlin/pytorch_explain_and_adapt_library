@@ -188,6 +188,8 @@ class TrainLoop:
         )
         pbar.num_steps = self.data.dataloader.train_config.steps_per_epoch
         pbar.config = config
+        pbar.config.best_fid = 1e9
+        pbar.config.current_fid = 1e9
 
         if os.path.exists(os.path.join(self.model_dir, "model")):
             shutil.move(
@@ -268,6 +270,8 @@ class TrainLoop:
             pbar.set_description(
                 f"Step: {pbar.step} / {pbar.num_steps}, "
                 + f"Batch: {i} / {int(batch.shape[0] / self.microbatch + 0.99)}"
+                + f"Current FID: {pbar.config.current_fid}"
+                + f"Best FID: {pbar.config.best_fid}"
             )
             pbar.update(1)
             micro = batch[i : i + self.microbatch].to(dist_util.dev())
@@ -326,23 +330,22 @@ class TrainLoop:
             state_dict = self.mp_trainer.master_params_to_state_dict(params)
             #if dist.get_rank() == 0:
             print(f"saving model {rate}...")
-            if not rate:
-                filename = os.path.join(
-                    f"model", f"{(self.step+self.resume_step):06d}.pt"
-                )
-                if (
-                    not pbar is None
-                    and pbar.config.current_fid < pbar.config.best_fid
-                ):
-                    pbar.config.best_fid = pbar.config.current_fid
-                    with bf.BlobFile(
-                        bf.join(copy.deepcopy(self.model_dir), f"final.pt"), "wb"
-                    ) as f:
-                        th.save(state_dict, f)
-            else:
+            filename = os.path.join(
+                f"model", f"{(self.step+self.resume_step):06d}.pt"
+            )
+            if (
+                not pbar is None
+                and pbar.config.current_fid <= pbar.config.best_fid
+            ):
+                pbar.config.best_fid = pbar.config.current_fid
+                with bf.BlobFile(
+                    bf.join(copy.deepcopy(self.model_dir), f"final.pt"), "wb"
+                ) as f:
+                    th.save(state_dict, f)
+            """else:
                 filename = os.path.join(
                     f"ema", f"{rate}_{(self.step+self.resume_step):06d}.pt"
-                )
+                )"""
 
             with bf.BlobFile(
                 bf.join(copy.deepcopy(self.model_dir), filename), "wb"

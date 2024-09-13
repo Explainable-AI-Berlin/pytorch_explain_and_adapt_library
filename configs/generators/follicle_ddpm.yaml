@@ -1,7 +1,7 @@
 # python train_generator.py --config "<PEAL_BASE>/configs/generators/follicle_ddpm.yaml"
 generator_type : DDPM
 category : generator
-base_path : $PEAL_RUNS/follicles_cut/ddpm_grey
+base_path : $PEAL_RUNS/follicles_cut/ddpm
 data: "<PEAL_BASE>/configs/data/follicles_generator.yaml"
 image_size: 128
 batch_size: 5
