@@ -152,9 +152,13 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         self.model.to(device)
         self.model_path = os.path.join(self.model_dir, "final.pt")
         if os.path.exists(self.model_path):
+            print('load model!!!')
             self.model.load_state_dict(
                 load_state_dict(self.model_path, map_location=device)
             )
+
+        else:
+            print('No model weights yet!!!')
 
         self.noise_fn = torch.randn_like if self.config.stochastic else torch.zeros_like
 
@@ -206,7 +210,7 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         respaced_steps = int(t * int(self.config.timestep_respacing))
         timesteps = list(range(respaced_steps))[::-1]
         for idx, t in enumerate(timesteps):
-            t = torch.tensor([t] * z.size(0), device=x.device)
+            t = torch.tensor([t] * z.size(0), device=z.device)
 
             if idx == 0:
                 z = self.diffusion.q_sample(z, t, noise=self.noise_fn(z))
@@ -368,6 +372,7 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
     ):
         if not self.config.is_trained:
             print('Model not trained yet. Model will be trained now!')
+            import pdb; pdb.set_trace()
             self.train_model()
             
         if not explainer_config.distilled_predictor is None:

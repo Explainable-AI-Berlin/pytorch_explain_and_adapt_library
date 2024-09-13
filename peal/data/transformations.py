@@ -146,7 +146,7 @@ class RandomResizeCropPad(object):
         pad_bottom = max(0, output_size[1] - resized_height - pad_top)
 
         # Apply crop/pad
-        img = transforms.functional.pad(img, (pad_left, pad_top, pad_right, pad_bottom))
+        img = transforms.functional.pad(img, (pad_left, pad_top, pad_right, pad_bottom), fill=0.5)
 
         # Perform center crop
         img = transforms.functional.center_crop(img, output_size)

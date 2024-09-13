@@ -10,14 +10,14 @@ continuous_learning                  :  "retrain"
 replace_model                        :  True
 use_visualization                    :  True
 calculate_group_accuracies           :  True
-explainer                            :  <PEAL_BASE>/configs/explainers/square_pdc.yaml
+explainer                            :  <PEAL_BASE>/configs/explainers/square_pdc_new.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_poisened100.yaml
 test_data                            :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_unpoisened.yaml
 student                              :  $PEAL_RUNS/square2/colora_confounding_colorb/regularized0/classifier_poisened100/model.cpl
 teacher                              :  $PEAL_RUNS/square2/colora_confounding_colorb/regularized0/classifier_unpoisened/model.cpl
 generator                            :  $PEAL_RUNS/square2/ddpm/config.yaml
-base_dir                             :  $PEAL_RUNS/square2/colora_confounding_colorb/regularized0/classifier_poisened100/pdc_cfkd
+base_dir                             :  $PEAL_RUNS/square2/colora_confounding_colorb/regularized0/classifier_poisened100/pdc_new_cfkd
 task:
   criterions:
     ce     : 1.0

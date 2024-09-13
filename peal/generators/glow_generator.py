@@ -55,7 +55,7 @@ class GlowGeneratorConfig(GeneratorConfig):
 
 
 class GlowGenerator(InvertibleGenerator):
-    def __init__(self, config, model_dir=None, device="cpu", classifier_dataset=None, train=True):
+    def __init__(self, config, model_dir=None, device="cpu", predictor_dataset=None, train=True):
         super().__init__()
         self.config = load_yaml_config(config)
         print(self.config)
@@ -158,10 +158,15 @@ class GlowGenerator(InvertibleGenerator):
         train_dataloader = get_dataloader(
             self.train_dataset, mode="train", batch_size=self.config.batch
         )
+        if len(self.val_dataset) > 0:
+            val_dataloader = get_dataloader(
+                self.val_dataset, mode="train", batch_size=self.config.batch
+            )
 
-        val_dataloader = get_dataloader(
-            self.val_dataset, mode="train", batch_size=self.config.batch
-        )
+        else:
+            val_dataloader = get_dataloader(
+                self.train_dataset, mode="train", batch_size=self.config.batch
+            )
 
         if not self.config.x_selection is None:
             self.train_dataset.task_config = SimpleNamespace(

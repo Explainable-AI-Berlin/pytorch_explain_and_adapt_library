@@ -1,8 +1,8 @@
 # python -W ignore train_generator.py --config "<PEAL_BASE>/configs/generators/celeba_copyrighttag_glow.yaml"
 generator_type: 'GlowGenerator'
 category: 'generator'
-data : '<PEAL_BASE>/configs/data/celeba_copyrighttag.yaml'
+data : '<PEAL_BASE>/configs/data/celeba64x64_copyrighttag.yaml'
 base_path: '$PEAL_RUNS/celeba_copyrighttag/glow'
-img_size: 128
-lr: 1e-6
-n_block: 5
+img_size: 64
+lr: 1e-5
+n_block: 4
