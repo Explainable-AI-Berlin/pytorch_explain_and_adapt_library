@@ -466,6 +466,9 @@ class CounterfactualExplainer(ExplainerInterface):
             gradient_predictor = self.predictor
 
         x = torch.clone(x_in)
+        history = [
+            x.detach().cpu()[idx].unsqueeze(0) for idx in range(x.shape[0])
+        ]
         x = self.predictor_datasets[1].project_to_pytorch_default(x)
         x = self.generator.dataset.project_from_pytorch_default(x)
         x = torchvision.transforms.Resize(self.generator.config.data.input_size[1:])(x)
@@ -506,9 +509,6 @@ class CounterfactualExplainer(ExplainerInterface):
             )
 
         x_adv = x.clone().detach()
-        history = [
-            x_adv.detach().cpu()[idx].unsqueeze(0) for idx in range(x_adv.shape[0])
-        ]
         mask = torch.ones(x.shape[0]).to(x)
 
         for i in range(self.explainer_config.gradient_steps):
@@ -601,9 +601,6 @@ class CounterfactualExplainer(ExplainerInterface):
 
         if not self.explainer_config.iterationwise_encoding:
             z_cuda = [z_elem.to(self.device) for z_elem in z]
-            z_cuda = self.generator.encode(
-                z_cuda[0], t=self.explainer_config.sampling_time_fraction
-            )
             counterfactual = self.generator.decode(z_cuda).detach().cpu()
 
         else:
