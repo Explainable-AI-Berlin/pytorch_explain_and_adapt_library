@@ -1,4 +1,4 @@
-# python -W ignore run_explainer.py --config "<PEAL_BASE>/configs/explainers/square_pdc_new.yaml"
+# python -W ignore run_explainer.py --config "<PEAL_BASE>/configs/explainers/square_newpdc.yaml"
 explainer_type : PDC
 category: explainer
 gradient_steps: 300

@@ -88,9 +88,14 @@ def get_explanation(
                     batch, remove_below_threshold=False, explainer_path=base_path
                 )
             )
-            cfkd_counterfactual = torch.stack(
-                student_cfkd_counterfactual_explanation["x_counterfactual_list"]
-            ).cpu()
+            try:
+                cfkd_counterfactual = torch.stack(
+                    student_cfkd_counterfactual_explanation["x_counterfactual_list"]
+                ).cpu()
+
+            except Exception:
+                import pdb; pdb.set_trace()
+
             cfkd_heatmap = torch.stack(
                 student_cfkd_counterfactual_explanation["x_attribution_list"]
             ).cpu()
