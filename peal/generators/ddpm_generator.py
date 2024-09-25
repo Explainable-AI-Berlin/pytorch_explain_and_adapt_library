@@ -105,6 +105,7 @@ class DDPMConfig(GeneratorConfig):
     full_args: dict = {}
     x_selection: Union[list, type(None)] = None
     is_trained: bool = False
+    best_fid: float = 1e9
 
 
 def load_state_dict(path, **kwargs):
