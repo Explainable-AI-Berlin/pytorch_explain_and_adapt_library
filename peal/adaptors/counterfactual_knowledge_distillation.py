@@ -703,8 +703,6 @@ class CFKD(Adaptor):
                         self.adaptor_config.current_iteration,
                     )
 
-            self.adaptor_config.test_accuracies = [test_accuracy]
-
         else:
             with open(os.path.join(self.base_dir, "platform.txt"), "w") as f:
                 f.write(platform.node())
