@@ -6,7 +6,7 @@ input_type              : image
 input_size              : [3, 128, 128]
 output_type             : multiclass
 output_size             : [2]
-invariances             : [rotation, hflipping, vflipping, random_resize50, color_jitter, sharpness]
+invariances             : [rotation, hflipping, vflipping, random_resize50]
 confounding_factors     : [type, confounder]
 normalization           : [0.5,0.5]
 has_hints               : True

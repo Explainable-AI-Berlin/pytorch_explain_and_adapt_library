@@ -121,6 +121,10 @@ class PDCConfig(ExplainerConfig):
     """
     iterationwise_encoding: bool = True
     """
+    Whether to use stochastic counterfactual search or not.
+    """
+    is_stochastic: Union[type(None), bool] = None
+    """
     A dict containing all variables that could not be given with the current config structure
     """
     kwargs: dict = {}
@@ -466,11 +470,12 @@ class CounterfactualExplainer(ExplainerInterface):
             gradient_predictor = self.predictor
 
         x = torch.clone(x_in)
+        history = [x.detach().cpu()[idx].unsqueeze(0) for idx in range(x.shape[0])]
         x = self.predictor_datasets[1].project_to_pytorch_default(x)
         x = self.generator.dataset.project_from_pytorch_default(x)
         x = torchvision.transforms.Resize(self.generator.config.data.input_size[1:])(x)
         if not self.explainer_config.iterationwise_encoding:
-            z_original = self.generator.encode(x.to(self.device))
+            z_original = self.generator.encode(x.to(self.device), stochastic=False)
 
             if isinstance(z_original, list):
                 z = []
@@ -505,38 +510,44 @@ class CounterfactualExplainer(ExplainerInterface):
                 self.explainer_config.optimizer + " is not a valid optimizer!"
             )
 
-        x_adv = x.clone().detach()
-        history = [
-            x_adv.detach().cpu()[idx].unsqueeze(0) for idx in range(x_adv.shape[0])
-        ]
         mask = torch.ones(x.shape[0]).to(x)
+        gradient_confidences_old = torch.zeros(x.shape[0]).to(x)
 
         for i in range(self.explainer_config.gradient_steps):
             z_cuda = [z_elem.to(self.device) for z_elem in z]
             optimizer.zero_grad()
             if self.explainer_config.iterationwise_encoding:
                 z_cuda = self.generator.encode(
-                    z_cuda[0], t=self.explainer_config.sampling_time_fraction
+                    z_cuda[0], t=self.explainer_config.sampling_time_fraction, stochastic=True
+                )
+                z_default = self.generator.dataset.project_to_pytorch_default(z[0])
+                z_predictor = self.predictor_datasets[1].project_from_pytorch_default(z_default).to(self.device)
+                pred_original = torch.nn.functional.softmax(
+                    self.predictor(z_predictor)
                 )
 
-            img = self.generator.decode(
+            img_decoded = self.generator.decode(
                 z_cuda, t=self.explainer_config.sampling_time_fraction
             )
-            img = self.generator.dataset.project_to_pytorch_default(img)
-            img = torch.clamp(img, 0, 1)
-            img = torchvision.transforms.Resize(
+            img_default = self.generator.dataset.project_to_pytorch_default(img_decoded)
+            img_default = torch.clamp(img_default, 0, 1)
+            img_predictor = torchvision.transforms.Resize(
                 self.predictor_datasets[1].config.input_size[1:]
-            )(img)
-            img = self.predictor_datasets[1].project_from_pytorch_default(img)
-
-            pred_original = torch.nn.functional.softmax(
-                self.predictor(img.detach()), -1
+            )(img_default)
+            img_predictor = self.predictor_datasets[1].project_from_pytorch_default(
+                img_predictor
             )
+
+            if not self.explainer_config.iterationwise_encoding:
+                pred_original = torch.nn.functional.softmax(
+                    self.predictor(img_predictor.detach()), -1
+                )
+
             target_confidences = [
                 float(pred_original[i][y_target[i]]) for i in range(len(y_target))
             ]
 
-            for j in range(img.shape[0]):
+            for j in range(img_predictor.shape[0]):
                 if (
                     pred_original[j, int(y_target[j])]
                     > self.explainer_config.y_target_goal_confidence
@@ -545,23 +556,24 @@ class CounterfactualExplainer(ExplainerInterface):
 
             for idx in range(len(history)):
                 history[idx] = torch.cat(
-                    (history[idx], img[idx].detach().cpu().unsqueeze(0)), 0
+                    (history[idx], img_predictor[idx].detach().cpu().unsqueeze(0)), 0
                 )
 
             if mask.sum() == 0:
                 break
 
-            logits_perturbed = gradient_predictor(
-                img + self.explainer_config.img_noise_injection * torch.randn_like(img)
+            logits_gradient = gradient_predictor(
+                img_predictor
+                + self.explainer_config.img_noise_injection
+                * torch.randn_like(img_predictor)
             )
-            loss = self.loss(logits_perturbed, y_target.to(self.device))
+            loss = self.loss(logits_gradient, y_target.to(self.device))
             l1_losses = []
-            for i in range(len(z_original)):
+            for z_idx in range(len(z_original)):
                 l1_losses.append(
                     torch.mean(
                         torch.abs(
-                            z[i].to(self.device)
-                            - torch.clone(z_original[i]).detach()
+                            z[z_idx].to(self.device) - torch.clone(z_original[z_idx]).detach()
                         )
                     )
                 )
@@ -573,8 +585,10 @@ class CounterfactualExplainer(ExplainerInterface):
                     + f"it: {i}"
                     + f"/{self.explainer_config.gradient_steps}"
                     + f", loss: {loss.detach().item():.2E}"
-                    + f", target_confidence: {target_confidences[0]:.2E}"
-                    + f", visual_difference: {torch.mean(torch.abs(x_in - img.detach().cpu())).item():.2E}"
+                    + f", target_confidence: [{target_confidences[0]:.2E}, {target_confidences[-1]:.2E}]"
+                    + f", gradient_confidence: [{gradient_confidences_old[0]:.2E}, {gradient_confidences_old[-1]:.2E}]"
+                    + f", visual_difference:"
+                    + f"{torch.mean(torch.abs(x_in - img_predictor.detach().cpu())).item():.2E}"
                     + ", ".join(
                         [
                             key + ": " + str(pbar.stored_values[key])
@@ -597,13 +611,33 @@ class CounterfactualExplainer(ExplainerInterface):
 
                             v_elem.grad[sample_idx].data.zero_()
 
+            if self.explainer_config.iterationwise_encoding:
+                z_old = torch.clone(z[0])
+
             optimizer.step()
+            if self.explainer_config.iterationwise_encoding:
+                z_default = self.generator.dataset.project_to_pytorch_default(z[0])
+                z_predictor = self.predictor_datasets[1].project_from_pytorch_default(z_default).to(self.device)
+                pred_new = torch.nn.functional.softmax(
+                    self.predictor(z_predictor)
+                )
+                for j in range(gradient_confidences_old.shape[0]):
+                    if (
+                        pred_new[j, int(y_target[j])]
+                        >= gradient_confidences_old[j]
+                    ):
+                        gradient_confidences_old[j] = pred_new[j, int(y_target[j])]
+
+                    else:
+                        z[0].data[j] = z_old[j]
+
+            # torchvision.utils.save_image(torch.cat([x_in, img_default.detach().cpu()]), fp="b.png", nrow=x_in.shape[0])
+            # torchvision.utils.save_image(torch.cat([x_in, torch.ones_like(x_in), z_cuda.detach().cpu(), torch.ones_like(x_in), img_default.detach().cpu()]), fp="a.png", nrow=x_in.shape[0])
+            #import pdb
+            #pdb.set_trace()
 
         if not self.explainer_config.iterationwise_encoding:
             z_cuda = [z_elem.to(self.device) for z_elem in z]
-            z_cuda = self.generator.encode(
-                z_cuda[0], t=self.explainer_config.sampling_time_fraction
-            )
             counterfactual = self.generator.decode(z_cuda).detach().cpu()
 
         else:
@@ -634,176 +668,7 @@ class CounterfactualExplainer(ExplainerInterface):
 
         attributions = torch.cat(attributions, 1)
 
-        return counterfactual, attributions, target_confidences
-
-    def gradient_based_counterfactual(
-        self, x_in, target_confidence_goal, y_target, pbar=None, mode=""
-    ):
-        """
-        This function generates a counterfactual for a given batch of inputs.
-
-        Args:
-            batch (_type_): _description_
-
-        Returns:
-            _type_: _description_
-        """
-        x = torch.clone(x_in)
-        x = self.predictor_datasets[1].project_to_pytorch_default(x)
-        x = self.generator.dataset.project_from_pytorch_default(x)
-        x = torchvision.transforms.Resize(self.generator.config.data.input_size[1:])(x)
-        v_original = self.generator.encode(x.to(self.device))
-        if isinstance(v_original, list):
-            v = []
-
-            for v_org in v_original:
-                v.append(
-                    nn.Parameter(torch.clone(v_org.detach().cpu()), requires_grad=True)
-                )
-
-        else:
-            v = nn.Parameter(torch.clone(v_original.detach().cpu()), requires_grad=True)
-            v = [v]
-
-        if self.explainer_config.optimizer == "Adam":
-            optimizer = torch.optim.Adam(v, lr=self.explainer_config.learning_rate)
-
-        elif self.explainer_config.optimizer == "SGD":
-            optimizer = torch.optim.SGD(v, lr=self.explainer_config.learning_rate)
-
-        target_confidences = [0.0 for i in range(len(y_target))]
-
-        for i in range(self.explainer_config.gradient_steps):
-            if self.explainer_config.use_masking:
-                mask = (
-                    torch.tensor(target_confidences).to(self.device)
-                    < target_confidence_goal
-                )
-                if torch.sum(mask) == 0.0:
-                    break
-
-            latent_code = [v_elem.to(self.device) for v_elem in v]
-
-            optimizer.zero_grad()
-            img = self.generator.decode(latent_code)
-
-            img = self.generator.dataset.project_to_pytorch_default(img)
-            img = torchvision.transforms.Resize(
-                self.predictor_datasets[1].config.input_size[1:]
-            )(img)
-            img = self.predictor_datasets[1].project_from_pytorch_default(img)
-
-            logits_perturbed = self.predictor(
-                img + self.explainer_config.img_noise_injection * torch.randn_like(img)
-            )
-            loss = self.loss(logits_perturbed, y_target.to(self.device))
-            l1_losses = []
-            for v_idx in range(len(v_original)):
-                l1_losses.append(
-                    torch.mean(
-                        torch.abs(
-                            v[v_idx].to(self.device)
-                            - torch.clone(v_original[v_idx]).detach()
-                        )
-                    )
-                )
-
-            loss += self.explainer_config.dist_l1 * torch.mean(torch.stack(l1_losses))
-            """loss += self.explainer_config.log_prob_regularization * torch.mean(
-                self.generator.log_prob_z(latent_code)
-            )"""
-            logit_confidences = (
-                torch.nn.Softmax(dim=-1)(logits_perturbed).detach().cpu()
-            )
-            target_confidences = [
-                float(logit_confidences[i][y_target[i]]) for i in range(len(y_target))
-            ]
-            if not pbar is None:
-                pbar.set_description(
-                    f"Creating {mode} Counterfactuals:"
-                    + f"it: {i}"
-                    + f"/{self.explainer_config.gradient_steps}"
-                    + f", loss: {loss.detach().item():.2E}"
-                    + f", target_confidence: {target_confidences[0]:.2E}"
-                    + f", visual_difference: {torch.mean(torch.abs(x_in - img.detach().cpu())).item():.2E}"
-                    + ", ".join(
-                        [
-                            key + ": " + str(pbar.stored_values[key])
-                            for key in pbar.stored_values
-                        ]
-                    )
-                )
-                pbar.update(1)
-
-            loss.backward()
-
-            if self.explainer_config.use_masking:
-                for sample_idx in range(len(target_confidences)):
-                    if target_confidences[sample_idx] >= target_confidence_goal:
-                        for variable_idx, v_elem in enumerate(v):
-                            if self.explainer_config.optimizer == "Adam":
-                                optimizer = torch.optim.Adam(
-                                    v, lr=self.explainer_config.learning_rate
-                                )
-
-                            v_elem.grad[sample_idx].data.zero_()
-
-            optimizer.step()
-
-        latent_code = [v_elem.to(self.device) for v_elem in v]
-        counterfactual = self.generator.decode(latent_code).detach().cpu()
-        counterfactual = self.generator.dataset.project_to_pytorch_default(
-            counterfactual
-        )
-        counterfactual = torchvision.transforms.Resize(
-            self.predictor_datasets[1].config.input_size[1:]
-        )(counterfactual)
-        counterfactual = self.predictor_datasets[1].project_from_pytorch_default(
-            counterfactual
-        )
-        logits = self.predictor(counterfactual.to(self.device))
-        logit_confidences = torch.nn.Softmax(dim=-1)(logits).detach().cpu()
-        target_confidences = [
-            float(logit_confidences[i][y_target[i]]) for i in range(len(y_target))
-        ]
-
-        attributions = []
-        for v_idx in range(len(v_original)):
-            attributions.append(
-                torch.flatten(
-                    v_original[v_idx].detach().cpu() - v[v_idx].detach().cpu(), 1
-                )
-            )
-
-        attributions = torch.cat(attributions, 1)
-
-        return counterfactual, attributions, target_confidences
-
-    def perfect_false_counterfactuals(self, x_in, y_target, idx_list, mode):
-        """
-        This function generates a counterfactual for a given batch of inputs.
-
-        Args:
-            batch (_type_): _description_
-
-        Returns:
-            _type_: _description_
-        """
-        x_counterfactual_list = []
-        z_difference_list = []
-        y_target_end_confidence_list = []
-        for i, idx in enumerate(idx_list):
-            x_counterfactual = self.inverse_datasets[mode][idx][0]
-            x_counterfactual_list.append(x_counterfactual)
-            preds = torch.nn.Softmax()(
-                self.predictor(x_counterfactual.unsqueeze(0).to(self.device))
-                .detach()
-                .cpu()
-            )
-            y_target_end_confidence_list.append(preds[0][y_target[i]])
-            z_difference_list.append(x_in[i] - x_counterfactual)
-
-        return x_counterfactual_list, z_difference_list, y_target_end_confidence_list
+        return list(counterfactual), list(attributions), list(target_confidences)
 
     def explain_batch(
         self,

@@ -6,3 +6,4 @@ base_path: '$PEAL_RUNS/follicles_cut/glow'
 img_size: 128
 lr: 1e-6
 n_block: 5
+x_selection  : ["imgs_cut"]

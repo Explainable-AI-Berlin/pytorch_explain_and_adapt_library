@@ -703,14 +703,6 @@ class CFKD(Adaptor):
                         self.adaptor_config.current_iteration,
                     )
 
-            if self.output_size == 2 and self.adaptor_config.use_visualization:
-                print("visualize progress!!!")
-                self.visualize_progress(
-                    [os.path.join(self.base_dir, "visualization.png")]
-                )
-
-            self.adaptor_config.test_accuracies = [test_accuracy]
-
         else:
             with open(os.path.join(self.base_dir, "platform.txt"), "w") as f:
                 f.write(platform.node())
@@ -750,6 +742,15 @@ class CFKD(Adaptor):
                     map_location=self.device,
                 )
                 self.explainer.predictor = self.student
+
+        visualization_path = os.path.join(self.base_dir, "visualization.png")
+        if (
+            self.output_size == 2
+            and self.adaptor_config.use_visualization
+            and not os.path.exists(visualization_path)
+        ):
+            print("visualize progress!!!")
+            self.visualize_progress([visualization_path])
 
         return validation_stats, writer
 
@@ -1001,6 +1002,8 @@ class CFKD(Adaptor):
         collage_path_list = os.listdir(
             os.path.join(self.base_dir, str(finetune_iteration), "collages")
         )
+        collage_path_list.sort()
+        collage_path_list = list(filter(lambda x: x[-4:] == ".png", collage_path_list))
         tracked_values["collage_path_list"] = list(
             map(
                 lambda x: os.path.join(
@@ -1662,7 +1665,10 @@ class CFKD(Adaptor):
             idx = 0
             collage_path_list = []
             while os.path.exists(get_collage_path(idx)):
-                collage_path_list.extend(os.listdir(get_collage_path(idx)))
+                collage_paths = os.listdir(get_collage_path(idx))
+                collage_paths.sort()
+                collage_paths = list(filter(lambda x: x[-4:] == ".png", collage_paths))
+                collage_path_list.extend(collage_paths)
                 idx += 1
                 # TODO this is a bug, but currently not used
                 if idx == 1:
@@ -1843,12 +1849,17 @@ class CFKD(Adaptor):
 
             self.feedback_accuracy = validation_stats["feedback_accuracy"]
 
-            if self.output_size == 2 and self.adaptor_config.use_visualization:
+            visualization_path = os.path.join(
+                self.base_dir, str(finetune_iteration), "visualization.png"
+            )
+            if (
+                self.output_size == 2
+                and self.adaptor_config.use_visualization
+                and not os.path.exists(visualization_path)
+            ):
                 self.visualize_progress(
                     [
-                        os.path.join(
-                            self.base_dir, str(finetune_iteration), "visualization.png"
-                        ),
+                        visualization_path,
                         os.path.join(self.base_dir, "visualization.png"),
                     ]
                 )

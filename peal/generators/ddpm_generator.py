@@ -105,6 +105,8 @@ class DDPMConfig(GeneratorConfig):
     full_args: dict = {}
     x_selection: Union[list, type(None)] = None
     is_trained: bool = False
+    best_fid: float = 1e9
+    is_loaded: bool = False
 
 
 def load_state_dict(path, **kwargs):
@@ -151,7 +153,7 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         self.device = device
         self.model.to(device)
         self.model_path = os.path.join(self.model_dir, "final.pt")
-        if os.path.exists(self.model_path):
+        if os.path.exists(self.model_path) and self.config.is_trained:
             print('load model!!!')
             self.model.load_state_dict(
                 load_state_dict(self.model_path, map_location=device)
@@ -159,7 +161,13 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
 
         else:
             print('No model weights yet!!!')
+            if os.path.exists(self.model_dir):
+                import pdb; pdb.set_trace()
+                shutil.move(self.model_dir, self.model_dir + "_old" + datetime.now().strftime("%Y%m%d_%H%M%S"))
 
+            Path(self.model_dir).mkdir(parents=True, exist_ok=True)
+
+        self.config.is_trained = True
         self.noise_fn = torch.randn_like if self.config.stochastic else torch.zeros_like
 
     def sample_x(self, batch_size=1, renormalize=True):
@@ -171,7 +179,10 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
 
         return sample
 
-    def encode(self, x, t=1.0):
+    def encode(self, x, t=1.0, stochastic=None, num_steps=None):
+        if stochastic is None:
+            stochastic = self.config.stochastic
+
         respaced_steps = int(t * int(self.config.timestep_respacing))
         timesteps = list(range(respaced_steps))[::-1]
         def local_forward(x, t, idx, noise, steps, diffusion, model):
@@ -193,7 +204,7 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
             if hasattr(self, "fix_noise") and self.fix_noise:
                 noise = self.noise[idx + 1, ...].unsqueeze(dim=0)
 
-            elif self.config.stochastic:
+            elif stochastic:
                 noise = torch.randn_like(x)
 
             else:
@@ -205,7 +216,10 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         #t = torch.tensor([self.steps - 1] * x.size(0), device=x.device)
         return x
 
-    def decode(self, z, t=1.0):
+    def decode(self, z, t=1.0, stochastic=None, num_steps=None):
+        if stochastic is None:
+            stochastic = self.config.stochastic
+
         # TODO test decode function via sampling function
         respaced_steps = int(t * int(self.config.timestep_respacing))
         timesteps = list(range(respaced_steps))[::-1]
