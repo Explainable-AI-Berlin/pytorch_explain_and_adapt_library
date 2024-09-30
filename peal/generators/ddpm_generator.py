@@ -153,7 +153,7 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         self.device = device
         self.model.to(device)
         self.model_path = os.path.join(self.model_dir, "final.pt")
-        if os.path.exists(self.model_path) and self.config.is_loaded:
+        if os.path.exists(self.model_path) and self.config.is_trained:
             print('load model!!!')
             self.model.load_state_dict(
                 load_state_dict(self.model_path, map_location=device)
@@ -167,7 +167,7 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
 
             Path(self.model_dir).mkdir(parents=True, exist_ok=True)
 
-        self.config.is_loaded = True
+        self.config.is_trained = True
         self.noise_fn = torch.randn_like if self.config.stochastic else torch.zeros_like
 
     def sample_x(self, batch_size=1, renormalize=True):

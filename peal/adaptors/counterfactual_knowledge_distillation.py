@@ -1002,6 +1002,8 @@ class CFKD(Adaptor):
         collage_path_list = os.listdir(
             os.path.join(self.base_dir, str(finetune_iteration), "collages")
         )
+        collage_path_list.sort()
+        collage_path_list = list(filter(lambda x: x[-4:] == ".png", collage_path_list))
         tracked_values["collage_path_list"] = list(
             map(
                 lambda x: os.path.join(
@@ -1663,7 +1665,10 @@ class CFKD(Adaptor):
             idx = 0
             collage_path_list = []
             while os.path.exists(get_collage_path(idx)):
-                collage_path_list.extend(os.listdir(get_collage_path(idx)))
+                collage_paths = os.listdir(get_collage_path(idx))
+                collage_paths.sort()
+                collage_paths = list(filter(lambda x: x[-4:] == ".png", collage_paths))
+                collage_path_list.extend(collage_paths)
                 idx += 1
                 # TODO this is a bug, but currently not used
                 if idx == 1:
