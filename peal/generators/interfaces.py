@@ -20,6 +20,10 @@ class GeneratorConfig(BaseModel):
     """
     category: str = 'generator'
     """
+    The batch size of the generator.
+    """
+    batch_size: int = 1
+    """
     The name of the class.
     """
     current_fid: float = float('inf')

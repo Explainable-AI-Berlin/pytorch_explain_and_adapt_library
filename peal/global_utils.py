@@ -1,9 +1,12 @@
 # This whole file contains all the stuff, that is written too bad and had no clear position where it should be located in the project!
+import copy
 from pathlib import Path
 
 import numpy as np
 import sys
 import types
+
+import pandas as pd
 import torch
 import os
 import yaml
@@ -19,6 +22,8 @@ from pkg_resources import resource_filename
 
 
 import matplotlib.pyplot as plt
+from tqdm import tqdm
+
 
 def dict_to_bar_chart(input_dict, name):
   """
@@ -364,3 +369,71 @@ def reset_weights(model):
 
         else:
             parameter.data = torch.zeros_like(parameter.data)
+
+
+def replace_relu_with_leakyrelu(model, negative_slope=0.1):
+    for child_name, child in model.named_children():
+        if isinstance(child, torch.nn.ReLU):
+            setattr(model, child_name, torch.nn.LeakyReLU(negative_slope=negative_slope))
+        else:
+            replace_relu_with_leakyrelu(child, negative_slope)
+
+    return model
+
+
+def get_predictions(args):
+    torch.set_grad_enabled(False)
+
+    device = torch.device("cuda:0")
+    os.makedirs("utils", exist_ok=True)
+
+    dataset = args.dataset
+
+    loader = torch.utils.data.DataLoader(
+        dataset, batch_size=args.batch_size, num_workers=5, shuffle=False
+    )
+
+    classifier = args.classifier
+
+    d = {"idx": [], "prediction": []}
+    n = 0
+    acc = 0
+
+    for idx, sample in enumerate(tqdm.tqdm(loader)):
+        if not args.max_samples is None and idx > args.max_samples:
+            break
+
+        if len(sample) == 3:
+            img, lab, img_file = sample
+
+        else:
+            img, y = sample
+            if len(y) == 2:
+                (lab, img_file) = y
+
+            elif len(y) == 3:
+                (lab, hint, img_file) = y
+
+        img = img.to(device)
+        lab = lab.to(device)
+        logits = classifier(img)
+        if len(logits.shape) > 1:
+            pred = logits.argmax(dim=1)
+
+        else:
+            pred = (logits > 0).int()
+
+        acc += (pred == lab).float().sum().item()
+        n += lab.size(0)
+
+        d["prediction"] += [p.item() for p in pred]
+        d["idx"] += list(img_file)
+
+    print(acc / n)
+    df = pd.DataFrame(data=d)
+    df.to_csv(
+        args.label_path,
+        index=False,
+    )
+
+    torch.set_grad_enabled(True)

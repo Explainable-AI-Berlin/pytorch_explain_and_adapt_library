@@ -35,7 +35,7 @@ from peal.generators.interfaces import (
 from peal.data.interfaces import PealDataset
 from peal.explainers.interfaces import ExplainerInterface, ExplainerConfig
 from peal.teachers.human2model_teacher import DataStore
-from peal.training.trainers import PredictorConfig, ModelTrainer
+from peal.training.trainers import PredictorConfig, ModelTrainer, distill_predictor
 
 
 class PDCConfig(ExplainerConfig):
@@ -373,64 +373,6 @@ class CounterfactualExplainer(ExplainerInterface):
                 inverse_test_config.dataset_path += "_inverse"
                 self.inverse_datasets["test"] = get_datasets(inverse_test_config)[-1]
 
-    def distill_predictor(
-        self, explainer_config, base_path, predictor, predictor_datasets
-    ):
-        distillation_datasets = []
-        for i in range(2):
-            class_predictions_path = os.path.join(
-                base_path, "explainer", str(i) + "predictions.csv"
-            )
-            Path(os.path.join(base_path, "explainer")).mkdir(
-                exist_ok=True, parents=True
-            )
-            if not os.path.exists(class_predictions_path):
-                predictor_datasets[i].enable_url()
-                prediction_args = types.SimpleNamespace(
-                    batch_size=32,
-                    dataset=predictor_datasets[i],
-                    classifier=predictor,
-                    label_path=class_predictions_path,
-                    partition="train",
-                    label_query=0,
-                    max_samples=explainer_config.max_samples,
-                )
-                get_predictions(prediction_args)
-                predictor_datasets[i].disable_url()
-
-            distilled_dataset_config = copy.deepcopy(predictor_datasets[i].config)
-            distilled_dataset_config.split = [1.0, 1.0] if i == 0 else [0.0, 1.0]
-            distilled_dataset_config.img_name_idx = 0
-            distilled_dataset_config.confounding_factors = None
-            distilled_dataset_config.confounder_probability = None
-            distilled_dataset_config.dataset_class = None
-            distillation_datasets.append(
-                get_datasets(
-                    config=distilled_dataset_config, data_dir=class_predictions_path
-                )[i]
-            )
-            distilled_predictor_config = load_yaml_config(
-                explainer_config.distilled_predictor, PredictorConfig
-            )
-            distilled_predictor_config.data = distilled_dataset_config
-            explainer_config.distilled_predictor = distilled_predictor_config
-            distillation_datasets[i].task_config = (
-                explainer_config.distilled_predictor.task
-            )
-            distillation_datasets[i].task_config.x_selection = predictor_datasets[
-                i
-            ].task_config.x_selection
-
-        predictor_distilled = copy.deepcopy(predictor)
-        distillation_trainer = ModelTrainer(
-            config=explainer_config.distilled_predictor,
-            model=predictor_distilled,
-            datasource=distillation_datasets,
-            model_path=os.path.join(base_path, "explainer", "distilled_predictor"),
-        )
-        distillation_trainer.fit()
-        return predictor_distilled
-
     def predictor_distilled_counterfactual(
         self, x_in, target_confidence_goal, y_target, pbar=None, mode="", base_path=None
     ):
@@ -454,7 +396,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 "model.cpl",
             )
             if not os.path.exists(distilled_path):
-                gradient_predictor = self.distill_predictor(
+                gradient_predictor = distill_predictor(
                     self.explainer_config,
                     base_path,
                     self.predictor,

@@ -453,7 +453,7 @@ class ImageDataset(PealDataset):
         """
         if batch_size is None:
             if hasattr(generator, "config"):
-                batch_size = generator.config.training.val_batch_size
+                batch_size = generator.config.batch_size
 
             else:
                 batch_size = 1

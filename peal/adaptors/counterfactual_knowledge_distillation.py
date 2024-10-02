@@ -660,23 +660,25 @@ class CFKD(Adaptor):
                 isinstance(self.val_dataloader.dataset, ImageDataset)
                 and self.adaptor_config.use_visualization
             ):
-                generator_sample = self.generator.sample_x(
-                    batch_size=self.adaptor_config.batch_size
-                )
+                generator_sample = self.generator.sample_x()
                 if not generator_sample is None:
                     torchvision.utils.save_image(
                         generator_sample,
                         os.path.join(self.base_dir, "generator_sample.png"),
                         normalize=True,
+                        nrow=int(np.sqrt(generator_sample.shape[0])),
                     )
 
                     # TODO move this back!!!
                     generator_performance = (
                         self.val_dataloader.dataset.track_generator_performance(
-                            self.generator, batch_size=self.adaptor_config.batch_size
+                            generator_sample
                         )
                     )
                     print("Generator performance: " + str(generator_performance))
+                    writer.add_scalar(
+                        "generator_fid", generator_performance['fid'], self.adaptor_config.current_iteration
+                    )
                     self.adaptor_config.generator_performance = generator_performance
 
         else:
