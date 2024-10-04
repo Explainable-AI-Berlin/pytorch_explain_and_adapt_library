@@ -399,7 +399,7 @@ def get_predictions(args):
     n = 0
     acc = 0
 
-    for idx, sample in enumerate(tqdm.tqdm(loader)):
+    for idx, sample in enumerate(tqdm(loader)):
         if not args.max_samples is None and idx > args.max_samples:
             break
 

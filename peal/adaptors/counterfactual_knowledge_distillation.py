@@ -648,18 +648,28 @@ class CFKD(Adaptor):
                 print("group_distribution: " + str(group_distribution))
                 print("group_numbers: " + str(groups))
                 print("worst_group_accuracy: " + str(worst_group_accuracy))
+                avg_group_accuracy = np.mean(group_accuracies)
+                print("avg_group_accuracy: " + str(avg_group_accuracy))
+                writer.add_scalar(
+                    "test_avg_group_accuracy",
+                    avg_group_accuracy,
+                    self.adaptor_config.current_iteration,
+                )
 
             writer.add_scalar(
                 "test_accuracy", test_accuracy, self.adaptor_config.current_iteration
             )
+            print("log sample batches!")
             log_images_to_writer(self.train_dataloader, writer, "train0")
             log_images_to_writer(self.val_dataloader, writer, "validation0")
             log_images_to_writer(self.test_dataloader, writer, "test")
+            print("log sample batches done!")
 
             if (
                 isinstance(self.val_dataloader.dataset, ImageDataset)
                 and self.adaptor_config.use_visualization
             ):
+                print("visualized sample!!!")
                 generator_sample = self.generator.sample_x()
                 if not generator_sample is None:
                     torchvision.utils.save_image(
@@ -677,7 +687,9 @@ class CFKD(Adaptor):
                     )
                     print("Generator performance: " + str(generator_performance))
                     writer.add_scalar(
-                        "generator_fid", generator_performance['fid'], self.adaptor_config.current_iteration
+                        "generator_fid",
+                        generator_performance["fid"],
+                        self.adaptor_config.current_iteration,
                     )
                     self.adaptor_config.generator_performance = generator_performance
 
@@ -696,6 +708,7 @@ class CFKD(Adaptor):
             with open(os.path.join(self.base_dir, "platform.txt"), "w") as f:
                 f.write(platform.node())
 
+            print("start retrieving validation stats!!!")
             validation_stats = self.retrieve_validation_stats(finetune_iteration=0)
             for key in validation_stats.keys():
                 if isinstance(validation_stats[key], float):
@@ -1460,6 +1473,7 @@ class CFKD(Adaptor):
         if not self.overwrite and os.path.exists(
             os.path.join(self.base_dir, str(finetune_iteration), "validation_stats.npz")
         ):
+            print('load already completed validation stats!!!')
             with open(
                 os.path.join(
                     self.base_dir, str(finetune_iteration), "validation_stats.npz"
@@ -1477,6 +1491,7 @@ class CFKD(Adaptor):
             self.base_dir, str(finetune_iteration), "validation_tracked_values.npz"
         )
         if self.overwrite or not os.path.exists(validation_values_path):
+            print('calculate validation tracked values from scratch!!!')
             x_list_collection = []
             x_counterfactual_collection = []
             y_confidence_list = []
@@ -1526,7 +1541,8 @@ class CFKD(Adaptor):
                     max_validation_samples=self.adaptor_config.max_validation_samples,
                     min_start_target_percentile=self.adaptor_config.min_start_target_percentile,
                 )
-                # torch.nn.functional.softmax(self.student(validation_tracked_values_current['x_counterfactual_list'][i]
+                # torch.nn.functional.softmax(
+                # self.student(validation_tracked_values_current['x_counterfactual_list'][i]
                 # .unsqueeze(0).to('cuda')).squeeze(0))[validation_tracked_values_current['y_target_list'][i]]
                 if validation_tracked_values is None:
                     validation_tracked_values = validation_tracked_values_current
@@ -1635,6 +1651,7 @@ class CFKD(Adaptor):
         else:
             # TODO think about this again
             if self.adaptor_config.tracking_level > 0:
+                print('load validation tracked values!!!')
                 with open(
                     validation_values_path,
                     "rb",
@@ -1646,6 +1663,7 @@ class CFKD(Adaptor):
                             torch.tensor(validation_tracked_value_file[key])
                         )
 
+                print('load validation prestats!!!')
                 with open(
                     os.path.join(
                         self.base_dir,
@@ -1661,6 +1679,7 @@ class CFKD(Adaptor):
                             validation_tracked_file[key]
                         )
 
+            print('recreate validation collage path!')
             get_collage_path = lambda x: os.path.join(
                 self.base_dir, str(finetune_iteration), "validation_collages" + str(x)
             )
@@ -1834,9 +1853,15 @@ class CFKD(Adaptor):
                 print("group_distribution: " + str(group_distribution))
                 print("group_sizes: " + str(groups))
                 print("worst_group_accuracy: " + str(worst_group_accuracy))
+                avg_group_accuracy = np.mean(group_accuracies)
+                print("avg_group_accuracy: " + str(avg_group_accuracy))
+                writer.add_scalar(
+                    "test_avg_group_accuracy", avg_group_accuracy, finetune_iteration
+                )
 
             writer.add_scalar("test_accuracy", test_accuracy, finetune_iteration)
             print("test_accuracy: " + str(test_accuracy))
+            print('Start to retrieve validation stats')
             validation_stats = self.retrieve_validation_stats(
                 finetune_iteration=finetune_iteration
             )

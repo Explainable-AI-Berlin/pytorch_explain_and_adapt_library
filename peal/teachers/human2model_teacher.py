@@ -93,6 +93,7 @@ class Human2ModelTeacher(TeacherInterface):
 
     def get_feedback(self, collage_path_list, base_dir, **kwargs):
         """ """
+        print('start collecting feedback!!!')
         collage_paths_static = []
         for path in collage_path_list:
             collage_path_static = os.path.join("static", path.split("/")[-1])
