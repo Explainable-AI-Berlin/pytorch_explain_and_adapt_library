@@ -23,3 +23,4 @@ peal/dependencies/ace/outputs
 environment.yaml
 
 !peal/dependencies/dive/src/datasets
+peal/dependencies/rrclarc/data

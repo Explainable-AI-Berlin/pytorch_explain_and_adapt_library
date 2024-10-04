@@ -1,0 +1,26 @@
+artifact: blonde_collar
+artifacts_file: data/artifacts_celeba.json
+batch_size: 64
+cav_type: cavs_max
+ckpt_path: checkpoints/checkpoint_efficientnet_b0_last_celeba.pth
+ckpt_path_corrected: checkpoints/efficientnet_b0_AClarc_ridge_adam_lr0.0001_lamb1.0_blonde_collar_last_conv/last.ckpt
+compute: l2_mean
+criterion: allrand
+data_paths:
+- celeba_dir
+dataset_name: celeba_biased
+device: cuda
+direction_mode: ridge
+eval_acc_every_epoch: false
+img_size: 224
+lamb: 1.0
+layer_name: last_conv
+loss: cross_entropy
+lr: 0.0001
+method: AClarc
+model_name: efficientnet_b0
+num_epochs: 1
+optimizer: adam
+unique_wandb_ids: true
+wandb_api_key: your_api_key
+wandb_project_name: your_project_name
