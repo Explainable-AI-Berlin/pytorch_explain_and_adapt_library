@@ -364,19 +364,31 @@ def reset_weights(model):
     Resets all weights in the model recursively using reset_parameters
     """
     for parameter_idx, parameter in enumerate(model.parameters()):
-        if len(parameter.shape) == 2:
-            parameter.data = torch.nn.init.xavier_uniform_(parameter)
+        if len(parameter.shape) >= 2:
+            #parameter.data = torch.nn.init.xavier_uniform_(parameter)
+            parameter.data = torch.randn_like(parameter.data)
 
         else:
             parameter.data = torch.zeros_like(parameter.data)
 
 
-def replace_relu_with_leakyrelu(model, negative_slope=0.1):
+class LeakySoftplus(torch.nn.Module):
+    def __init__(self):
+        super(LeakySoftplus, self).__init__()
+        self.leaky_relu = torch.nn.LeakyReLU(negative_slope=0.1)
+        self.softplus = torch.nn.Softplus(beta=10.0)
+
+    def forward(self, x):
+        return 0.5 * (self.leaky_relu(x) + self.softplus(x))
+
+
+def replace_relu_with_leakysoftplus(model):
     for child_name, child in model.named_children():
         if isinstance(child, torch.nn.ReLU):
-            setattr(model, child_name, torch.nn.LeakyReLU(negative_slope=negative_slope))
+            setattr(model, child_name, LeakySoftplus())
+
         else:
-            replace_relu_with_leakyrelu(child, negative_slope)
+            replace_relu_with_leakysoftplus(child)
 
     return model
 

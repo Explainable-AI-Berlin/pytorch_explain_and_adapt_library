@@ -19,7 +19,7 @@ from typing import Union
 
 from peal.global_utils import (
     load_yaml_config,
-    save_yaml_config,
+    save_yaml_config, reset_weights,
 )
 from peal.training.loggers import log_images_to_writer
 from peal.data.dataloaders import (
@@ -187,6 +187,10 @@ class CFKDConfig(AdaptorConfig):
     """
     tracking_level: int = 0
     """
+    How aggressively to change the model based on the counterfactual samples. 0 -> No change, 1 -> Full change
+    """
+    mixing_ratio: float = 0.5
+    """
     What level of tracking is used.
     """
     counterfactual_type: str = "1sided"
@@ -230,6 +234,7 @@ class CFKDConfig(AdaptorConfig):
         tracking_level: int = None,
         counterfactual_type: str = None,
         max_test_batches: Union[type(None), PositiveInt] = None,
+        mixing_ratio: float = None,
         **kwargs,
     ):
         """
@@ -381,6 +386,9 @@ class CFKDConfig(AdaptorConfig):
         )
         self.tracking_level = (
             tracking_level if not tracking_level is None else self.tracking_level
+        )
+        self.mixing_ratio = (
+            mixing_ratio if not mixing_ratio is None else self.mixing_ratio
         )
         self.counterfactual_type = (
             counterfactual_type
@@ -746,7 +754,7 @@ class CFKD(Adaptor):
                 self.dataloader_mixer = self.add_dataset_to_dataloader_mixer(
                     dataloader_old=self.dataloader_mixer,
                     dataset_path=dataset_dir,
-                    mixing_ratio=0.5,
+                    mixing_ratio=self.adaptor_config.mixing_ratio,
                     writer=writer,
                     finetune_iteration=i,
                 )
@@ -1208,7 +1216,8 @@ class CFKD(Adaptor):
         )
         log_images_to_writer(dataloader, writer, "train_" + str(finetune_iteration))
         dataloader = DataloaderMixer(self.adaptor_config.training, dataloader)
-        dataloader.append(dataloader_old, mixing_ratio=1 - mixing_ratio)
+        # mixing ratio has to be flipped because in fact the old dataloader is the one appended
+        dataloader.append(dataloader_old, weight_added_dataloader=1 - mixing_ratio)
         dataloader.return_src = True
         return dataloader
 
@@ -1227,8 +1236,8 @@ class CFKD(Adaptor):
         )
 
         #
-        mixing_ratio = min(0.5, 1 - self.feedback_accuracy)
-        writer.add_scalar("mixing_ratio", mixing_ratio, finetune_iteration)
+        """mixing_ratio = min(0.5, 1 - self.feedback_accuracy)
+        writer.add_scalar("mixing_ratio", mixing_ratio, finetune_iteration)"""
         if not hasattr(self, "dataloader_mixer"):
             self.dataloader_mixer = DataloaderMixer(
                 self.adaptor_config.training, self.train_dataloader
@@ -1237,7 +1246,7 @@ class CFKD(Adaptor):
         self.dataloader_mixer = self.add_dataset_to_dataloader_mixer(
             dataloader_old=self.dataloader_mixer,
             dataset_path=dataset_path,
-            mixing_ratio=mixing_ratio,
+            mixing_ratio=self.adaptor_config.mixing_ratio,
             writer=writer,
             finetune_iteration=finetune_iteration,
         )
@@ -1283,13 +1292,17 @@ class CFKD(Adaptor):
             ).mkdir(parents=True, exist_ok=True)
 
             if self.adaptor_config.continuous_learning == "retrain":
+                print("reset student weights!!!")
+                print("reset student weights!!!")
+                print("reset student weights!!!")
 
-                def weight_reset(m):
+                """def weight_reset(m):
                     reset_parameters = getattr(m, "reset_parameters", None)
                     if callable(reset_parameters):
                         m.reset_parameters()
 
-                self.student.apply(weight_reset)
+                self.student.apply(weight_reset)"""
+                reset_weights(self.student)
 
             finetune_trainer = ModelTrainer(
                 config=copy.deepcopy(self.adaptor_config),
@@ -1299,8 +1312,8 @@ class CFKD(Adaptor):
                     self.base_dir, str(finetune_iteration), "finetuned_model"
                 ),
                 val_dataloader_weights=[
-                    1 - mixing_ratio,
-                    mixing_ratio,
+                    1 - self.adaptor_config.mixing_ratio,
+                    self.adaptor_config.mixing_ratio,
                 ],
                 only_last_layer=self.adaptor_config.continuous_learning
                 == "deep_feature_reweighting",

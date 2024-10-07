@@ -1,10 +1,12 @@
 import argparse
+import copy
+
 import torch
 import os
 
 from peal.architectures.predictors import TaskConfig
 from peal.data.datasets import DataConfig
-from peal.training.trainers import TrainingConfig
+from peal.training.trainers import TrainingConfig, ModelTrainer, PredictorConfig
 from peal.data.dataloaders import create_dataloaders_from_datasource
 from peal.global_utils import load_yaml_config
 from peal.training.trainers import calculate_test_accuracy
@@ -19,7 +21,7 @@ def main():
     args = parser.parse_args()
 
     # TODO this can't be done properly before bug is fixed...
-    model_config = load_yaml_config(args.model_config) #, ModelConfig)
+    model_config = load_yaml_config(args.model_config)
     if not isinstance(model_config.data, DataConfig):
         model_config.data = DataConfig(**model_config.data)
 
@@ -40,15 +42,22 @@ def main():
         model_path = os.path.join(model_config.model_path, "model.cpl")
 
     model = torch.load(model_path, map_location=device)
+    if not isinstance(model, torch.nn.Module):
+        predictor_config = load_yaml_config(args.model_config, PredictorConfig)
+        model_weights = model
+        model = ModelTrainer(predictor_config).model
+        model.load_state_dict(model_weights)
+
     model.eval()
     test_dataloader = create_dataloaders_from_datasource(model_config)[args.partition]
-    correct, group_accuracies, group_distribution, worst_group_accuracy = calculate_test_accuracy(
+    correct, group_accuracies, group_distribution, groups, worst_group_accuracy = calculate_test_accuracy(
         model, test_dataloader, device, True
     )
     partitions = ['Training', 'Validation', 'Test']
     print(partitions[args.partition] + " accuracy: " + str(correct))
     print("Group accuracies: " + str(group_accuracies))
     print("Group distribution: " + str(group_distribution))
+    print("Groups: " + str(groups))
     print("Worst group accuracy: " + str(worst_group_accuracy))
 
 main()

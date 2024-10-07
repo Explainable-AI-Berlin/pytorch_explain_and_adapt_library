@@ -575,8 +575,8 @@ class CounterfactualExplainer(ExplainerInterface):
 
             # torchvision.utils.save_image(torch.cat([x_in, img_default.detach().cpu()]), fp="b.png", nrow=x_in.shape[0])
             # torchvision.utils.save_image(torch.cat([x_in, torch.ones_like(x_in), z_cuda.detach().cpu(), torch.ones_like(x_in), img_default.detach().cpu()]), fp="a.png", nrow=x_in.shape[0])
-            #import pdb
-            #pdb.set_trace()
+            import pdb
+            pdb.set_trace()
 
         if not self.explainer_config.iterationwise_encoding:
             z_cuda = [z_elem.to(self.device) for z_elem in z]

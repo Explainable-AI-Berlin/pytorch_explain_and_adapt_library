@@ -24,7 +24,7 @@ from peal.global_utils import (
     load_yaml_config,
     save_yaml_config,
     reset_weights,
-    requires_grad_, get_predictions, replace_relu_with_leakyrelu,
+    requires_grad_, get_predictions, replace_relu_with_leakysoftplus,
 )
 from peal.training.loggers import log_images_to_writer
 from peal.training.loggers import Logger
@@ -786,7 +786,7 @@ def distill_predictor(
         ].task_config.x_selection
 
     predictor_distilled = copy.deepcopy(predictor)
-    predictor_distilled = replace_relu_with_leakyrelu(predictor_distilled)
+    predictor_distilled = replace_relu_with_leakysoftplus(predictor_distilled)
     distillation_trainer = ModelTrainer(
         config=explainer_config.distilled_predictor,
         model=predictor_distilled,
