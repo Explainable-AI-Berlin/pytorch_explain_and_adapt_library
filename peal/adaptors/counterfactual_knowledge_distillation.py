@@ -588,6 +588,7 @@ class CFKD(Adaptor):
         self.validation_data_config.data.split = [0.0, 1.0]
 
     def initialize_run(self):
+        print('intialize run!!!')
         if self.overwrite:
             # move from self.base_dir to self.base_dir + "_old_" + {date}_{timestamp}
             if os.path.exists(self.base_dir):
@@ -716,7 +717,7 @@ class CFKD(Adaptor):
             with open(os.path.join(self.base_dir, "platform.txt"), "w") as f:
                 f.write(platform.node())
 
-            print("start retrieving validation stats!!!")
+            print("start generating validation stats!!!")
             validation_stats = self.retrieve_validation_stats(finetune_iteration=0)
             for key in validation_stats.keys():
                 if isinstance(validation_stats[key], float):
@@ -726,10 +727,13 @@ class CFKD(Adaptor):
                         self.adaptor_config.current_iteration,
                     )
 
+            print('validation stats generatated!!!')
+
         else:
             with open(os.path.join(self.base_dir, "platform.txt"), "w") as f:
                 f.write(platform.node())
 
+            print("start loading validation stats!!!")
             validation_stats_existed = os.path.exists(
                 os.path.join(self.base_dir, "0", "validation_stats.npz")
             )
@@ -745,6 +749,7 @@ class CFKD(Adaptor):
                             self.adaptor_config.current_iteration,
                         )
 
+            print('Create dataloader mixer and add counterfactual datasets!!!')
             self.dataloader_mixer = DataloaderMixer(
                 self.adaptor_config.training, self.train_dataloader
             )
@@ -758,8 +763,10 @@ class CFKD(Adaptor):
                     writer=writer,
                     finetune_iteration=i,
                 )
+                print("counterfactual dataset " + str(i) + " added!!!")
 
             if self.adaptor_config.current_iteration > 0:
+                print('load already updated student model!!!')
                 self.student = torch.load(
                     os.path.join(self.adaptor_config.base_dir, "model.cpl"),
                     map_location=self.device,
@@ -774,7 +781,9 @@ class CFKD(Adaptor):
         ):
             print("visualize progress!!!")
             self.visualize_progress([visualization_path])
+            print('Visualization done!!!')
 
+        print('intialization done!!!')
         return validation_stats, writer
 
     def get_batch(
@@ -811,9 +820,7 @@ class CFKD(Adaptor):
             cm_idx = (cm_idx + 1) % (self.output_size**2)
             x, y = self.datastack.pop(int(y_source))
 
-            if isinstance(self.teacher, SegmentationMaskTeacher) or isinstance(
-                self.explainer.explainer_config, PerfectFalseCounterfactualConfig
-            ):
+            if self.train_dataloader.dataset.hints_enabled:
                 y_res = y[1:]
                 y = y[0]
                 if isinstance(self.teacher, SegmentationMaskTeacher):
@@ -856,7 +863,6 @@ class CFKD(Adaptor):
                 print([int(y), y_source, y_target, y_target_start_confidence])
 
             else:
-                # import pdb; pdb.set_trace()
                 pass
 
         x_batch = torch.stack(x_batch)
@@ -903,6 +909,7 @@ class CFKD(Adaptor):
         else:
             acceptance_threshold = 0.51
 
+        print('Start generating x counterfactual list!!!')
         pbar = tqdm(
             total=int(
                 self.adaptor_config.min_train_samples / self.adaptor_config.batch_size
@@ -975,6 +982,7 @@ class CFKD(Adaptor):
             else:
                 continue_collecting = False
 
+        print('x counterfactual list generated!!!')
         pbar.close()
         return tracked_values
 
@@ -983,6 +991,7 @@ class CFKD(Adaptor):
             self.base_dir, str(finetune_iteration), "tracked_values.npz"
         )
         if self.overwrite or not os.path.exists(tracked_values_path):
+            print('Start generating tracked values!!!')
             tracked_values = self.generate_x_counterfactual_list(
                 error_matrix=validation_stats["error_matrix"],
                 confidence_score_stats=validation_stats["confidence_score_stats"],
@@ -1017,11 +1026,13 @@ class CFKD(Adaptor):
                 tracked_values_path,
                 "rb",
             ) as f:
+                print('Load tracked values!!!')
                 tracked_values = {}
                 tracked_values_file = np.load(f, allow_pickle=True)
                 for key in tracked_values_file.keys():
                     tracked_values[key] = list(torch.tensor(tracked_values_file[key]))
 
+        print("Create collage path list!!!")
         collage_path_list = os.listdir(
             os.path.join(self.base_dir, str(finetune_iteration), "collages")
         )
@@ -1498,7 +1509,8 @@ class CFKD(Adaptor):
                 for key in validation_tracked_file.keys():
                     validation_stats[key] = torch.tensor(validation_tracked_file[key])
 
-                return validation_stats
+            print('validation stats loaded!!!')
+            return validation_stats
 
         validation_values_path = os.path.join(
             self.base_dir, str(finetune_iteration), "validation_tracked_values.npz"
@@ -1771,6 +1783,7 @@ class CFKD(Adaptor):
             self.adaptor_config.current_iteration + 1,
             self.adaptor_config.finetune_iterations + 1,
         ):
+            print('Start retrieving training counterfactuals for iteration ' + str(finetune_iteration))
             tracked_values = self.retrieve_counterfactual_list(
                 validation_stats=validation_stats, finetune_iteration=finetune_iteration
             )

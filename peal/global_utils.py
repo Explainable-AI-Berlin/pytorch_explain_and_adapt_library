@@ -449,3 +449,35 @@ def get_predictions(args):
     )
 
     torch.set_grad_enabled(True)
+
+
+def high_contrast_heatmap(x, counterfactual):
+    heatmap_red = torch.maximum(
+        torch.tensor(0.0),
+        torch.sum(x, dim=0) - torch.sum(counterfactual, dim=0),
+    )
+    heatmap_blue = torch.maximum(
+        torch.tensor(0.0),
+        torch.sum(counterfactual, dim=0) - torch.sum(x, dim=0),
+    )
+    if counterfactual.shape[0] == 3:
+        heatmap_green = torch.abs(x[0] - counterfactual[0])
+        heatmap_green = heatmap_green + torch.abs(x[1] - counterfactual[1])
+        heatmap_green = heatmap_green + torch.abs(x[2] - counterfactual[2])
+        heatmap_green = heatmap_green - heatmap_red - heatmap_blue
+        x_in = torch.clone(x)
+        counterfactual_rgb = torch.clone(counterfactual)
+
+    else:
+        heatmap_green = torch.zeros_like(heatmap_red)
+        x_in = torch.tile(x, [3, 1, 1])
+        counterfactual_rgb = torch.tile(torch.clone(counterfactual), [3, 1, 1])
+
+    heatmap = torch.stack([heatmap_red, heatmap_green, heatmap_blue], dim=0)
+    if torch.abs(heatmap.sum() - torch.abs(x - counterfactual).sum()) > 0.1:
+        print(
+            "Error: Heatmap does not add up to absolute counterfactual difference."
+        )
+    heatmap_high_contrast = torch.clamp(heatmap / heatmap.max(), 0.0, 1.0)
+
+    return heatmap_high_contrast, x_in, counterfactual_rgb
