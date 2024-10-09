@@ -26,6 +26,7 @@ from peal.global_utils import (
     get_project_resource_dir,
     is_port_in_use,
     dict_to_bar_chart,
+    high_contrast_heatmap,
 )
 from peal.generators.interfaces import (
     InvertibleGenerator,
@@ -35,7 +36,7 @@ from peal.generators.interfaces import (
 from peal.data.interfaces import PealDataset
 from peal.explainers.interfaces import ExplainerInterface, ExplainerConfig
 from peal.teachers.human2model_teacher import DataStore
-from peal.training.trainers import PredictorConfig, ModelTrainer
+from peal.training.trainers import PredictorConfig, ModelTrainer, distill_predictor
 
 
 class PDCConfig(ExplainerConfig):
@@ -373,64 +374,6 @@ class CounterfactualExplainer(ExplainerInterface):
                 inverse_test_config.dataset_path += "_inverse"
                 self.inverse_datasets["test"] = get_datasets(inverse_test_config)[-1]
 
-    def distill_predictor(
-        self, explainer_config, base_path, predictor, predictor_datasets
-    ):
-        distillation_datasets = []
-        for i in range(2):
-            class_predictions_path = os.path.join(
-                base_path, "explainer", str(i) + "predictions.csv"
-            )
-            Path(os.path.join(base_path, "explainer")).mkdir(
-                exist_ok=True, parents=True
-            )
-            if not os.path.exists(class_predictions_path):
-                predictor_datasets[i].enable_url()
-                prediction_args = types.SimpleNamespace(
-                    batch_size=32,
-                    dataset=predictor_datasets[i],
-                    classifier=predictor,
-                    label_path=class_predictions_path,
-                    partition="train",
-                    label_query=0,
-                    max_samples=explainer_config.max_samples,
-                )
-                get_predictions(prediction_args)
-                predictor_datasets[i].disable_url()
-
-            distilled_dataset_config = copy.deepcopy(predictor_datasets[i].config)
-            distilled_dataset_config.split = [1.0, 1.0] if i == 0 else [0.0, 1.0]
-            distilled_dataset_config.img_name_idx = 0
-            distilled_dataset_config.confounding_factors = None
-            distilled_dataset_config.confounder_probability = None
-            distilled_dataset_config.dataset_class = None
-            distillation_datasets.append(
-                get_datasets(
-                    config=distilled_dataset_config, data_dir=class_predictions_path
-                )[i]
-            )
-            distilled_predictor_config = load_yaml_config(
-                explainer_config.distilled_predictor, PredictorConfig
-            )
-            distilled_predictor_config.data = distilled_dataset_config
-            explainer_config.distilled_predictor = distilled_predictor_config
-            distillation_datasets[i].task_config = (
-                explainer_config.distilled_predictor.task
-            )
-            distillation_datasets[i].task_config.x_selection = predictor_datasets[
-                i
-            ].task_config.x_selection
-
-        predictor_distilled = copy.deepcopy(predictor)
-        distillation_trainer = ModelTrainer(
-            config=explainer_config.distilled_predictor,
-            model=predictor_distilled,
-            datasource=distillation_datasets,
-            model_path=os.path.join(base_path, "explainer", "distilled_predictor"),
-        )
-        distillation_trainer.fit()
-        return predictor_distilled
-
     def predictor_distilled_counterfactual(
         self, x_in, target_confidence_goal, y_target, pbar=None, mode="", base_path=None
     ):
@@ -454,7 +397,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 "model.cpl",
             )
             if not os.path.exists(distilled_path):
-                gradient_predictor = self.distill_predictor(
+                gradient_predictor = distill_predictor(
                     self.explainer_config,
                     base_path,
                     self.predictor,
@@ -514,18 +457,28 @@ class CounterfactualExplainer(ExplainerInterface):
         gradient_confidences_old = torch.zeros(x.shape[0]).to(x)
 
         for i in range(self.explainer_config.gradient_steps):
-            z_cuda = [z_elem.to(self.device) for z_elem in z]
-            optimizer.zero_grad()
             if self.explainer_config.iterationwise_encoding:
+                # TODO this only works if generator is normalized in -1 and 1
+                z[0].data = torch.clamp(z[0].data, -1, 1)
                 z_cuda = self.generator.encode(
-                    z_cuda[0], t=self.explainer_config.sampling_time_fraction, stochastic=True
+                    z[0].to(self.device),
+                    t=self.explainer_config.sampling_time_fraction,
+                    stochastic=True,
                 )
                 z_default = self.generator.dataset.project_to_pytorch_default(z[0])
-                z_predictor = self.predictor_datasets[1].project_from_pytorch_default(z_default).to(self.device)
+                z_predictor_original = (
+                    self.predictor_datasets[1]
+                    .project_from_pytorch_default(z_default)
+                    .to(self.device)
+                )
                 pred_original = torch.nn.functional.softmax(
-                    self.predictor(z_predictor)
+                    self.predictor(z_predictor_original)
                 )
 
+            else:
+                z_cuda = [z_elem.to(self.device) for z_elem in z]
+
+            optimizer.zero_grad()
             img_decoded = self.generator.decode(
                 z_cuda, t=self.explainer_config.sampling_time_fraction
             )
@@ -573,7 +526,8 @@ class CounterfactualExplainer(ExplainerInterface):
                 l1_losses.append(
                     torch.mean(
                         torch.abs(
-                            z[z_idx].to(self.device) - torch.clone(z_original[z_idx]).detach()
+                            z[z_idx].to(self.device)
+                            - torch.clone(z_original[z_idx]).detach()
                         )
                     )
                 )
@@ -586,7 +540,8 @@ class CounterfactualExplainer(ExplainerInterface):
                     + f"/{self.explainer_config.gradient_steps}"
                     + f", loss: {loss.detach().item():.2E}"
                     + f", target_confidence: [{target_confidences[0]:.2E}, {target_confidences[-1]:.2E}]"
-                    + f", gradient_confidence: [{gradient_confidences_old[0]:.2E}, {gradient_confidences_old[-1]:.2E}]"
+                    + f", gradient_confidence: [{gradient_confidences_old[0]:.2E},"
+                    + f"{gradient_confidences_old[-1]:.2E}]"
                     + f", visual_difference:"
                     + f"{torch.mean(torch.abs(x_in - img_predictor.detach().cpu())).item():.2E}"
                     + ", ".join(
@@ -617,24 +572,45 @@ class CounterfactualExplainer(ExplainerInterface):
             optimizer.step()
             if self.explainer_config.iterationwise_encoding:
                 z_default = self.generator.dataset.project_to_pytorch_default(z[0])
-                z_predictor = self.predictor_datasets[1].project_from_pytorch_default(z_default).to(self.device)
-                pred_new = torch.nn.functional.softmax(
-                    self.predictor(z_predictor)
+                z_predictor = (
+                    self.predictor_datasets[1]
+                    .project_from_pytorch_default(z_default)
+                    .to(self.device)
                 )
+                pred_new = torch.nn.functional.softmax(gradient_predictor(z_predictor))
                 for j in range(gradient_confidences_old.shape[0]):
-                    if (
-                        pred_new[j, int(y_target[j])]
-                        >= gradient_confidences_old[j]
-                    ):
+                    if pred_new[j, int(y_target[j])] >= gradient_confidences_old[j]:
                         gradient_confidences_old[j] = pred_new[j, int(y_target[j])]
 
                     else:
                         z[0].data[j] = z_old[j]
 
+            heatmap_high_contrast = []
+            for it in range(x_in.shape[0]):
+                heatmap_high_contrast.append(
+                    high_contrast_heatmap(
+                        x_in[it], z_predictor_original[it].detach().cpu()
+                    )[0]
+                )
+
+            """save_tensor = torch.cat(
+                [
+                    x_in,
+                    torch.ones_like(x_in),
+                    torch.stack(heatmap_high_contrast),
+                    torch.ones_like(x_in),
+                    z_predictor_original.detach().cpu(),
+                    torch.ones_like(x_in),
+                    z_cuda.detach().cpu(),
+                    torch.ones_like(x_in),
+                    img_default.detach().cpu(),
+                ]
+            )
+            torchvision.utils.save_image(save_tensor, fp="b.png", nrow=x_in.shape[0])
             # torchvision.utils.save_image(torch.cat([x_in, img_default.detach().cpu()]), fp="b.png", nrow=x_in.shape[0])
-            # torchvision.utils.save_image(torch.cat([x_in, torch.ones_like(x_in), z_cuda.detach().cpu(), torch.ones_like(x_in), img_default.detach().cpu()]), fp="a.png", nrow=x_in.shape[0])
-            #import pdb
-            #pdb.set_trace()
+            import pdb
+
+            pdb.set_trace()"""
 
         if not self.explainer_config.iterationwise_encoding:
             z_cuda = [z_elem.to(self.device) for z_elem in z]
@@ -979,13 +955,7 @@ class CounterfactualExplainer(ExplainerInterface):
         collage_paths_static = []
         for path in collage_path_list:
             collage_path_static = os.path.join("static", path.split("/")[-1])
-            try:
-                shutil.copy(path, collage_path_static)
-
-            except Exception:
-                import pdb
-
-                pdb.set_trace()
+            shutil.copy(path, collage_path_static)
 
             collage_paths_static.append(collage_path_static)
 

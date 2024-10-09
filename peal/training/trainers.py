@@ -1,3 +1,4 @@
+import copy
 from datetime import datetime
 
 import torch
@@ -14,6 +15,7 @@ from tqdm import tqdm
 from pydantic import BaseModel, PositiveInt
 from typing import Union
 
+from peal.data.dataset_factory import get_datasets
 from peal.data.datasets import DataConfig
 from peal.dependencies.attacks.attacks import PGD_L2
 from peal.global_utils import (
@@ -22,7 +24,7 @@ from peal.global_utils import (
     load_yaml_config,
     save_yaml_config,
     reset_weights,
-    requires_grad_,
+    requires_grad_, get_predictions, replace_relu_with_leakysoftplus,
 )
 from peal.training.loggers import log_images_to_writer
 from peal.training.loggers import Logger
@@ -733,3 +735,63 @@ class ModelTrainer:
             save_yaml_config(self.config, os.path.join(self.model_path, "config.yaml"))
 
             self.config.training.epoch += 1
+
+
+def distill_predictor(
+    explainer_config, base_path, predictor, predictor_datasets
+):
+    distillation_datasets = []
+    for i in range(2):
+        class_predictions_path = os.path.join(
+            base_path, "explainer", str(i) + "predictions.csv"
+        )
+        Path(os.path.join(base_path, "explainer")).mkdir(
+            exist_ok=True, parents=True
+        )
+        if not os.path.exists(class_predictions_path):
+            predictor_datasets[i].enable_url()
+            prediction_args = types.SimpleNamespace(
+                batch_size=32,
+                dataset=predictor_datasets[i],
+                classifier=predictor,
+                label_path=class_predictions_path,
+                partition="train",
+                label_query=0,
+                max_samples=explainer_config.max_samples,
+            )
+            get_predictions(prediction_args)
+            predictor_datasets[i].disable_url()
+
+        distilled_dataset_config = copy.deepcopy(predictor_datasets[i].config)
+        distilled_dataset_config.split = [1.0, 1.0] if i == 0 else [0.0, 1.0]
+        distilled_dataset_config.img_name_idx = 0
+        distilled_dataset_config.confounding_factors = None
+        distilled_dataset_config.confounder_probability = None
+        distilled_dataset_config.dataset_class = None
+        distillation_datasets.append(
+            get_datasets(
+                config=distilled_dataset_config, data_dir=class_predictions_path
+            )[i]
+        )
+        distilled_predictor_config = load_yaml_config(
+            explainer_config.distilled_predictor, PredictorConfig
+        )
+        distilled_predictor_config.data = distilled_dataset_config
+        explainer_config.distilled_predictor = distilled_predictor_config
+        distillation_datasets[
+            i
+        ].task_config = explainer_config.distilled_predictor.task
+        distillation_datasets[i].task_config.x_selection = predictor_datasets[
+            i
+        ].task_config.x_selection
+
+    predictor_distilled = copy.deepcopy(predictor)
+    predictor_distilled = replace_relu_with_leakysoftplus(predictor_distilled)
+    distillation_trainer = ModelTrainer(
+        config=explainer_config.distilled_predictor,
+        model=predictor_distilled,
+        datasource=distillation_datasets,
+        model_path=os.path.join(base_path, "explainer", "distilled_predictor"),
+    )
+    distillation_trainer.fit()
+    return predictor_distilled

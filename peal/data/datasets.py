@@ -15,7 +15,7 @@ from typing import Union
 
 from peal.data.interfaces import PealDataset
 from peal.data.dataset_utils import parse_json, parse_csv
-from peal.global_utils import embed_numberstring
+from peal.global_utils import embed_numberstring, high_contrast_heatmap
 from peal.generators.interfaces import Generator
 
 matplotlib.use("Agg")
@@ -312,34 +312,8 @@ class ImageDataset(PealDataset):
             x = self.project_to_pytorch_default(x_list[i])
             counterfactual = self.project_to_pytorch_default(x_counterfactual_list[i])
 
-            heatmap_red = torch.maximum(
-                torch.tensor(0.0),
-                torch.sum(x, dim=0) - torch.sum(counterfactual, dim=0),
-            )
-            heatmap_blue = torch.maximum(
-                torch.tensor(0.0),
-                torch.sum(counterfactual, dim=0) - torch.sum(x, dim=0),
-            )
-            if counterfactual.shape[0] == 3:
-                heatmap_green = torch.abs(x[0] - counterfactual[0])
-                heatmap_green = heatmap_green + torch.abs(x[1] - counterfactual[1])
-                heatmap_green = heatmap_green + torch.abs(x[2] - counterfactual[2])
-                heatmap_green = heatmap_green - heatmap_red - heatmap_blue
-                x_in = torch.clone(x)
-                counterfactual_rgb = torch.clone(counterfactual)
+            heatmap_high_contrast, x_in, counterfactual_rgb = high_contrast_heatmap(x, counterfactual)
 
-            else:
-                heatmap_green = torch.zeros_like(heatmap_red)
-                x_in = torch.tile(x, [3, 1, 1])
-                counterfactual_rgb = torch.tile(torch.clone(counterfactual), [3, 1, 1])
-
-            heatmap = torch.stack([heatmap_red, heatmap_green, heatmap_blue], dim=0)
-            if torch.abs(heatmap.sum() - torch.abs(x - counterfactual).sum()) > 0.1:
-                print(
-                    "Error: Heatmap does not add up to absolute counterfactual difference."
-                )
-
-            heatmap_high_contrast = torch.clamp(heatmap / heatmap.max(), 0.0, 1.0)
             heatmap_list.append(heatmap_high_contrast)
 
             if tracking_level >= 1:
@@ -453,7 +427,7 @@ class ImageDataset(PealDataset):
         """
         if batch_size is None:
             if hasattr(generator, "config"):
-                batch_size = generator.config.training.val_batch_size
+                batch_size = generator.config.batch_size
 
             else:
                 batch_size = 1

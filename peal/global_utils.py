@@ -1,9 +1,12 @@
 # This whole file contains all the stuff, that is written too bad and had no clear position where it should be located in the project!
+import copy
 from pathlib import Path
 
 import numpy as np
 import sys
 import types
+
+import pandas as pd
 import torch
 import os
 import yaml
@@ -19,6 +22,8 @@ from pkg_resources import resource_filename
 
 
 import matplotlib.pyplot as plt
+from tqdm import tqdm
+
 
 def dict_to_bar_chart(input_dict, name):
   """
@@ -359,8 +364,120 @@ def reset_weights(model):
     Resets all weights in the model recursively using reset_parameters
     """
     for parameter_idx, parameter in enumerate(model.parameters()):
-        if len(parameter.shape) == 2:
-            parameter.data = torch.nn.init.xavier_uniform_(parameter)
+        if len(parameter.shape) >= 2:
+            #parameter.data = torch.nn.init.xavier_uniform_(parameter)
+            parameter.data = torch.randn_like(parameter.data)
 
         else:
             parameter.data = torch.zeros_like(parameter.data)
+
+
+class LeakySoftplus(torch.nn.Module):
+    def __init__(self):
+        super(LeakySoftplus, self).__init__()
+        self.leaky_relu = torch.nn.LeakyReLU(negative_slope=0.1)
+        self.softplus = torch.nn.Softplus(beta=10.0)
+
+    def forward(self, x):
+        return 0.5 * (self.leaky_relu(x) + self.softplus(x))
+
+
+def replace_relu_with_leakysoftplus(model):
+    for child_name, child in model.named_children():
+        if isinstance(child, torch.nn.ReLU):
+            setattr(model, child_name, LeakySoftplus())
+
+        else:
+            replace_relu_with_leakysoftplus(child)
+
+    return model
+
+
+def get_predictions(args):
+    torch.set_grad_enabled(False)
+
+    device = torch.device("cuda:0")
+    os.makedirs("utils", exist_ok=True)
+
+    dataset = args.dataset
+
+    loader = torch.utils.data.DataLoader(
+        dataset, batch_size=args.batch_size, num_workers=5, shuffle=False
+    )
+
+    classifier = args.classifier
+
+    d = {"idx": [], "prediction": []}
+    n = 0
+    acc = 0
+
+    for idx, sample in enumerate(tqdm(loader)):
+        if not args.max_samples is None and idx > args.max_samples:
+            break
+
+        if len(sample) == 3:
+            img, lab, img_file = sample
+
+        else:
+            img, y = sample
+            if len(y) == 2:
+                (lab, img_file) = y
+
+            elif len(y) == 3:
+                (lab, hint, img_file) = y
+
+        img = img.to(device)
+        lab = lab.to(device)
+        logits = classifier(img)
+        if len(logits.shape) > 1:
+            pred = logits.argmax(dim=1)
+
+        else:
+            pred = (logits > 0).int()
+
+        acc += (pred == lab).float().sum().item()
+        n += lab.size(0)
+
+        d["prediction"] += [p.item() for p in pred]
+        d["idx"] += list(img_file)
+
+    print(acc / n)
+    df = pd.DataFrame(data=d)
+    df.to_csv(
+        args.label_path,
+        index=False,
+    )
+
+    torch.set_grad_enabled(True)
+
+
+def high_contrast_heatmap(x, counterfactual):
+    heatmap_red = torch.maximum(
+        torch.tensor(0.0),
+        torch.sum(x, dim=0) - torch.sum(counterfactual, dim=0),
+    )
+    heatmap_blue = torch.maximum(
+        torch.tensor(0.0),
+        torch.sum(counterfactual, dim=0) - torch.sum(x, dim=0),
+    )
+    if counterfactual.shape[0] == 3:
+        heatmap_green = torch.abs(x[0] - counterfactual[0])
+        heatmap_green = heatmap_green + torch.abs(x[1] - counterfactual[1])
+        heatmap_green = heatmap_green + torch.abs(x[2] - counterfactual[2])
+        heatmap_green = heatmap_green - heatmap_red - heatmap_blue
+        x_in = torch.clone(x)
+        counterfactual_rgb = torch.clone(counterfactual)
+
+    else:
+        heatmap_green = torch.zeros_like(heatmap_red)
+        x_in = torch.tile(x, [3, 1, 1])
+        counterfactual_rgb = torch.tile(torch.clone(counterfactual), [3, 1, 1])
+
+    heatmap = torch.stack([heatmap_red, heatmap_green, heatmap_blue], dim=0)
+    if torch.abs(heatmap.sum() - torch.abs(x - counterfactual).sum()) > 0.1:
+        print(
+            "Error: Heatmap does not add up to absolute counterfactual difference."
+        )
+    heatmap_high_contrast = torch.clamp(heatmap / heatmap.max(), 0.0, 1.0)
+
+    return heatmap_high_contrast, x_in, counterfactual_rgb

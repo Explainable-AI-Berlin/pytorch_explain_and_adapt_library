@@ -167,7 +167,7 @@ class DataloaderMixer(DataLoader):
         self.iterators = [iter(self.dataloaders[0])]
         self.return_src = return_src
 
-    def append(self, dataloader, priority=1, mixing_ratio=None):
+    def append(self, dataloader, priority=1, weight_added_dataloader=None):
         """
         _summary_
 
@@ -177,7 +177,7 @@ class DataloaderMixer(DataLoader):
         """
         self.dataloaders.append(dataloader)
         self.iterators.append(iter(self.dataloaders[-1]))
-        if mixing_ratio is None:
+        if weight_added_dataloader is None:
             self.priorities = np.zeros(len(self.dataloaders))
             for i in range(len(self.dataloaders)):
                 self.priorities[i] = self.dataloaders[i].dataset.__len__()
@@ -186,7 +186,7 @@ class DataloaderMixer(DataLoader):
             self.priorities = self.priorities / self.priorities.sum()
 
         else:
-            self.priorities = np.array([1 - mixing_ratio, mixing_ratio])
+            self.priorities = np.array([1 - weight_added_dataloader, weight_added_dataloader])
 
     def __iter__(self):
         return DataIterator(self)
