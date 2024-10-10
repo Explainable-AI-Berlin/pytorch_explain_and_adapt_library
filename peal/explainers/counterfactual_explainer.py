@@ -580,6 +580,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 pred_new = torch.nn.functional.softmax(gradient_predictor(z_predictor))
                 for j in range(gradient_confidences_old.shape[0]):
                     if pred_new[j, int(y_target[j])] >= gradient_confidences_old[j]:
+                        print('Update ' + str(j))
                         gradient_confidences_old[j] = pred_new[j, int(y_target[j])]
 
                     else:
@@ -606,8 +607,9 @@ class CounterfactualExplainer(ExplainerInterface):
                     img_default.detach().cpu(),
                 ]
             )
-            torchvision.utils.save_image(save_tensor, fp="b.png", nrow=x_in.shape[0])
-            # torchvision.utils.save_image(torch.cat([x_in, img_default.detach().cpu()]), fp="b.png", nrow=x_in.shape[0])
+            torchvision.utils.save_image(save_tensor, fp="a.png", nrow=x_in.shape[0])
+            print(list(gradient_confidences_old))
+            print(target_confidences)
             import pdb
 
             pdb.set_trace()"""

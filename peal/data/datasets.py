@@ -324,15 +324,16 @@ class ImageDataset(PealDataset):
                 plt.gcf()
                 plt.imshow(current_collage.permute(1, 2, 0))
                 title_string = (
-                    str(int(y_list[i]))
-                    + " -> "
+                    "Original: "
+                    + str(int(y_list[i]))
+                    + " -> Prediction: "
                     + str(int(y_source_list[i]))
-                    + " -> "
+                    + " -> Target: "
                     + str(int(y_target_list[i]))
                     + "\n"
                 )
                 title_string += (
-                    "Confidence: "
+                    "Target Confidence: "
                     + str(
                         round(
                             float(y_target_start_confidence_list[i]),

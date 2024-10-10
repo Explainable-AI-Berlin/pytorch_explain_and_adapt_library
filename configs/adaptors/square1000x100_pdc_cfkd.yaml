@@ -15,9 +15,9 @@ training                             :  <PEAL_BASE>/configs/training/img_finetun
 data                                 :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_poisened100.yaml
 test_data                            :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_unpoisened.yaml
 student                              :  $PEAL_RUNS/square2/colora_confounding_colorb/regularized0/classifier_poisened100/model.cpl
-teacher                              :  $PEAL_RUNS/square2/colora_confounding_colorb/regularized0/classifier_unpoisened/model.cpl
+teacher                              :  SegmentationMask
 generator                            :  $PEAL_RUNS/square2/ddpm/config.yaml
-base_dir                             :  $PEAL_RUNS/square2/colora_confounding_colorb/regularized0/classifier_poisened100/pdc_cfkd
+base_dir                             :  $PEAL_RUNS/square2/colora_confounding_colorb/regularized0/classifier_poisened100/pdc_cfkd_leakysoftplus
 task:
   criterions:
     ce     : 1.0
