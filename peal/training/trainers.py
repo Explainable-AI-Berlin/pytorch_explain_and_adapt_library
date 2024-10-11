@@ -561,12 +561,7 @@ class ModelTrainer:
 
             else:
                 print("reset weights!!!")
-                print("reset weights!!!")
-                print("reset weights!!!")
-                print("reset weights!!!")
-                print("reset weights!!!")
-                print("reset weights!!!")
-                orthogonal_initialization(self.model)
+                reset_weights(self.model)
 
         if not is_initialized:
             if os.path.exists(self.model_path):

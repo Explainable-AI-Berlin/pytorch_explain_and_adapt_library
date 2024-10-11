@@ -37,6 +37,7 @@ from peal.data.interfaces import PealDataset
 from peal.explainers.interfaces import ExplainerInterface, ExplainerConfig
 from peal.teachers.human2model_teacher import DataStore
 from peal.training.trainers import PredictorConfig, ModelTrainer, distill_predictor
+from peal.visualization.visualize_counterfactual_gradients import visualize_step
 
 
 class PDCConfig(ExplainerConfig):
@@ -68,7 +69,7 @@ class PDCConfig(ExplainerConfig):
     """
     The optimizer used for searching the counterfactual
     """
-    optimizer: str = "Adam"
+    optimizer: str = "SGD"
     """
     The learning rate used for finding the counterfactual
     """
@@ -87,7 +88,7 @@ class PDCConfig(ExplainerConfig):
     How much noise to inject into the image while passing through it in the forward pass.
     Helps avoiding adversarial attacks in the case of a weak generator
     """
-    img_noise_injection: float = 0.01
+    img_noise_injection: float = 0.0
     """
     Regularizing factor of the L1 distance in latent space between the latent code of the
     original image and the counterfactual
@@ -124,7 +125,9 @@ class PDCConfig(ExplainerConfig):
     """
     Whether to use stochastic counterfactual search or not.
     """
-    is_stochastic: Union[type(None), bool] = None
+    stochastic: Union[type(None), bool] = None
+    dilation: int = 17
+    inpaint: float = 0.7
     """
     A dict containing all variables that could not be given with the current config structure
     """
@@ -534,6 +537,7 @@ class CounterfactualExplainer(ExplainerInterface):
 
             loss += self.explainer_config.dist_l1 * torch.mean(torch.stack(l1_losses))
             if not pbar is None:
+                absolute_difference = torch.abs(x_in - img_predictor.detach().cpu())
                 pbar.set_description(
                     f"Creating {mode} Counterfactuals:"
                     + f"it: {i}"
@@ -542,8 +546,8 @@ class CounterfactualExplainer(ExplainerInterface):
                     + f", target_confidence: [{target_confidences[0]:.2E}, {target_confidences[-1]:.2E}]"
                     + f", gradient_confidence: [{gradient_confidences_old[0]:.2E},"
                     + f"{gradient_confidences_old[-1]:.2E}]"
-                    + f", visual_difference:"
-                    + f"{torch.mean(torch.abs(x_in - img_predictor.detach().cpu())).item():.2E}"
+                    + f", visual_difference: [{torch.mean(absolute_difference[0]).item():.2E}, "
+                    + f"{torch.mean(absolute_difference[-1]).item():.2E}]"
                     + ", ".join(
                         [
                             key + ": " + str(pbar.stored_values[key])
@@ -553,6 +557,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 )
                 pbar.update(1)
 
+            img_predictor.retain_grad()
             loss.backward()
 
             if self.explainer_config.use_masking:
@@ -571,6 +576,16 @@ class CounterfactualExplainer(ExplainerInterface):
 
             optimizer.step()
             if self.explainer_config.iterationwise_encoding:
+                if self.explainer_config.inpaint != 0.0:
+                    z[0].data = self.generator.repaint(
+                        x=x.to(self.device), # TODO seems to be in generator normalization
+                        pe=z[0],
+                        inpaint=self.explainer_config.inpaint,
+                        dilation=self.explainer_config.dilation,
+                        t=self.explainer_config.sampling_time_fraction,
+                        stochastic=self.explainer_config.stochastic,
+                    ).detach().cpu()
+
                 z_default = self.generator.dataset.project_to_pytorch_default(z[0])
                 z_predictor = (
                     self.predictor_datasets[1]
@@ -580,39 +595,14 @@ class CounterfactualExplainer(ExplainerInterface):
                 pred_new = torch.nn.functional.softmax(gradient_predictor(z_predictor))
                 for j in range(gradient_confidences_old.shape[0]):
                     if pred_new[j, int(y_target[j])] >= gradient_confidences_old[j]:
-                        print('Update ' + str(j))
+                        #print("Update " + str(j))
                         gradient_confidences_old[j] = pred_new[j, int(y_target[j])]
 
                     else:
                         z[0].data[j] = z_old[j]
 
-            heatmap_high_contrast = []
-            for it in range(x_in.shape[0]):
-                heatmap_high_contrast.append(
-                    high_contrast_heatmap(
-                        x_in[it], z_predictor_original[it].detach().cpu()
-                    )[0]
-                )
-
-            """save_tensor = torch.cat(
-                [
-                    x_in,
-                    torch.ones_like(x_in),
-                    torch.stack(heatmap_high_contrast),
-                    torch.ones_like(x_in),
-                    z_predictor_original.detach().cpu(),
-                    torch.ones_like(x_in),
-                    z_cuda.detach().cpu(),
-                    torch.ones_like(x_in),
-                    img_default.detach().cpu(),
-                ]
-            )
-            torchvision.utils.save_image(save_tensor, fp="a.png", nrow=x_in.shape[0])
-            print(list(gradient_confidences_old))
-            print(target_confidences)
-            import pdb
-
-            pdb.set_trace()"""
+            visualize_step(x_in, z_predictor_original, img_predictor, z, z_cuda, img_default, "a.png")
+            import pdb; pdb.set_trace()
 
         if not self.explainer_config.iterationwise_encoding:
             z_cuda = [z_elem.to(self.device) for z_elem in z]
@@ -677,6 +667,11 @@ class CounterfactualExplainer(ExplainerInterface):
         Returns:
             dict: The batch with the counterfactuals added.
         """
+        if explainer_path is None:
+            explainer_path = os.path.join(
+                *([os.path.abspath(os.sep)] + base_path.split(os.sep)[:-1])
+            )
+
         if y_target_goal_confidence_in is None:
             if hasattr(self.explainer_config, "y_target_goal_confidence"):
                 target_confidence_goal = self.explainer_config.y_target_goal_confidence

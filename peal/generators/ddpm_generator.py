@@ -16,6 +16,7 @@ from types import SimpleNamespace
 
 from torch.utils.tensorboard import SummaryWriter
 
+from peal.dependencies.ace.core.utils import generate_mask
 from peal.dependencies.time.get_predictions import get_predictions
 from peal.generators.interfaces import EditCapableGenerator, InvertibleGenerator
 from peal.global_utils import load_yaml_config
@@ -240,6 +241,40 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
                     z += torch.exp(0.5 * out["log_variance"]) * self.noise_fn(z)
 
         return z
+
+    def repaint(self, x, pe, inpaint, dilation, t, stochastic):
+        respaced_steps = int(t * int(self.config.timestep_respacing))
+        indices = list(range(respaced_steps))[::-1]
+        x_normalized = self.dataset.project_to_pytorch_default(x)
+        pe_normalized = self.dataset.project_to_pytorch_default(pe)
+        mask, dil_mask = generate_mask(x_normalized, pe_normalized, dilation)
+        boolmask = (dil_mask < inpaint).float()
+
+        noise_fn = torch.randn_like if stochastic else torch.zeros_like
+
+        ce = torch.clone(pe)
+        for idx, t in enumerate(indices):
+            # filter the with the diffusion model
+            t = torch.tensor([t] * ce.size(0), device=ce.device)
+
+            if idx == 0:
+                ce = self.diffusion.q_sample(ce, t, noise=noise_fn(ce))
+
+            if inpaint != 0:
+                ce = ce * (1 - boolmask) + boolmask * self.diffusion.q_sample(
+                    x, t, noise=noise_fn(ce)
+                )
+
+            out = self.diffusion.p_mean_variance(self.model, ce, t, clip_denoised=True)
+
+            ce = out["mean"]
+
+            if stochastic and (idx != (steps - 1)):
+                noise = torch.randn_like(ce)
+                ce += torch.exp(0.5 * out["log_variance"]) * noise
+
+        ce = ce * (1 - boolmask) + boolmask * x
+        return ce
 
     def train_model(
         self,
