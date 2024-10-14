@@ -577,14 +577,20 @@ class CounterfactualExplainer(ExplainerInterface):
             optimizer.step()
             if self.explainer_config.iterationwise_encoding:
                 if self.explainer_config.inpaint != 0.0:
-                    z[0].data = self.generator.repaint(
-                        x=x.to(self.device), # TODO seems to be in generator normalization
-                        pe=z[0],
-                        inpaint=self.explainer_config.inpaint,
-                        dilation=self.explainer_config.dilation,
-                        t=self.explainer_config.sampling_time_fraction,
-                        stochastic=self.explainer_config.stochastic,
-                    ).detach().cpu()
+                    z[0].data, boolmask = (
+                        self.generator.repaint(
+                            x=x.to(
+                                self.device
+                            ),  # TODO seems to be in generator normalization
+                            pe=z[0],
+                            inpaint=self.explainer_config.inpaint,
+                            dilation=self.explainer_config.dilation,
+                            t=self.explainer_config.sampling_time_fraction,
+                            stochastic=self.explainer_config.stochastic,
+                        )
+                        .detach()
+                        .cpu()
+                    )
 
                 z_default = self.generator.dataset.project_to_pytorch_default(z[0])
                 z_predictor = (
@@ -595,14 +601,23 @@ class CounterfactualExplainer(ExplainerInterface):
                 pred_new = torch.nn.functional.softmax(gradient_predictor(z_predictor))
                 for j in range(gradient_confidences_old.shape[0]):
                     if pred_new[j, int(y_target[j])] >= gradient_confidences_old[j]:
-                        #print("Update " + str(j))
+                        # print("Update " + str(j))
                         gradient_confidences_old[j] = pred_new[j, int(y_target[j])]
 
                     else:
                         z[0].data[j] = z_old[j]
 
-            visualize_step(x_in, z_predictor_original, img_predictor, z, z_cuda, img_default, "a.png")
-            import pdb; pdb.set_trace()
+            visualize_step(
+                x=x_in,
+                z=z,
+                z_noisy=z_default,
+                img_predictor=img_predictor,
+                boolmask=boolmask,
+                filename="a.png",
+            )
+            import pdb
+
+            pdb.set_trace()
 
         if not self.explainer_config.iterationwise_encoding:
             z_cuda = [z_elem.to(self.device) for z_elem in z]

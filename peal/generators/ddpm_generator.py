@@ -269,12 +269,12 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
 
             ce = out["mean"]
 
-            if stochastic and (idx != (steps - 1)):
+            if stochastic and (idx != (respaced_steps - 1)):
                 noise = torch.randn_like(ce)
                 ce += torch.exp(0.5 * out["log_variance"]) * noise
 
         ce = ce * (1 - boolmask) + boolmask * x
-        return ce
+        return ce, boolmask
 
     def train_model(
         self,
