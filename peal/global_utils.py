@@ -354,7 +354,8 @@ def orthogonal_initialization(model):
     """ """
     for parameter_idx, parameter in enumerate(model.parameters()):
         if len(parameter.shape) == 1:
-            parameter.data = torch.randn(parameter.shape).to(parameter.device)
+            parameter.data = torch.zeros(parameter.shape).to(parameter.device)
+
         else:
             torch.nn.init.orthogonal_(parameter)
 

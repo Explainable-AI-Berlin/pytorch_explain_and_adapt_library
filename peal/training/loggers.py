@@ -317,16 +317,12 @@ def log_images_to_writer(dataloader, writer, tag="train"):
 
         sample_batch_label_str = "sample_" + tag + "_batch" + str(i) + "_"
         if isinstance(sample_train_y, torch.Tensor) and len(sample_train_y.shape) == 1:
-            sample_batch_label_str += "_" + str(
-                list(map(lambda x: int(x), list(sample_train_y)))
-            )
+            sample_batch_label_str += "_" + str( list(map(lambda x: int(x), list(sample_train_y))))
 
-        try:
-            writer.add_image(
-                sample_batch_label_str,
-                torchvision.utils.make_grid(sample_train_imgs, sample_train_imgs.shape[0]),
-            )
+        elif isinstance(sample_train_y, list) and len(sample_train_y) == 1:
+            sample_batch_label_str += "_" + str( list(map(lambda x: int(x), list(sample_train_y[0]))))
 
-        except Exception as e:
-            import pdb; pdb.set_trace()
-            print(e)
+        writer.add_image(
+            sample_batch_label_str,
+            torchvision.utils.make_grid(sample_train_imgs, sample_train_imgs.shape[0]),
+        )

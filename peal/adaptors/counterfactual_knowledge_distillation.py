@@ -1524,6 +1524,7 @@ class CFKD(Adaptor):
             validation_tracked_values = None
             validation_stats = []
             for i in range(self.adaptor_config.validation_runs):
+                print('Validation run: ' + str(i))
                 self.explainer.explainer_config = copy.deepcopy(
                     original_explainer_config
                 )
@@ -1546,6 +1547,11 @@ class CFKD(Adaptor):
                                 attribute[1][0] + effective_idx,
                             )
 
+                validation_collages_base_path = os.path.join(
+                    self.base_dir,
+                    str(finetune_iteration),
+                    "validation_collages" + str(i),
+                )
                 (
                     validation_tracked_values_current,
                     validation_stats_current,
@@ -1553,11 +1559,7 @@ class CFKD(Adaptor):
                     model=self.student,
                     dataloader=self.dataloaders_val[0],
                     tracked_keys=self.tracked_keys,
-                    base_path=os.path.join(
-                        self.base_dir,
-                        str(finetune_iteration),
-                        "validation_collages" + str(i),
-                    ),
+                    base_path=validation_collages_base_path,
                     output_size=self.output_size,
                     explainer=self.explainer,
                     device=self.device,
