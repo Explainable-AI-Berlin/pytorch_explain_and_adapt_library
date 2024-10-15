@@ -1524,6 +1524,7 @@ class CFKD(Adaptor):
             validation_tracked_values = None
             validation_stats = []
             for i in range(self.adaptor_config.validation_runs):
+                print('Validation run: ' + str(i))
                 self.explainer.explainer_config = copy.deepcopy(
                     original_explainer_config
                 )

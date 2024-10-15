@@ -438,6 +438,7 @@ class CounterfactualExplainer(ExplainerInterface):
                     torch.clone(z_original.detach().cpu()), requires_grad=True
                 )
                 z = [z]
+                z_original = [z_original]
 
         else:
             z_original = x.to(self.device)
@@ -498,6 +499,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 pred_original = torch.nn.functional.softmax(
                     self.predictor(img_predictor.detach()), -1
                 )
+                z_default = img_default
 
             target_confidences = [
                 float(pred_original[i][y_target[i]]) for i in range(len(y_target))
@@ -526,14 +528,18 @@ class CounterfactualExplainer(ExplainerInterface):
             loss = self.loss(logits_gradient, y_target.to(self.device))
             l1_losses = []
             for z_idx in range(len(z_original)):
-                l1_losses.append(
-                    torch.mean(
-                        torch.abs(
-                            z[z_idx].to(self.device)
-                            - torch.clone(z_original[z_idx]).detach()
+                try:
+                    l1_losses.append(
+                        torch.mean(
+                            torch.abs(
+                                z[z_idx].to(self.device)
+                                - torch.clone(z_original[z_idx]).detach()
+                            )
                         )
                     )
-                )
+
+                except Exception:
+                    import pdb; pdb.set_trace()
 
             loss += self.explainer_config.dist_l1 * torch.mean(torch.stack(l1_losses))
             if not pbar is None:
@@ -575,22 +581,20 @@ class CounterfactualExplainer(ExplainerInterface):
                 z_old = torch.clone(z[0])
 
             optimizer.step()
+            boolmask = torch.zeros_like(z[0].data)
             if self.explainer_config.iterationwise_encoding:
                 if self.explainer_config.inpaint != 0.0:
-                    z[0].data, boolmask = (
-                        self.generator.repaint(
-                            x=x.to(
-                                self.device
-                            ),  # TODO seems to be in generator normalization
-                            pe=z[0],
-                            inpaint=self.explainer_config.inpaint,
-                            dilation=self.explainer_config.dilation,
-                            t=self.explainer_config.sampling_time_fraction,
-                            stochastic=self.explainer_config.stochastic,
-                        )
-                        .detach()
-                        .cpu()
+                    z_updated, boolmask = self.generator.repaint(
+                        x=x.to(
+                            self.device
+                        ),  # TODO seems to be in generator normalization
+                        pe=z[0].to(self.device),
+                        inpaint=self.explainer_config.inpaint,
+                        dilation=self.explainer_config.dilation,
+                        t=self.explainer_config.sampling_time_fraction,
+                        stochastic=self.explainer_config.stochastic,
                     )
+                    z[0].data = z_updated.detach().cpu()
 
                 z_default = self.generator.dataset.project_to_pytorch_default(z[0])
                 z_predictor = (
@@ -603,11 +607,12 @@ class CounterfactualExplainer(ExplainerInterface):
                     if pred_new[j, int(y_target[j])] >= gradient_confidences_old[j]:
                         # print("Update " + str(j))
                         gradient_confidences_old[j] = pred_new[j, int(y_target[j])]
+                        print("Update " + str(j))
 
                     else:
                         z[0].data[j] = z_old[j]
 
-            visualize_step(
+            """visualize_step(
                 x=x_in,
                 z=z,
                 z_noisy=z_default,
@@ -617,7 +622,7 @@ class CounterfactualExplainer(ExplainerInterface):
             )
             import pdb
 
-            pdb.set_trace()
+            pdb.set_trace()"""
 
         if not self.explainer_config.iterationwise_encoding:
             z_cuda = [z_elem.to(self.device) for z_elem in z]
@@ -713,6 +718,7 @@ class CounterfactualExplainer(ExplainerInterface):
         elif isinstance(self.generator, InvertibleGenerator) and isinstance(
             self.explainer_config, PDCConfig
         ):
+            print('start creating predictor-distilled counterfactual!')
             (
                 batch["x_counterfactual_list"],
                 batch["z_difference_list"],

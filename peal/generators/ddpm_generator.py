@@ -220,6 +220,9 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         return x
 
     def decode(self, z, t=1.0, stochastic=None, num_steps=None):
+        if isinstance(z, list) and len(z) == 1:
+            z = z[0]
+
         if stochastic is None:
             stochastic = self.config.stochastic
 
