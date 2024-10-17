@@ -127,7 +127,7 @@ class PDCConfig(ExplainerConfig):
     """
     stochastic: Union[type(None), bool] = None
     dilation: int = 17
-    inpaint: float = 0.7
+    inpaint: float = 0.5
     """
     A dict containing all variables that could not be given with the current config structure
     """
