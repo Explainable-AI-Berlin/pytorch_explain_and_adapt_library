@@ -3,7 +3,7 @@ import torch.hub
 from torch import Tensor
 from torchvision.models import efficientnet_b0, efficientnet_b4
 
-from utils.lrp_canonizers import EfficientNetBNCanonizer
+from peal.dependencies.rrclarc.utils.lrp_canonizers import EfficientNetBNCanonizer
 
 
 def get_efficientnet_b0(ckpt_path=None, pretrained=True, n_class: int = None) -> torch.nn.Module:

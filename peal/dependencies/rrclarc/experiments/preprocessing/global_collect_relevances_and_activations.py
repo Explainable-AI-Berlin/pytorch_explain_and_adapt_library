@@ -12,9 +12,9 @@ from crp.helper import get_layer_names
 from tqdm import tqdm
 from zennit.composites import EpsilonPlusFlat
 
-from datasets import get_dataset, get_dataset_kwargs
-from models import get_canonizer, get_fn_model_loader
-from utils.artificial_artifact import get_artifact_kwargs
+from peal.dependencies.rrclarc.datasets import get_dataset_kwargs, get_dataset
+from peal.dependencies.rrclarc.models import get_fn_model_loader, get_canonizer
+from peal.dependencies.rrclarc.utils.artificial_artifact import get_artifact_kwargs
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)

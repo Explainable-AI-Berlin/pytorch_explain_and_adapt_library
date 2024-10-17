@@ -145,6 +145,7 @@ class DataConfig(BaseModel):
     label_rel_path: str = "data.csv"
     img_name_idx: int = 0
     has_hints: bool = False
+    full_confounder_config: Union[type(None), list[float]] = None
 
 
 class SymbolicDataset(PealDataset):

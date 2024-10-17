@@ -2,9 +2,9 @@ import logging
 
 import torch
 
-from models.efficientnet import get_efficientnet_b0, get_efficientnet_b4, get_efficientnet_canonizer
-from models.resnet import get_resnet18, get_resnet34, get_resnet50, get_resnet_canonizer
-from models.vgg import get_vgg16, get_vgg16_bn, get_vgg11, get_vgg11_bn, get_vgg13_bn, get_vgg13, get_vgg_canonizer
+from .efficientnet import get_efficientnet_b0, get_efficientnet_b4, get_efficientnet_canonizer
+from .resnet import get_resnet18, get_resnet34, get_resnet50, get_resnet_canonizer
+from .vgg import get_vgg16, get_vgg16_bn, get_vgg11, get_vgg11_bn, get_vgg13_bn, get_vgg13, get_vgg_canonizer
 
 logger = logging.getLogger(__name__)
 

@@ -3,7 +3,7 @@ import torch.hub
 from torch import Tensor
 from torchvision.models import resnet18, resnet34, resnet50
 
-from utils.lrp_canonizers import ResNetCanonizer
+from peal.dependencies.rrclarc.utils.lrp_canonizers import ResNetCanonizer
 
 
 def get_resnet18(ckpt_path=None, pretrained=True, n_class: int = None) -> torch.nn.Module:
