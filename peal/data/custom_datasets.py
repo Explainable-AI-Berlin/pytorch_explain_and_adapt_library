@@ -357,33 +357,57 @@ def plot_latents_with_arrows(original_latents, counterfactual_latents, filename)
     for i, (orig, cf) in enumerate(zip(original_latents, counterfactual_latents)):
         if orig[0] < 0.5:
             # Points with x < 0.5 are dark blue, counterfactuals are light blue
-            ax.scatter(orig[0], orig[1], color='darkblue', label='Original (x < 0.5)' if i == 0 else "")
-            ax.scatter(cf[0], cf[1], color='lightblue', label='Counterfactual (x < 0.5)' if i == 0 else "")
+            ax.scatter(
+                orig[0],
+                orig[1],
+                color="darkblue",
+                label="Original (x < 0.5)" if i == 0 else "",
+            )
+            ax.scatter(
+                cf[0],
+                cf[1],
+                color="lightblue",
+                label="Counterfactual (x < 0.5)" if i == 0 else "",
+            )
         else:
             # Points with x >= 0.5 are red, counterfactuals are light red
-            ax.scatter(orig[0], orig[1], color='red', label='Original (x >= 0.5)' if i == 0 else "")
-            ax.scatter(cf[0], cf[1], color='lightcoral', label='Counterfactual (x >= 0.5)' if i == 0 else "")
+            ax.scatter(
+                orig[0],
+                orig[1],
+                color="red",
+                label="Original (x >= 0.5)" if i == 0 else "",
+            )
+            ax.scatter(
+                cf[0],
+                cf[1],
+                color="lightcoral",
+                label="Counterfactual (x >= 0.5)" if i == 0 else "",
+            )
 
         # Draw arrow between original and counterfactual points
-        ax.annotate('', xy=(cf[0], cf[1]), xytext=(orig[0], orig[1]),
-                    arrowprops=dict(facecolor='green', edgecolor='green', arrowstyle='->'))
+        ax.annotate(
+            "",
+            xy=(cf[0], cf[1]),
+            xytext=(orig[0], orig[1]),
+            arrowprops=dict(fc="green", ec="green", edgecolor="yellow", arrowstyle="->", alpha=0.7),
+        )
 
     # Setting limits for the plot (0 to 1 for both axes)
     ax.set_xlim([0, 1])
     ax.set_ylim([0, 1])
 
     # Add grey dotted lines at x == 0.5 and y == 0.5
-    ax.axvline(x=0.5, color='grey', linestyle='--', linewidth=1)
-    ax.axhline(y=0.5, color='grey', linestyle='--', linewidth=1)
+    ax.axvline(x=0.5, color="grey", linestyle="--", linewidth=1)
+    ax.axhline(y=0.5, color="grey", linestyle="--", linewidth=1)
 
     # Axis labels
-    ax.set_xlabel('Foreground Intensity')
-    ax.set_ylabel('Background Intensity')
+    ax.set_xlabel("Foreground Intensity")
+    ax.set_ylabel("Background Intensity")
 
     # Create a legend with the correct markers
     handles, labels = ax.get_legend_handles_labels()
     by_label = dict(zip(labels, handles))
-    ax.legend(by_label.values(), by_label.keys(), loc='upper right')
+    ax.legend(by_label.values(), by_label.keys(), loc="upper right")
 
     # Show the plot
     plt.grid(True)
@@ -397,6 +421,10 @@ def test():
 
     plot_latents_with_arrows(original_latents, counterfactual_latents, "bla.png")
 
+
+from peal.data.dataset_generators import latent_to_square_image
+
+
 class SquareDataset(Image2MixedDataset):
     def __init__(self, config: DataConfig, **kwargs):
         if not os.path.exists(config.dataset_path):
@@ -405,7 +433,9 @@ class SquareDataset(Image2MixedDataset):
 
         super(SquareDataset, self).__init__(config=config, **kwargs)
 
-    def global_counterfactual_visualization(self, counterfactuals, filename, num_samples):
+    def global_counterfactual_visualization(
+        self, counterfactuals, filename, num_samples
+    ):
         original_latents = []
         counterfactual_latents = []
         hints_enabled_buffer = self.hints_enabled
@@ -424,6 +454,33 @@ class SquareDataset(Image2MixedDataset):
 
         self.hints_enabled = hints_enabled_buffer
         plot_latents_with_arrows(original_latents, counterfactual_latents, filename)
+
+    def visualize_decision_boundary(self, predictor, batch_size, device, path):
+        x = torch.linspace(0, 1, 100)
+        y = torch.linspace(0, 1, 100)
+        xx, yy = torch.meshgrid(x, y)
+        grid = torch.stack([xx.flatten(), yy.flatten()], dim=1)
+        current_batch = []
+        logits = []
+        first_batch = None
+        for i in range(len(grid)):
+            current_batch.append(
+                ToTensor()(latent_to_square_image(255 * float(grid[i][0]), 255 * float(grid[i][1]))[0])
+            )
+            if len(current_batch) == batch_size:
+                current_batch = torch.stack(current_batch)
+                if first_batch is None:
+                    first_batch = current_batch
+
+                logits.append(predictor(current_batch.to(device)).detach())
+                current_batch = []
+
+        logits.append(predictor(torch.stack(current_batch).to(device)).detach())
+        logits = torch.cat(logits, dim=0).detach().cpu().numpy()
+        prediction_grid = logits.argmax(axis=1).reshape(100, 100)
+        plt.figure()
+        plt.contourf(xx, yy, prediction_grid, levels=100)
+        plt.savefig(path)
 
     def check_foreground(self, x, hint):
         intensity_foreground = torch.sum(hint * x) / torch.sum(hint)

@@ -598,6 +598,20 @@ class CFKD(Adaptor):
                     self.base_dir + "_old_" + datetime.now().strftime("%Y%m%d_%H%M%S"),
                 )
 
+        if not os.path.exists(os.path.join(self.base_dir, "0")):
+            os.makedirs(os.path.join(self.base_dir, "0"))
+
+        boundary_path = os.path.join(self.base_dir, "0", "decision_boundary.png")
+        if not os.path.exists(boundary_path) and hasattr(
+            self.dataloaders_val[0].dataset, "visualize_decision_boundary"
+        ):
+            self.dataloaders_val[0].dataset.visualize_decision_boundary(
+                self.student,
+                self.adaptor_config.training.train_batch_size,
+                self.device,
+                boundary_path,
+            )
+
         log_dir = os.path.join(self.base_dir, "logs")
         if not os.path.exists(log_dir):
             Path(log_dir).mkdir(parents=True, exist_ok=True)
@@ -1615,15 +1629,15 @@ class CFKD(Adaptor):
             self.explainer.explainer_config = original_explainer_config
             if self.adaptor_config.validation_runs > 1:
                 self.datastack.dataset._initialize_performance_metrics()
-                validation_stats[
-                    "distance_to_manifold"
-                ] = self.datastack.dataset.distribution_distance(
-                    x_counterfactual_collection
+                validation_stats["distance_to_manifold"] = (
+                    self.datastack.dataset.distribution_distance(
+                        x_counterfactual_collection
+                    )
                 )
-                validation_stats[
-                    "pairwise_distance"
-                ] = self.datastack.dataset.pair_wise_distance(
-                    x_list_collection, x_counterfactual_collection
+                validation_stats["pairwise_distance"] = (
+                    self.datastack.dataset.pair_wise_distance(
+                        x_list_collection, x_counterfactual_collection
+                    )
                 )
                 validation_stats["diversity"] = self.datastack.dataset.variance(
                     x_counterfactual_collection
@@ -1763,14 +1777,17 @@ class CFKD(Adaptor):
 
                 np.savez(f, **validation_stats_file)
 
-        if hasattr(self.val_dataloader.dataset, "global_counterfactual_visualization"):
-            self.val_dataloader.dataset.global_counterfactual_visualization(
-                validation_tracked_values["x_counterfactuals"],
+        if hasattr(self.dataloaders_val[0].dataset, "global_counterfactual_visualization"):
+            self.dataloaders_val[0].dataset.global_counterfactual_visualization(
+                validation_tracked_values["x_counterfactual_list"],
                 os.path.join(
-                    self.base_dir, str(finetune_iteration), "val_counterfactuals_global.png"
+                    self.base_dir,
+                    str(finetune_iteration),
+                    "val_counterfactuals_global.png",
                 ),
                 self.adaptor_config.max_validation_samples,
             )
+            print("global counterfactual visualization saved!!!")
 
         self.create_dataset(
             feedback=validation_feedback,
@@ -1903,6 +1920,15 @@ class CFKD(Adaptor):
             writer.add_scalar("test_accuracy", test_accuracy, finetune_iteration)
             print("test_accuracy: " + str(test_accuracy))
             print("Start to retrieve validation stats")
+
+            if hasattr(self.dataloaders_val[0].dataset, "visualize_decision_boundary"):
+                self.dataloaders_val[0].dataset.visualize_decision_boundary(
+                    self.student,
+                    self.adaptor_config.training.train_batch_size,
+                    self.device,
+                    os.path.join(self.base_dir, str(finetune_iteration), "decision_boundary.png"),
+                )
+
             validation_stats = self.retrieve_validation_stats(
                 finetune_iteration=finetune_iteration
             )
