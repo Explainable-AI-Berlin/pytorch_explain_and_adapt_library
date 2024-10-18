@@ -34,7 +34,7 @@ from peal.generators.interfaces import Generator
 from peal.architectures.predictors import (
     SequentialModel,
     ArchitectureConfig,
-    TaskConfig,
+    TaskConfig, TorchvisionModel,
 )
 
 
@@ -119,7 +119,7 @@ class PredictorConfig:
     """
     The config of the architecture of the model.
     """
-    architecture: Union[ArchitectureConfig, types.SimpleNamespace, type(None)] = None
+    architecture: Union[ArchitectureConfig, types.SimpleNamespace, str, type(None)] = None
     """
     The config of the data used for training the model.
     """
@@ -312,6 +312,12 @@ class ModelTrainer:
                     self.config.training.dropout,
                 )
 
+            elif isinstance(self.config.architecture, str) and self.config.architecture[:12] == "torchvision_":
+                self.model = TorchvisionModel(self.config.architecture[12:], output_channels)
+
+            else:
+                raise Exception("Architecture not available!")
+
         else:
             self.model = model
 
@@ -356,7 +362,7 @@ class ModelTrainer:
             print("trainable parameters: ", len(param_list))
             if self.config.training.optimizer == "sgd":
                 self.optimizer = torch.optim.SGD(
-                    param_list, lr=self.config.training.learning_rate
+                    param_list, lr=self.config.training.learning_rate, momentum=0.9, weight_decay=0.0001
                 )
                 lambda1 = lambda epoch: 0.95**epoch
                 self.scheduler = torch.optim.lr_scheduler.LambdaLR(
@@ -557,9 +563,14 @@ class ModelTrainer:
         print("Training Config: " + str(self.config))
         if not continue_training:
             if "orthogonality" in self.config.task.criterions.keys():
+                print('Orthogonal intialization!!!')
+                print('Orthogonal intialization!!!')
+                print('Orthogonal intialization!!!')
                 orthogonal_initialization(self.model)
 
             else:
+                print("reset weights!!!")
+                print("reset weights!!!")
                 print("reset weights!!!")
                 reset_weights(self.model)
 

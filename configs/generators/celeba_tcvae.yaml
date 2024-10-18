@@ -51,7 +51,7 @@ diversity_weight: 1
 n_samples: 10
 fisher_samples: 0
 
-#teacher: '$PEAL_RUNS/Smiling_confounding_copyrighttag_celeba/classifier_unpoisened/model.cpl'
-#student: '$PEAL_RUNS/Smiling_confounding_copyrighttag_celeba/classifier_poisened100/model.cpl'
+#teacher: '$PEAL_RUNS/Smiling_confounding_copyrighttag_celeba/classifier_unpoisoned/model.cpl'
+#student: '$PEAL_RUNS/Smiling_confounding_copyrighttag_celeba/classifier_poisoned100/model.cpl'
 
 #generator_path: 'peal_runs/dive'

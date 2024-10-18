@@ -1,5 +1,5 @@
 dataset_name            : follicles
-dataset_path            : $PEAL_DATA/follicles
+dataset_path            : $PEAL_DATA/follicles2
 num_samples             : 1389
 split                   : []
 input_type              : image

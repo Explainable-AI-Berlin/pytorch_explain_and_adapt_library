@@ -360,7 +360,7 @@ def orthogonal_initialization(model):
             torch.nn.init.orthogonal_(parameter)
 
 
-def reset_weights(model):
+'''def reset_weights(model):
     """
     Resets all weights in the model recursively using reset_parameters
     """
@@ -370,7 +370,17 @@ def reset_weights(model):
             parameter.data = torch.randn_like(parameter.data)
 
         else:
-            parameter.data = torch.zeros_like(parameter.data)
+            parameter.data = torch.zeros_like(parameter.data)'''
+
+
+def reset_weights(model):
+    for idx, layer in enumerate(model.children()):
+        if hasattr(layer, 'reset_parameters'):
+            print(f'Resetting parameters of layer: {layer}')
+            layer.reset_parameters()
+
+        else:
+            print(f'Layer {idx} does not have a reset_parameters method')
 
 
 class LeakySoftplus(torch.nn.Module):

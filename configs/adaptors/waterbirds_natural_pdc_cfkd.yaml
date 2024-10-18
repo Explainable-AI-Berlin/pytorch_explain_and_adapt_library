@@ -4,20 +4,19 @@ category                             :  "adaptor"
 batch_size                           :  2
 tracking_level                       :  3
 min_train_samples                    :  400
-finetune_iterations                  :  1
-max_test_batches                     :  1
-max_validation_samples               :  4
+finetune_iterations                  :  0
+max_validation_samples               :  100
 continuous_learning                  :  "finetune"
 replace_model                        :  True
 use_visualization                    :  True
 calculate_group_accuracies           :  True
-explainer                            :  <PEAL_BASE>/configs/explainers/pdc_default.yaml
+explainer                            :  <PEAL_BASE>/configs/explainers/square_newpdc.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/waterbirds.yaml
 test_data                            :  <PEAL_BASE>/configs/data/waterbirds.yaml
 student                              :  $PEAL_RUNS/waterbirds/classifier_natural/model.cpl
-teacher                              :  human@8000
-generator                            :  $PEAL_RUNS/waterbirds/ddpm/config.yaml
+teacher                              :  Baseline:false
+generator                            :  $PEAL_RUNS/imagenet/ddpm/config.yaml
 base_dir                             :  $PEAL_RUNS/waterbirds/classifier_natural/pdc_cfkd
 task:
   criterions:

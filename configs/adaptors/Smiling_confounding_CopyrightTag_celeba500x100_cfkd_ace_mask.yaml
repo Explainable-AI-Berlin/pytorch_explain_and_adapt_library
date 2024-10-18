@@ -12,12 +12,12 @@ use_visualization                    :  False #True
 calculate_group_accuracies           :  True
 explainer                            :  <PEAL_BASE>/configs/explainers/ace_diverse_Copyrighttag_celeba.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
-data                                 :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba500_poisened100.yaml
+data                                 :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba500_poisoned100.yaml
 test_data                            :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba.yaml
-student                              :  $PEAL_RUNS/Smiling_confounding_copyrighttag_celeba/classifier_poisened100/model.cpl
+student                              :  $PEAL_RUNS/Smiling_confounding_copyrighttag_celeba/classifier_poisoned100/model.cpl
 teacher                              :  SegmentationMask
 generator                            :  $PEAL_RUNS/ddpm_CopyrightTag_celeba_1000/config.yaml
-base_dir                             :  $PEAL_RUNS/Smiling_confounding_copyrighttag_celeba/classifier_poisened100/cfkd_ace_mask
+base_dir                             :  $PEAL_RUNS/Smiling_confounding_copyrighttag_celeba/classifier_poisoned100/cfkd_ace_mask
 task:
   criterions:
     ce     : 1.0

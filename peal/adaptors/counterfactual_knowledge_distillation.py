@@ -17,6 +17,7 @@ from types import SimpleNamespace
 from pydantic import PositiveInt
 from typing import Union
 
+from peal.architectures.predictors import TorchvisionModel
 from peal.global_utils import (
     load_yaml_config,
     save_yaml_config,
@@ -1318,17 +1319,8 @@ class CFKD(Adaptor):
             ).mkdir(parents=True, exist_ok=True)
 
             if self.adaptor_config.continuous_learning == "retrain":
-                print("reset student weights!!!")
-                print("reset student weights!!!")
-                print("reset student weights!!!")
-
-                """def weight_reset(m):
-                    reset_parameters = getattr(m, "reset_parameters", None)
-                    if callable(reset_parameters):
-                        m.reset_parameters()
-
-                self.student.apply(weight_reset)"""
-                reset_weights(self.student)
+                # TODO this should be changed!
+                self.student = TorchvisionModel("resnet18", 2)
 
             finetune_trainer = ModelTrainer(
                 config=copy.deepcopy(self.adaptor_config),
@@ -1354,7 +1346,7 @@ class CFKD(Adaptor):
                 self.train_dataloader.dataset.disable_idx()
                 self.val_dataloader.dataset.disable_idx()
 
-            finetune_trainer.fit(continue_training=True)
+            finetune_trainer.fit(continue_training=True) #bool(self.adaptor_config.continuous_learning != "retrain"))
 
             if isinstance(self.teacher, SegmentationMaskTeacher):
                 self.train_dataloader.dataset.enable_hints()

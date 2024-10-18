@@ -12,12 +12,12 @@ use_visualization                    :  True
 calculate_group_accuracies           :  True
 explainer                            :  <PEAL_BASE>/configs/explainers/square_pdc.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
-data                                 :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_poisened080.yaml
-test_data                            :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_unpoisened.yaml
-student                              :  $PEAL_RUNS/square2/colora_confounding_colorb/regularized0/classifier_poisened080/model.cpl
-teacher                              :  $PEAL_RUNS/square2/colora_confounding_colorb/regularized0/classifier_unpoisened/model.cpl
+data                                 :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_poisoned080.yaml
+test_data                            :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_unpoisoned.yaml
+student                              :  $PEAL_RUNS/square2/colora_confounding_colorb/regularized0/classifier_poisoned080/model.cpl
+teacher                              :  $PEAL_RUNS/square2/colora_confounding_colorb/regularized0/classifier_unpoisoned/model.cpl
 generator                            :  $PEAL_RUNS/square2/ddpm/config.yaml
-base_dir                             :  $PEAL_RUNS/square2/colora_confounding_colorb/regularized0/classifier_poisened080/pdc_cfkd
+base_dir                             :  $PEAL_RUNS/square2/colora_confounding_colorb/regularized0/classifier_poisoned080/pdc_cfkd
 task:
   criterions:
     ce     : 1.0
