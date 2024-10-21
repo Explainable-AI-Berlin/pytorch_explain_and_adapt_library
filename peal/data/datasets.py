@@ -786,12 +786,15 @@ class Image2MixedDataset(ImageDataset):
         return_dict = {"x": img_tensor, "y": target}
 
         if self.hints_enabled:
+            option2 = os.path.join(self.root_dir, "masks", name.split("/")[-1])
             if os.path.exists(os.path.join(self.root_dir, "masks", name)):
                 mask = Image.open(os.path.join(self.root_dir, "masks", name))
 
+            elif os.path.exists(option2):
+                mask = Image.open(option2)
+
             else:
-                mask_name = name.split("/")[-1]
-                mask = Image.open(os.path.join(self.root_dir, "masks", mask_name))
+                mask = Image.new("RGB", img.size, (0, 0, 0))
 
             torch.set_rng_state(state)
             mask_tensor = self.transform(mask)

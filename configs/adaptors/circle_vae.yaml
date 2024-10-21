@@ -6,12 +6,12 @@
 'replace_model'                        :  True
 'explainer'                            :  '<PEAL_BASE>/configs/explainers/counterfactual_default.yaml'
 'training'                             :  '<PEAL_BASE>/configs/training/img_classifier.yaml'
-'data'                                 :  '<PEAL_BASE>/configs/data/circle_dataset_diffusion_poisened.yaml'
-'test_data'                            :  '<PEAL_BASE>/configs/data/circle_dataset_diffusion_poisened.yaml'
-'student'                              :  'peal_runs/artificial_circle_poisened_classifier/model.cpl'
-'teacher'                              :  'peal_runs/artificial_circle_unpoisened_classifier/model.cpl'
+'data'                                 :  '<PEAL_BASE>/configs/data/circle_dataset_diffusion_poisoned.yaml'
+'test_data'                            :  '<PEAL_BASE>/configs/data/circle_dataset_diffusion_poisoned.yaml'
+'student'                              :  'peal_runs/artificial_circle_poisoned_classifier/model.cpl'
+'teacher'                              :  'peal_runs/artificial_circle_unpoisoned_classifier/model.cpl'
 'generator'                            :  'peal_runs/artificial_circle_vae_generator/config.yaml'
-'base_dir'                             :  'peal_runs/artificial_circle_poisened_classifier/cfkd_vae'
+'base_dir'                             :  'peal_runs/artificial_circle_poisoned_classifier/cfkd_vae'
 'task':
   'criterions':
     'ce'     : 1.0

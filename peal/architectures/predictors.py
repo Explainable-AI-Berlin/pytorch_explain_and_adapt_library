@@ -1,6 +1,7 @@
 import torch
 import os
 
+import torchvision
 from pydantic import BaseModel, PositiveInt
 from typing import Union
 
@@ -238,3 +239,21 @@ class SequentialModel(torch.nn.Sequential):
         self.output_channels = num_neurons_previous
 
         super(SequentialModel, self).__init__(*layers)
+
+
+class TorchvisionModel(torch.nn.Module):
+    def __init__(self, model, num_classes):
+        super(TorchvisionModel, self).__init__()
+        if model == 'resnet18':
+            self.model = torchvision.models.resnet18(pretrained=True)
+
+        elif model == "resnet50":
+            self.model = torchvision.models.resnet50(pretrained=True)
+
+        else:
+            raise ValueError("Unknown model: {}".format(model))
+
+        self.model.fc = torch.nn.Linear(self.model.fc.in_features, num_classes)
+
+    def forward(self, x):
+        return self.model(x)

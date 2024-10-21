@@ -4,7 +4,7 @@ category                             :  "adaptor"
 batch_size                           :  6
 tracking_level                       :  3
 min_train_samples                    :  900
-finetune_iterations                  :  5
+finetune_iterations                  :  0
 max_validation_samples               :  100
 continuous_learning                  :  "retrain"
 replace_model                        :  True
@@ -12,12 +12,12 @@ use_visualization                    :  True
 calculate_group_accuracies           :  True
 explainer                            :  <PEAL_BASE>/configs/explainers/square_pdc.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
-data                                 :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_poisened100.yaml
-test_data                            :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_unpoisened.yaml
-student                              :  $PEAL_RUNS/square2/colora_confounding_colorb/regularized0/classifier_poisened100/model.cpl
-teacher                              :  SegmentationMask
+data                                 :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_poisoned100.yaml
+test_data                            :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_unpoisoned.yaml
+student                              :  $PEAL_RUNS/square2/colora_confounding_colorb/torchvision/classifier_poisoned100/model.cpl
+teacher                              :  $PEAL_RUNS/square2/colora_confounding_colorb/torchvision/classifier_unpoisoned/model.cpl
 generator                            :  $PEAL_RUNS/square2/ddpm/config.yaml
-base_dir                             :  $PEAL_RUNS/square2/colora_confounding_colorb/regularized0/classifier_poisened100/pdc_cfkd_leakysoftplus
+base_dir                             :  $PEAL_RUNS/square2/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_cfkd
 task:
   criterions:
     ce     : 1.0

@@ -119,6 +119,10 @@ class PDCConfig(ExplainerConfig):
     """
     sampling_time_fraction: float = 0.3
     """
+    The number of discretizations when going into the latent space
+    """
+    num_discretization_steps: int = 15
+    """
     Whether to encode every iteration again or not.
     """
     iterationwise_encoding: bool = True
@@ -129,9 +133,9 @@ class PDCConfig(ExplainerConfig):
     dilation: int = 17
     inpaint: float = 0.5
     """
-    A dict containing all variables that could not be given with the current config structure
+    The activation function ReLU is replaced with: leaky_relu, leaky_softplus
     """
-    kwargs: dict = {}
+    replace_with_activation: str = "leaky_softplus"
 
 
 class ACEConfig(ExplainerConfig):
@@ -194,6 +198,10 @@ class ACEConfig(ExplainerConfig):
     chunk: int = 0  # current chunk (between 0 and chunks - 1)
     merge_chunks: bool = False  # to merge all chunked results
     y_target_goal_confidence: float = 1.1
+    """
+    The activation function ReLU is replaced with: leaky_relu, leaky_softplus
+    """
+    replace_with_activation: str = ""
 
 
 class TIMEConfig(ExplainerConfig):

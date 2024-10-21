@@ -11,12 +11,12 @@ use_visualization                    :  False #True
 calculate_group_accuracies           :  True
 explainer                            :  <PEAL_BASE>/configs/explainers/perfect_false_counterfactuals.yaml
 training                             :  <PEAL_BASE>/configs/training/img_classifier.yaml
-data                                 :  <PEAL_BASE>/configs/data/Young_confounding_OverdrawnSmiling_celeba500_poisened092.yaml
+data                                 :  <PEAL_BASE>/configs/data/Young_confounding_OverdrawnSmiling_celeba500_poisoned092.yaml
 test_data                            :  <PEAL_BASE>/configs/data/Young_confounding_Smiling_celeba.yaml
-student                              :  $PEAL_RUNS/Young_confounding_Smiling_celeba/classifier_poisened092/model.cpl
-teacher                              :  $PEAL_RUNS/Young_confounding_Smiling_celeba/classifier_unpoisened/model.cpl
+student                              :  $PEAL_RUNS/Young_confounding_Smiling_celeba/classifier_poisoned092/model.cpl
+teacher                              :  $PEAL_RUNS/Young_confounding_Smiling_celeba/classifier_unpoisoned/model.cpl
 generator                            :  $PEAL_RUNS/ddpm_CopyrightTag_celeba_1000/config.yaml
-base_dir                             :  $PEAL_RUNS/Young_confounding_Smiling_celeba/classifier_poisened092/cfkd_perfect_false_counterfactuals
+base_dir                             :  $PEAL_RUNS/Young_confounding_Smiling_celeba/classifier_poisoned092/cfkd_perfect_false_counterfactuals
 task:
   criterions:
     ce     : 1.0

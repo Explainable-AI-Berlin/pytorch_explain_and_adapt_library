@@ -7,11 +7,11 @@ distilled_predictor: <PEAL_BASE>/configs/predictors/generic_distillation.yaml
 y_target_goal_confidence: 0.8
 dist_l1: 1.0e-08
 sampling_time_fraction: 0.5
-predictor_path: $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened090/model.cpl
-predictor: $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened090/config.yaml
+predictor_path: $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisoned090/model.cpl
+predictor: $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisoned090/config.yaml
 generator: $PEAL_RUNS/celeba_copyrighttag/ddpm/config.yaml
 validate_generator: True
-explanations_dir: $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened090/pdc_new_explanation
+explanations_dir: $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisoned090/pdc_new_explanation
 max_samples: 10
 batch_size: 1
 iterationwise_encoding: True

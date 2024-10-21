@@ -12,12 +12,12 @@ use_visualization                    :  False #True
 calculate_group_accuracies           :  True
 explainer                            :  <PEAL_BASE>/configs/explainers/Young_vs_Smiling_pdc.yaml
 training                             :  <PEAL_BASE>/configs/training/img_classifier.yaml
-data                                 :  <PEAL_BASE>/configs/data/Young_confounding_Smiling_celeba_poisened100.yaml
+data                                 :  <PEAL_BASE>/configs/data/Young_confounding_Smiling_celeba_poisoned100.yaml
 test_data                            :  <PEAL_BASE>/configs/data/Young_confounding_Smiling_celeba.yaml
-student                              :  $PEAL_RUNS/celeba/Young_confounding_Smiling/regularized0/classifier_poisened100/model.cpl
-teacher                              :  $PEAL_RUNS/celeba/Young_confounding_Smiling/regularized0/classifier_poisened050/model.cpl
+student                              :  $PEAL_RUNS/celeba/Young_confounding_Smiling/regularized0/classifier_poisoned100/model.cpl
+teacher                              :  $PEAL_RUNS/celeba/Young_confounding_Smiling/regularized0/classifier_poisoned050/model.cpl
 generator                            :  $PEAL_RUNS/celeba/ddpm/config.yaml
-base_dir                             :  $PEAL_RUNS/celeba/Young_confounding_Smiling/regularized0/classifier_poisened100/pdc_cfkd
+base_dir                             :  $PEAL_RUNS/celeba/Young_confounding_Smiling/regularized0/classifier_poisoned100/pdc_cfkd
 task:
   criterions:
     ce     : 1.0

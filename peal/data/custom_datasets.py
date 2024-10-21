@@ -129,7 +129,8 @@ class CircleDataset(SymbolicDataset):
                 fc="blue",
                 ec="blue",
             )
-        # flip_rate = np.mean((classifier(torch.stack(x_counterfactual_list, dim=0)).softmax(dim=-1).argmax(dim=-1) != classifier(torch.stack(x_list, dim=0)).softmax(dim=-1).argmax(dim=-1)).numpy())
+        # flip_rate = np.mean((classifier(torch.stack(x_counterfactual_list, dim=0)).softmax(dim=-1).argmax(dim=-1)
+        # != classifier(torch.stack(x_list, dim=0)).softmax(dim=-1).argmax(dim=-1)).numpy())
         plt.show()
         plt.savefig(counterfactual_path + "/counterfactuals.png")
         collage_paths.append(counterfactual_path)
@@ -346,80 +347,144 @@ class MnistDataset(Image2ClassDataset):
         super(MnistDataset, self).__init__(config=config, **kwargs)
 
 
-def plot_latents_with_arrows(original_latents, counterfactual_latents, filename):
+import matplotlib.cm as cm
+
+from matplotlib.colors import ListedColormap
+
+
+def plot_latents_with_arrows(
+    original_latents,
+    counterfactual_latents,
+    filename,
+    y_target_start_confidence,
+    y_target_end_confidence,
+    decision_boundary,
+):
     fig, ax = plt.subplots()
 
     # Convert to numpy arrays for easy manipulation
     original_latents = np.array(original_latents)
     counterfactual_latents = np.array(counterfactual_latents)
+    y_target_start_confidence = np.array(y_target_start_confidence)
+    y_target_end_confidence = np.array(y_target_end_confidence)
 
-    # Plotting the original latents and counterfactuals
-    for i, (orig, cf) in enumerate(zip(original_latents, counterfactual_latents)):
-        if orig[0] < 0.5:
-            # Points with x < 0.5 are dark blue, counterfactuals are light blue
-            ax.scatter(
-                orig[0],
-                orig[1],
-                color="darkblue",
-                label="Original (x < 0.5)" if i == 0 else "",
-            )
-            ax.scatter(
-                cf[0],
-                cf[1],
-                color="lightblue",
-                label="Counterfactual (x < 0.5)" if i == 0 else "",
-            )
-        else:
-            # Points with x >= 0.5 are red, counterfactuals are light red
-            ax.scatter(
-                orig[0],
-                orig[1],
-                color="red",
-                label="Original (x >= 0.5)" if i == 0 else "",
-            )
-            ax.scatter(
-                cf[0],
-                cf[1],
-                color="lightcoral",
-                label="Counterfactual (x >= 0.5)" if i == 0 else "",
-            )
+    # Define the colormap for the points: blue -> red
+    cmap = cm.get_cmap("bwr")  # blue to red
+
+    # Create a custom colormap for the decision boundary (0 -> light blue, 1 -> light red)
+    decision_cmap = ListedColormap(["lightcoral", "lightblue"])
+
+    # Display the decision boundary grid as the background
+    ax.imshow(
+        decision_boundary,
+        extent=[0, 1, 0, 1],  # Extend from x=0 to x=1 and y=0 to y=1
+        origin="lower",  # Aligns the grid with the bottom-left of the plot
+        cmap=decision_cmap,  # Apply custom colormap
+        alpha=0.3,  # Make the background semi-transparent
+    )
+
+    # Plot original latents and counterfactuals
+    for i, (orig, cf, start_conf, end_conf) in enumerate(
+        zip(
+            original_latents,
+            counterfactual_latents,
+            y_target_start_confidence,
+            y_target_end_confidence,
+        )
+    ):
+        # Get the color from the colormap based on confidence (blue -> red)
+        start_color = cmap(start_conf)  # Color for the original point
+        end_color = cmap(end_conf)  # Color for the counterfactual point
+
+        # Plot original point with darkblue border
+        ax.scatter(
+            orig[0],
+            orig[1],
+            facecolor=start_color,
+            edgecolor="darkblue",
+            label="Original" if i == 0 else "",
+        )
+
+        # Plot counterfactual point with darkred border
+        ax.scatter(
+            cf[0],
+            cf[1],
+            facecolor=end_color,
+            edgecolor="darkred",
+            label="Counterfactual" if i == 0 else "",
+        )
 
         # Draw arrow between original and counterfactual points
         ax.annotate(
             "",
             xy=(cf[0], cf[1]),
             xytext=(orig[0], orig[1]),
-            arrowprops=dict(fc="green", ec="green", edgecolor="yellow", arrowstyle="->", alpha=0.7),
+            arrowprops=dict(
+                fc="green", ec="green", edgecolor="yellow", arrowstyle="->", alpha=0.7
+            ),
         )
 
     # Setting limits for the plot (0 to 1 for both axes)
     ax.set_xlim([0, 1])
     ax.set_ylim([0, 1])
 
-    # Add grey dotted lines at x == 0.5 and y == 0.5
-    ax.axvline(x=0.5, color="grey", linestyle="--", linewidth=1)
-    ax.axhline(y=0.5, color="grey", linestyle="--", linewidth=1)
+    # Set ticks at 0.5 intervals
+    ax.set_xticks(np.arange(0, 1.1, 0.5))
+    ax.set_yticks(np.arange(0, 1.1, 0.5))
 
     # Axis labels
     ax.set_xlabel("Foreground Intensity")
     ax.set_ylabel("Background Intensity")
 
-    # Create a legend with the correct markers
+
+    # Add vertical dotted line for Foreground Intensity == 0.5
+    plt.axvline(x=0.5, color="black", linestyle="--")
+    plt.text(
+        1.05,
+        0.5,
+        "Confounding feature only",
+        rotation=270,
+        verticalalignment="center",
+    )
+
+    # Add horizontal dotted line for Background Intensity == 0.5
+    plt.axhline(y=0.5, color="black", linestyle="--")
+    plt.text(0.5, 1.05, "True feature only", horizontalalignment="center")
+
+    # Create neutral markers for the legend (gray fill color)
     handles, labels = ax.get_legend_handles_labels()
+    neutral_marker = plt.Line2D(
+        [0],
+        [0],
+        marker="o",
+        color="w",
+        markerfacecolor="gray",
+        markeredgecolor="darkblue",
+        markersize=8,
+        label="Original",
+    )
+    cf_marker = plt.Line2D(
+        [0],
+        [0],
+        marker="o",
+        color="w",
+        markerfacecolor="gray",
+        markeredgecolor="darkred",
+        markersize=8,
+        label="Counterfactual",
+    )
     by_label = dict(zip(labels, handles))
+
+    # Override handles with neutral markers
+    by_label["Original"] = neutral_marker
+    by_label["Counterfactual"] = cf_marker
+
+    # Display the updated legend
     ax.legend(by_label.values(), by_label.keys(), loc="upper right")
 
     # Show the plot
     plt.grid(True)
     plt.savefig(filename)
-
-
-def test():
-    # Example usage
-    original_latents = [(0.2, 0.4), (0.6, 0.7), (0.4, 0.1), (0.8, 0.9)]
-    counterfactual_latents = [(0.3, 0.5), (0.7, 0.6), (0.35, 0.15), (0.75, 0.85)]
-
-    plot_latents_with_arrows(original_latents, counterfactual_latents, "bla.png")
 
 
 from peal.data.dataset_generators import latent_to_square_image
@@ -434,8 +499,20 @@ class SquareDataset(Image2MixedDataset):
         super(SquareDataset, self).__init__(config=config, **kwargs)
 
     def global_counterfactual_visualization(
-        self, counterfactuals, filename, num_samples
+        self,
+        counterfactuals,
+        filename,
+        num_samples,
+        y_target_start_confidence,
+        y_target_end_confidence,
+        y_list,
     ):
+        y_start_confidence = list(
+            map(lambda i: abs(y_list[i] - y_target_start_confidence[i]), range(len(y_list)))
+        )
+        y_end_confidence = list(
+            map(lambda i: abs(y_list[i] - y_target_end_confidence[i]), range(len(y_list)))
+        )
         original_latents = []
         counterfactual_latents = []
         hints_enabled_buffer = self.hints_enabled
@@ -453,34 +530,108 @@ class SquareDataset(Image2MixedDataset):
             )
 
         self.hints_enabled = hints_enabled_buffer
-        plot_latents_with_arrows(original_latents, counterfactual_latents, filename)
+
+        path = filename.split("/")[:-1] + ["decision_boundary.npy"]
+        decision_boundary = np.load("/" + os.path.join(*path))
+        decision_boundary = np.transpose(decision_boundary, (1, 0))
+
+        plot_latents_with_arrows(
+            original_latents,
+            counterfactual_latents,
+            filename,
+            y_start_confidence,
+            y_end_confidence,
+            decision_boundary,
+        )
 
     def visualize_decision_boundary(self, predictor, batch_size, device, path):
+        print("visualize_decision_boundary")
+
+        # Create the grid for plotting
         x = torch.linspace(0, 1, 100)
         y = torch.linspace(0, 1, 100)
         xx, yy = torch.meshgrid(x, y)
         grid = torch.stack([xx.flatten(), yy.flatten()], dim=1)
-        current_batch = []
-        logits = []
-        first_batch = None
-        for i in range(len(grid)):
-            current_batch.append(
-                ToTensor()(latent_to_square_image(255 * float(grid[i][0]), 255 * float(grid[i][1]))[0])
-            )
-            if len(current_batch) == batch_size:
-                current_batch = torch.stack(current_batch)
-                if first_batch is None:
-                    first_batch = current_batch
 
-                logits.append(predictor(current_batch.to(device)).detach())
+        prediction_grids = []
+        positions = [0, 26, 52]
+
+        # Predict the grid values for decision boundary
+        for x_pos in positions:
+            for y_pos in positions:
                 current_batch = []
+                logits = []
+                first_batch = None
 
-        logits.append(predictor(torch.stack(current_batch).to(device)).detach())
-        logits = torch.cat(logits, dim=0).detach().cpu().numpy()
-        prediction_grid = logits.argmax(axis=1).reshape(100, 100)
+                for i in range(len(grid)):
+                    current_batch.append(
+                        ToTensor()(
+                            latent_to_square_image(
+                                255 * float(grid[i][0]),
+                                255 * float(grid[i][1]),
+                                position_x=x_pos,
+                                position_y=y_pos,
+                            )[0],
+                        )
+                    )
+                    if len(current_batch) == batch_size:
+                        current_batch = torch.stack(current_batch)
+                        if first_batch is None:
+                            first_batch = current_batch
+
+                        logits.append(predictor(current_batch.to(device)).detach())
+                        current_batch = []
+
+                logits.append(predictor(torch.stack(current_batch).to(device)).detach())
+                logits = torch.cat(logits, dim=0).detach().cpu()
+                prediction_grid = logits.argmax(axis=1).reshape(100, 100)
+                prediction_grids.append(prediction_grid)
+
+        # Average the predictions across grids
+        prediction_grid = (
+            torch.mean(torch.stack(prediction_grids).to(torch.float32), dim=0) > 0.5
+        ).numpy()
+
+        # Create the plot
         plt.figure()
-        plt.contourf(xx, yy, prediction_grid, levels=100)
-        plt.savefig(path)
+
+        # Set a lighter color map: use "coolwarm" and make it lighter
+        cmap = plt.get_cmap("coolwarm")
+        custom_cmap = cmap(
+            np.linspace(0.25, 0.75, cmap.N)
+        )  # Focus on the lighter range
+        plt.contourf(xx, yy, prediction_grid, levels=100, cmap=cmap)
+
+        # Set axis labels
+        plt.xlabel("Foreground Intensity")
+        plt.ylabel("Background Intensity")
+
+        # Set the ticks to increments of 0.5
+        plt.xticks(np.arange(0, 1.1, 0.5))
+        plt.yticks(np.arange(0, 1.1, 0.5))
+
+        # Add vertical dotted line for Foreground Intensity == 0.5
+        plt.axvline(x=0.5, color="black", linestyle="--")
+        plt.text(
+            1.05,
+            0.5,
+            "Confounding feature only",
+            rotation=270,
+            verticalalignment="center",
+        )
+
+        # Add horizontal dotted line for Background Intensity == 0.5
+        plt.axhline(y=0.5, color="black", linestyle="--")
+        plt.text(0.5, 1.05, "True feature only", horizontalalignment="center")
+
+        # Adjust plot limits to give space for text labels outside the plot
+        plt.subplots_adjust(right=0.85, top=0.85)
+
+        # Save the plot to the specified path
+        plt.savefig(path, bbox_inches="tight")
+        np.save(path[:-4] + ".npy", prediction_grid)
+
+        print("visualize_decision_boundary saved under " + path)
 
     def check_foreground(self, x, hint):
         intensity_foreground = torch.sum(hint * x) / torch.sum(hint)
