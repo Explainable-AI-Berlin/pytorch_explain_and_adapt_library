@@ -387,6 +387,7 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
 
         else:
             gradient_predictor = predictor
+            import pdb; pdb.set_trace()
 
         dataset = [
             (

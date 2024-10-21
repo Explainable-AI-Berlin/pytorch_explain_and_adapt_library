@@ -1,4 +1,4 @@
-# python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_pdc_cfkd.yaml"
+# python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_ace_leakysoftplus_cfkd.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  6
@@ -10,14 +10,14 @@ continuous_learning                  :  "retrain"
 replace_model                        :  True
 use_visualization                    :  True
 calculate_group_accuracies           :  True
-explainer                            :  <PEAL_BASE>/configs/explainers/square_pdc.yaml
+explainer                            :  <PEAL_BASE>/configs/explainers/square_ace_leakysoftplus.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_poisoned100.yaml
 test_data                            :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_unpoisoned.yaml
 student                              :  $PEAL_RUNS/square2/colora_confounding_colorb/torchvision/classifier_poisoned100/model.cpl
 teacher                              :  $PEAL_RUNS/square2/colora_confounding_colorb/torchvision/classifier_unpoisoned/model.cpl
 generator                            :  $PEAL_RUNS/square2/ddpm/config.yaml
-base_dir                             :  $PEAL_RUNS/square2/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_cfkd
+base_dir                             :  $PEAL_RUNS/square2/colora_confounding_colorb/torchvision/classifier_poisoned100/ace_leakysoftplus_cfkd
 task:
   criterions:
     ce     : 1.0

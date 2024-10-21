@@ -404,6 +404,17 @@ def replace_relu_with_leakysoftplus(model):
     return model
 
 
+def replace_relu_with_leakyrelu(model):
+    for child_name, child in model.named_children():
+        if isinstance(child, torch.nn.ReLU):
+            setattr(model, child_name, torch.nn.LeakyReLU(negative_slope=0.1))
+
+        else:
+            replace_relu_with_leakysoftplus(child)
+
+    return model
+
+
 def get_predictions(args):
     torch.set_grad_enabled(False)
 
