@@ -78,7 +78,7 @@ class PDCConfig(ExplainerConfig):
     The desired target confidence.
     Consider the tradeoff between minimality and clarity of counterfactual
     """
-    y_target_goal_confidence: float = 0.9
+    y_target_goal_confidence: Union[type(None), float] = None
     """
     Whether samples in the current search batch are masked after reaching y_target_goal_confidence
     or whether they are continued to be updated until the last surpasses the threshhold
@@ -133,9 +133,9 @@ class PDCConfig(ExplainerConfig):
     dilation: int = 17
     inpaint: float = 0.5
     """
-    The activation function ReLU is replaced with: leaky_relu, leaky_softplus
+    The activation function ReLU is replaced with: leakyrelu, leakysoftplus
     """
-    replace_with_activation: str = "leaky_softplus"
+    replace_with_activation: str = "leakysoftplus"
 
 
 class ACEConfig(ExplainerConfig):
@@ -197,7 +197,7 @@ class ACEConfig(ExplainerConfig):
     chunks: int = 1  # Chunking for spliting the CE generation into multiple gpus
     chunk: int = 0  # current chunk (between 0 and chunks - 1)
     merge_chunks: bool = False  # to merge all chunked results
-    y_target_goal_confidence: float = 1.1
+    y_target_goal_confidence: Union[type(None), float] = None
     """
     The activation function ReLU is replaced with: leaky_relu, leaky_softplus
     """
@@ -386,7 +386,13 @@ class CounterfactualExplainer(ExplainerInterface):
                 self.inverse_datasets["test"] = get_datasets(inverse_test_config)[-1]
 
     def predictor_distilled_counterfactual(
-        self, x_in, target_confidence_goal, y_target, pbar=None, mode="", base_path=None
+        self,
+        x_in,
+        y_target,
+        target_confidence_goal=None,
+        pbar=None,
+        mode="",
+        base_path=None,
     ):
         """
         This function generates a counterfactual for a given batch of inputs.
@@ -423,9 +429,12 @@ class CounterfactualExplainer(ExplainerInterface):
         else:
             gradient_predictor = self.predictor
 
-        x = torch.clone(x_in)
-        history = [x.detach().cpu()[idx].unsqueeze(0) for idx in range(x.shape[0])]
-        x = self.predictor_datasets[1].project_to_pytorch_default(x)
+        x_predictor = torch.clone(x_in)
+        history = [
+            x_predictor.detach().cpu()[idx].unsqueeze(0)
+            for idx in range(x_predictor.shape[0])
+        ]
+        x = self.predictor_datasets[1].project_to_pytorch_default(x_predictor)
         x = self.generator.dataset.project_from_pytorch_default(x)
         x = torchvision.transforms.Resize(self.generator.config.data.input_size[1:])(x)
         if not self.explainer_config.iterationwise_encoding:
@@ -467,6 +476,19 @@ class CounterfactualExplainer(ExplainerInterface):
 
         mask = torch.ones(x.shape[0]).to(x)
         gradient_confidences_old = torch.zeros(x.shape[0]).to(x)
+        if target_confidence_goal is None:
+            pred_original = torch.nn.functional.softmax(
+                self.predictor(x_predictor.to(self.device))
+            ).detach().cpu()
+            target_confidences = [
+                pred_original[i][y_target[i]] for i in range(len(y_target))
+            ]
+            target_confidence_goal_current = 1 - torch.tensor(target_confidences)
+
+        else:
+            target_confidence_goal_current = (
+                torch.ones([x_predictor.shape[0]]) * target_confidence_goal
+            )
 
         for i in range(self.explainer_config.gradient_steps):
             if self.explainer_config.iterationwise_encoding:
@@ -547,7 +569,9 @@ class CounterfactualExplainer(ExplainerInterface):
                     )
 
                 except Exception:
-                    import pdb; pdb.set_trace()
+                    import pdb
+
+                    pdb.set_trace()
 
             loss += self.explainer_config.dist_l1 * torch.mean(torch.stack(l1_losses))
             if not pbar is None:
@@ -576,7 +600,10 @@ class CounterfactualExplainer(ExplainerInterface):
 
             if self.explainer_config.use_masking:
                 for sample_idx in range(len(target_confidences)):
-                    if target_confidences[sample_idx] >= target_confidence_goal:
+                    if (
+                        target_confidences[sample_idx]
+                        >= target_confidence_goal_current[sample_idx]
+                    ):
                         for variable_idx, v_elem in enumerate(z):
                             if self.explainer_config.optimizer == "Adam":
                                 optimizer = torch.optim.Adam(
@@ -726,15 +753,15 @@ class CounterfactualExplainer(ExplainerInterface):
         elif isinstance(self.generator, InvertibleGenerator) and isinstance(
             self.explainer_config, PDCConfig
         ):
-            print('start creating predictor-distilled counterfactual!')
+            print("start creating predictor-distilled counterfactual!")
             (
                 batch["x_counterfactual_list"],
                 batch["z_difference_list"],
                 batch["y_target_end_confidence_list"],
             ) = self.predictor_distilled_counterfactual(
                 x_in=batch["x_list"],
-                target_confidence_goal=target_confidence_goal,
                 y_target=batch["y_target_list"],
+                target_confidence_goal=target_confidence_goal,
                 pbar=pbar,
                 mode=mode,
                 base_path=explainer_path,

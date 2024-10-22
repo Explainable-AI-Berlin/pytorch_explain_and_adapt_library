@@ -1,7 +1,7 @@
 dataset_path            : $PEAL_DATA/waterbirds
 split                   : []
 input_type              : image
-input_size              : [3, 224, 224]
+input_size              : [3, 128, 128]
 output_type             : multiclass
 output_size             : [2]
 confounding_factors     : [y, place]

@@ -1,12 +1,11 @@
-explainer_type : ACE
+explainer_type : PDC
 attack_iterations: 50
 learning_rate: 100.0
 category: explainer
 distilled_predictor: <PEAL_BASE>/configs/predictors/generic_distillation.yaml
+replace_with_activation: leakysoftplus
 sampling_inpaint: 0.5
-y_target_goal_confidence: 1.1
 dist_l1: 0.0
-timestep_respacing: 100
 num_discretization_steps: 15
 sampling_time_fraction: 0.3
 iterationwise_encoding: True

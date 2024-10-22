@@ -162,7 +162,6 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         else:
             print('No model weights yet!!!')
             if os.path.exists(self.model_dir):
-                import pdb; pdb.set_trace()
                 shutil.move(self.model_dir, self.model_dir + "_old" + datetime.now().strftime("%Y%m%d_%H%M%S"))
 
             Path(self.model_dir).mkdir(parents=True, exist_ok=True)
@@ -387,7 +386,6 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
 
         else:
             gradient_predictor = predictor
-            import pdb; pdb.set_trace()
 
         dataset = [
             (

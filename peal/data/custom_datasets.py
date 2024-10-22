@@ -245,6 +245,7 @@ class CircleDataset(SymbolicDataset):
         #    axs[i].set_title(f'Class:{i}')
         plt.show()
         plt.savefig(contour_path)
+        plt.clf()
 
         return x_list, collage_paths
 
@@ -485,6 +486,7 @@ def plot_latents_with_arrows(
     # Show the plot
     plt.grid(True)
     plt.savefig(filename)
+    plt.clf()
 
 
 from peal.data.dataset_generators import latent_to_square_image
@@ -629,6 +631,7 @@ class SquareDataset(Image2MixedDataset):
 
         # Save the plot to the specified path
         plt.savefig(path, bbox_inches="tight")
+        plt.clf()
         np.save(path[:-4] + ".npy", prediction_grid)
 
         print("visualize_decision_boundary saved under " + path)
