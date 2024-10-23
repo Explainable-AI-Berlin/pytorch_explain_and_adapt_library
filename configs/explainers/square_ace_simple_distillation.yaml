@@ -5,6 +5,6 @@ attack_iterations: 150
 sampling_time_fraction: 0.5
 sampling_inpaint: 0.0
 attack_step: 5
-dist_l1: 0.001
+dist_l1: 0.01
 y_target_goal_confidence: 0.8
 distilled_predictor: <PEAL_BASE>/configs/predictors/generic_distillation.yaml

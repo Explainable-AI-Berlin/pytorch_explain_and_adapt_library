@@ -10,7 +10,7 @@ continuous_learning                  :  "retrain"
 replace_model                        :  True
 use_visualization                    :  True
 calculate_group_accuracies           :  True
-explainer                            :  <PEAL_BASE>/configs/explainers/square_pdc.yaml
+explainer                            :  <PEAL_BASE>/configs/explainers/square_pdc_onmanifold.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_poisoned060.yaml
 test_data                            :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_unpoisoned.yaml

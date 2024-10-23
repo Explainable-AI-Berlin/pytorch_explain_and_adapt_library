@@ -65,7 +65,7 @@ class PDCConfig(ExplainerConfig):
     """
     The maximum number of gradients step done for explaining the network
     """
-    gradient_steps: PositiveInt = 1000
+    gradient_steps: PositiveInt = 50
     """
     The optimizer used for searching the counterfactual
     """
@@ -538,7 +538,7 @@ class CounterfactualExplainer(ExplainerInterface):
             for j in range(img_predictor.shape[0]):
                 if (
                     pred_original[j, int(y_target[j])]
-                    > self.explainer_config.y_target_goal_confidence
+                    > target_confidence_goal_current[j]
                 ):
                     mask[j] = 0
 

@@ -381,6 +381,7 @@ def reset_weights(model):
 
         else:
             print(f'Layer {idx} does not have a reset_parameters method')
+            reset_weights(layer)
 
 
 class LeakySoftplus(torch.nn.Module):
