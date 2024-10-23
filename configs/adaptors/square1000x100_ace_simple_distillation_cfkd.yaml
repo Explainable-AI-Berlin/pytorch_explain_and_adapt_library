@@ -1,0 +1,27 @@
+# python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_ace_simple_distillation_cfkd.yaml"
+adaptor_type                         :  "CFKD"
+category                             :  "adaptor"
+batch_size                           :  6
+tracking_level                       :  3
+min_train_samples                    :  900
+finetune_iterations                  :  0
+max_validation_samples               :  100
+continuous_learning                  :  "retrain"
+replace_model                        :  True
+use_visualization                    :  True
+calculate_group_accuracies           :  True
+explainer                            :  <PEAL_BASE>/configs/explainers/square_ace_simple_distillation.yaml
+training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
+data                                 :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_poisoned100.yaml
+test_data                            :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_unpoisoned.yaml
+student                              :  $PEAL_RUNS/square2/colora_confounding_colorb/torchvision/classifier_poisoned100/model.cpl
+teacher                              :  $PEAL_RUNS/square2/colora_confounding_colorb/torchvision/classifier_unpoisoned/model.cpl
+generator                            :  $PEAL_RUNS/square2/ddpm/config.yaml
+base_dir                             :  $PEAL_RUNS/square2/colora_confounding_colorb/torchvision/classifier_poisoned100/ace_simple_distillation_cfkd
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [ClassA]

@@ -20,6 +20,10 @@ class GeneratorConfig(BaseModel):
     """
     category: str = 'generator'
     """
+    The batch size of the generator.
+    """
+    batch_size: int = 1
+    """
     The name of the class.
     """
     current_fid: float = float('inf')
@@ -41,7 +45,7 @@ class Generator(nn.Module):
 
 
 class InvertibleGenerator(Generator):
-    def encode(self, x, t=1.0):
+    def encode(self, x, t=1.0, stochastic=None, num_steps=None):
         """
         This function encodes a batch of data samples to latent vectors
         Args:
@@ -53,7 +57,7 @@ class InvertibleGenerator(Generator):
         """
         raise NotImplementedError
 
-    def decode(self, z, t=1.0):
+    def decode(self, z, t=1.0, stochastic=None, num_steps=None):
         """
         This function decodes a batch of latent vectors to data samples
         Args:

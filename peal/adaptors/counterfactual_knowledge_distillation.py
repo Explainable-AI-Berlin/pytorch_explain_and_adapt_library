@@ -17,9 +17,11 @@ from types import SimpleNamespace
 from pydantic import PositiveInt
 from typing import Union
 
+from peal.architectures.predictors import TorchvisionModel
 from peal.global_utils import (
     load_yaml_config,
     save_yaml_config,
+    reset_weights,
 )
 from peal.training.loggers import log_images_to_writer
 from peal.data.dataloaders import (
@@ -157,7 +159,7 @@ class CFKDConfig(AdaptorConfig):
     What batch_size is used for creating the counterfactuals?
     If use_confusion_matrix is deativated always use an even batch_size!!!
     """
-    batch_size: PositiveInt = 2
+    batch_size: PositiveInt = 1
     """
     The number validation runs used for evaluating CFKD.
     """
@@ -186,6 +188,10 @@ class CFKDConfig(AdaptorConfig):
     What level of tracking is used.
     """
     tracking_level: int = 0
+    """
+    How aggressively to change the model based on the counterfactual samples. 0 -> No change, 1 -> Full change
+    """
+    mixing_ratio: float = 0.5
     """
     What level of tracking is used.
     """
@@ -230,6 +236,7 @@ class CFKDConfig(AdaptorConfig):
         tracking_level: int = None,
         counterfactual_type: str = None,
         max_test_batches: Union[type(None), PositiveInt] = None,
+        mixing_ratio: float = None,
         **kwargs,
     ):
         """
@@ -382,15 +389,14 @@ class CFKDConfig(AdaptorConfig):
         self.tracking_level = (
             tracking_level if not tracking_level is None else self.tracking_level
         )
+        self.mixing_ratio = (
+            mixing_ratio if not mixing_ratio is None else self.mixing_ratio
+        )
         self.counterfactual_type = (
             counterfactual_type
             if not counterfactual_type is None
             else self.counterfactual_type
         )
-        if not self.use_confusion_matrix:
-            assert (
-                self.batch_size % 2 == 0
-            ), "Batch size must be even when using deterministic CFKD!"
         self.kwargs = kwargs
 
 
@@ -482,12 +488,26 @@ class CFKD(Adaptor):
         self.adaptor_config.data = self.train_dataloader.dataset.config
 
         #
+        explainer_config = load_yaml_config(self.adaptor_config.explainer)
+        if hasattr(explainer_config, "num_discretization_steps") and hasattr(
+            explainer_config, "sampling_time_fraction"
+        ):
+            timestep_respacing = int(
+                1.0
+                / explainer_config.sampling_time_fraction
+                * explainer_config.num_discretization_steps
+            )
+
+        else:
+            timestep_respacing = None
+
         self.generator = get_generator(
             generator=(
                 generator if not generator is None else self.adaptor_config.generator
             ),
             device=self.device,
             predictor_dataset=self.val_dataloader.dataset,
+            timestep_respacing=timestep_respacing,
         )
 
         self.output_size = (
@@ -580,6 +600,7 @@ class CFKD(Adaptor):
         self.validation_data_config.data.split = [0.0, 1.0]
 
     def initialize_run(self):
+        print("intialize run!!!")
         if self.overwrite:
             # move from self.base_dir to self.base_dir + "_old_" + {date}_{timestamp}
             if os.path.exists(self.base_dir):
@@ -587,6 +608,22 @@ class CFKD(Adaptor):
                     self.base_dir,
                     self.base_dir + "_old_" + datetime.now().strftime("%Y%m%d_%H%M%S"),
                 )
+
+        if not os.path.exists(os.path.join(self.base_dir, "0")):
+            os.makedirs(os.path.join(self.base_dir, "0"))
+
+        boundary_path = os.path.join(self.base_dir, "0", "decision_boundary.png")
+        if (
+            not os.path.exists(boundary_path)
+            and hasattr(self.dataloaders_val[0].dataset, "visualize_decision_boundary")
+            and not os.path.exists(boundary_path)
+        ):
+            self.dataloaders_val[0].dataset.visualize_decision_boundary(
+                self.student,
+                self.adaptor_config.training.train_batch_size,
+                self.device,
+                boundary_path,
+            )
 
         log_dir = os.path.join(self.base_dir, "logs")
         if not os.path.exists(log_dir):
@@ -648,36 +685,63 @@ class CFKD(Adaptor):
                 print("group_distribution: " + str(group_distribution))
                 print("group_numbers: " + str(groups))
                 print("worst_group_accuracy: " + str(worst_group_accuracy))
+                avg_group_accuracy = np.mean(group_accuracies)
+                print("avg_group_accuracy: " + str(avg_group_accuracy))
+                writer.add_scalar(
+                    "test_avg_group_accuracy",
+                    avg_group_accuracy,
+                    self.adaptor_config.current_iteration,
+                )
 
             writer.add_scalar(
                 "test_accuracy", test_accuracy, self.adaptor_config.current_iteration
             )
+            print("log sample batches!")
             log_images_to_writer(self.train_dataloader, writer, "train0")
             log_images_to_writer(self.val_dataloader, writer, "validation0")
             log_images_to_writer(self.test_dataloader, writer, "test")
+            print("log sample batches done!")
 
             if (
                 isinstance(self.val_dataloader.dataset, ImageDataset)
                 and self.adaptor_config.use_visualization
             ):
-                generator_sample = self.generator.sample_x(
-                    batch_size=self.adaptor_config.batch_size
-                )
+                print("visualizing sample!!!")
+                generator_sample = self.generator.sample_x()
                 if not generator_sample is None:
                     torchvision.utils.save_image(
                         generator_sample,
                         os.path.join(self.base_dir, "generator_sample.png"),
                         normalize=True,
+                        nrow=int(np.sqrt(generator_sample.shape[0])),
                     )
+                    print("sample visulized!")
 
                     # TODO move this back!!!
                     generator_performance = (
                         self.val_dataloader.dataset.track_generator_performance(
-                            self.generator, batch_size=self.adaptor_config.batch_size
+                            generator_sample
                         )
                     )
                     print("Generator performance: " + str(generator_performance))
+                    writer.add_scalar(
+                        "generator_fid",
+                        generator_performance["fid"],
+                        self.adaptor_config.current_iteration,
+                    )
                     self.adaptor_config.generator_performance = generator_performance
+
+                else:
+                    print("generator sample is None!!!")
+                    import pdb
+
+                    pdb.set_trace()
+
+            else:
+                print("no visualization!!!")
+                import pdb
+
+                pdb.set_trace()
 
         else:
             writer = SummaryWriter(log_dir)
@@ -694,6 +758,7 @@ class CFKD(Adaptor):
             with open(os.path.join(self.base_dir, "platform.txt"), "w") as f:
                 f.write(platform.node())
 
+            print("start generating validation stats!!!")
             validation_stats = self.retrieve_validation_stats(finetune_iteration=0)
             for key in validation_stats.keys():
                 if isinstance(validation_stats[key], float):
@@ -703,18 +768,13 @@ class CFKD(Adaptor):
                         self.adaptor_config.current_iteration,
                     )
 
-            if self.output_size == 2 and self.adaptor_config.use_visualization:
-                print("visualize progress!!!")
-                self.visualize_progress(
-                    [os.path.join(self.base_dir, "visualization.png")]
-                )
-
-            self.adaptor_config.test_accuracies = [test_accuracy]
+            print("validation stats generatated!!!")
 
         else:
             with open(os.path.join(self.base_dir, "platform.txt"), "w") as f:
                 f.write(platform.node())
 
+            print("start loading validation stats!!!")
             validation_stats_existed = os.path.exists(
                 os.path.join(self.base_dir, "0", "validation_stats.npz")
             )
@@ -730,6 +790,7 @@ class CFKD(Adaptor):
                             self.adaptor_config.current_iteration,
                         )
 
+            print("Create dataloader mixer and add counterfactual datasets!!!")
             self.dataloader_mixer = DataloaderMixer(
                 self.adaptor_config.training, self.train_dataloader
             )
@@ -739,23 +800,37 @@ class CFKD(Adaptor):
                 self.dataloader_mixer = self.add_dataset_to_dataloader_mixer(
                     dataloader_old=self.dataloader_mixer,
                     dataset_path=dataset_dir,
-                    mixing_ratio=0.5,
+                    mixing_ratio=self.adaptor_config.mixing_ratio,
                     writer=writer,
                     finetune_iteration=i,
                 )
+                print("counterfactual dataset " + str(i) + " added!!!")
 
             if self.adaptor_config.current_iteration > 0:
+                print("load already updated student model!!!")
                 self.student = torch.load(
                     os.path.join(self.adaptor_config.base_dir, "model.cpl"),
                     map_location=self.device,
                 )
                 self.explainer.predictor = self.student
 
+        visualization_path = os.path.join(self.base_dir, "visualization.png")
+        if (
+            self.output_size == 2
+            and self.adaptor_config.use_visualization
+            and not os.path.exists(visualization_path)
+        ):
+            print("visualize progress!!!")
+            self.visualize_progress([visualization_path])
+            print("Visualization done!!!")
+
+        print("intialization done!!!")
         return validation_stats, writer
 
     def get_batch(
         self,
         error_matrix: torch.Tensor = None,
+        cm_idx: int = 1,
     ):
         x_batch = []
         y_source_batch = []
@@ -768,9 +843,6 @@ class CFKD(Adaptor):
         torch.manual_seed(torch.seed())
         if self.adaptor_config.use_confusion_matrix:
             error_distribution = torch.distributions.Categorical(error_matrix)
-
-        else:
-            cm_idx = 1
 
         while not sample_idx >= self.adaptor_config.batch_size:
             if self.adaptor_config.use_confusion_matrix:
@@ -787,9 +859,7 @@ class CFKD(Adaptor):
             cm_idx = (cm_idx + 1) % (self.output_size**2)
             x, y = self.datastack.pop(int(y_source))
 
-            if isinstance(self.teacher, SegmentationMaskTeacher) or isinstance(
-                self.explainer.explainer_config, PerfectFalseCounterfactualConfig
-            ):
+            if self.train_dataloader.dataset.hints_enabled:
                 y_res = y[1:]
                 y = y[0]
                 if isinstance(self.teacher, SegmentationMaskTeacher):
@@ -832,7 +902,6 @@ class CFKD(Adaptor):
                 print([int(y), y_source, y_target, y_target_start_confidence])
 
             else:
-                # import pdb; pdb.set_trace()
                 pass
 
         x_batch = torch.stack(x_batch)
@@ -879,6 +948,7 @@ class CFKD(Adaptor):
         else:
             acceptance_threshold = 0.51
 
+        print("Start generating x counterfactual list!!!")
         pbar = tqdm(
             total=int(
                 self.adaptor_config.min_train_samples / self.adaptor_config.batch_size
@@ -902,7 +972,7 @@ class CFKD(Adaptor):
                 / self.adaptor_config.batch_size
             )
             for i in range(num_batches_per_iteration):
-                batch = self.get_batch(error_matrix)
+                batch = self.get_batch(error_matrix, i % 2)
                 values = self.explainer.explain_batch(
                     batch=batch,
                     base_path=collage_base_path,
@@ -951,6 +1021,7 @@ class CFKD(Adaptor):
             else:
                 continue_collecting = False
 
+        print("x counterfactual list generated!!!")
         pbar.close()
         return tracked_values
 
@@ -959,6 +1030,7 @@ class CFKD(Adaptor):
             self.base_dir, str(finetune_iteration), "tracked_values.npz"
         )
         if self.overwrite or not os.path.exists(tracked_values_path):
+            print("Start generating tracked values!!!")
             tracked_values = self.generate_x_counterfactual_list(
                 error_matrix=validation_stats["error_matrix"],
                 confidence_score_stats=validation_stats["confidence_score_stats"],
@@ -993,14 +1065,18 @@ class CFKD(Adaptor):
                 tracked_values_path,
                 "rb",
             ) as f:
+                print("Load tracked values!!!")
                 tracked_values = {}
                 tracked_values_file = np.load(f, allow_pickle=True)
                 for key in tracked_values_file.keys():
                     tracked_values[key] = list(torch.tensor(tracked_values_file[key]))
 
+        print("Create collage path list!!!")
         collage_path_list = os.listdir(
             os.path.join(self.base_dir, str(finetune_iteration), "collages")
         )
+        collage_path_list.sort()
+        collage_path_list = list(filter(lambda x: x[-4:] == ".png", collage_path_list))
         tracked_values["collage_path_list"] = list(
             map(
                 lambda x: os.path.join(
@@ -1190,7 +1266,8 @@ class CFKD(Adaptor):
         )
         log_images_to_writer(dataloader, writer, "train_" + str(finetune_iteration))
         dataloader = DataloaderMixer(self.adaptor_config.training, dataloader)
-        dataloader.append(dataloader_old, mixing_ratio=1 - mixing_ratio)
+        # mixing ratio has to be flipped because in fact the old dataloader is the one appended
+        dataloader.append(dataloader_old, weight_added_dataloader=1 - mixing_ratio)
         dataloader.return_src = True
         return dataloader
 
@@ -1209,8 +1286,8 @@ class CFKD(Adaptor):
         )
 
         #
-        mixing_ratio = min(0.5, 1 - self.feedback_accuracy)
-        writer.add_scalar("mixing_ratio", mixing_ratio, finetune_iteration)
+        """mixing_ratio = min(0.5, 1 - self.feedback_accuracy)
+        writer.add_scalar("mixing_ratio", mixing_ratio, finetune_iteration)"""
         if not hasattr(self, "dataloader_mixer"):
             self.dataloader_mixer = DataloaderMixer(
                 self.adaptor_config.training, self.train_dataloader
@@ -1219,7 +1296,7 @@ class CFKD(Adaptor):
         self.dataloader_mixer = self.add_dataset_to_dataloader_mixer(
             dataloader_old=self.dataloader_mixer,
             dataset_path=dataset_path,
-            mixing_ratio=mixing_ratio,
+            mixing_ratio=self.adaptor_config.mixing_ratio,
             writer=writer,
             finetune_iteration=finetune_iteration,
         )
@@ -1265,13 +1342,8 @@ class CFKD(Adaptor):
             ).mkdir(parents=True, exist_ok=True)
 
             if self.adaptor_config.continuous_learning == "retrain":
-
-                def weight_reset(m):
-                    reset_parameters = getattr(m, "reset_parameters", None)
-                    if callable(reset_parameters):
-                        m.reset_parameters()
-
-                self.student.apply(weight_reset)
+                # TODO this should be changed!
+                self.student = TorchvisionModel("resnet18", 2)
 
             finetune_trainer = ModelTrainer(
                 config=copy.deepcopy(self.adaptor_config),
@@ -1281,8 +1353,8 @@ class CFKD(Adaptor):
                     self.base_dir, str(finetune_iteration), "finetuned_model"
                 ),
                 val_dataloader_weights=[
-                    1 - mixing_ratio,
-                    mixing_ratio,
+                    1 - self.adaptor_config.mixing_ratio,
+                    self.adaptor_config.mixing_ratio,
                 ],
                 only_last_layer=self.adaptor_config.continuous_learning
                 == "deep_feature_reweighting",
@@ -1297,7 +1369,9 @@ class CFKD(Adaptor):
                 self.train_dataloader.dataset.disable_idx()
                 self.val_dataloader.dataset.disable_idx()
 
-            finetune_trainer.fit(continue_training=True)
+            finetune_trainer.fit(
+                continue_training=True
+            )  # bool(self.adaptor_config.continuous_learning != "retrain"))
 
             if isinstance(self.teacher, SegmentationMaskTeacher):
                 self.train_dataloader.dataset.enable_hints()
@@ -1455,6 +1529,7 @@ class CFKD(Adaptor):
         if not self.overwrite and os.path.exists(
             os.path.join(self.base_dir, str(finetune_iteration), "validation_stats.npz")
         ):
+            print("load already completed validation stats!!!")
             with open(
                 os.path.join(
                     self.base_dir, str(finetune_iteration), "validation_stats.npz"
@@ -1466,12 +1541,14 @@ class CFKD(Adaptor):
                 for key in validation_tracked_file.keys():
                     validation_stats[key] = torch.tensor(validation_tracked_file[key])
 
-                return validation_stats
+            print("validation stats loaded!!!")
+            return validation_stats
 
         validation_values_path = os.path.join(
             self.base_dir, str(finetune_iteration), "validation_tracked_values.npz"
         )
         if self.overwrite or not os.path.exists(validation_values_path):
+            print("calculate validation tracked values from scratch!!!")
             x_list_collection = []
             x_counterfactual_collection = []
             y_confidence_list = []
@@ -1479,6 +1556,7 @@ class CFKD(Adaptor):
             validation_tracked_values = None
             validation_stats = []
             for i in range(self.adaptor_config.validation_runs):
+                print("Validation run: " + str(i))
                 self.explainer.explainer_config = copy.deepcopy(
                     original_explainer_config
                 )
@@ -1501,6 +1579,11 @@ class CFKD(Adaptor):
                                 attribute[1][0] + effective_idx,
                             )
 
+                validation_collages_base_path = os.path.join(
+                    self.base_dir,
+                    str(finetune_iteration),
+                    "validation_collages" + str(i),
+                )
                 (
                     validation_tracked_values_current,
                     validation_stats_current,
@@ -1508,11 +1591,7 @@ class CFKD(Adaptor):
                     model=self.student,
                     dataloader=self.dataloaders_val[0],
                     tracked_keys=self.tracked_keys,
-                    base_path=os.path.join(
-                        self.base_dir,
-                        str(finetune_iteration),
-                        "validation_collages" + str(i),
-                    ),
+                    base_path=validation_collages_base_path,
                     output_size=self.output_size,
                     explainer=self.explainer,
                     device=self.device,
@@ -1521,7 +1600,8 @@ class CFKD(Adaptor):
                     max_validation_samples=self.adaptor_config.max_validation_samples,
                     min_start_target_percentile=self.adaptor_config.min_start_target_percentile,
                 )
-                # torch.nn.functional.softmax(self.student(validation_tracked_values_current['x_counterfactual_list'][i]
+                # torch.nn.functional.softmax(
+                # self.student(validation_tracked_values_current['x_counterfactual_list'][i]
                 # .unsqueeze(0).to('cuda')).squeeze(0))[validation_tracked_values_current['y_target_list'][i]]
                 if validation_tracked_values is None:
                     validation_tracked_values = validation_tracked_values_current
@@ -1566,15 +1646,15 @@ class CFKD(Adaptor):
             self.explainer.explainer_config = original_explainer_config
             if self.adaptor_config.validation_runs > 1:
                 self.datastack.dataset._initialize_performance_metrics()
-                validation_stats["distance_to_manifold"] = (
-                    self.datastack.dataset.distribution_distance(
-                        x_counterfactual_collection
-                    )
+                validation_stats[
+                    "distance_to_manifold"
+                ] = self.datastack.dataset.distribution_distance(
+                    x_counterfactual_collection
                 )
-                validation_stats["pairwise_distance"] = (
-                    self.datastack.dataset.pair_wise_distance(
-                        x_list_collection, x_counterfactual_collection
-                    )
+                validation_stats[
+                    "pairwise_distance"
+                ] = self.datastack.dataset.pair_wise_distance(
+                    x_list_collection, x_counterfactual_collection
                 )
                 validation_stats["diversity"] = self.datastack.dataset.variance(
                     x_counterfactual_collection
@@ -1630,6 +1710,7 @@ class CFKD(Adaptor):
         else:
             # TODO think about this again
             if self.adaptor_config.tracking_level > 0:
+                print("load validation tracked values!!!")
                 with open(
                     validation_values_path,
                     "rb",
@@ -1641,6 +1722,7 @@ class CFKD(Adaptor):
                             torch.tensor(validation_tracked_value_file[key])
                         )
 
+                print("load validation prestats!!!")
                 with open(
                     os.path.join(
                         self.base_dir,
@@ -1656,13 +1738,17 @@ class CFKD(Adaptor):
                             validation_tracked_file[key]
                         )
 
+            print("recreate validation collage path!")
             get_collage_path = lambda x: os.path.join(
                 self.base_dir, str(finetune_iteration), "validation_collages" + str(x)
             )
             idx = 0
             collage_path_list = []
             while os.path.exists(get_collage_path(idx)):
-                collage_path_list.extend(os.listdir(get_collage_path(idx)))
+                collage_paths = os.listdir(get_collage_path(idx))
+                collage_paths.sort()
+                collage_paths = list(filter(lambda x: x[-4:] == ".png", collage_paths))
+                collage_path_list.extend(collage_paths)
                 idx += 1
                 # TODO this is a bug, but currently not used
                 if idx == 1:
@@ -1684,6 +1770,31 @@ class CFKD(Adaptor):
             tracked_values=validation_tracked_values,
             finetune_iteration=finetune_iteration,
             mode="validation",
+        )
+
+        if hasattr(
+            self.dataloaders_val[0].dataset, "global_counterfactual_visualization"
+        ):
+            self.dataloaders_val[0].dataset.global_counterfactual_visualization(
+                validation_tracked_values["x_counterfactual_list"],
+                os.path.join(
+                    self.base_dir,
+                    str(finetune_iteration),
+                    "val_counterfactuals_global.png",
+                ),
+                self.adaptor_config.max_validation_samples,
+                validation_tracked_values["y_target_start_confidence_list"],
+                validation_tracked_values["y_target_end_confidence_list"],
+                validation_tracked_values["y_target_list"],
+            )
+            print("global counterfactual visualization saved!!!")
+
+        self.create_dataset(
+            feedback=validation_feedback,
+            finetune_iteration=finetune_iteration + 1,
+            mode="validation",
+            config=self.validation_data_config,
+            **validation_tracked_values,
         )
 
         for key in validation_feedback_stats.keys():
@@ -1708,14 +1819,6 @@ class CFKD(Adaptor):
 
                 np.savez(f, **validation_stats_file)
 
-        self.create_dataset(
-            feedback=validation_feedback,
-            finetune_iteration=finetune_iteration + 1,
-            mode="validation",
-            config=self.validation_data_config,
-            **validation_tracked_values,
-        )
-
         return validation_stats
 
     def run(self):
@@ -1731,6 +1834,10 @@ class CFKD(Adaptor):
             self.adaptor_config.current_iteration + 1,
             self.adaptor_config.finetune_iterations + 1,
         ):
+            print(
+                "Start retrieving training counterfactuals for iteration "
+                + str(finetune_iteration)
+            )
             tracked_values = self.retrieve_counterfactual_list(
                 validation_stats=validation_stats, finetune_iteration=finetune_iteration
             )
@@ -1826,9 +1933,29 @@ class CFKD(Adaptor):
                 print("group_distribution: " + str(group_distribution))
                 print("group_sizes: " + str(groups))
                 print("worst_group_accuracy: " + str(worst_group_accuracy))
+                avg_group_accuracy = np.mean(group_accuracies)
+                print("avg_group_accuracy: " + str(avg_group_accuracy))
+                writer.add_scalar(
+                    "test_avg_group_accuracy", avg_group_accuracy, finetune_iteration
+                )
 
             writer.add_scalar("test_accuracy", test_accuracy, finetune_iteration)
             print("test_accuracy: " + str(test_accuracy))
+            print("Start to retrieve validation stats")
+
+            decision_boundary_path = os.path.join(
+                self.base_dir, str(finetune_iteration), "decision_boundary.png"
+            )
+            if hasattr(
+                self.dataloaders_val[0].dataset, "visualize_decision_boundary"
+            ) and not os.path.exists(decision_boundary_path):
+                self.dataloaders_val[0].dataset.visualize_decision_boundary(
+                    self.student,
+                    self.adaptor_config.training.train_batch_size,
+                    self.device,
+                    decision_boundary_path,
+                )
+
             validation_stats = self.retrieve_validation_stats(
                 finetune_iteration=finetune_iteration
             )
@@ -1843,12 +1970,17 @@ class CFKD(Adaptor):
 
             self.feedback_accuracy = validation_stats["feedback_accuracy"]
 
-            if self.output_size == 2 and self.adaptor_config.use_visualization:
+            visualization_path = os.path.join(
+                self.base_dir, str(finetune_iteration), "visualization.png"
+            )
+            if (
+                self.output_size == 2
+                and self.adaptor_config.use_visualization
+                and not os.path.exists(visualization_path)
+            ):
                 self.visualize_progress(
                     [
-                        os.path.join(
-                            self.base_dir, str(finetune_iteration), "visualization.png"
-                        ),
+                        visualization_path,
                         os.path.join(self.base_dir, "visualization.png"),
                     ]
                 )

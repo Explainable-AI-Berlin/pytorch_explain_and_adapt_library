@@ -1,10 +1,12 @@
 explainer_type : ACE
-attack_iterations: 300
-attack_step: 5.0
+attack_iterations: 50
+learning_rate: 100.0
 category: explainer
 distilled_predictor: <PEAL_BASE>/configs/predictors/generic_distillation.yaml
-sampling_inpaint: 0.0
+sampling_inpaint: 0.5
 y_target_goal_confidence: 1.1
-dist_l1: 1.0e-08
+dist_l1: 0.0
 timestep_respacing: 100
-sampling_time_fraction: 0.6
+num_discretization_steps: 15
+sampling_time_fraction: 0.3
+iterationwise_encoding: True

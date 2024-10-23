@@ -822,6 +822,47 @@ class CircleDatasetGenerator:
         return self
 
 
+def latent_to_square_image(color_a, color_b, position_x=None, position_y=None, SIZE_INNER = 8, SIZE_BORDER = 2, noise=None):
+    SIZE_ADDED = SIZE_INNER + 2 * SIZE_BORDER
+    img = np.ones([64, 64, 3], dtype=np.float32) * color_b
+    if noise is None:
+        noise = np.random.randn(*img.shape) * 10
+
+    if position_x is None:
+        position_x = int((64 - SIZE_ADDED) / 2)
+
+    if position_y is None:
+        position_y = int((64 - SIZE_ADDED) / 2)
+
+    img_base = np.clip(img + noise, 0, 255)
+    img = np.copy(img_base)
+    img[
+        position_x : position_x + SIZE_ADDED,
+        position_y : position_y + SIZE_ADDED,
+    ] = np.clip(
+        127
+        + noise[
+            position_x : position_x + SIZE_ADDED,
+            position_y : position_y + SIZE_ADDED,
+        ],
+        0,
+        255,
+    )
+    img[
+        position_x + SIZE_BORDER: position_x + SIZE_ADDED - SIZE_BORDER,
+        position_y + SIZE_BORDER : position_y + SIZE_ADDED - SIZE_BORDER,
+    ] = np.clip(
+        color_a
+        + noise[
+            position_x + SIZE_BORDER : position_x + SIZE_ADDED - SIZE_BORDER,
+            position_y + SIZE_BORDER : position_y + SIZE_ADDED - SIZE_BORDER,
+        ],
+        0,
+        255,
+    )
+    img = Image.fromarray(img.astype(dtype=np.uint8))
+    return img, noise
+
 class SquareDatasetGenerator:
     """ """
 
@@ -858,10 +899,10 @@ class SquareDatasetGenerator:
         lines_out_inverse = [
             "Name,ClassA,ClassB,ClassC,ClassD,ColorA,ColorB,PositionX,PositionY"
         ]
+
         SIZE_INNER = 8
         SIZE_BORDER = 2
         SIZE_ADDED = SIZE_INNER + 2 * SIZE_BORDER
-
         for sample_idx in range(self.data_config.num_samples):
             if sample_idx % 2 == 0:
                 class_a = 1
@@ -897,37 +938,10 @@ class SquareDatasetGenerator:
                 position_y = np.random.randint(0, int(num_positions / 2))
 
             sample_name = embed_numberstring(sample_idx, 8) + ".png"
-            img = np.ones([64, 64, 3], dtype=np.float32) * color_b
-            noise = np.random.randn(*img.shape) * 10
-            img_base = np.clip(img + noise, 0, 255)
-            img = np.copy(img_base)
-            img[
-                position_x : position_x + SIZE_ADDED,
-                position_y : position_y + SIZE_ADDED,
-            ] = np.clip(
-                127
-                + noise[
-                    position_x : position_x + SIZE_ADDED,
-                    position_y : position_y + SIZE_ADDED,
-                ],
-                0,
-                255,
-            )
-            img[
-                position_x + SIZE_BORDER: position_x + SIZE_ADDED - SIZE_BORDER,
-                position_y + SIZE_BORDER : position_y + SIZE_ADDED - SIZE_BORDER,
-            ] = np.clip(
-                color_a
-                + noise[
-                    position_x + SIZE_BORDER : position_x + SIZE_ADDED - SIZE_BORDER,
-                    position_y + SIZE_BORDER : position_y + SIZE_ADDED - SIZE_BORDER,
-                ],
-                0,
-                255,
-            )
-            img = Image.fromarray(img.astype(dtype=np.uint8))
+            img, noise = latent_to_square_image(position_x, position_y, color_a, color_b)
             img.save(os.path.join(self.data_config.dataset_path, "imgs", sample_name))
-            img_inverse = np.abs(img_base - 255)
+            img_inverse, noise = latent_to_square_image(position_x, position_y, color_a, 255 - color_b, noise=noise)
+            """img_inverse = np.abs(img_base - 255)
             img_inverse[
                 position_x : position_x + SIZE_ADDED,
                 position_y : position_y + SIZE_ADDED,
@@ -952,7 +966,7 @@ class SquareDatasetGenerator:
                 0,
                 255,
             )
-            img_inverse = Image.fromarray(img_inverse.astype(dtype=np.uint8))
+            img_inverse = Image.fromarray(img_inverse.astype(dtype=np.uint8))"""
             img_inverse.save(
                 os.path.join(
                     self.data_config.dataset_path + "_inverse", "imgs", sample_name

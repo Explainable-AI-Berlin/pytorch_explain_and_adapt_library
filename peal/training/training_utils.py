@@ -62,6 +62,7 @@ def calculate_validation_statistics(
     )
     pbar.stored_values = {}
 
+    print('start iteration over validation dataset!')
     for it, (x, y) in enumerate(dataloader):
         pred_confidences = torch.nn.Softmax(dim=-1)(model(x.to(device))).detach().cpu()
         y_pred = logits_to_prediction(pred_confidences)
@@ -106,7 +107,6 @@ def calculate_validation_statistics(
         batch["y_target_start_confidence_list"] = torch.stack(
             batch_target_start_confidences, 0
         )
-        # try:
         results = explainer.explain_batch(
             batch=batch,
             base_path=base_path,

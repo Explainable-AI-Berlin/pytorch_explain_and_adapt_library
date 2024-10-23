@@ -191,14 +191,6 @@ class TrainLoop:
         pbar.config.best_fid = 1e9
         pbar.config.current_fid = 1e9
 
-        if os.path.exists(os.path.join(self.model_dir, "model")):
-            shutil.move(
-                self.model_dir,
-                self.model_dir
-                + "_old_"
-                + datetime.now().strftime("%Y%m%d_%H%M%S"),
-            )
-
         os.makedirs(os.path.join(self.model_dir, "ema"), exist_ok=True)
         os.makedirs(os.path.join(self.model_dir, "model"), exist_ok=True)
         os.makedirs(os.path.join(self.model_dir, "optimizer"), exist_ok=True)
@@ -219,18 +211,24 @@ class TrainLoop:
                 #cond = {"y": cond}
                 cond = {}
 
-            self.run_step(batch, cond, pbar)
             if self.step % self.save_interval == 0:
                 # save intermediate images as outputs
-                imgs = self.diffusion.p_sample_loop(self.model, batch.shape)
+                imgs = self.data.dataloader.dataset.project_to_pytorch_default(
+                    self.diffusion.p_sample_loop(self.model, batch.shape)
+                )
+                x = self.data.dataloader.dataset.project_to_pytorch_default(
+                    batch
+                )
+                imgs_cat = th.cat([x.cpu(), imgs.cpu()], dim=0)
                 torchvision.utils.save_image(
-                    imgs,
+                    imgs_cat,
                     os.path.join(
                         copy.deepcopy(self.model_dir),
                         os.path.join(
                             "outputs", f"{(self.step+self.resume_step):06d}.png"
                         ),
                     ),
+                    nrow=10,
                 )
                 train_generator_performance = (
                     self.data.dataloader.dataset.track_generator_performance(
@@ -251,6 +249,8 @@ class TrainLoop:
                 # Run for a finite amount of time in integration tests.
                 if os.environ.get("DIFFUSION_TRAINING_TEST", "") and self.step > 0:
                     return
+
+            self.run_step(batch, cond, pbar)
             self.step += 1
         # Save the last checkpoint if it wasn't already saved.
         if (self.step - 1) % self.save_interval != 0:

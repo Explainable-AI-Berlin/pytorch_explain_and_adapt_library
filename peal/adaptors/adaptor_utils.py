@@ -47,7 +47,7 @@ def integrate_data_config_into_adaptor_config(
     return output_size
 
 
-def calculate_validation_statistics(finetune_iteration, tracked_keys, base_dir):
+'''def calculate_validation_statistics(finetune_iteration, tracked_keys, base_dir):
     """
     This method calculates the validation statistics for the current finetune iteration.
 
@@ -97,7 +97,7 @@ def calculate_validation_statistics(finetune_iteration, tracked_keys, base_dir):
         for key in valid_tracked_values.keys():
             np.savez(f, key=torch.stack(valid_tracked_values[key]).numpy())
 
-    return validation_basics, valid_tracked_values
+    return validation_basics, valid_tracked_values'''
 
 
 def retrieve_validation_statistics(finetune_iteration, tracked_keys, base_dir):

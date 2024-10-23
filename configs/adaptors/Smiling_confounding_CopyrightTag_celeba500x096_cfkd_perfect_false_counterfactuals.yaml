@@ -11,11 +11,11 @@ use_visualization                    :  False #True
 calculate_group_accuracies           :  True
 explainer                            :  <PEAL_BASE>/configs/explainers/perfect_false_counterfactuals.yaml
 training                             :  <PEAL_BASE>/configs/training/img_classifier.yaml
-data                                 :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba500_poisened096.yaml
+data                                 :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba500_poisoned096.yaml
 test_data                            :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba.yaml
-student                              :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened096/model.cpl
-teacher                              :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened050/model.cpl
-base_dir                             :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened096/cfkd_perfect_false_counterfactuals500
+student                              :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisoned096/model.cpl
+teacher                              :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisoned050/model.cpl
+base_dir                             :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisoned096/cfkd_perfect_false_counterfactuals500
 task:
   criterions:
     ce     : 1.0

@@ -21,6 +21,7 @@ from typing import Union
 
 from peal.generators.interfaces import GeneratorConfig
 from peal.data.datasets import DataConfig
+from peal.training.loggers import log_images_to_writer
 
 
 class GlowGeneratorConfig(GeneratorConfig):
@@ -49,7 +50,7 @@ class GlowGeneratorConfig(GeneratorConfig):
     temp: float = 0.7
     n_sample: int = 20
     base_path: str = "glow_run"
-    x_selection: Union[str, type(None)] = None
+    x_selection: Union[list, type(None)] = None
     full_args: Union[None, dict] = None
 
 
@@ -78,7 +79,7 @@ class GlowGenerator(InvertibleGenerator):
         self.train_dataset, self.val_dataset, _ = get_datasets(self.config.data)
         self.dataset = self.val_dataset
 
-    def encode(self, x):
+    def encode(self, x, t=1.0):
         out = x
         z_outs = []
 
@@ -88,7 +89,7 @@ class GlowGenerator(InvertibleGenerator):
 
         return z_outs
 
-    def decode(self, z, reconstruct=True):
+    def decode(self, z, t=1.0, reconstruct=True):
         for i, block in enumerate(self.glow.blocks[::-1]):
             if i == 0:
                 x = block.reverse(z[-1], z[-1], reconstruct=reconstruct)
@@ -184,6 +185,7 @@ class GlowGenerator(InvertibleGenerator):
 
         args = types.SimpleNamespace(**self.config.__dict__)
         args.train_dataloader = train_dataloader
+        log_images_to_writer(args.train_dataloader, writer, "train")
         args.val_dataloader = val_dataloader
         args.writer = writer
         args.glow = self.glow

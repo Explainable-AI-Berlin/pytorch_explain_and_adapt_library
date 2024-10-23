@@ -171,9 +171,9 @@ class Logger:
             )
             if not pbar is None:
                 pbar.stored_values[mode + "_accuracy"] = accuracy
-                pbar.stored_values[mode + "_predicted_classes"] = (
-                    predictions_one_hot.mean(0).cpu()[:2]
-                )
+                pbar.stored_values[
+                    mode + "_predicted_classes"
+                ] = predictions_one_hot.mean(0).cpu()[:2]
                 pbar.stored_values[mode + "_targets"] = targets_one_hot.mean(0).cpu()[
                     :2
                 ]
@@ -292,11 +292,7 @@ def log_images_to_writer(dataloader, writer, tag="train"):
             else:
                 iterator = iter(dataloader)
 
-        if (
-            i == 2
-            and dataloader_mixer_treatment
-            and len(dataloader.dataloaders) > 1
-        ):
+        if i == 2 and dataloader_mixer_treatment and len(dataloader.dataloaders) > 1:
             iterator = iter(dataloader.dataloaders[1])
 
         sample_train_imgs, sample_train_y = next(iterator)
@@ -321,12 +317,12 @@ def log_images_to_writer(dataloader, writer, tag="train"):
                 list(map(lambda x: int(x), list(sample_train_y)))
             )
 
-        try:
-            writer.add_image(
-                sample_batch_label_str,
-                torchvision.utils.make_grid(sample_train_imgs, sample_train_imgs.shape[0]),
+        elif isinstance(sample_train_y, list) and len(sample_train_y) == 1:
+            sample_batch_label_str += "_" + str(
+                list(map(lambda x: int(x), list(sample_train_y[0])[:128]))
             )
 
-        except Exception as e:
-            import pdb; pdb.set_trace()
-            print(e)
+        writer.add_image(
+            sample_batch_label_str,
+            torchvision.utils.make_grid(sample_train_imgs[:128], 128),
+        )

@@ -3,6 +3,7 @@ import os
 
 from torchvision import transforms
 from torchvision.transforms import ToTensor
+from torchvision.transforms import v2
 
 from peal.architectures.predictors import TaskConfig
 from peal.global_utils import (
@@ -114,6 +115,9 @@ def get_datasets(
 
         if "sharpness" in config.invariances:
             transform_list_train.append(transforms.RandomAdjustSharpness(0.3))
+
+        if "blur" in config.invariances:
+            transform_list_train.append(v2.GaussianBlur(kernel_size=(5, 9), sigma=(0.1, 5.)))
 
         #
         if not config.crop_size is None:

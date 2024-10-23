@@ -1,0 +1,10 @@
+# python -W ignore run_explainer.py --config "<PEAL_BASE>/configs/explainers/square_ace.yaml"
+explainer_type : ACE
+category : explainer
+attack_iterations: 50
+sampling_time_fraction: 0.3
+sampling_inpaint: 0.0
+attack_step: 1
+dist_l1: 0.01
+y_target_goal_confidence: 0.8
+distilled_predictor: <PEAL_BASE>/configs/predictors/generic_distillation.yaml

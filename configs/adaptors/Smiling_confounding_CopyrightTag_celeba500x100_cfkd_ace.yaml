@@ -20,12 +20,12 @@ explainer                            :
   y_target_goal_confidence: 0.8
   distilled_predictor: <PEAL_BASE>/configs/predictors/generic_distillation.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
-data                                 :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba500_poisened100.yaml
+data                                 :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba500_poisoned100.yaml
 test_data                            :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba.yaml
-student                              :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened100/model.cpl
-teacher                              :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened050/model.cpl
+student                              :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisoned100/model.cpl
+teacher                              :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisoned050/model.cpl
 generator                            :  $PEAL_RUNS/celeba_copyrighttag/ddpm/config.yaml
-base_dir                             :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisened100/cfkd_ace
+base_dir                             :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisoned100/cfkd_ace
 task:
   criterions:
     ce     : 1.0

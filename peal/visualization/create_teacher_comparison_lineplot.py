@@ -24,9 +24,8 @@ def plot_accuracy_line(data):
     )  # Increase horizontal spacing
 
     # Define color and label mappings
-    colors = ["red", "blue", "green", "purple"]
-    #labels = ["Human", "Mask", "Oracle", "Random", "Positive", "Negative"]
-    labels = ["Oracle", "Negative",  "Positive", "Random"]
+    colors = ["red", "blue", "grey", "green", "purple", "black"]
+    labels = ["Human", "Mask", "Oracle", "Random", "Positive", "Negative"]
     inner_labels = ["Empirical Accuracy", "Worst Group Accuracy", "Group Average Accuracy", "Feedback Accuracy"]
 
     # Create a dictionary to map colors to labels for legend clarity
@@ -68,6 +67,18 @@ def plot_accuracy_line(data):
 # test_data = np.random.rand(6, 3, 2)
 test_data = np.array(
     [
+        [
+            [1.0, 0.98],
+            [0.675, 0.774],
+            [0.835, 0.873],
+            [0.405, 0.7],
+        ],
+        [
+            [1.0, 0.98],
+            [0.675, 0.799],
+            [0.835, 0.862],
+            [0.237, 0.425],
+        ],
         [
             [1.0, 0.98],
             [0.675, 0.796],

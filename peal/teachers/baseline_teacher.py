@@ -44,6 +44,9 @@ class BaselineTeacher(TeacherInterface):
             ):
                 feedback.append("student originally wrong!")
 
+            elif y_target_end_confidence_list[idx] < 0.5:
+                feedback.append("student not swapped!")
+
             else:
                 if self.strategy == 'random':
                     f = np.random.randint(0, 2)
