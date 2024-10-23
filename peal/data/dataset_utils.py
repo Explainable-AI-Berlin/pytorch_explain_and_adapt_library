@@ -212,8 +212,8 @@ def process_confounder_data_controlled(
     max_attribute_confounding = np.array([[0, 0], [0, 0]])
 
     if not config.full_confounder_config is None:
-        assert(len(config.full_confounder_config) == 4, "confounder config must have 4 entries")
-        assert(sum(config.full_confounder_config) == 1, "confounder config must sum to 100%")
+        assert len(config.full_confounder_config) == 4, "confounder config must have 4 entries"
+        assert sum(config.full_confounder_config) == 1, "confounder config must sum to 100%"
 
         max_attribute_confounding[0][0] = int(
             config.num_samples * config.full_confounder_config[0]

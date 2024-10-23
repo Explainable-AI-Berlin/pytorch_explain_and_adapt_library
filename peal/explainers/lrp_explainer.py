@@ -46,10 +46,11 @@ class LRPExplainer:
         downstream_model,
         num_classes,
         explainer_config="<PEAL_BASE>/configs/explainers/lrp_default.yaml",
+        explainer_config_return_namespace=True
     ):
         self.downstream_model = downstream_model
         self.num_classes = num_classes
-        self.explainer_config = load_yaml_config(explainer_config)
+        self.explainer_config = load_yaml_config(explainer_config, return_namespace=explainer_config_return_namespace)
         self.device = (
             "cuda" if next(self.downstream_model.parameters()).is_cuda else "cpu"
         )

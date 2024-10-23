@@ -12,9 +12,9 @@ from matplotlib import pyplot as plt
 from tqdm import tqdm
 from zennit.composites import EpsilonPlusFlat
 
-from datasets import get_dataset
-from models import get_canonizer, get_fn_model_loader
-from utils.cav import compute_cav
+from peal.dependencies.rrclarc.datasets import get_dataset
+from peal.dependencies.rrclarc.models import get_canonizer, get_fn_model_loader
+from peal.dependencies.rrclarc.utils.cav import compute_cav
 
 
 def get_args():
