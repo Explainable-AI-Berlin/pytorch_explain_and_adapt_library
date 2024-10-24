@@ -477,9 +477,14 @@ class CounterfactualExplainer(ExplainerInterface):
         mask = torch.ones(x.shape[0]).to(x)
         gradient_confidences_old = torch.zeros(x.shape[0]).to(x)
         if target_confidence_goal is None:
-            pred_original = torch.nn.functional.softmax(
-                self.predictor(x_predictor.to(self.device))
-            ).detach().cpu()
+            pred_original = (
+                torch.nn.functional.softmax(
+                    self.predictor(x_predictor.to(self.device))
+                    / self.explainer_config.temperature
+                )
+                .detach()
+                .cpu()
+            )
             target_confidences = [
                 pred_original[i][y_target[i]] for i in range(len(y_target))
             ]
@@ -507,6 +512,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 )
                 pred_original = torch.nn.functional.softmax(
                     self.predictor(z_predictor_original)
+                    / self.explainer_config.temperature
                 )
 
             else:
@@ -527,7 +533,9 @@ class CounterfactualExplainer(ExplainerInterface):
 
             if not self.explainer_config.iterationwise_encoding:
                 pred_original = torch.nn.functional.softmax(
-                    self.predictor(img_predictor.detach()), -1
+                    self.predictor(img_predictor.detach())
+                    / self.explainer_config.temperature,
+                    -1,
                 )
                 z_default = img_default
 
@@ -618,7 +626,7 @@ class CounterfactualExplainer(ExplainerInterface):
             optimizer.step()
             boolmask = torch.zeros_like(z[0].data)
             if self.explainer_config.iterationwise_encoding:
-                if self.explainer_config.inpaint != 0.0:
+                if self.explainer_config.inpaint > 0.0:
                     z_updated, boolmask = self.generator.repaint(
                         x=x.to(
                             self.device
@@ -627,7 +635,7 @@ class CounterfactualExplainer(ExplainerInterface):
                         inpaint=self.explainer_config.inpaint,
                         dilation=self.explainer_config.dilation,
                         t=self.explainer_config.sampling_time_fraction,
-                        stochastic=self.explainer_config.stochastic,
+                        stochastic=True,
                     )
                     z[0].data = z_updated.detach().cpu()
 
@@ -637,7 +645,9 @@ class CounterfactualExplainer(ExplainerInterface):
                     .project_from_pytorch_default(z_default)
                     .to(self.device)
                 )
-                pred_new = torch.nn.functional.softmax(gradient_predictor(z_predictor))
+                pred_new = torch.nn.functional.softmax(
+                    gradient_predictor(z_predictor) / self.explainer_config.temperature
+                )
                 for j in range(gradient_confidences_old.shape[0]):
                     if pred_new[j, int(y_target[j])] >= gradient_confidences_old[j]:
                         # print("Update " + str(j))
@@ -676,7 +686,11 @@ class CounterfactualExplainer(ExplainerInterface):
             counterfactual
         )
         logits = self.predictor(counterfactual.to(self.device))
-        logit_confidences = torch.nn.Softmax(dim=-1)(logits).detach().cpu()
+        logit_confidences = (
+            torch.nn.Softmax(dim=-1)(logits / self.explainer_config.temperature)
+            .detach()
+            .cpu()
+        )
         target_confidences = [
             float(logit_confidences[i][y_target[i]]) for i in range(len(y_target))
         ]
@@ -868,7 +882,9 @@ class CounterfactualExplainer(ExplainerInterface):
 
             y_logits = self.predictor(x.unsqueeze(0).to(self.device))[0]
             y_pred = y_logits.argmax()
-            y_confidence = torch.nn.Softmax(dim=-1)(y_logits)
+            y_confidence = torch.nn.Softmax(dim=-1)(
+                y_logits / self.explainer_config.temperature
+            )
             for y_target in range(self.predictor_datasets[1].output_size):
                 if y_target == y_pred:
                     continue

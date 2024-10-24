@@ -4,3 +4,4 @@ test_batch_size         : 128
 max_epochs              : 300
 learning_rate           : 0.001
 optimizer               : sgd
+class_balanced          : True

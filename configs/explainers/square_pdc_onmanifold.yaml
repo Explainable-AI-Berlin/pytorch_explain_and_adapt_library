@@ -1,10 +1,10 @@
 explainer_type : PDC
 gradient_steps: 50
-learning_rate: 2000.0
+learning_rate: 1000.0
 category: explainer
 distilled_predictor: <PEAL_BASE>/configs/predictors/generic_distillation.yaml
 replace_with_activation: leakysoftplus
-sampling_inpaint: 0.3
+inpaint: 0.3
 dist_l1: 0.0
 num_discretization_steps: 25
 sampling_time_fraction: 0.5

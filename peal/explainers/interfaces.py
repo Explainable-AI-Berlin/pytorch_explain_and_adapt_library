@@ -27,9 +27,11 @@ class ExplainerConfig(BaseModel):
     tracking_level: int = 2
     validate_generator: bool = False
     max_samples: Union[int, None] = None
+    temperature: float = 3.0
 
 
 class ExplainerInterface:
+    explainer_config: ExplainerConfig
     def explain_batch(self, batch, **args):
         raise NotImplementedError
 

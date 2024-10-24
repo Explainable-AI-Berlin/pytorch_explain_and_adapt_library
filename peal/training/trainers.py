@@ -29,7 +29,7 @@ from peal.global_utils import (
 from peal.training.loggers import log_images_to_writer
 from peal.training.loggers import Logger
 from peal.training.criterions import get_criterions
-from peal.data.dataloaders import create_dataloaders_from_datasource
+from peal.data.dataloaders import create_dataloaders_from_datasource, DataloaderMixer
 from peal.generators.interfaces import Generator
 from peal.architectures.predictors import (
     SequentialModel,
@@ -97,6 +97,7 @@ class TrainingConfig(BaseModel):
     attack_epsilon: float = 1.0
     attack_num_steps: int = 5
     train_on_test: bool = False
+    class_balanced: bool = False
     """
     A dict containing all variables that could not be given with the current config structure
     """
@@ -339,6 +340,28 @@ class ModelTrainer:
 
         if not isinstance(self.val_dataloaders, list):
             self.val_dataloaders = [self.val_dataloaders]
+
+        if self.config.training.class_balanced:
+            new_train_dataloaders = []
+            new_val_dataloaders = []
+            for i in range(self.config.task.output_channels):
+                train_dataloader_copy = copy.deepcopy(self.train_dataloader)
+                val_dataloader_copy = copy.deepcopy(self.val_dataloaders[0])
+                train_dataloader_copy.dataset.enable_class_restriction(i)
+                val_dataloader_copy.dataset.enable_class_restriction(i)
+                new_train_dataloaders.append(train_dataloader_copy)
+                new_val_dataloaders.append(val_dataloader_copy)
+
+            new_config = copy.deepcopy(self.config.training)
+            new_config.steps_per_epoch = 200
+            new_config.concatenate_batches = True
+            self.train_dataloader = DataloaderMixer(new_config, new_train_dataloaders[0])
+            for i in range(1, len(new_train_dataloaders)):
+                # TODO this only works for two classes!
+                self.train_dataloader.append(new_train_dataloaders[i], weight_added_dataloader=0.5)
+
+            self.val_dataloaders = new_val_dataloaders
+            self.val_dataloader_weights = [1.0 / len(self.val_dataloaders)] * len(self.val_dataloaders)
 
         #
         if optimizer is None:
