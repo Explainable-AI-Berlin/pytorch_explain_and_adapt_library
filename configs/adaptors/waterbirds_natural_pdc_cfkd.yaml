@@ -14,10 +14,10 @@ explainer                            :  <PEAL_BASE>/configs/explainers/square_pd
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/waterbirds.yaml
 test_data                            :  <PEAL_BASE>/configs/data/waterbirds.yaml
-student                              :  $PEAL_RUNS/waterbirds/classifier_natural/model.cpl
+student                              :  $PEAL_RUNS/waterbirds/classifier_natural2/model.cpl
 teacher                              :  Baseline:false
 generator                            :  $PEAL_RUNS/waterbirds/ddpm/config.yaml
-base_dir                             :  $PEAL_RUNS/waterbirds/classifier_natural/pdc_cfkd
+base_dir                             :  $PEAL_RUNS/waterbirds/classifier_natural2/pdc_cfkd
 task:
   criterions:
     ce     : 1.0
