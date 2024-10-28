@@ -7,6 +7,7 @@ data              : <PEAL_BASE>/configs/data/waterbirds.yaml
 task:
   criterions:
     ce     : 1.0
+    l2     : 100.0
   output_type             : singleclass
   y_selection             : [y]
   x_selection             : [""]

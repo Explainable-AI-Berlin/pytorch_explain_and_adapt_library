@@ -15,7 +15,7 @@ def main():
 
     model_trainer = ModelTrainer(config)
     model_trainer.fit(
-        continue_training=False, is_initialized=config.is_loaded
+        continue_training=config.is_loaded, is_initialized=config.is_loaded
     )
 
 

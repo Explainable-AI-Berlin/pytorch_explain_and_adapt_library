@@ -136,6 +136,8 @@ class PDCConfig(ExplainerConfig):
     The activation function ReLU is replaced with: leakyrelu, leakysoftplus
     """
     replace_with_activation: str = "leakysoftplus"
+    greedy: bool = False
+    visualize_gradients: bool = False
 
 
 class ACEConfig(ExplainerConfig):
@@ -393,6 +395,7 @@ class CounterfactualExplainer(ExplainerInterface):
         pbar=None,
         mode="",
         base_path=None,
+        batch_idx=0,
     ):
         """
         This function generates a counterfactual for a given batch of inputs.
@@ -430,10 +433,6 @@ class CounterfactualExplainer(ExplainerInterface):
             gradient_predictor = self.predictor
 
         x_predictor = torch.clone(x_in)
-        history = [
-            x_predictor.detach().cpu()[idx].unsqueeze(0)
-            for idx in range(x_predictor.shape[0])
-        ]
         x = self.predictor_datasets[1].project_to_pytorch_default(x_predictor)
         x = self.generator.dataset.project_from_pytorch_default(x)
         x = torchvision.transforms.Resize(self.generator.config.data.input_size[1:])(x)
@@ -495,14 +494,17 @@ class CounterfactualExplainer(ExplainerInterface):
                 torch.ones([x_predictor.shape[0]]) * target_confidence_goal
             )
 
+        best_z = torch.clone(z[0])
+        best_score = torch.tensor(target_confidences)
+
         for i in range(self.explainer_config.gradient_steps):
             if self.explainer_config.iterationwise_encoding:
                 # TODO this only works if generator is normalized in -1 and 1
                 z[0].data = torch.clamp(z[0].data, -1, 1)
-                z_cuda = self.generator.encode(
+                z_encoded = self.generator.encode(
                     z[0].to(self.device),
                     t=self.explainer_config.sampling_time_fraction,
-                    stochastic=True,
+                    stochastic="semi" if self.explainer_config.greedy else None,
                 )
                 z_default = self.generator.dataset.project_to_pytorch_default(z[0])
                 z_predictor_original = (
@@ -516,11 +518,11 @@ class CounterfactualExplainer(ExplainerInterface):
                 )
 
             else:
-                z_cuda = [z_elem.to(self.device) for z_elem in z]
+                z_encoded = [z_elem.to(self.device) for z_elem in z]
 
             optimizer.zero_grad()
             img_decoded = self.generator.decode(
-                z_cuda, t=self.explainer_config.sampling_time_fraction
+                z_encoded, t=self.explainer_config.sampling_time_fraction
             )
             img_default = self.generator.dataset.project_to_pytorch_default(img_decoded)
             img_default = torch.clamp(img_default, 0, 1)
@@ -537,7 +539,6 @@ class CounterfactualExplainer(ExplainerInterface):
                     / self.explainer_config.temperature,
                     -1,
                 )
-                z_default = img_default
 
             target_confidences = [
                 float(pred_original[i][y_target[i]]) for i in range(len(y_target))
@@ -546,14 +547,16 @@ class CounterfactualExplainer(ExplainerInterface):
             for j in range(img_predictor.shape[0]):
                 if (
                     pred_original[j, int(y_target[j])]
+                    > best_score[j]
+                ):
+                    best_z[j] = torch.clone(z[0][j])
+                    best_score[j] = pred_original[j, int(y_target[j])]
+
+                if (
+                    pred_original[j, int(y_target[j])]
                     > target_confidence_goal_current[j]
                 ):
                     mask[j] = 0
-
-            for idx in range(len(history)):
-                history[idx] = torch.cat(
-                    (history[idx], img_predictor[idx].detach().cpu().unsqueeze(0)), 0
-                )
 
             if mask.sum() == 0:
                 break
@@ -589,7 +592,7 @@ class CounterfactualExplainer(ExplainerInterface):
                     + f"it: {i}"
                     + f"/{self.explainer_config.gradient_steps}"
                     + f", loss: {loss.detach().item():.2E}"
-                    + f", target_confidence: [{target_confidences[0]:.2E}, {target_confidences[-1]:.2E}]"
+                    + f", target_confidence: [{best_score[0]:.2E}, {best_score[-1]:.2E}]"
                     + f", gradient_confidence: [{gradient_confidences_old[0]:.2E},"
                     + f"{gradient_confidences_old[-1]:.2E}]"
                     + f", visual_difference: [{torch.mean(absolute_difference[0]).item():.2E}, "
@@ -609,8 +612,7 @@ class CounterfactualExplainer(ExplainerInterface):
             if self.explainer_config.use_masking:
                 for sample_idx in range(len(target_confidences)):
                     if (
-                        target_confidences[sample_idx]
-                        >= target_confidence_goal_current[sample_idx]
+                        mask[sample_idx] == 0
                     ):
                         for variable_idx, v_elem in enumerate(z):
                             if self.explainer_config.optimizer == "Adam":
@@ -637,7 +639,11 @@ class CounterfactualExplainer(ExplainerInterface):
                         t=self.explainer_config.sampling_time_fraction,
                         stochastic=True,
                     )
-                    z[0].data = z_updated.detach().cpu()
+                    for sample_idx in range(z[0].data.shape[0]):
+                        if (
+                            mask[sample_idx] == 1
+                        ):
+                            z[0].data[sample_idx] = z_updated[sample_idx]
 
                 z_default = self.generator.dataset.project_to_pytorch_default(z[0])
                 z_predictor = (
@@ -648,33 +654,34 @@ class CounterfactualExplainer(ExplainerInterface):
                 pred_new = torch.nn.functional.softmax(
                     gradient_predictor(z_predictor) / self.explainer_config.temperature
                 )
-                for j in range(gradient_confidences_old.shape[0]):
-                    if pred_new[j, int(y_target[j])] >= gradient_confidences_old[j]:
-                        # print("Update " + str(j))
-                        gradient_confidences_old[j] = pred_new[j, int(y_target[j])]
-                        print("Update " + str(j))
+                if self.explainer_config.greedy:
+                    for j in range(gradient_confidences_old.shape[0]):
+                        if mask[j] == 1:
+                            if pred_new[j, int(y_target[j])] >= gradient_confidences_old[j]:
+                                gradient_confidences_old[j] = pred_new[j, int(y_target[j])]
+                                print("Update " + str(j))
 
-                    else:
-                        z[0].data[j] = z_old[j]
+                            else:
+                                z[0].data[j] = z_old[j]
 
-            """visualize_step(
-                x=x_in,
-                z=z,
-                z_noisy=z_default,
-                img_predictor=img_predictor,
-                boolmask=boolmask,
-                filename="a.png",
-            )
-            import pdb
-
-            pdb.set_trace()"""
+            if self.explainer_config.visualize_gradients:
+                gradients_path = os.path.join(base_path, "explainer_gradients", str(batch_idx))
+                Path(gradients_path).mkdir(parents=True, exist_ok=True)
+                visualize_step(
+                    x=x_in,
+                    z=z,
+                    z_noisy=self.generator.dataset.project_to_pytorch_default(z_encoded.detach().cpu()),
+                    img_predictor=img_predictor,
+                    boolmask=boolmask,
+                    filename=os.path.join(gradients_path, str(i) + ".png"),
+                )
 
         if not self.explainer_config.iterationwise_encoding:
-            z_cuda = [z_elem.to(self.device) for z_elem in z]
-            counterfactual = self.generator.decode(z_cuda).detach().cpu()
+            z_encoded = [z_elem.to(self.device) for z_elem in z]
+            counterfactual = self.generator.decode(z_encoded).detach().cpu()
 
         else:
-            counterfactual = z[0].clone().detach()
+            counterfactual = best_z.clone().detach()
 
         counterfactual = self.generator.dataset.project_to_pytorch_default(
             counterfactual
@@ -779,6 +786,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 pbar=pbar,
                 mode=mode,
                 base_path=explainer_path,
+                batch_idx=start_idx,
             )
             history = None
 

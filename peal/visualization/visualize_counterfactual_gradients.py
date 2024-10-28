@@ -5,10 +5,10 @@ from peal.global_utils import high_contrast_heatmap
 
 
 def visualize_step(x, z, z_noisy, img_predictor, boolmask, filename):
-    heatmap_high_contrast = []
+    original_vs_counterfactual = []
     z_classifier = 0.5 * z[0].data.detach().cpu() + 0.5
     for it in range(x.shape[0]):
-        heatmap_high_contrast.append(
+        original_vs_counterfactual.append(
             high_contrast_heatmap(
                 x[it], z_classifier[it]
             )[0]
@@ -34,28 +34,24 @@ def visualize_step(x, z, z_noisy, img_predictor, boolmask, filename):
     if boolmask.shape[1] == 1:
         boolmask = torch.cat(3 * [boolmask.detach().cpu()], dim=1)
 
-    try:
-        save_tensor = torch.cat(
-            [
-                x,
-                torch.ones_like(x),
-                torch.stack(heatmap_high_contrast),
-                torch.ones_like(x),
-                z_classifier,
-                torch.ones_like(x),
-                z_noisy.detach().cpu(),
-                torch.ones_like(x),
-                img_predictor.cpu().detach(),
-                torch.ones_like(x),
-                torch.stack(gradient_img),
-                torch.ones_like(x),
-                torch.stack(gradient_z),
-                torch.ones_like(x),
-                boolmask,
-            ]
-        )
-
-    except Exception:
-        import pdb; pdb.set_trace()
+    save_tensor = torch.cat(
+        [
+            x,
+            torch.ones_like(x),
+            torch.stack(original_vs_counterfactual),
+            torch.ones_like(x),
+            z_classifier,
+            torch.ones_like(x),
+            z_noisy.detach().cpu(),
+            torch.ones_like(x),
+            img_predictor.cpu().detach(),
+            torch.ones_like(x),
+            torch.stack(gradient_img),
+            torch.ones_like(x),
+            torch.stack(gradient_z),
+            torch.ones_like(x),
+            boolmask,
+        ]
+    )
 
     torchvision.utils.save_image(save_tensor, fp=filename, nrow=x.shape[0])

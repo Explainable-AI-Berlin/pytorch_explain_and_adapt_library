@@ -82,5 +82,5 @@ def generate_mask(x1, x2, dilation):
     assert (dilation % 2) == 1, "dilation must be an odd number"
     mask = (x1 - x2).abs().sum(dim=1, keepdim=True)
     mask = mask / mask.view(mask.size(0), -1).max(dim=1)[0].view(-1, 1, 1, 1)
-    dil_mask = F.max_pool2d(mask, dilation, stride=1, padding=(dilation - 1) // 2)
+    dil_mask = F.avg_pool2d(mask, dilation, stride=1, padding=(dilation - 1) // 2)
     return mask, dil_mask

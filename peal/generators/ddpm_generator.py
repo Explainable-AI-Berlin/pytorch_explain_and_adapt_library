@@ -11,6 +11,7 @@ import io
 import blobfile as bf
 
 from mpi4py import MPI
+from numpy import dtype
 from torch import nn
 from types import SimpleNamespace
 
@@ -185,34 +186,42 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         if stochastic is None:
             stochastic = self.config.stochastic
 
+
+
         respaced_steps = int(t * int(self.config.timestep_respacing))
-        timesteps = list(range(respaced_steps))[::-1]
-        def local_forward(x, t, idx, noise, steps, diffusion, model):
-            out = diffusion.p_mean_variance(model, x, t, clip_denoised=True)
+        if stochastic == "full":
+            noise = torch.randn_like(x)
+            timestep = torch.tensor(respaced_steps).to(x).long()
+            x = torch.clamp(self.diffusion.q_sample(x, timestep, noise=noise), 0, 1)
 
-            x = out["mean"]
+        else:
+            timesteps = list(range(respaced_steps))[::-1]
+            def local_forward(x, t, idx, noise, steps, diffusion, model):
+                out = diffusion.p_mean_variance(model, x, t, clip_denoised=True)
 
-            if idx != (steps - 1):
-                x += torch.exp(0.5 * out["log_variance"]) * noise
+                x = out["mean"]
 
-            return x
+                if idx != (steps - 1):
+                    x += torch.exp(0.5 * out["log_variance"]) * noise
 
-        for idx, t in enumerate(timesteps):
-            t = torch.tensor([t] * x.size(0), device=x.device)
+                return x
 
-            if idx == 0:
-                x = self.diffusion.q_sample(x, t, noise=self.noise_fn(x))
+            for idx, t in enumerate(timesteps):
+                t = torch.tensor([t] * x.size(0), device=x.device)
 
-            if hasattr(self, "fix_noise") and self.fix_noise:
-                noise = self.noise[idx + 1, ...].unsqueeze(dim=0)
+                if idx == 0:
+                    x = self.diffusion.q_sample(x, t, noise=self.noise_fn(x))
 
-            elif stochastic:
-                noise = torch.randn_like(x)
+                if hasattr(self, "fix_noise") and self.fix_noise:
+                    noise = self.noise[idx + 1, ...].unsqueeze(dim=0)
 
-            else:
-                noise = torch.zeros_like(x)
+                elif stochastic == "semi":
+                    noise = torch.randn_like(x)
 
-            x = local_forward(x, t, idx, noise, respaced_steps, self.diffusion, self.model)
+                else:
+                    noise = torch.zeros_like(x)
+
+                x = local_forward(x, t, idx, noise, respaced_steps, self.diffusion, self.model)
 
         # TODO why are gradients in ACE scaled???
         #t = torch.tensor([self.steps - 1] * x.size(0), device=x.device)
