@@ -253,12 +253,15 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
 
         return z
 
-    def repaint(self, x, pe, inpaint, dilation, t, stochastic):
+    def repaint(self, x, pe, inpaint, dilation, t, stochastic, old_mask=None, mask_momentum=0.5):
         respaced_steps = int(t * int(self.config.timestep_respacing))
         indices = list(range(respaced_steps))[::-1]
         x_normalized = self.dataset.project_to_pytorch_default(x)
         pe_normalized = self.dataset.project_to_pytorch_default(pe)
         mask, dil_mask = generate_mask(x_normalized, pe_normalized, dilation)
+        if old_mask is not None:
+            dil_mask =  dil_mask - inpaint * old_mask.to(dil_mask) * mask_momentum
+
         boolmask = (dil_mask < inpaint).float()
 
         noise_fn = torch.randn_like if stochastic else torch.zeros_like
@@ -285,7 +288,7 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
                 ce += torch.exp(0.5 * out["log_variance"]) * noise
 
         ce = ce * (1 - boolmask) + boolmask * x
-        return ce, boolmask
+        return ce, boolmask.cpu()
 
     def train_model(
         self,
