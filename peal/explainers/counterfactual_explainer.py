@@ -26,7 +26,8 @@ from peal.global_utils import (
     get_project_resource_dir,
     is_port_in_use,
     dict_to_bar_chart,
-    high_contrast_heatmap, embed_numberstring,
+    high_contrast_heatmap,
+    embed_numberstring,
 )
 from peal.generators.interfaces import (
     InvertibleGenerator,
@@ -140,6 +141,7 @@ class PDCConfig(ExplainerConfig):
     visualize_gradients: bool = False
     num_attempts: int = 2
     mask_momentum: float = 0.5
+    momentum: float = 0.9
 
 
 class ACEConfig(ExplainerConfig):
@@ -490,7 +492,11 @@ class CounterfactualExplainer(ExplainerInterface):
             optimizer = torch.optim.Adam(z, lr=self.explainer_config.learning_rate)
 
         elif self.explainer_config.optimizer == "SGD":
-            optimizer = torch.optim.SGD(z, lr=self.explainer_config.learning_rate)
+            optimizer = torch.optim.SGD(
+                z,
+                lr=self.explainer_config.learning_rate,
+                momentum=self.explainer_config.momentum,
+            )
 
         else:
             raise Exception(
@@ -529,7 +535,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 z_encoded = self.generator.encode(
                     z[0].to(self.device),
                     t=self.explainer_config.sampling_time_fraction,
-                    stochastic="semi" if self.explainer_config.greedy else None,
+                    stochastic=self.explainer_config.stochastic,
                 )
                 z_default = self.generator.dataset.project_to_pytorch_default(z[0])
                 clean_img_old = torch.clone(z_default).detach().cpu()
@@ -651,7 +657,9 @@ class CounterfactualExplainer(ExplainerInterface):
             optimizer.step()
             boolmask = torch.zeros_like(z[0].data)
             if self.explainer_config.iterationwise_encoding:
-                pe = torch.clone(z[0]).detach().cpu()
+                pe = self.generator.dataset.project_to_pytorch_default(
+                    torch.clone(z[0]).detach().cpu()
+                )
                 if self.explainer_config.inpaint > 0.0:
                     z_updated, boolmask = self.generator.repaint(
                         x=x.to(
@@ -664,6 +672,7 @@ class CounterfactualExplainer(ExplainerInterface):
                         stochastic=True,
                         old_mask=torch.clone(boolmask),
                         mask_momentum=self.explainer_config.mask_momentum,
+                        boolmask_in=boolmask_in,
                     )
                     for sample_idx in range(z[0].data.shape[0]):
                         if mask[sample_idx] == 1:
@@ -702,15 +711,17 @@ class CounterfactualExplainer(ExplainerInterface):
                 Path(gradients_path).mkdir(parents=True, exist_ok=True)
                 visualize_step(
                     x=x_in,
-                    clean_img_old=clean_img_old,
                     z=z,
-                    z_noisy=self.generator.dataset.project_to_pytorch_default(
+                    clean_img_old=clean_img_old,
+                    z_encoded=self.generator.dataset.project_to_pytorch_default(
                         z_encoded.detach().cpu()
                     ),
                     img_predictor=img_predictor,
                     pe=pe,
                     boolmask=boolmask,
-                    filename=os.path.join(gradients_path, embed_numberstring(i, 4) + ".png"),
+                    filename=os.path.join(
+                        gradients_path, embed_numberstring(i, 4) + ".png"
+                    ),
                     boolmask_in=boolmask_in,
                 )
 

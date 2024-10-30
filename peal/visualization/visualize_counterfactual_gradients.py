@@ -4,13 +4,13 @@ import torchvision
 from peal.global_utils import high_contrast_heatmap
 
 
-def visualize_step(x, z, clean_img_old, z_noisy, img_predictor, pe, boolmask, filename, boolmask_in):
+def visualize_step(x, z, clean_img_old, z_encoded, img_predictor, pe, boolmask, filename, boolmask_in):
     clean_img_new = 0.5 * z[0].data.detach().cpu() + 0.5
     original_vs_counterfactual = []
     for it in range(x.shape[0]):
         original_vs_counterfactual.append(
             high_contrast_heatmap(
-                x[it], clean_img_old[it]
+                x[it], pe[it]
             )[0]
         )
 
@@ -40,11 +40,11 @@ def visualize_step(x, z, clean_img_old, z_noisy, img_predictor, pe, boolmask, fi
             torch.ones_like(x),
             clean_img_old,
             torch.ones_like(x),
-            z_noisy.detach().cpu(),
+            z_encoded.detach().cpu(),
             torch.ones_like(x),
             img_predictor.cpu().detach(),
-            torch.ones_like(x),
-            torch.stack(gradient_img),
+            #torch.ones_like(x),
+            #torch.stack(gradient_img),
             torch.ones_like(x),
             torch.stack(gradient_z),
             torch.ones_like(x),

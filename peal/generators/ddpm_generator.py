@@ -186,15 +186,19 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         if stochastic is None:
             stochastic = self.config.stochastic
 
-
-
         respaced_steps = int(t * int(self.config.timestep_respacing))
         if stochastic == "fully":
             noise = torch.randn_like(x)
             timestep = torch.tensor(respaced_steps).to(x).long()
-            x = torch.clamp(self.diffusion.q_sample(x, timestep, noise=noise), 0, 1)
+            x = torch.clamp(self.diffusion.q_sample(x, timestep, noise=noise), -1, 1)
 
         else:
+            timesteps = list(range(respaced_steps))
+            for idx, t in enumerate(timesteps):
+                t = torch.tensor([t] * x.size(0), device=x.device)
+                x = self.diffusion.ddim_reverse_sample(self.model, x, t)["sample"]
+
+            '''
             timesteps = list(range(respaced_steps))[::-1]
             def local_forward(x, t, idx, noise, steps, diffusion, model):
                 out = diffusion.p_mean_variance(model, x, t, clip_denoised=True)
@@ -224,6 +228,7 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
                     noise = torch.zeros_like(x)
 
                 x = local_forward(x, t, idx, noise, respaced_steps, self.diffusion, self.model)
+            '''
 
         # TODO why are gradients in ACE scaled???
         #t = torch.tensor([self.steps - 1] * x.size(0), device=x.device)
@@ -257,7 +262,7 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
 
         return z
 
-    def repaint(self, x, pe, inpaint, dilation, t, stochastic, old_mask=None, mask_momentum=0.5):
+    def repaint(self, x, pe, inpaint, dilation, t, stochastic, old_mask=None, mask_momentum=0.5, boolmask_in=None):
         respaced_steps = int(t * int(self.config.timestep_respacing))
         indices = list(range(respaced_steps))[::-1]
         x_normalized = self.dataset.project_to_pytorch_default(x)
@@ -267,6 +272,8 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
             dil_mask =  dil_mask - inpaint * old_mask.to(dil_mask) * mask_momentum
 
         boolmask = (dil_mask < inpaint).float()
+        if boolmask_in is not None:
+            boolmask = torch.minimum(torch.ones_like(boolmask), boolmask + 1 - boolmask_in.to(boolmask))
 
         noise_fn = torch.randn_like if stochastic else torch.zeros_like
 
