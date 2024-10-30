@@ -189,7 +189,7 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
 
 
         respaced_steps = int(t * int(self.config.timestep_respacing))
-        if stochastic == "full":
+        if stochastic == "fully":
             noise = torch.randn_like(x)
             timestep = torch.tensor(respaced_steps).to(x).long()
             x = torch.clamp(self.diffusion.q_sample(x, timestep, noise=noise), 0, 1)
@@ -209,8 +209,10 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
             for idx, t in enumerate(timesteps):
                 t = torch.tensor([t] * x.size(0), device=x.device)
 
+                """
                 if idx == 0:
                     x = self.diffusion.q_sample(x, t, noise=self.noise_fn(x))
+                """
 
                 if hasattr(self, "fix_noise") and self.fix_noise:
                     noise = self.noise[idx + 1, ...].unsqueeze(dim=0)
@@ -240,8 +242,10 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         for idx, t in enumerate(timesteps):
             t = torch.tensor([t] * z.size(0), device=z.device)
 
+            """
             if idx == 0:
                 z = self.diffusion.q_sample(z, t, noise=self.noise_fn(z))
+            """
 
             out = self.diffusion.p_mean_variance(self.model, z, t, clip_denoised=True)
 

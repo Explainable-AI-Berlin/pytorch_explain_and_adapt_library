@@ -129,7 +129,7 @@ class PDCConfig(ExplainerConfig):
     """
     Whether to use stochastic counterfactual search or not.
     """
-    stochastic: Union[type(None), bool] = None
+    stochastic: Union[type(None), str] = None
     dilation: int = 17
     inpaint: float = 0.5
     """
@@ -532,6 +532,7 @@ class CounterfactualExplainer(ExplainerInterface):
                     stochastic="semi" if self.explainer_config.greedy else None,
                 )
                 z_default = self.generator.dataset.project_to_pytorch_default(z[0])
+                clean_img_old = torch.clone(z_default).detach().cpu()
                 z_predictor_original = (
                     self.predictor_datasets[1]
                     .project_from_pytorch_default(z_default)
@@ -650,6 +651,7 @@ class CounterfactualExplainer(ExplainerInterface):
             optimizer.step()
             boolmask = torch.zeros_like(z[0].data)
             if self.explainer_config.iterationwise_encoding:
+                pe = torch.clone(z[0]).detach().cpu()
                 if self.explainer_config.inpaint > 0.0:
                     z_updated, boolmask = self.generator.repaint(
                         x=x.to(
@@ -700,11 +702,13 @@ class CounterfactualExplainer(ExplainerInterface):
                 Path(gradients_path).mkdir(parents=True, exist_ok=True)
                 visualize_step(
                     x=x_in,
+                    clean_img_old=clean_img_old,
                     z=z,
                     z_noisy=self.generator.dataset.project_to_pytorch_default(
                         z_encoded.detach().cpu()
                     ),
                     img_predictor=img_predictor,
+                    pe=pe,
                     boolmask=boolmask,
                     filename=os.path.join(gradients_path, embed_numberstring(i, 4) + ".png"),
                     boolmask_in=boolmask_in,
