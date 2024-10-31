@@ -27,7 +27,7 @@ def visualize_step(x, z, clean_img_old, z_encoded, img_predictor, pe, boolmask, 
     for it in range(x.shape[0]):
         gradient_z.append(
             high_contrast_heatmap(
-                ref, z[0].grad[it].detach().cpu()
+                ref, -z[0].grad[it].detach().cpu()
             )[0]
         )
 

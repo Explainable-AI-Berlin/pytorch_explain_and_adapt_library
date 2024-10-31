@@ -526,6 +526,7 @@ class CounterfactualExplainer(ExplainerInterface):
 
         best_z = torch.clone(z[0])
         best_score = torch.tensor(target_confidences)
+        best_mask = torch.ones_like(best_z)
         boolmask = None
 
         for i in range(self.explainer_config.gradient_steps):
@@ -580,6 +581,8 @@ class CounterfactualExplainer(ExplainerInterface):
                 if pred_original[j, int(y_target[j])] > best_score[j]:
                     best_z[j] = torch.clone(z[0][j])
                     best_score[j] = pred_original[j, int(y_target[j])]
+                    if not boolmask is None:
+                        best_mask[j] = boolmask[j]
 
                 if (
                     pred_original[j, int(y_target[j])]

@@ -388,7 +388,7 @@ class LeakySoftplus(torch.nn.Module):
     def __init__(self):
         super(LeakySoftplus, self).__init__()
         self.leaky_relu = torch.nn.LeakyReLU(negative_slope=0.1)
-        self.softplus = torch.nn.Softplus(beta=10.0)
+        self.softplus = torch.nn.Softplus(beta=1.0)
 
     def forward(self, x):
         return 0.5 * (self.leaky_relu(x) + self.softplus(x))
