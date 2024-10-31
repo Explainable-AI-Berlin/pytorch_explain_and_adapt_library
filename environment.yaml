@@ -171,6 +171,7 @@ dependencies:
       - tifffile==2023.7.18
       - torch==2.1.2
       - torch-fidelity==0.3.0
+      - torch-geometric==2.0.1
       - torchmetrics==1.3.0
       - torchvision==0.16.2
       - tqdm==4.64.0
@@ -183,6 +184,7 @@ dependencies:
       - virelay==0.4.0
       - werkzeug==2.2.1
       - wget==3.2
+      - wilds
       - wrapt==1.15.0
       - xformers
       - zennit==0.5.0
