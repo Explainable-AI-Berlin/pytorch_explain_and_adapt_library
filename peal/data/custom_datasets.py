@@ -15,9 +15,11 @@ from peal.data.dataset_generators import SquareDatasetGenerator
 from peal.data.datasets import (
     Image2ClassDataset,
     DataConfig,
-    Image2MixedDataset, ImageDataset,
+    Image2MixedDataset,
+    ImageDataset,
 )
-from peal.data.interfaces import PealDataset
+from peal.global_utils import embed_numberstring
+from peal.data.dataset_generators import latent_to_square_image
 
 
 class MnistDataset(Image2ClassDataset):
@@ -52,7 +54,6 @@ class MnistDataset(Image2ClassDataset):
                 idxs[label] += 1
 
         super(MnistDataset, self).__init__(config=config, **kwargs)
-
 
 
 def plot_latents_with_arrows(
@@ -141,7 +142,6 @@ def plot_latents_with_arrows(
     ax.set_xlabel("Foreground Intensity")
     ax.set_ylabel("Background Intensity")
 
-
     # Add vertical dotted line for Foreground Intensity == 0.5
     plt.axvline(x=0.5, color="black", linestyle="--")
     plt.text(
@@ -185,15 +185,13 @@ def plot_latents_with_arrows(
     by_label["Counterfactual"] = cf_marker
 
     # Add explanation for the background colors in the legend
-    blue_patch = plt.Line2D(
-        [0], [0], color="lightblue", lw=4, label="Pred > 0.5"
-    )
-    red_patch = plt.Line2D(
-        [0], [0], color="lightcoral", lw=4, label="Pred < 0.5"
-    )
+    blue_patch = plt.Line2D([0], [0], color="lightblue", lw=4, label="Pred > 0.5")
+    red_patch = plt.Line2D([0], [0], color="lightcoral", lw=4, label="Pred < 0.5")
 
     # Display the updated legend
-    ax.legend(handles=[original_marker, cf_marker, blue_patch, red_patch], loc="upper right")
+    ax.legend(
+        handles=[original_marker, cf_marker, blue_patch, red_patch], loc="upper right"
+    )
 
     # Show the plot
     plt.grid(True)
@@ -285,7 +283,6 @@ def plot_latents_with_arrows_old(
     ax.set_xlabel("Foreground Intensity")
     ax.set_ylabel("Background Intensity")
 
-
     # Add vertical dotted line for Foreground Intensity == 0.5
     plt.axvline(x=0.5, color="black", linestyle="--")
     plt.text(
@@ -337,9 +334,6 @@ def plot_latents_with_arrows_old(
     plt.clf()
 
 
-from peal.data.dataset_generators import latent_to_square_image
-
-
 class SquareDataset(Image2MixedDataset):
     def __init__(self, config: DataConfig, **kwargs):
         if not os.path.exists(config.dataset_path):
@@ -358,10 +352,16 @@ class SquareDataset(Image2MixedDataset):
         y_list,
     ):
         y_start_confidence = list(
-            map(lambda i: abs(y_list[i] - y_target_start_confidence[i]), range(len(y_list)))
+            map(
+                lambda i: abs(y_list[i] - y_target_start_confidence[i]),
+                range(len(y_list)),
+            )
         )
         y_end_confidence = list(
-            map(lambda i: abs(y_list[i] - y_target_end_confidence[i]), range(len(y_list)))
+            map(
+                lambda i: abs(y_list[i] - y_target_end_confidence[i]),
+                range(len(y_list)),
+            )
         )
         original_latents = []
         counterfactual_latents = []
@@ -485,7 +485,7 @@ class SquareDataset(Image2MixedDataset):
         print("visualize_decision_boundary saved under " + path)
 
     def check_foreground(self, x, hint):
-        intensity_foreground = torch.sum(hint * x) / torch.sum(hint)
+        intensity_foreground = torch.sum(hint * x) / torch.sum(hint) * 3
         return intensity_foreground
 
     def check_background(self, x, hint):
@@ -565,3 +565,43 @@ class RxRx1Dataset(ImageDataset):
     def __getitem__(self, idx):
         x = self.original_dataset[idx]
         return self.transform(x[0]), x[1]
+
+
+class Camelyon17AugmentedDataset(Image2MixedDataset):
+    def __init__(self, config, **kwargs):
+        if not os.path.exists(config.dataset_path):
+            original_dataset = get_dataset(dataset="camelyon17", download=True)
+            Path(os.path.join(config.dataset_path, "imgs")).mkdir(
+                parents=True, exist_ok=True
+            )
+            lines = ["img,tumor,hospital"]
+            for i in range(len(original_dataset)):
+                img, label, meta = original_dataset[i]
+                img_name = f"{embed_numberstring(i, 7)}.png"
+                img.save(f"{config.dataset_path}/imgs/{img_name}")
+                lines.append(f"{img_name}, {label}, {meta[0]}")
+
+            with open(f"{config.dataset_path}/data.csv", "w") as f:
+                f.write("\n".join(lines))
+
+        super(Camelyon17AugmentedDataset, self).__init__(config=config, **kwargs)
+
+
+class RxRx1AugmentedDataset(Image2MixedDataset):
+    def __init__(self, config, **kwargs):
+        if not os.path.exists(config.dataset_path):
+            original_dataset = get_dataset(dataset="camelyon17", download=True)
+            Path(os.path.join(config.dataset_path, "imgs")).mkdir(
+                parents=True, exist_ok=True
+            )
+            lines = ["img, label, confounder"]
+            for i in range(len(original_dataset)):
+                img, label, meta = original_dataset[i]
+                img_name = f"{embed_numberstring(i, 7)}.png"
+                img.save(f"{config.dataset_path}/imgs/{img_name}")
+                lines.append(f"{img_name}, {label}, {meta[0]}")
+
+            with open(f"{config.dataset_path}/data.csv", "w") as f:
+                f.write("\n".join(lines))
+
+        super(RxRx1AugmentedDataset, self).__init__(config=config, **kwargs)

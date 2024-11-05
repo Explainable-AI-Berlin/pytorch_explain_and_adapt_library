@@ -155,13 +155,13 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         self.model.to(device)
         self.model_path = os.path.join(self.model_dir, "final.pt")
         if os.path.exists(self.model_path) and self.config.is_trained:
-            print('load ddpm model!!!')
+            print('load ddpm model weights!!!')
             self.model.load_state_dict(
                 load_state_dict(self.model_path, map_location=device)
             )
 
         else:
-            print('No model weights yet!!!')
+            print('No ddpm model weights yet!!!')
             if os.path.exists(self.model_dir):
                 shutil.move(self.model_dir, self.model_dir + "_old" + datetime.now().strftime("%Y%m%d_%H%M%S"))
 

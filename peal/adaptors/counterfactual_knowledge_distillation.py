@@ -715,7 +715,7 @@ class CFKD(Adaptor):
                         normalize=True,
                         nrow=int(np.sqrt(generator_sample.shape[0])),
                     )
-                    print("sample visulized!")
+                    print("sample visualized!")
 
                     # TODO move this back!!!
                     generator_performance = (
