@@ -708,7 +708,7 @@ class CounterfactualExplainer(ExplainerInterface):
             if self.explainer_config.visualize_gradients:
                 gradients_path = os.path.join(
                     base_path,
-                    "explainer_gradients",
+                    mode + "_explainer_gradients",
                     embed_numberstring(batch_idx, 4) + "_" + str(num_attempts),
                 )
                 Path(gradients_path).mkdir(parents=True, exist_ok=True)

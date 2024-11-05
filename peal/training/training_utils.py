@@ -118,7 +118,7 @@ def calculate_validation_statistics(
             base_path=base_path,
             remove_below_threshold=False,
             pbar=pbar,
-            mode="Validation",
+            mode="validation",
             start_idx=it * dataloader.batch_size,
             # dataloader=dataloader,
         )

@@ -540,8 +540,9 @@ class SquareDataset(Image2MixedDataset):
 
 
 class Camelyon17Dataset(ImageDataset):
-    def __init__(self, transform, **kwargs):
+    def __init__(self, config, transform, **kwargs):
         self.original_dataset = get_dataset(dataset="camelyon17", download=True)
+        self.config = config
         self.transform = transform
         super(Camelyon17Dataset, self).__init__()
 
@@ -554,8 +555,9 @@ class Camelyon17Dataset(ImageDataset):
 
 
 class RxRx1Dataset(ImageDataset):
-    def __init__(self, transform, **kwargs):
+    def __init__(self, config, transform, **kwargs):
         self.original_dataset = get_dataset(dataset="rxrx1", download=True)
+        self.config = config
         self.transform = transform
         super(RxRx1Dataset, self).__init__()
 
@@ -590,7 +592,7 @@ class Camelyon17AugmentedDataset(Image2MixedDataset):
 class RxRx1AugmentedDataset(Image2MixedDataset):
     def __init__(self, config, **kwargs):
         if not os.path.exists(config.dataset_path):
-            original_dataset = get_dataset(dataset="camelyon17", download=True)
+            original_dataset = get_dataset(dataset="rxrx1", download=True)
             Path(os.path.join(config.dataset_path, "imgs")).mkdir(
                 parents=True, exist_ok=True
             )
