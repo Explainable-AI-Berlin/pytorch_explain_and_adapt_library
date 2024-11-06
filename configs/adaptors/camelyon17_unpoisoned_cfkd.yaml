@@ -14,10 +14,10 @@ explainer                            :  <PEAL_BASE>/configs/explainers/camelyon1
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/camelyon17_poisoned100.yaml
 test_data                            :  <PEAL_BASE>/configs/data/camelyon17_unpoisoned.yaml
-student                              :  $PEAL_RUNS/camelyon17/classifier_poisoned100/model.cpl
-teacher                              :  $PEAL_RUNS/camelyon17/classifier_unpoisened/model.cpl
+student                              :  $PEAL_RUNS/camelyon17/classifier_unpoisoned/model.cpl
+teacher                              :  Baseline:false
 generator                            :  $PEAL_RUNS/camelyon17/ddpm/config.yaml
-base_dir                             :  $PEAL_RUNS/camelyon17/classifier_poisoned100/cfkd
+base_dir                             :  $PEAL_RUNS/camelyon17/classifier_unpoisoned/cfkd
 task:
   criterions:
     ce     : 1.0

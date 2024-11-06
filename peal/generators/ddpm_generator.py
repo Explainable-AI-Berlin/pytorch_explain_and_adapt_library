@@ -153,19 +153,27 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         self.model, self.diffusion = create_model_and_diffusion(**self.config.__dict__)
         self.device = device
         self.model.to(device)
-        self.model_path = os.path.join(self.model_dir, "final.pt")
+        self.model_path = os.path.join(self.model_dir, "final.cpl")
         if os.path.exists(self.model_path) and self.config.is_trained:
             print('load ddpm model weights!!!')
             self.model.load_state_dict(
-                load_state_dict(self.model_path, map_location=device)
+                torch.load(self.model_path, map_location=device)
             )
 
         else:
-            print('No ddpm model weights yet!!!')
-            if os.path.exists(self.model_dir):
-                shutil.move(self.model_dir, self.model_dir + "_old" + datetime.now().strftime("%Y%m%d_%H%M%S"))
+            self.model_path = os.path.join(self.model_dir, "final.pt")
+            if os.path.exists(self.model_path) and self.config.is_trained:
+                print('load ddpm model weights!!!')
+                self.model.load_state_dict(
+                    load_state_dict(self.model_path, map_location=device)
+                )
 
-            Path(self.model_dir).mkdir(parents=True, exist_ok=True)
+            else:
+                print('No ddpm model weights yet!!!')
+                if os.path.exists(self.model_dir):
+                    shutil.move(self.model_dir, self.model_dir + "_old" + datetime.now().strftime("%Y%m%d_%H%M%S"))
+
+                Path(self.model_dir).mkdir(parents=True, exist_ok=True)
 
         self.config.is_trained = True
         self.noise_fn = torch.randn_like if self.config.stochastic else torch.zeros_like

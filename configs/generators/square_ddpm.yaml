@@ -5,3 +5,4 @@ base_path : $PEAL_RUNS/square3/ddpm
 data: <PEAL_BASE>/configs/data/square3_generator.yaml
 image_size: 64
 batch_size: 196
+save_interval: 1000
