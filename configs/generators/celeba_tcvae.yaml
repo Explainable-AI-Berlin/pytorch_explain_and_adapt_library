@@ -32,7 +32,7 @@ beta_annealing: True
 dp_prob: 0.3
 
 # Data
-data : '<PEAL_BASE>/configs/data/celeba.yaml'
+data : '<PEAL_BASE>/configs/data/celeba_generator.yaml'
 height: 128
 width: 128
 

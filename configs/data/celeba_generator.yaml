@@ -6,4 +6,4 @@ output_type             : multiclass
 output_size             : [40]
 downsize                : Resize
 delimiter               : ","
-confounding_factors     : [Smiling, Blond_Hair]
+normalization           : [0.5,0.5]

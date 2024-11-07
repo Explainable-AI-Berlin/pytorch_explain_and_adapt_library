@@ -130,7 +130,7 @@ class PDCConfig(ExplainerConfig):
     """
     Whether to use stochastic counterfactual search or not.
     """
-    stochastic: Union[type(None), str] = None
+    stochastic: Union[type(None), str] = "fully"
     dilation: int = 17
     inpaint: float = 0.5
     """

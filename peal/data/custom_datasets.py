@@ -485,7 +485,7 @@ class SquareDataset(Image2MixedDataset):
         print("visualize_decision_boundary saved under " + path)
 
     def check_foreground(self, x, hint):
-        intensity_foreground = torch.sum(hint * x) / torch.sum(hint) * 3
+        intensity_foreground = torch.sum(hint[...,0,:,:] * x[...,0,:,:]) / torch.sum(hint[...,0,:,:])
         return intensity_foreground
 
     def check_background(self, x, hint):
