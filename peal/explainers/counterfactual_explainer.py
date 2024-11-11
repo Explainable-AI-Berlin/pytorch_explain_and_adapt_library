@@ -455,6 +455,24 @@ class CounterfactualExplainer(ExplainerInterface):
                     distilled_path, map_location=self.device
                 )
 
+            decision_boundary_path_distilled = os.path.join(
+                base_path,
+                "explainer",
+                "distilled_predictor",
+                "decision_boundary.png",
+            )
+            if (
+                hasattr(self.predictor_datasets[1], "visualize_decision_boundary")
+                and not os.path.exists(decision_boundary_path_distilled)
+            ):
+                self.predictor_datasets[1].visualize_decision_boundary(
+                    gradient_predictor,
+                    32,
+                    self.device,
+                    decision_boundary_path_distilled,
+                    temperature=self.explainer_config.temperature,
+                )
+
         else:
             gradient_predictor = self.predictor
 
@@ -595,9 +613,7 @@ class CounterfactualExplainer(ExplainerInterface):
 
             logits_gradient = gradient_predictor(
                 img_predictor
-                + self.explainer_config.img_noise_injection
-                * torch.randn_like(img_predictor)
-            )
+            ) / self.explainer_config.temperature
             loss = self.loss(logits_gradient, y_target.to(self.device))
             l1_losses = []
             for z_idx in range(len(z_original)):

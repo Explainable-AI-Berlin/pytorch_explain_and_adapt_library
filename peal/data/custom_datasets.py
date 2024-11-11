@@ -394,7 +394,7 @@ class SquareDataset(Image2MixedDataset):
             decision_boundary,
         )
 
-    def visualize_decision_boundary(self, predictor, batch_size, device, path):
+    def visualize_decision_boundary(self, predictor, batch_size, device, path, temperature=1.0):
         print("visualize_decision_boundary")
 
         # Create the grid for plotting
@@ -434,23 +434,61 @@ class SquareDataset(Image2MixedDataset):
 
                 logits.append(predictor(torch.stack(current_batch).to(device)).detach())
                 logits = torch.cat(logits, dim=0).detach().cpu()
-                prediction_grid = logits.argmax(axis=1).reshape(100, 100)
+                prediction_grid = torch.nn.Softmax(dim=1)(logits / temperature)[:,0].reshape(100, 100)
                 prediction_grids.append(prediction_grid)
 
+        """# Average the predictions across grids
+        prediction_grid = torch.mean(torch.stack(prediction_grids).to(torch.float32), dim=0).numpy()
+        
+        # Create the plot
+        plt.figure()
+        
+        # Set a lighter color map: use "coolwarm" and make it lighter
+        cmap = cm.get_cmap("bwr")
+        plt.contourf(xx, yy, prediction_grid, levels=100, cmap=cmap)
+        
+        # Set axis labels
+        plt.xlabel("Foreground Intensity")
+        plt.ylabel("Background Intensity")
+        
+        # Set the ticks to increments of 0.5
+        plt.xticks(np.arange(0, 1.1, 0.5))
+        plt.yticks(np.arange(0, 1.1, 0.5))
+        
+        # Add vertical dotted line for Foreground Intensity == 0.5
+        plt.axvline(x=0.5, color="black", linestyle="--")
+        plt.text(
+            1.05,
+            0.5,
+            "Confounding feature only",
+            rotation=270,
+            verticalalignment="center",
+        )
+        
+        # Add horizontal dotted line for Background Intensity == 0.5
+        plt.axhline(y=0.5, color="black", linestyle="--")
+        plt.text(0.5, 1.05, "True feature only", horizontalalignment="center")
+        
+        # Adjust plot limits to give space for text labels outside the plot
+        plt.subplots_adjust(right=0.85, top=0.85)
+        
+        # Save the plot to the specified path
+        plt.savefig(path, bbox_inches="tight")
+        plt.clf()"""
+
         # Average the predictions across grids
-        prediction_grid = (
-            torch.mean(torch.stack(prediction_grids).to(torch.float32), dim=0) > 0.5
-        ).numpy()
+        prediction_grid = torch.mean(torch.stack(prediction_grids).to(torch.float32), dim=0).numpy()
 
         # Create the plot
         plt.figure()
 
         # Set a lighter color map: use "coolwarm" and make it lighter
-        cmap = plt.get_cmap("coolwarm")
-        custom_cmap = cmap(
-            np.linspace(0.25, 0.75, cmap.N)
-        )  # Focus on the lighter range
-        plt.contourf(xx, yy, prediction_grid, levels=100, cmap=cmap)
+        cmap = cm.get_cmap("bwr")
+        # Create filled contour plot
+        contour_fill = plt.contourf(xx, yy, prediction_grid, levels=100, cmap=cmap)
+
+        # Add contour lines with black color and thicker lines
+        contour_lines = plt.contour(xx, yy, prediction_grid, levels=10, colors='black', linewidths=1.5)
 
         # Set axis labels
         plt.xlabel("Foreground Intensity")
@@ -485,7 +523,9 @@ class SquareDataset(Image2MixedDataset):
         print("visualize_decision_boundary saved under " + path)
 
     def check_foreground(self, x, hint):
-        intensity_foreground = torch.sum(hint[...,0,:,:] * x[...,0,:,:]) / torch.sum(hint[...,0,:,:])
+        intensity_foreground = torch.sum(
+            hint[..., 0, :, :] * x[..., 0, :, :]
+        ) / torch.sum(hint[..., 0, :, :])
         return intensity_foreground
 
     def check_background(self, x, hint):

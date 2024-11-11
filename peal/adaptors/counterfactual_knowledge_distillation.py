@@ -623,6 +623,7 @@ class CFKD(Adaptor):
                 self.adaptor_config.training.train_batch_size,
                 self.device,
                 boundary_path,
+                temperature=self.adaptor_config.explainer.temperature,
             )
 
         log_dir = os.path.join(self.base_dir, "logs")
@@ -1956,6 +1957,7 @@ class CFKD(Adaptor):
                     self.adaptor_config.training.train_batch_size,
                     self.device,
                     decision_boundary_path,
+                    temperature=self.adaptor_config.explainer.temperature,
                 )
 
             validation_stats = self.retrieve_validation_stats(
