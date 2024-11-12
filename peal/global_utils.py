@@ -1,28 +1,23 @@
 # This whole file contains all the stuff, that is written too bad and had no clear position where it should be located in the project!
-import copy
-from pathlib import Path
-
 import numpy as np
 import sys
 import types
-
 import pandas as pd
 import torch
 import os
 import yaml
 import socket
 import typing
-import torchvision
 import inspect
 import pkgutil
 import importlib
 import importlib.util
+import torch.nn.functional as F
+import matplotlib.pyplot as plt
 
 from pkg_resources import resource_filename
-
-
-import matplotlib.pyplot as plt
 from tqdm import tqdm
+from pathlib import Path
 
 
 def dict_to_bar_chart(input_dict, name):
@@ -381,6 +376,7 @@ def reset_weights(model):
 
         else:
             print(f'Layer {idx} does not have a reset_parameters method')
+            reset_weights(layer)
 
 
 class LeakySoftplus(torch.nn.Module):
@@ -503,3 +499,13 @@ def high_contrast_heatmap(x, counterfactual):
     heatmap_high_contrast = torch.clamp(heatmap / heatmap.max(), 0.0, 1.0)
 
     return heatmap_high_contrast, x_in, counterfactual_rgb
+
+
+@torch.no_grad()
+def generate_smooth_mask(x1, x2, dilation):
+    assert (dilation % 2) == 1, "dilation must be an odd number"
+    mask = (x1 - x2).abs().sum(dim=1, keepdim=True)
+    mask = mask / mask.view(mask.size(0), -1).max(dim=1)[0].view(-1, 1, 1, 1)
+    #dil_mask = F.avg_pool2d(mask, dilation, stride=1, padding=(dilation - 1) // 2)
+    dil_mask = F.max_pool2d(mask, dilation, stride=1, padding=(dilation - 1) // 2)
+    return mask, dil_mask

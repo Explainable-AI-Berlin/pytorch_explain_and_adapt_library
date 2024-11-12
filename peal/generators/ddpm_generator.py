@@ -1,28 +1,23 @@
 import os
-import random
 import types
 import shutil
 import copy
-from datetime import datetime
-from pathlib import Path
-
 import torch
 import io
 import blobfile as bf
 
+from datetime import datetime
+from pathlib import Path
 from mpi4py import MPI
 from torch import nn
 from types import SimpleNamespace
-
 from torch.utils.tensorboard import SummaryWriter
+from typing import Union
 
-from peal.dependencies.ace.core.utils import generate_mask
-from peal.dependencies.time.get_predictions import get_predictions
 from peal.generators.interfaces import EditCapableGenerator, InvertibleGenerator
-from peal.global_utils import load_yaml_config
+from peal.global_utils import load_yaml_config, generate_smooth_mask
 from peal.dependencies.ace.run_ace import main as ace_main
 from peal.dependencies.ace.guided_diffusion import logger
-from peal.dependencies.ace.guided_diffusion import dist_util
 from peal.dependencies.ace.guided_diffusion.resample import (
     create_named_schedule_sampler,
 )
@@ -32,15 +27,11 @@ from peal.dependencies.ace.guided_diffusion.script_util import (
 from peal.dependencies.ace.guided_diffusion.train_util import TrainLoop
 from peal.data.dataloaders import get_dataloader
 from peal.data.dataset_factory import get_datasets
-from peal.data.interfaces import PealDataset
 from peal.explainers.counterfactual_explainer import ACEConfig
 from peal.training.loggers import log_images_to_writer
-
-from typing import Union
-
 from peal.generators.interfaces import GeneratorConfig
 from peal.data.datasets import DataConfig
-from peal.training.trainers import ModelTrainer, PredictorConfig, distill_predictor
+from peal.training.trainers import distill_predictor
 
 
 class DDPMConfig(GeneratorConfig):
@@ -152,20 +143,30 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         self.model, self.diffusion = create_model_and_diffusion(**self.config.__dict__)
         self.device = device
         self.model.to(device)
-        self.model_path = os.path.join(self.model_dir, "final.pt")
+        self.model_path = os.path.join(self.model_dir, "final.cpl")
         if os.path.exists(self.model_path) and self.config.is_trained:
-            print('load model!!!')
-            self.model.load_state_dict(
-                load_state_dict(self.model_path, map_location=device)
-            )
+            print("load ddpm model weights!!!")
+            self.model.load_state_dict(torch.load(self.model_path, map_location=device))
 
         else:
-            print('No model weights yet!!!')
-            if os.path.exists(self.model_dir):
-                import pdb; pdb.set_trace()
-                shutil.move(self.model_dir, self.model_dir + "_old" + datetime.now().strftime("%Y%m%d_%H%M%S"))
+            self.model_path = os.path.join(self.model_dir, "final.pt")
+            if os.path.exists(self.model_path) and self.config.is_trained:
+                print("load ddpm model weights!!!")
+                self.model.load_state_dict(
+                    load_state_dict(self.model_path, map_location=device)
+                )
 
-            Path(self.model_dir).mkdir(parents=True, exist_ok=True)
+            else:
+                print("No ddpm model weights yet!!!")
+                if os.path.exists(self.model_dir):
+                    shutil.move(
+                        self.model_dir,
+                        self.model_dir
+                        + "_old"
+                        + datetime.now().strftime("%Y%m%d_%H%M%S"),
+                    )
+
+                Path(self.model_dir).mkdir(parents=True, exist_ok=True)
 
         self.config.is_trained = True
         self.noise_fn = torch.randn_like if self.config.stochastic else torch.zeros_like
@@ -187,36 +188,51 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
             stochastic = self.config.stochastic
 
         respaced_steps = int(t * int(self.config.timestep_respacing))
-        timesteps = list(range(respaced_steps))[::-1]
-        def local_forward(x, t, idx, noise, steps, diffusion, model):
-            out = diffusion.p_mean_variance(model, x, t, clip_denoised=True)
+        if stochastic == "fully":
+            noise = torch.randn_like(x)
+            timestep = torch.tensor(respaced_steps).to(x).long()
+            x = torch.clamp(self.diffusion.q_sample(x, timestep, noise=noise), -1, 1)
 
-            x = out["mean"]
+        else:
+            timesteps = list(range(respaced_steps))
+            for idx, t in enumerate(timesteps):
+                t = torch.tensor([t] * x.size(0), device=x.device)
+                x = self.diffusion.ddim_reverse_sample(self.model, x, t)["sample"]
 
-            if idx != (steps - 1):
-                x += torch.exp(0.5 * out["log_variance"]) * noise
+            '''
+            timesteps = list(range(respaced_steps))[::-1]
+            def local_forward(x, t, idx, noise, steps, diffusion, model):
+                out = diffusion.p_mean_variance(model, x, t, clip_denoised=True)
 
-            return x
+                x = out["mean"]
 
-        for idx, t in enumerate(timesteps):
-            t = torch.tensor([t] * x.size(0), device=x.device)
+                if idx != (steps - 1):
+                    x += torch.exp(0.5 * out["log_variance"]) * noise
 
-            if idx == 0:
-                x = self.diffusion.q_sample(x, t, noise=self.noise_fn(x))
+                return x
 
-            if hasattr(self, "fix_noise") and self.fix_noise:
-                noise = self.noise[idx + 1, ...].unsqueeze(dim=0)
+            for idx, t in enumerate(timesteps):
+                t = torch.tensor([t] * x.size(0), device=x.device)
 
-            elif stochastic:
-                noise = torch.randn_like(x)
+                """
+                if idx == 0:
+                    x = self.diffusion.q_sample(x, t, noise=self.noise_fn(x))
+                """
 
-            else:
-                noise = torch.zeros_like(x)
+                if hasattr(self, "fix_noise") and self.fix_noise:
+                    noise = self.noise[idx + 1, ...].unsqueeze(dim=0)
 
-            x = local_forward(x, t, idx, noise, respaced_steps, self.diffusion, self.model)
+                elif stochastic == "semi":
+                    noise = torch.randn_like(x)
+
+                else:
+                    noise = torch.zeros_like(x)
+
+                x = local_forward(x, t, idx, noise, respaced_steps, self.diffusion, self.model)
+            '''
 
         # TODO why are gradients in ACE scaled???
-        #t = torch.tensor([self.steps - 1] * x.size(0), device=x.device)
+        # t = torch.tensor([self.steps - 1] * x.size(0), device=x.device)
         return x
 
     def decode(self, z, t=1.0, stochastic=None, num_steps=None):
@@ -232,8 +248,10 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         for idx, t in enumerate(timesteps):
             t = torch.tensor([t] * z.size(0), device=z.device)
 
+            """
             if idx == 0:
                 z = self.diffusion.q_sample(z, t, noise=self.noise_fn(z))
+            """
 
             out = self.diffusion.p_mean_variance(self.model, z, t, clip_denoised=True)
 
@@ -245,13 +263,31 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
 
         return z
 
-    def repaint(self, x, pe, inpaint, dilation, t, stochastic):
+    def repaint(
+        self,
+        x,
+        pe,
+        inpaint,
+        dilation,
+        t,
+        stochastic,
+        old_mask=None,
+        mask_momentum=0.5,
+        boolmask_in=None,
+    ):
         respaced_steps = int(t * int(self.config.timestep_respacing))
         indices = list(range(respaced_steps))[::-1]
         x_normalized = self.dataset.project_to_pytorch_default(x)
         pe_normalized = self.dataset.project_to_pytorch_default(pe)
-        mask, dil_mask = generate_mask(x_normalized, pe_normalized, dilation)
+        mask, dil_mask = generate_smooth_mask(x_normalized, pe_normalized, dilation)
+        if old_mask is not None:
+            dil_mask = dil_mask - inpaint * old_mask.to(dil_mask) * mask_momentum
+
         boolmask = (dil_mask < inpaint).float()
+        if boolmask_in is not None:
+            boolmask = torch.minimum(
+                torch.ones_like(boolmask), boolmask + 1 - boolmask_in.to(boolmask)
+            )
 
         noise_fn = torch.randn_like if stochastic else torch.zeros_like
 
@@ -277,7 +313,7 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
                 ce += torch.exp(0.5 * out["log_variance"]) * noise
 
         ce = ce * (1 - boolmask) + boolmask * x
-        return ce, boolmask
+        return ce, boolmask.cpu()
 
     def train_model(
         self,
@@ -367,10 +403,12 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         mode: str = "",
     ):
         if not self.config.is_trained:
-            print('Model not trained yet. Model will be trained now!')
-            import pdb; pdb.set_trace()
+            print("Model not trained yet. Model will be trained now!")
+            import pdb
+
+            pdb.set_trace()
             self.train_model()
-            
+
         if not explainer_config.distilled_predictor is None:
             distilled_path = os.path.join(
                 base_path, "explainer", "distilled_predictor", "model.cpl"
@@ -387,7 +425,6 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
 
         else:
             gradient_predictor = predictor
-            import pdb; pdb.set_trace()
 
         dataset = [
             (

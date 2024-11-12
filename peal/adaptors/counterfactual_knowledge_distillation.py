@@ -623,6 +623,7 @@ class CFKD(Adaptor):
                 self.adaptor_config.training.train_batch_size,
                 self.device,
                 boundary_path,
+                temperature=self.adaptor_config.explainer.temperature,
             )
 
         log_dir = os.path.join(self.base_dir, "logs")
@@ -715,7 +716,7 @@ class CFKD(Adaptor):
                         normalize=True,
                         nrow=int(np.sqrt(generator_sample.shape[0])),
                     )
-                    print("sample visulized!")
+                    print("sample visualized!")
 
                     # TODO move this back!!!
                     generator_performance = (
@@ -873,7 +874,9 @@ class CFKD(Adaptor):
             logits = (
                 self.student(x.to(self.device).unsqueeze(0)).squeeze(0).detach().cpu()
             )
-            y_target_start_confidence = torch.nn.Softmax()(logits)[y_target]
+            y_target_start_confidence = torch.nn.Softmax()(
+                logits / self.explainer.explainer_config.temperature
+            )[y_target]
             prediction = self.logits_to_prediction(logits)
             if (
                 not self.adaptor_config.counterfactual_type == "1sided"
@@ -1646,15 +1649,15 @@ class CFKD(Adaptor):
             self.explainer.explainer_config = original_explainer_config
             if self.adaptor_config.validation_runs > 1:
                 self.datastack.dataset._initialize_performance_metrics()
-                validation_stats[
-                    "distance_to_manifold"
-                ] = self.datastack.dataset.distribution_distance(
-                    x_counterfactual_collection
+                validation_stats["distance_to_manifold"] = (
+                    self.datastack.dataset.distribution_distance(
+                        x_counterfactual_collection
+                    )
                 )
-                validation_stats[
-                    "pairwise_distance"
-                ] = self.datastack.dataset.pair_wise_distance(
-                    x_list_collection, x_counterfactual_collection
+                validation_stats["pairwise_distance"] = (
+                    self.datastack.dataset.pair_wise_distance(
+                        x_list_collection, x_counterfactual_collection
+                    )
                 )
                 validation_stats["diversity"] = self.datastack.dataset.variance(
                     x_counterfactual_collection
@@ -1954,6 +1957,7 @@ class CFKD(Adaptor):
                     self.adaptor_config.training.train_batch_size,
                     self.device,
                     decision_boundary_path,
+                    temperature=self.adaptor_config.explainer.temperature,
                 )
 
             validation_stats = self.retrieve_validation_stats(

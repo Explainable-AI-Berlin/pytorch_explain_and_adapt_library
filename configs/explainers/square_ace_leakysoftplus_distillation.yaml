@@ -1,0 +1,12 @@
+# python -W ignore run_explainer.py --config "<PEAL_BASE>/configs/explainers/square_ace_leakysoftplus_distillation.yaml"
+explainer_type : ACE
+category : explainer
+attack_iterations: 150
+sampling_time_fraction: 0.5
+sampling_inpaint: 0.0
+attack_step: 5
+dist_l1: 0.001
+y_target_goal_confidence: 1.1
+distilled_predictor: <PEAL_BASE>/configs/predictors/generic_distillation.yaml
+replace_with_activation: leakysoftplus
+temperature: 1.0
