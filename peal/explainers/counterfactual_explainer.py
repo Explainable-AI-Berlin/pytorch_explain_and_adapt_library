@@ -632,7 +632,13 @@ class CounterfactualExplainer(ExplainerInterface):
 
                     pdb.set_trace()
 
-            loss += self.explainer_config.dist_l1 * torch.mean(torch.stack(l1_losses))
+            if num_attempts > 1 or self.explainer_config.num_attempts == 1:
+                dist_l1 = self.explainer_config.dist_l1
+
+            else:
+                dist_l1 = 0.0
+
+            loss += dist_l1 * torch.mean(torch.stack(l1_losses))
             if not pbar is None:
                 absolute_difference = torch.abs(x_in - img_predictor.detach().cpu())
                 pbar.set_description(

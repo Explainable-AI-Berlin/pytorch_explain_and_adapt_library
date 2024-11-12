@@ -1,6 +1,6 @@
 category: explainer
 dilation: 5
-dist_l1: 0.0
+dist_l1: 0.01
 distilled_predictor: <PEAL_BASE>/configs/predictors/generic_distillation.yaml
 explainer_type: PDC
 explanation_type: PDCConfig
