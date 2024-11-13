@@ -9,6 +9,7 @@ from pathlib import Path
 import torch
 import torchvision
 from flask import render_template, Flask, request
+from numpy.f2py.auxfuncs import throw_error
 from pydantic import PositiveInt
 
 from torch import nn
@@ -139,7 +140,7 @@ class PDCConfig(ExplainerConfig):
     replace_with_activation: str = "leakysoftplus"
     greedy: bool = False
     visualize_gradients: bool = False
-    num_attempts: int = 2
+    num_attempts: int = 1
     mask_momentum: float = 0.5
     momentum: float = 0.9
 
@@ -522,19 +523,19 @@ class CounterfactualExplainer(ExplainerInterface):
             )
 
         mask = torch.ones(x.shape[0]).to(x)
+        pred_original = (
+            torch.nn.functional.softmax(
+                self.predictor(x_predictor.to(self.device))
+                / self.explainer_config.temperature
+            )
+            .detach()
+            .cpu()
+        )
+        target_confidences = [
+            pred_original[i][y_target[i]] for i in range(len(y_target))
+        ]
         gradient_confidences_old = torch.zeros(x.shape[0]).to(x)
         if target_confidence_goal is None:
-            pred_original = (
-                torch.nn.functional.softmax(
-                    self.predictor(x_predictor.to(self.device))
-                    / self.explainer_config.temperature
-                )
-                .detach()
-                .cpu()
-            )
-            target_confidences = [
-                pred_original[i][y_target[i]] for i in range(len(y_target))
-            ]
             target_confidence_goal_current = 1 - torch.tensor(target_confidences)
 
         else:
@@ -791,7 +792,6 @@ class CounterfactualExplainer(ExplainerInterface):
             list(attributions),
             list(target_confidences),
         )
-        new_counterfactuals, new_attributions, new_target_confidences = [], [], []
 
         if not boolmask is None:
             if boolmask.shape[1] == 1:
@@ -802,6 +802,8 @@ class CounterfactualExplainer(ExplainerInterface):
         else:
             boolmask_out = None
 
+        """
+        new_counterfactuals, new_attributions, new_target_confidences = [], [], []
         for sample_idx in range(len(current_counterfactuals)):
             if (
                 previous_target_confidences_list is None
@@ -817,12 +819,17 @@ class CounterfactualExplainer(ExplainerInterface):
                 new_attributions.append(previous_attributions_list[sample_idx])
                 new_target_confidences.append(
                     previous_target_confidences_list[sample_idx]
-                )
+                )"""
+
+        if not previous_target_confidences_list is None:
+            current_counterfactuals = current_counterfactuals + previous_counterfactual_list
+            current_attributions = current_attributions + previous_attributions_list
+            current_target_confidences = current_target_confidences + previous_target_confidences_list
 
         return (
-            new_counterfactuals,
-            new_attributions,
-            new_target_confidences,
+            current_counterfactuals,
+            current_attributions,
+            current_target_confidences,
             boolmask_out,
         )
 
@@ -881,7 +888,6 @@ class CounterfactualExplainer(ExplainerInterface):
                 idx_list=batch["idx_list"],
                 mode=mode,
             )
-            history = None
 
         elif isinstance(self.generator, InvertibleGenerator) and isinstance(
             self.explainer_config, PDCConfig
@@ -902,7 +908,6 @@ class CounterfactualExplainer(ExplainerInterface):
                 batch_idx=start_idx,
                 num_attempts=self.explainer_config.num_attempts,
             )
-            history = None
 
         elif isinstance(self.generator, EditCapableGenerator):
             if explainer_path is None:
@@ -928,6 +933,20 @@ class CounterfactualExplainer(ExplainerInterface):
                 predictor_datasets=self.predictor_datasets,
                 base_path=explainer_path,
             )
+
+        if len(batch["x_list"]) < len(batch["x_counterfactual_list"]):
+            n_reps = len(batch["x_counterfactual_list"]) // len(batch["x_list"])
+            for key in batch.keys():
+                print(key)
+                if len(batch[key]) < len(batch["x_counterfactual_list"]):
+                    if isinstance(batch[key], torch.Tensor):
+                        batch[key] = torch.cat(n_reps * [batch[key]], dim=0)
+
+                    elif isinstance(batch[key], list):
+                        batch[key] = n_reps * batch[key]
+
+                    else:
+                        raise Exception
 
         batch_out = {}
         if remove_below_threshold:

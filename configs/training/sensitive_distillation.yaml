@@ -4,7 +4,7 @@ test_batch_size         : 32
 max_epochs              : 10
 learning_rate           : 0.001
 optimizer               : adam
-adv_training            : False
+adv_training            : True
 class_balanced          : True
 use_mixup               : True
 label_smoothing         : 0.05

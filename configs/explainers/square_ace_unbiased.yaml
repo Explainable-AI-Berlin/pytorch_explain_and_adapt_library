@@ -7,6 +7,6 @@ sampling_inpaint: 0.0
 attack_step: 5
 dist_l1: 0.0
 y_target_goal_confidence: 1.1
-distilled_predictor: <PEAL_BASE>/configs/predictors/generic_distillation.yaml
+distilled_predictor: <PEAL_BASE>/configs/predictors/sensitive_distillation.yaml
 replace_with_activation: leakysoftplus
 temperature: 1.0

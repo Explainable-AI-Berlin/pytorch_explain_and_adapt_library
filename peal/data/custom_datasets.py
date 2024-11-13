@@ -219,7 +219,7 @@ def plot_latents_with_arrows_old(
     cmap = cm.get_cmap("bwr")  # blue to red
 
     # Create a custom colormap for the decision boundary (0 -> light blue, 1 -> light red)
-    decision_cmap = ListedColormap(["lightcoral", "lightblue"])
+    decision_cmap = ListedColormap(["lightblue", "lightcoral"])
 
     # Display the decision boundary grid as the background
     ax.imshow(
