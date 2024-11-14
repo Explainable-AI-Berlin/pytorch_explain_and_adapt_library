@@ -12,13 +12,13 @@ from pytorch_lightning.callbacks import ModelCheckpoint, Timer
 from pytorch_lightning.loggers import WandbLogger
 from torch.utils.data import DataLoader
 
-from datasets import get_dataset, get_dataset_kwargs
-from experiments.evaluation.evaluate_by_subset import evaluate_by_subset
-from experiments.evaluation.evaluate_by_subset_attacked import evaluate_by_subset_attacked
-from experiments.preprocessing.global_collect_relevances_and_activations import run_collect_relevances_and_activations
-from model_training.correction_methods import get_correction_method
-from models import get_fn_model_loader
-from utils.artificial_artifact import get_artifact_kwargs
+from peal.dependencies.rrclarc.datasets import get_dataset, get_dataset_kwargs
+from peal.dependencies.rrclarc.experiments.evaluation.evaluate_by_subset import evaluate_by_subset
+from peal.dependencies.rrclarc.experiments.evaluation.evaluate_by_subset_attacked import evaluate_by_subset_attacked
+from peal.dependencies.rrclarc.experiments.preprocessing.global_collect_relevances_and_activations import run_collect_relevances_and_activations
+from peal.dependencies.rrclarc.model_training.correction_methods import get_correction_method
+from peal.dependencies.rrclarc.models import get_fn_model_loader
+from peal.dependencies.rrclarc.utils.artificial_artifact import get_artifact_kwargs
 
 torch.random.manual_seed(0)
 np.random.seed(0)

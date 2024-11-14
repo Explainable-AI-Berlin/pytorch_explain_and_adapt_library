@@ -1,7 +1,7 @@
 import torch
 
-from model_training.correction_methods.base_correction_method import Freeze
-from model_training.correction_methods.clarc import Clarc
+from peal.dependencies.rrclarc.model_training.correction_methods.base_correction_method import Freeze
+from peal.dependencies.rrclarc.model_training.correction_methods.clarc import Clarc
 
 
 class RRClarc(Clarc):

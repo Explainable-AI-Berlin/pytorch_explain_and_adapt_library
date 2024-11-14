@@ -2,8 +2,8 @@ import pytorch_lightning as pl
 import torch
 from pytorch_lightning.callbacks import Callback
 
-from model_training.training_utils import get_optimizer, get_loss
-from utils.metrics import get_accuracy, get_f1, get_auc
+from peal.dependencies.rrclarc.model_training.training_utils import get_optimizer, get_loss
+from peal.dependencies.rrclarc.utils.metrics import get_accuracy, get_f1, get_auc
 
 
 class LitClassifier(pl.LightningModule):

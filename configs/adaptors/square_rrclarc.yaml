@@ -1,0 +1,16 @@
+adaptor_type: "RRClArC"
+model_path: $PEAL_RUNS/square2/colora_confounding_colorb/torchvision/classifier_unbalanced/model.cpl
+eval_acc_every_epoch: False
+img_size: 64
+classes: [0, 1]
+data: <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_unpoisoned.yaml
+# data: <PEAL_BASE>/configs/data/square.yaml
+training: <PEAL_BASE>/configs/training/rrclarc_collect_relevances.yaml
+base_dir: $PEAL_RUNS/square2/colora_confounding_colorb/torchvision/classifier_unbalanced/rrclarc
+lamb: 1000.0
+category: "adaptor"
+task:
+  y_selection: [ClassA, ClassB]
+  output_type: 'multiclass'
+  criterions:
+    l2: 1.0

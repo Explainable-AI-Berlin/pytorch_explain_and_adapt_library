@@ -4,8 +4,8 @@ import numpy as np
 import torch
 from zennit.core import stabilize
 
-from model_training.correction_methods.base_correction_method import LitClassifier, Freeze
-from utils.cav import compute_cav
+from peal.dependencies.rrclarc.model_training.correction_methods.base_correction_method import LitClassifier, Freeze
+from peal.dependencies.rrclarc.utils.cav import compute_cav
 
 
 class Clarc(LitClassifier):

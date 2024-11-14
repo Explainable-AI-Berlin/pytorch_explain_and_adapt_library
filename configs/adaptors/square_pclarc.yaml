@@ -1,0 +1,15 @@
+adaptor_type: "PClArC"
+model_path: $PEAL_RUNS/square2/colora_confounding_colorb/torchvision/classifier_unbalanced/model.cpl
+data: <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_unbalanced.yaml
+# data: <PEAL_BASE>/configs/data/square.yaml
+training: <PEAL_BASE>/configs/training/rrclarc_collect_relevances.yaml
+base_dir: $PEAL_RUNS/square2/colora_confounding_colorb/torchvision/classifier_unbalanced/pclarc
+category: "adaptor"
+projection_type: 'svm' # ['svm', 'simple']
+projection_location: 'features' # ['input', 'features']
+unpoisoned_data: <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_unpoisoned.yaml
+task:
+  y_selection: [ClassA, ClassB]
+  output_type: 'multiclass'
+  criterions:
+    l2: 1.0

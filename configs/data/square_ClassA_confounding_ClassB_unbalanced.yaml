@@ -10,5 +10,5 @@ downsize                : Resize
 delimiter               : ","
 confounding_factors     : [ClassA, ClassB]
 # [(prob A=B=0), (prob A=0,B=1), (prob A=1,B=0), (prob A=B=1)]
-full_confounder_config  : [0.2, 0.3, 0.5, 0.0]
+full_confounder_config  : [0.1, 0.4, 0.5, 0.0]
 has_hints               : True
