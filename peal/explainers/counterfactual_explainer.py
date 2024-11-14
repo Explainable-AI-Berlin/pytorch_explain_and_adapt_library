@@ -633,7 +633,7 @@ class CounterfactualExplainer(ExplainerInterface):
 
                     pdb.set_trace()
 
-            if num_attempts > 1 or self.explainer_config.num_attempts == 1:
+            if num_attempts == 1:
                 dist_l1 = self.explainer_config.dist_l1
 
             else:

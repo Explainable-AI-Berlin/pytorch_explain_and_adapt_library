@@ -542,6 +542,14 @@ class ModelTrainer:
 
             X = move_to_device(X, self.device)
             y_original = y
+            if self.config.training.label_smoothing > 0.0 and mode=="train":
+                y_dist = torch.ones(y.size(0), self.config.task.output_channels)
+                y_dist *= self.config.training.label_smoothing / (self.config.task.output_channels - 1)
+                for i in range(y.size(0)):
+                    y_dist[i, y[i]] = 1 - self.config.training.label_smoothing
+
+                y = torch.distributions.categorical.Categorical(y_dist).sample()
+
             if self.config.training.use_mixup and mode=="train":
                 X, y = mixup(
                     X,
