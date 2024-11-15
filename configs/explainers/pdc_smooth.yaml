@@ -8,11 +8,11 @@ gradient_steps: 50
 greedy: false
 inpaint: 0.2
 iterationwise_encoding: true
-learning_rate: 50.0
+learning_rate: 100.0
 mask_momentum: 0.2
 momentum: 0.999
 num_attempts: 1
-num_discretization_steps: 25
+num_discretization_steps: 50
 optimizer: SGD
 replace_with_activation: leakysoftplus
 sampling_time_fraction: 0.3

@@ -7,5 +7,5 @@ optimizer               : adam
 adv_training            : True
 class_balanced          : True
 use_mixup               : True
-label_smoothing         : 0.02
-mixup_alpha             : 15
+label_smoothing         : 0.05
+mixup_alpha             : 10
