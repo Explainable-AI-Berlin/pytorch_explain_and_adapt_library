@@ -143,6 +143,7 @@ class PDCConfig(ExplainerConfig):
     num_attempts: int = 1
     mask_momentum: float = 0.5
     momentum: float = 0.9
+    gradient_clipping: float = 0.01
 
 
 class ACEConfig(ExplainerConfig):
@@ -661,7 +662,15 @@ class CounterfactualExplainer(ExplainerInterface):
                 pbar.update(1)
 
             img_predictor.retain_grad()
+
             loss.backward()
+            for sample_idx in range(z[0].size(0)):
+                norm = z[0].grad[sample_idx].norm(p=1.0) * self.explainer_config.learning_rate
+                clip_value = self.explainer_config.gradient_clipping * float(
+                    torch.prod(torch.tensor(list(z[0][sample_idx].shape)))
+                )
+                if norm > clip_value:
+                    z[0].grad[sample_idx] = z[0].grad[sample_idx] * clip_value / norm
 
             if self.explainer_config.use_masking:
                 for sample_idx in range(len(target_confidences)):
@@ -728,11 +737,11 @@ class CounterfactualExplainer(ExplainerInterface):
                                 z[0].data[j] = z_old[j]
 
             if self.explainer_config.visualize_gradients:
-                gradients_path = os.path.join(
+                gradients_path = str(os.path.join(
                     base_path,
                     mode + "_explainer_gradients",
                     embed_numberstring(batch_idx, 4) + "_" + str(num_attempts),
-                )
+                ))
                 Path(gradients_path).mkdir(parents=True, exist_ok=True)
                 visualize_step(
                     x=x_in,
@@ -908,7 +917,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 pbar=pbar,
                 mode=mode,
                 base_path=explainer_path,
-                batch_idx=start_idx * self.explainer_config.num_attempts,
+                batch_idx=start_idx,
                 num_attempts=self.explainer_config.num_attempts,
             )
 
@@ -970,7 +979,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 target_confidence_goal=target_confidence_goal,
                 base_path=base_path,
                 predictor=self.predictor,
-                start_idx=start_idx,
+                start_idx=start_idx * self.explainer_config.num_attempts,
                 **batch_out,
             )
 
@@ -1079,9 +1088,14 @@ class CounterfactualExplainer(ExplainerInterface):
                     + torch.sign(absolute_cosine_similarities[idx_cluster, idx_current])
                     * current_differences[idx_current]
                 ) / (idx + 1)
-                collage_path = explanations_list_by_source[idx_current][idx]["collage_path_list"]
+                collage_path = explanations_list_by_source[idx_current][idx][
+                    "collage_path_list"
+                ]
                 collage_path_new = os.path.join(
-                    *[collage_path_base + "_" + str(idx_cluster), embed_numberstring(idx, 7)]
+                    *[
+                        collage_path_base + "_" + str(idx_cluster),
+                        embed_numberstring(idx, 7),
+                    ]
                 )
                 shutil.copy(collage_path, collage_path_new)
 
