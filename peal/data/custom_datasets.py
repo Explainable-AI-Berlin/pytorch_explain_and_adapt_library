@@ -219,7 +219,7 @@ def plot_latents_with_arrows_old(
     cmap = cm.get_cmap("bwr")  # blue to red
 
     # Create a custom colormap for the decision boundary (0 -> light blue, 1 -> light red)
-    decision_cmap = ListedColormap(["lightcoral", "lightblue"])
+    decision_cmap = ListedColormap(["lightblue", "lightcoral"])
 
     # Display the decision boundary grid as the background
     ax.imshow(
@@ -337,8 +337,12 @@ def plot_latents_with_arrows_old(
 class SquareDataset(Image2MixedDataset):
     def __init__(self, config: DataConfig, **kwargs):
         if not os.path.exists(config.dataset_path):
-            cdg = SquareDatasetGenerator(data_config=config)
-            cdg.generate_dataset()
+            if config.confounder_probability == 0.5:
+                cdg = SquareDatasetGenerator(data_config=config)
+                cdg.generate_dataset()
+
+            else:
+                raise NotImplementedError("Only confounder_probability=0.5 can be used to generate the dataset")
 
         super(SquareDataset, self).__init__(config=config, **kwargs)
 

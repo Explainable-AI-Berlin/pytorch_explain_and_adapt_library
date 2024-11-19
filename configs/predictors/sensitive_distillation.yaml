@@ -1,4 +1,4 @@
-'training'          : '<PEAL_BASE>/configs/training/adversarially_robust.yaml'
+'training'          : '<PEAL_BASE>/configs/training/sensitive_distillation.yaml'
 'task':
   'criterions':
     'ce'     : 1.0

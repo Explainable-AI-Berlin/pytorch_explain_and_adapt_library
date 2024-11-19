@@ -9,7 +9,6 @@ import pandas as pd
 
 from pathlib import Path
 
-import pygame
 import torch
 import torchvision
 from PIL import Image
@@ -1036,3 +1035,13 @@ class SquareDatasetGenerator:
                     ),
                     "w",
                 ).write("\n".join(lines_out_inverse))
+
+        open(
+            os.path.join(self.data_config.dataset_path, "data.csv"), "w"
+        ).write("\n".join(lines_out))
+        open(
+            os.path.join(
+                self.data_config.dataset_path + "_inverse", "data.csv"
+            ),
+            "w",
+        ).write("\n".join(lines_out_inverse))
