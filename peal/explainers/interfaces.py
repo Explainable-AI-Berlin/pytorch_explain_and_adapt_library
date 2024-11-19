@@ -28,6 +28,7 @@ class ExplainerConfig(BaseModel):
     validate_generator: bool = False
     max_samples: Union[int, None] = None
     temperature: float = 3.0
+    use_clustering: bool = False
 
 
 class ExplainerInterface:

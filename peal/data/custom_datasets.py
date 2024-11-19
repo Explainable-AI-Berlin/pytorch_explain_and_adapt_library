@@ -348,12 +348,13 @@ class SquareDataset(Image2MixedDataset):
 
     def global_counterfactual_visualization(
         self,
-        counterfactuals,
         filename,
-        num_samples,
+        x_list,
+        counterfactuals,
         y_target_start_confidence,
         y_target_end_confidence,
         y_list,
+        hint_list,
     ):
         y_start_confidence = list(
             map(
@@ -371,8 +372,9 @@ class SquareDataset(Image2MixedDataset):
         counterfactual_latents = []
         hints_enabled_buffer = self.hints_enabled
         self.hints_enabled = True
-        for idx in range(num_samples):
-            x, (y, hint) = self[idx]
+        for idx in range(len(x_list)):
+            x = x_list[idx]
+            hint = hint_list[idx]
             original_latents.append(
                 [self.check_foreground(x, hint), self.check_background(x, hint)]
             )
@@ -386,7 +388,7 @@ class SquareDataset(Image2MixedDataset):
         self.hints_enabled = hints_enabled_buffer
 
         path = filename.split("/")[:-1] + ["decision_boundary.npy"]
-        decision_boundary = np.load("/" + os.path.join(*path))
+        decision_boundary = np.load("/" + str(os.path.join(*path)))
         decision_boundary = np.transpose(decision_boundary, (1, 0))
 
         plot_latents_with_arrows(

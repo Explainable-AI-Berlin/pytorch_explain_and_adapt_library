@@ -1634,7 +1634,6 @@ class CFKD(Adaptor):
                         )
                     )
 
-            
             validation_stats = {
                 key: torch.mean(
                     torch.stack(
@@ -1770,6 +1769,11 @@ class CFKD(Adaptor):
                 )
             )
 
+        if self.adaptor_config.explainer.use_clustering:
+            validation_tracked_values = self.explainer.cluster_explanations(
+                validation_tracked_values
+            )
+
         validation_feedback, validation_feedback_stats = self.retrieve_feedback(
             tracked_values=validation_tracked_values,
             finetune_iteration=finetune_iteration,
@@ -1780,16 +1784,17 @@ class CFKD(Adaptor):
             self.dataloaders_val[0].dataset, "global_counterfactual_visualization"
         ):
             self.dataloaders_val[0].dataset.global_counterfactual_visualization(
-                validation_tracked_values["x_counterfactual_list"],
                 os.path.join(
                     self.base_dir,
                     str(finetune_iteration),
                     "val_counterfactuals_global.png",
                 ),
-                self.adaptor_config.max_validation_samples,
+                validation_tracked_values["x_list"],
+                validation_tracked_values["x_counterfactual_list"],
                 validation_tracked_values["y_target_start_confidence_list"],
                 validation_tracked_values["y_target_end_confidence_list"],
                 validation_tracked_values["y_target_list"],
+                validation_tracked_values["hint_list"],
             )
             print("global counterfactual visualization saved!!!")
 

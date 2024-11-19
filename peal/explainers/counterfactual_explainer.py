@@ -144,6 +144,7 @@ class PDCConfig(ExplainerConfig):
     mask_momentum: float = 0.5
     momentum: float = 0.9
     gradient_clipping: float = 0.01
+    merge_clusters: str = "select_best"
 
 
 class ACEConfig(ExplainerConfig):
@@ -1001,7 +1002,7 @@ class CounterfactualExplainer(ExplainerInterface):
         This function clusters the explanations.
         """
         explanations_list = []
-        for idx in range(explanations_dict["x_list"]):
+        for idx in range(len(explanations_dict["x_list"])):
             current_dict = {}
             for key in explanations_dict.keys():
                 current_dict[key] = explanations_dict[key][idx]
@@ -1026,6 +1027,7 @@ class CounterfactualExplainer(ExplainerInterface):
 
         def extract_feature_difference(explanations):
             difference_list = []
+            import pdb; pdb.set_trace()
             activation_ref = self.predictor.feature_extractor(
                 explanations[0]["x_list"].to(self.device)
             )
@@ -1045,9 +1047,9 @@ class CounterfactualExplainer(ExplainerInterface):
         cluster_means = extract_feature_difference(explanations_beginning)
         collage_path_ref = explanations_beginning[0]["collage_path_list"]
         collage_path_elements = collage_path_ref.split(os.sep)[:-1]
-        collage_path_base = os.path.join(
+        collage_path_base = str(os.path.join(
             *([os.path.abspath(os.sep)] + collage_path_elements)
-        )
+        ))
         for cluster_idx in range(len(cluster_means)):
             collage_path = explanations_beginning[cluster_idx]["collage_path_list"]
             Path(collage_path_base + "_" + str(cluster_idx)).mkdir(
@@ -1088,6 +1090,12 @@ class CounterfactualExplainer(ExplainerInterface):
                     + torch.sign(absolute_cosine_similarities[idx_cluster, idx_current])
                     * current_differences[idx_current]
                 ) / (idx + 1)
+                if hasattr(explanations_list_by_source[idx_current][idx], "cluster_list"):
+                    explanations_list_by_source[idx_current][idx]["cluster_list"].append(idx_cluster)
+
+                else:
+                    explanations_list_by_source[idx_current][idx]["cluster_list"] = [idx_cluster]
+
                 collage_path = explanations_list_by_source[idx_current][idx][
                     "collage_path_list"
                 ]
@@ -1113,7 +1121,34 @@ class CounterfactualExplainer(ExplainerInterface):
 
             cluster_dicts.append(cluster_dict)
 
-        return cluster_dicts
+        if self.explainer_config.merge_clusters == "select_best":
+            cluster_scores = []
+            for cluster_idx in range(len(cluster_dicts)):
+                sample_scores = []
+                for sample_idx in range(len(cluster_dicts[cluster_idx]["x_list"])):
+                    sample_scores.append(
+                        cluster_dicts[cluster_idx]["y_target_end_confidence_list"][
+                            sample_idx
+                        ]
+                    )
+
+                cluster_scores.append(torch.mean(torch.tensor(sample_scores)))
+
+            cluster_scores = torch.tensor(cluster_scores)
+            best_cluster_idx = torch.argmax(cluster_scores)
+            explanations_dict_out = cluster_dicts[best_cluster_idx]
+
+        elif self.explainer_config.merge_clusters == "concatenate":
+            explanations_dict_out = {}
+            for key in cluster_dicts[0].keys():
+                explanations_dict_out[key] = []
+                for cluster_idx in range(len(cluster_dicts)):
+                    explanations_dict_out[key] += cluster_dicts[cluster_idx][key]
+
+        else:
+            raise Exception("Merge cluster method not implemented!")
+
+        return explanations_dict_out
 
     def run(self, oracle_path=None, confounder_oracle_path=None):
         """
