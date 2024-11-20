@@ -1771,7 +1771,7 @@ class CFKD(Adaptor):
 
         if self.adaptor_config.explainer.use_clustering:
             validation_tracked_values = self.explainer.cluster_explanations(
-                validation_tracked_values
+                validation_tracked_values, self.adaptor_config.batch_size, self.adaptor_config.explainer.num_attempts
             )
 
         validation_feedback, validation_feedback_stats = self.retrieve_feedback(

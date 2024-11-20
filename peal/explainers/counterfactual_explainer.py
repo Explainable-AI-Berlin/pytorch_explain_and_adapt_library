@@ -1009,10 +1009,10 @@ class CounterfactualExplainer(ExplainerInterface):
 
             explanations_list.append(current_dict)
 
-        explanations_list_by_source = n_clusters * []
+        explanations_list_by_source = [[] for i in range(n_clusters)]
         batch_counter = 0
         cluster_counter = 0
-        for i, elem in enumerate(explanations_list_by_source):
+        for i, elem in enumerate(explanations_list):
             if batch_counter == batch_size:
                 batch_counter = 0
                 cluster_counter += 1
@@ -1025,10 +1025,16 @@ class CounterfactualExplainer(ExplainerInterface):
 
         cluster_lists = n_clusters * []
 
+        # TODO very hacky! should this better be done with hooks?
+        submodules = list(self.predictor.children())
+        while len(submodules) == 1:
+            submodules = list(submodules[0].children())
+
+        feature_extractor = nn.Sequential(*submodules[:-1])
+
         def extract_feature_difference(explanations):
             difference_list = []
-            import pdb; pdb.set_trace()
-            activation_ref = self.predictor.feature_extractor(
+            activation_ref = feature_extractor(
                 explanations[0]["x_list"].to(self.device)
             )
             for i in range(1, len(explanations)):
@@ -1036,7 +1042,7 @@ class CounterfactualExplainer(ExplainerInterface):
                     torch.sum(explanations[0]["x_list"] != explanations[i]["x_list"])
                     == 0
                 )
-                a = self.predictor.feature_extractor(
+                a = feature_extractor(
                     explanations[i]["x_counterfactual_list"].to(self.device)
                 )
                 difference_list.append(a - activation_ref)
