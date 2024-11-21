@@ -1774,12 +1774,6 @@ class CFKD(Adaptor):
                 validation_tracked_values, self.adaptor_config.batch_size, self.adaptor_config.explainer.num_attempts
             )
 
-        validation_feedback, validation_feedback_stats = self.retrieve_feedback(
-            tracked_values=validation_tracked_values,
-            finetune_iteration=finetune_iteration,
-            mode="validation",
-        )
-
         if hasattr(
             self.dataloaders_val[0].dataset, "global_counterfactual_visualization"
         ):
@@ -1797,6 +1791,12 @@ class CFKD(Adaptor):
                 validation_tracked_values["hint_list"],
             )
             print("global counterfactual visualization saved!!!")
+
+        validation_feedback, validation_feedback_stats = self.retrieve_feedback(
+            tracked_values=validation_tracked_values,
+            finetune_iteration=finetune_iteration,
+            mode="validation",
+        )
 
         self.create_dataset(
             feedback=validation_feedback,

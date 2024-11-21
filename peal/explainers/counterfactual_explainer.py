@@ -1029,7 +1029,6 @@ class CounterfactualExplainer(ExplainerInterface):
             explanations_list_by_source[cluster_counter].append(explanations_list[i])
             batch_counter += 1
 
-        cluster_lists = n_clusters * []
 
         """# TODO very hacky! should this better be done with hooks?
         submodules = list(self.predictor.children())
@@ -1043,13 +1042,13 @@ class CounterfactualExplainer(ExplainerInterface):
             activation_ref = extract_penultima_activation(
                 explanations[0]["x_list"][None, ...].to(self.device), self.predictor
             )
-            for i in range(1, len(explanations)):
+            for i in range(len(explanations)):
                 assert (
                     torch.sum(explanations[0]["x_list"] != explanations[i]["x_list"])
                     == 0
                 )
                 activation_current = extract_penultima_activation(
-                    explanations[i]["x_list"][None, ...].to(self.device), self.predictor
+                    explanations[i]["x_counterfactual_list"][None, ...].to(self.device), self.predictor
                 )
                 difference_list.append(activation_current - activation_ref)
 
@@ -1062,13 +1061,16 @@ class CounterfactualExplainer(ExplainerInterface):
         collage_path_base = str(
             os.path.join(*([os.path.abspath(os.sep)] + collage_path_elements))
         )
+        cluster_lists = [[] for i in range(n_clusters)]
+        cluster_lists[0] = [explanations_list_by_source[0][0]]
+        cluster_lists[1] = [explanations_list_by_source[1][0]]
         for cluster_idx in range(len(cluster_means)):
             collage_path = explanations_beginning[cluster_idx]["collage_path_list"]
             Path(collage_path_base + "_" + str(cluster_idx)).mkdir(
                 parents=True, exist_ok=True
             )
             collage_path_new = os.path.join(
-                *[collage_path_base + "_" + str(cluster_idx), embed_numberstring(0, 7)]
+                *[collage_path_base + "_" + str(cluster_idx), embed_numberstring(0, 7) + '.png']
             )
             shutil.copy(collage_path, collage_path_new)
 
@@ -1077,9 +1079,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 [e[idx] for e in explanations_list_by_source]
             )
             # build outer product between cluster means and current differences
-            cosine_similarities = torch.zeros(
-                [len(cluster_means), len(current_differences)]
-            )
+            cosine_similarities = torch.zeros([len(cluster_means), len(current_differences)])
             for i in range(len(cluster_means)):
                 for j in range(len(current_differences)):
                     cosine_similarities[i, j] = torch.nn.CosineSimilarity()(
@@ -1093,7 +1093,6 @@ class CounterfactualExplainer(ExplainerInterface):
                 ))
                 idx_cluster = idx_combined // len(current_differences)
                 idx_current = idx_combined % len(current_differences)
-                import pdb; pdb.set_trace()
                 cluster_lists[idx_cluster].append(
                     explanations_list_by_source[idx_current][idx]
                 )
@@ -1123,7 +1122,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 collage_path_new = os.path.join(
                     *[
                         collage_path_base + "_" + str(idx_cluster),
-                        embed_numberstring(idx, 7),
+                        embed_numberstring(idx, 7) + '.png',
                     ]
                 )
                 shutil.copy(collage_path, collage_path_new)
