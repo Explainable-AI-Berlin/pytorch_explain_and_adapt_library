@@ -21,29 +21,30 @@ from pathlib import Path
 
 
 def dict_to_bar_chart(input_dict, name):
-  """
-  Creates a bar chart from a dictionary and saves it as a PNG image.
+    """
+    Creates a bar chart from a dictionary and saves it as a PNG image.
 
-  Args:
-    interpretation: A dictionary where keys are strings and values are integers.
-    name: The desired filename (without the .png extension) to save the image.
-  """
+    Args:
+      interpretation: A dictionary where keys are strings and values are integers.
+      name: The desired filename (without the .png extension) to save the image.
+    """
 
-  # Extract labels and values from the dictionary
-  labels = list(input_dict.keys())
-  values = list(input_dict.values())
+    # Extract labels and values from the dictionary
+    labels = list(input_dict.keys())
+    values = list(input_dict.values())
 
-  # Create the bar chart
-  plt.bar(labels, values)
-  plt.xlabel("Interpretation")
-  plt.ylabel("Count")
-  plt.title("Interpretation Distribution")
+    # Create the bar chart
+    plt.bar(labels, values)
+    plt.xlabel("Interpretation")
+    plt.ylabel("Count")
+    plt.title("Interpretation Distribution")
 
-  # Save the chart as a PNG image
-  plt.savefig(f"{name}.png")
+    # Save the chart as a PNG image
+    plt.savefig(f"{name}.png")
 
-  # Clear the plot to avoid affecting subsequent plots
-  plt.clf()
+    # Clear the plot to avoid affecting subsequent plots
+    plt.clf()
+
 
 def find_subclasses(base_class, directory):
     subclasses = []
@@ -183,7 +184,7 @@ def request(name, default, is_asking=True):
 
 def get_project_resource_dir():
     return os.path.abspath(os.sep) + os.path.join(
-        *resource_filename(__name__,".").replace("\\", "/").split("/")[:-2]
+        *resource_filename(__name__, ".").replace("\\", "/").split("/")[:-2]
     )
 
 
@@ -200,12 +201,12 @@ def _load_yaml_config(config_path):
         # config_path is already a config object
         return config_path
 
-    if config_path[:len("$PEAL_RUNS")] == "$PEAL_RUNS":
-        peal_runs = os.environ.get('PEAL_RUNS', "peal_runs")
+    if config_path[: len("$PEAL_RUNS")] == "$PEAL_RUNS":
+        peal_runs = os.environ.get("PEAL_RUNS", "peal_runs")
         config_path = config_path.replace("$PEAL_RUNS", peal_runs)
 
-    if config_path[:len("$PEAL_DATA")] == "$PEAL_DATA":
-        peal_data = os.environ.get('PEAL_DATA', "datasets")
+    if config_path[: len("$PEAL_DATA")] == "$PEAL_DATA":
+        peal_data = os.environ.get("PEAL_DATA", "datasets")
         config_path = config_path.replace("$PEAL_DATA", peal_data)
 
     if config_path[-5:] == ".yaml":
@@ -229,12 +230,12 @@ def _load_yaml_config(config_path):
 
         for key in config.keys():
             if isinstance(config[key], str):
-                if config[key][:len("$PEAL_RUNS")] == "$PEAL_RUNS":
-                    peal_runs = os.environ.get('PEAL_RUNS', "peal_runs")
+                if config[key][: len("$PEAL_RUNS")] == "$PEAL_RUNS":
+                    peal_runs = os.environ.get("PEAL_RUNS", "peal_runs")
                     config[key] = config[key].replace("$PEAL_RUNS", peal_runs)
 
-                if config[key][:len("$PEAL_DATA")] == "$PEAL_DATA":
-                    peal_data = os.environ.get('PEAL_DATA', "datasets")
+                if config[key][: len("$PEAL_DATA")] == "$PEAL_DATA":
+                    peal_data = os.environ.get("PEAL_DATA", "datasets")
                     config[key] = config[key].replace("$PEAL_DATA", peal_data)
 
                 if config[key][-5:] == ".yaml":
@@ -259,7 +260,10 @@ def get_config_model(config_data):
     superclass = None
     for name, obj in inspect.getmembers(module):
         if inspect.isclass(obj):
-            if obj.__name__[-6:] == "Config" and obj.__module__ == superclass_module_name:
+            if (
+                obj.__name__[-6:] == "Config"
+                and obj.__module__ == superclass_module_name
+            ):
                 superclass = obj
 
     subclass_dir = os.path.join(
@@ -267,9 +271,7 @@ def get_config_model(config_data):
         module_path,
     )
     class_list = find_subclasses(superclass, subclass_dir)
-    class_dict = {
-        c.__name__: c for c in class_list
-    }
+    class_dict = {c.__name__: c for c in class_list}
     config_model = class_dict[config_class_str]
 
     return config_model
@@ -291,7 +293,9 @@ def load_yaml_config(config_path, config_model=None, return_namespace=True):
     elif not config_model is None and isinstance(config_data, dict):
         for key in config_data.keys():
             if isinstance(config_data[key], dict):
-                config_data[key] = load_yaml_config(config_data[key], return_namespace=False)
+                config_data[key] = load_yaml_config(
+                    config_data[key], return_namespace=False
+                )
 
         config = config_model(**config_data)
 
@@ -370,12 +374,12 @@ def orthogonal_initialization(model):
 
 def reset_weights(model):
     for idx, layer in enumerate(model.children()):
-        if hasattr(layer, 'reset_parameters'):
-            print(f'Resetting parameters of layer: {layer}')
+        if hasattr(layer, "reset_parameters"):
+            print(f"Resetting parameters of layer: {layer}")
             layer.reset_parameters()
 
         else:
-            print(f'Layer {idx} does not have a reset_parameters method')
+            print(f"Layer {idx} does not have a reset_parameters method")
             reset_weights(layer)
 
 
@@ -493,9 +497,7 @@ def high_contrast_heatmap(x, counterfactual):
 
     heatmap = torch.stack([heatmap_red, heatmap_green, heatmap_blue], dim=0)
     if torch.abs(heatmap.sum() - torch.abs(x - counterfactual).sum()) > 0.1:
-        print(
-            "Error: Heatmap does not add up to absolute counterfactual difference."
-        )
+        print("Error: Heatmap does not add up to absolute counterfactual difference.")
     heatmap_high_contrast = torch.clamp(heatmap / heatmap.max(), 0.0, 1.0)
 
     return heatmap_high_contrast, x_in, counterfactual_rgb
@@ -507,6 +509,38 @@ def generate_smooth_mask(x1, x2, dilation):
     mask = (x1 - x2).abs().sum(dim=1, keepdim=True)
     mask = mask / mask.view(mask.size(0), -1).max(dim=1)[0].view(-1, 1, 1, 1)
     dil_mask = 0.5 * F.avg_pool2d(mask, dilation, stride=1, padding=(dilation - 1) // 2)
-    dil_mask += 0.5 * F.max_pool2d(mask, dilation, stride=1, padding=(dilation - 1) // 2)
-    #dil_mask = F.max_pool2d(mask, dilation, stride=1, padding=(dilation - 1) // 2)
+    dil_mask += 0.5 * F.max_pool2d(
+        mask, dilation, stride=1, padding=(dilation - 1) // 2
+    )
+    # dil_mask = F.max_pool2d(mask, dilation, stride=1, padding=(dilation - 1) // 2)
     return mask, dil_mask
+
+
+def extract_penultima_activation(x, predictor):
+    # Function to traverse the computation graph
+    """predictor.train()
+    def find_activation(tensor, depth=2):
+        current_fn = tensor.grad_fn  # Start from the output tensor
+        for _ in range(depth):
+            if current_fn is None or not current_fn.next_functions:
+                raise ValueError(
+                    "Unable to traverse the graph; check the computation structure."
+                )
+            # Navigate to the next function
+            current_fn = current_fn.next_functions[0][0]  # Access the next function
+        # Return the associated variable (activation)
+        if hasattr(current_fn, "variable"):
+            return current_fn.variable
+        raise ValueError("Activation not found at the specified depth.")
+
+    # Example: Find the second-to-last activation
+    output = predictor(x.requires_grad_())
+    import pdb; pdb.set_trace()
+    second_last_activation = find_activation(output, depth=2)
+    predictor.eval()"""
+    submodules = list(predictor.children())
+    while len(submodules) == 1:
+        submodules = list(submodules[0].children())
+
+    feature_extractor = torch.nn.Sequential(*submodules[:-1])
+    return feature_extractor(x)

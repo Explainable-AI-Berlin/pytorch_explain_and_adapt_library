@@ -29,6 +29,7 @@ from peal.global_utils import (
     dict_to_bar_chart,
     high_contrast_heatmap,
     embed_numberstring,
+    extract_penultima_activation,
 )
 from peal.generators.interfaces import (
     InvertibleGenerator,
@@ -666,7 +667,10 @@ class CounterfactualExplainer(ExplainerInterface):
 
             loss.backward()
             for sample_idx in range(z[0].size(0)):
-                norm = z[0].grad[sample_idx].norm(p=1.0) * self.explainer_config.learning_rate
+                norm = (
+                    z[0].grad[sample_idx].norm(p=1.0)
+                    * self.explainer_config.learning_rate
+                )
                 clip_value = self.explainer_config.gradient_clipping * float(
                     torch.prod(torch.tensor(list(z[0][sample_idx].shape)))
                 )
@@ -738,11 +742,13 @@ class CounterfactualExplainer(ExplainerInterface):
                                 z[0].data[j] = z_old[j]
 
             if self.explainer_config.visualize_gradients:
-                gradients_path = str(os.path.join(
-                    base_path,
-                    mode + "_explainer_gradients",
-                    embed_numberstring(batch_idx, 4) + "_" + str(num_attempts),
-                ))
+                gradients_path = str(
+                    os.path.join(
+                        base_path,
+                        mode + "_explainer_gradients",
+                        embed_numberstring(batch_idx, 4) + "_" + str(num_attempts),
+                    )
+                )
                 Path(gradients_path).mkdir(parents=True, exist_ok=True)
                 visualize_step(
                     x=x_in,
@@ -1025,27 +1031,27 @@ class CounterfactualExplainer(ExplainerInterface):
 
         cluster_lists = n_clusters * []
 
-        # TODO very hacky! should this better be done with hooks?
+        """# TODO very hacky! should this better be done with hooks?
         submodules = list(self.predictor.children())
         while len(submodules) == 1:
             submodules = list(submodules[0].children())
 
-        feature_extractor = nn.Sequential(*submodules[:-1])
+        feature_extractor = nn.Sequential(*submodules[:-1])"""
 
         def extract_feature_difference(explanations):
             difference_list = []
-            activation_ref = feature_extractor(
-                explanations[0]["x_list"].to(self.device)
+            activation_ref = extract_penultima_activation(
+                explanations[0]["x_list"][None, ...].to(self.device), self.predictor
             )
             for i in range(1, len(explanations)):
                 assert (
                     torch.sum(explanations[0]["x_list"] != explanations[i]["x_list"])
                     == 0
                 )
-                a = feature_extractor(
-                    explanations[i]["x_counterfactual_list"].to(self.device)
+                activation_current = extract_penultima_activation(
+                    explanations[i]["x_list"][None, ...].to(self.device), self.predictor
                 )
-                difference_list.append(a - activation_ref)
+                difference_list.append(activation_current - activation_ref)
 
             return difference_list
 
@@ -1053,9 +1059,9 @@ class CounterfactualExplainer(ExplainerInterface):
         cluster_means = extract_feature_difference(explanations_beginning)
         collage_path_ref = explanations_beginning[0]["collage_path_list"]
         collage_path_elements = collage_path_ref.split(os.sep)[:-1]
-        collage_path_base = str(os.path.join(
-            *([os.path.abspath(os.sep)] + collage_path_elements)
-        ))
+        collage_path_base = str(
+            os.path.join(*([os.path.abspath(os.sep)] + collage_path_elements))
+        )
         for cluster_idx in range(len(cluster_means)):
             collage_path = explanations_beginning[cluster_idx]["collage_path_list"]
             Path(collage_path_base + "_" + str(cluster_idx)).mkdir(
@@ -1071,36 +1077,45 @@ class CounterfactualExplainer(ExplainerInterface):
                 [e[idx] for e in explanations_list_by_source]
             )
             # build outer product between cluster means and current differences
-            absolute_cosine_similarities = torch.zeros(
+            cosine_similarities = torch.zeros(
                 [len(cluster_means), len(current_differences)]
             )
             for i in range(len(cluster_means)):
-                for j in current_differences:
-                    absolute_cosine_similarities[i, j] = torch.nn.CosineSimilarity()(
-                        cluster_means[i], j
+                for j in range(len(current_differences)):
+                    cosine_similarities[i, j] = torch.nn.CosineSimilarity()(
+                        cluster_means[i], current_differences[j]
                     )
 
             # find the cluster with the highest similarity
             for i in range(len(cluster_means)):
-                idx_cluster, idx_current = torch.argmax(
-                    torch.abs(absolute_cosine_similarities)
-                )
+                idx_combined = int(torch.argmax(
+                    torch.abs(cosine_similarities.flatten())
+                ))
+                idx_cluster = idx_combined // len(current_differences)
+                idx_current = idx_combined % len(current_differences)
+                import pdb; pdb.set_trace()
                 cluster_lists[idx_cluster].append(
                     explanations_list_by_source[idx_current][idx]
                 )
-                absolute_cosine_similarities[idx_cluster, :] = 0
-                absolute_cosine_similarities[:, idx_current] = 0
+                cosine_similarities[idx_cluster, :] = 0
+                cosine_similarities[:, idx_current] = 0
                 # update running mean
                 cluster_means[idx_cluster] = (
                     idx * cluster_means[idx_cluster]
-                    + torch.sign(absolute_cosine_similarities[idx_cluster, idx_current])
+                    + torch.sign(cosine_similarities[idx_cluster, idx_current])
                     * current_differences[idx_current]
                 ) / (idx + 1)
-                if hasattr(explanations_list_by_source[idx_current][idx], "cluster_list"):
-                    explanations_list_by_source[idx_current][idx]["cluster_list"].append(idx_cluster)
+                if hasattr(
+                    explanations_list_by_source[idx_current][idx], "cluster_list"
+                ):
+                    explanations_list_by_source[idx_current][idx][
+                        "cluster_list"
+                    ].append(idx_cluster)
 
                 else:
-                    explanations_list_by_source[idx_current][idx]["cluster_list"] = [idx_cluster]
+                    explanations_list_by_source[idx_current][idx]["cluster_list"] = [
+                        idx_cluster
+                    ]
 
                 collage_path = explanations_list_by_source[idx_current][idx][
                     "collage_path_list"
