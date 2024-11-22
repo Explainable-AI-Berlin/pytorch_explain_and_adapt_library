@@ -10,7 +10,7 @@ continuous_learning                  :  "finetune"
 replace_model                        :  True
 use_visualization                    :  True
 calculate_group_accuracies           :  True
-explainer                            :  <PEAL_BASE>/configs/explainers/pdc_minimal.yaml
+explainer                            :  <PEAL_BASE>/configs/explainers/pdc_sparse.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/waterbirds.yaml
 test_data                            :  <PEAL_BASE>/configs/data/waterbirds.yaml

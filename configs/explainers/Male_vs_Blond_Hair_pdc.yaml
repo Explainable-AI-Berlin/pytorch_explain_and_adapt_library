@@ -1,8 +1,0 @@
-explainer_type : ACE
-category : explainer
-sampling_time_fraction: 0.3
-attack_iterations: 50
-dist_l1: 0.00001
-sampling_inpaint: 0.5
-y_target_goal_confidence: 0.8
-distilled_predictor: <PEAL_BASE>/configs/predictors/sensitive_distillation.yaml

@@ -20,14 +20,11 @@ from tqdm import tqdm
 from peal.architectures.predictors import get_predictor, TaskConfig
 from peal.data.dataset_factory import get_datasets
 from peal.data.datasets import DataConfig
-from peal.dependencies.time.get_predictions import get_predictions
 from peal.generators.generator_factory import get_generator
 from peal.global_utils import (
     load_yaml_config,
-    get_project_resource_dir,
     is_port_in_use,
     dict_to_bar_chart,
-    high_contrast_heatmap,
     embed_numberstring,
     extract_penultima_activation,
 )
@@ -39,7 +36,7 @@ from peal.generators.interfaces import (
 from peal.data.interfaces import PealDataset
 from peal.explainers.interfaces import ExplainerInterface, ExplainerConfig
 from peal.teachers.human2model_teacher import DataStore
-from peal.training.trainers import PredictorConfig, ModelTrainer, distill_predictor
+from peal.training.trainers import distill_predictor
 from peal.visualization.visualize_counterfactual_gradients import visualize_step
 
 
@@ -141,10 +138,9 @@ class PDCConfig(ExplainerConfig):
     replace_with_activation: str = "leakysoftplus"
     greedy: bool = False
     visualize_gradients: bool = False
-    num_attempts: int = 1
     mask_momentum: float = 0.5
     momentum: float = 0.9
-    gradient_clipping: float = 0.01
+    gradient_clipping: float = 0.05
     merge_clusters: str = "select_best"
 
 
@@ -668,7 +664,7 @@ class CounterfactualExplainer(ExplainerInterface):
             loss.backward()
             for sample_idx in range(z[0].size(0)):
                 norm = (
-                    z[0].grad[sample_idx].norm(p=1.0)
+                    z[0].grad[sample_idx].norm(p=float("inf"))
                     * self.explainer_config.learning_rate
                 )
                 clip_value = self.explainer_config.gradient_clipping * float(

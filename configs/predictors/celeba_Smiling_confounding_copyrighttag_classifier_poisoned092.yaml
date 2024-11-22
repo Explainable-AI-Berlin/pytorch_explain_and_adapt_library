@@ -1,6 +1,6 @@
-# python train_predictor.py --config peal/configs/predictors/Smiling_confounding_copyrighttag_celeba_classifier_poisoned090.yaml
-'model_path'        : '$PEAL_RUNS/Smiling_confounding_copyrighttag_celeba/classifier_poisoned090'
-'data'              : '<PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba_poisoned090.yaml'
+# python train_predictor.py --config peal/configs/predictors/celeba_Smiling_confounding_copyrighttag_classifier_poisoned092.yaml
+'model_path'        : '$PEAL_RUNS/Smiling_confounding_copyrighttag_celeba/classifier_poisoned092'
+'data'              : '<PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba_poisoned092.yaml'
 'training'          : '<PEAL_BASE>/configs/training/img_classifier.yaml'
 'architecture'      : '<PEAL_BASE>/configs/architectures/resnet18.yaml'
 'task':
