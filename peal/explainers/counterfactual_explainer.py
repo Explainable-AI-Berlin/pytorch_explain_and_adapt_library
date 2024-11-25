@@ -667,11 +667,11 @@ class CounterfactualExplainer(ExplainerInterface):
                     z[0].grad[sample_idx].norm(p=float("inf"))
                     * self.explainer_config.learning_rate
                 )
-                clip_value = self.explainer_config.gradient_clipping * float(
+                """clip_value = self.explainer_config.gradient_clipping * float(
                     torch.prod(torch.tensor(list(z[0][sample_idx].shape)))
-                )
-                if norm > clip_value:
-                    z[0].grad[sample_idx] = z[0].grad[sample_idx] * clip_value / norm
+                )"""
+                if norm > self.explainer_config.gradient_clipping:
+                    z[0].grad[sample_idx] = z[0].grad[sample_idx] * self.explainer_config.gradient_clipping / norm
 
             if self.explainer_config.use_masking:
                 for sample_idx in range(len(target_confidences)):
@@ -1208,7 +1208,7 @@ class CounterfactualExplainer(ExplainerInterface):
             y_confidence = torch.nn.Softmax(dim=-1)(
                 y_logits / self.explainer_config.temperature
             )
-            for y_target in range(self.predictor_datasets[1].output_size):
+            for y_target in range(self.predictor_datasets[1].output_size[-1]):
                 if y_target == y_pred:
                     continue
 
