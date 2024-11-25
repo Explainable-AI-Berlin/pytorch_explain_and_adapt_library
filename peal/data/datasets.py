@@ -936,6 +936,9 @@ class Image2ClassDataset(ImageDataset):
         ):
             self.set_task_specific_urls()
 
+        self.class_restriction_enabled = False
+        self.backup_urls = copy.deepcopy(self.urls)
+
     def class_idx_to_name(self, class_idx):
         return self.idx_to_name[class_idx]
 
@@ -1000,6 +1003,21 @@ class Image2ClassDataset(ImageDataset):
             self.set_task_specific_urls()
 
         return len(self.urls)
+
+    def enable_class_restriction(self, class_idx):
+        self.backup_urls = copy.deepcopy(self.urls)
+        self.urls = []
+        self.class_restriction_enabled = True
+        for url in self.backup_urls:
+            if url[0] == self.idx_to_name[class_idx]:
+                self.urls.append(url)
+
+    def disable_class_restriction(self):
+        if hasattr(self, "backup_urls"):
+            self.urls = copy.deepcopy(self.backup_urls)
+
+        self.class_restriction_enabled = False
+
 
     def __getitem__(self, idx):
         if (

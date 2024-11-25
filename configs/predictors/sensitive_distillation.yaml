@@ -1,8 +1,8 @@
-'training'          : '<PEAL_BASE>/configs/training/sensitive_distillation.yaml'
-'task':
-  'criterions':
-    'ce'     : 1.0
-    'l2'     : 100.0
-  'output_type'             : 'singleclass'
-  'output_channels'         : 2
-  'y_selection'             : ['prediction']
+training          : <PEAL_BASE>/configs/training/sensitive_distillation.yaml
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [prediction]

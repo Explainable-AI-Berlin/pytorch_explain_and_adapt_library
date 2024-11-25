@@ -4,11 +4,11 @@ predictor: $PEAL_RUNS/mnist/natural_classifier/config.yaml
 data_config: <PEAL_BASE>/configs/data/mnist.yaml
 generator: $PEAL_RUNS/mnist/ddpm/config.yaml
 validate_generator: False
-explanations_dir: $PEAL_RUNS/mnist/natural_classifier/ace_explanations
+explanations_dir: $PEAL_RUNS/mnist/natural_classifier/pdc_explanations
 max_samples: 100
 dilation: 5
 dist_l1: 0.0
-distilled_predictor: <PEAL_BASE>/configs/predictors/sensitive_distillation.yaml
+distilled_predictor: <PEAL_BASE>/configs/predictors/sensitive_distillation_1ofn.yaml
 explainer_type: PDC
 explanation_type: PDCConfig
 gradient_steps: 50

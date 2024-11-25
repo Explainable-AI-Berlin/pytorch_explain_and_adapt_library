@@ -10,13 +10,15 @@ import platform
 import numpy as np
 
 from pathlib import Path
+
+import torchvision.utils
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 from pydantic import BaseModel, PositiveInt
 from typing import Union
 
 from peal.data.dataset_factory import get_datasets
-from peal.data.datasets import DataConfig
+from peal.data.datasets import DataConfig, Image2MixedDataset, Image2ClassDataset
 from peal.dependencies.attacks.attacks import PGD_L2
 from peal.global_utils import (
     orthogonal_initialization,
@@ -814,8 +816,7 @@ class ModelTrainer:
 
             self.config.training.epoch += 1
 
-
-def distill_predictor(explainer_config, base_path, predictor, predictor_datasets):
+def distill_binary_dataset(explainer_config, base_path, predictor, predictor_datasets):
     distillation_datasets = []
     for i in range(2):
         class_predictions_path = os.path.join(
@@ -856,6 +857,62 @@ def distill_predictor(explainer_config, base_path, predictor, predictor_datasets
         distillation_datasets[i].task_config.x_selection = predictor_datasets[
             i
         ].task_config.x_selection
+
+    return distillation_datasets
+
+def distill_1ofn_dataset(explainer_config, base_path, predictor, predictor_datasets):
+    distillation_datasets = []
+    for i in range(2):
+        class_predictions_path = os.path.join(
+            base_path, "explainer", "dataset_" + str(i)
+        )
+        if not os.path.exists(class_predictions_path):
+            for sample_idx in range(predictor_datasets[i].__len__()):
+                X, y = predictor_datasets[i][sample_idx]
+                # get device of predictor torch.nn.Module
+                device = next(predictor.parameters()).device
+                y_pred = str(int(predictor(X.unsqueeze(0).to(device))[0].argmax(-1)))
+                Path(os.path.join(class_predictions_path, y_pred)).mkdir(
+                    exist_ok=True, parents=True
+                )
+                sample_url = os.path.join(class_predictions_path, y_pred, str(sample_idx) + ".png")
+                X_default = predictor_datasets[i].project_to_pytorch_default(X)
+                torchvision.utils.save_image(X_default, sample_url)
+
+        distilled_dataset_config = copy.deepcopy(predictor_datasets[i].config)
+        distilled_dataset_config.split = [1.0, 1.0] if i == 0 else [0.0, 1.0]
+        distilled_dataset_config.img_name_idx = 0
+        distilled_dataset_config.confounding_factors = None
+        distilled_dataset_config.confounder_probability = None
+        distilled_dataset_config.dataset_class = None
+        distillation_datasets.append(
+            get_datasets(
+                config=distilled_dataset_config, data_dir=class_predictions_path
+            )[i]
+        )
+        distilled_predictor_config = load_yaml_config(
+            explainer_config.distilled_predictor, PredictorConfig
+        )
+        distilled_predictor_config.data = distilled_dataset_config
+        explainer_config.distilled_predictor = distilled_predictor_config
+        distillation_datasets[i].task_config = predictor_datasets[i].task_config
+
+    return distillation_datasets
+
+def distill_predictor(explainer_config, base_path, predictor, predictor_datasets):
+    if isinstance(predictor_datasets[0], Image2MixedDataset):
+        distillation_datasets = distill_binary_dataset(
+            explainer_config, base_path, predictor, predictor_datasets
+        )
+
+    elif isinstance(predictor_datasets[0], Image2ClassDataset):
+        distillation_datasets = distill_1ofn_dataset(
+            explainer_config, base_path, predictor, predictor_datasets
+        )
+        explainer_config.distilled_predictor.task = predictor_datasets[0].task_config
+
+    else:
+        raise Exception("Dataset type not available!")
 
     predictor_distilled = copy.deepcopy(predictor)
     if explainer_config.replace_with_activation == "leakysoftplus":
