@@ -1,4 +1,4 @@
-# python -W ignore run_explainer.py --config "<PEAL_BASE>/configs/explainers/square_ace_pe_only.yaml"
+# python -W ignore run_explainer.py --config "<PEAL_BASE>/configs/explainers/ace_pe_only.yaml"
 explainer_type : ACE
 category : explainer
 attack_iterations: 50

@@ -93,7 +93,7 @@ class PDCConfig(ExplainerConfig):
     Regularizing factor of the L1 distance in latent space between the latent code of the
     original image and the counterfactual
     """
-    dist_l1: float = 1.0
+    dist_l1: float = 0.0
     """
     Keeps the counterfactual in the high density area of the generative model
     """
@@ -130,15 +130,15 @@ class PDCConfig(ExplainerConfig):
     Whether to use stochastic counterfactual search or not.
     """
     stochastic: Union[type(None), str] = "fully"
-    dilation: int = 17
-    inpaint: float = 0.5
+    dilation: int = 5
+    inpaint: float = 0.0
     """
     The activation function ReLU is replaced with: leakyrelu, leakysoftplus
     """
     replace_with_activation: str = "leakysoftplus"
     greedy: bool = False
     visualize_gradients: bool = False
-    mask_momentum: float = 0.5
+    mask_momentum: float = 0.0
     momentum: float = 0.9
     gradient_clipping: float = 0.05
     merge_clusters: str = "select_best"
@@ -671,7 +671,12 @@ class CounterfactualExplainer(ExplainerInterface):
                     torch.prod(torch.tensor(list(z[0][sample_idx].shape)))
                 )"""
                 if norm > self.explainer_config.gradient_clipping:
-                    z[0].grad[sample_idx] = z[0].grad[sample_idx] * self.explainer_config.gradient_clipping / norm
+                    rescale_factor = (
+                        self.explainer_config.gradient_clipping
+                        / norm
+                        / self.explainer_config.learning_rate
+                    )
+                    z[0].grad[sample_idx] = z[0].grad[sample_idx] * rescale_factor
 
             if self.explainer_config.use_masking:
                 for sample_idx in range(len(target_confidences)):
@@ -1025,7 +1030,6 @@ class CounterfactualExplainer(ExplainerInterface):
             explanations_list_by_source[cluster_counter].append(explanations_list[i])
             batch_counter += 1
 
-
         """# TODO very hacky! should this better be done with hooks?
         submodules = list(self.predictor.children())
         while len(submodules) == 1:
@@ -1044,7 +1048,8 @@ class CounterfactualExplainer(ExplainerInterface):
                     == 0
                 )
                 activation_current = extract_penultima_activation(
-                    explanations[i]["x_counterfactual_list"][None, ...].to(self.device), self.predictor
+                    explanations[i]["x_counterfactual_list"][None, ...].to(self.device),
+                    self.predictor,
                 )
                 difference_list.append(activation_current - activation_ref)
 
@@ -1066,7 +1071,10 @@ class CounterfactualExplainer(ExplainerInterface):
                 parents=True, exist_ok=True
             )
             collage_path_new = os.path.join(
-                *[collage_path_base + "_" + str(cluster_idx), embed_numberstring(0, 7) + '.png']
+                *[
+                    collage_path_base + "_" + str(cluster_idx),
+                    embed_numberstring(0, 7) + ".png",
+                ]
             )
             shutil.copy(collage_path, collage_path_new)
 
@@ -1075,7 +1083,9 @@ class CounterfactualExplainer(ExplainerInterface):
                 [e[idx] for e in explanations_list_by_source]
             )
             # build outer product between cluster means and current differences
-            cosine_similarities = torch.zeros([len(cluster_means), len(current_differences)])
+            cosine_similarities = torch.zeros(
+                [len(cluster_means), len(current_differences)]
+            )
             for i in range(len(cluster_means)):
                 for j in range(len(current_differences)):
                     cosine_similarities[i, j] = torch.nn.CosineSimilarity()(
@@ -1084,9 +1094,9 @@ class CounterfactualExplainer(ExplainerInterface):
 
             # find the cluster with the highest similarity
             for i in range(len(cluster_means)):
-                idx_combined = int(torch.argmax(
-                    torch.abs(cosine_similarities.flatten())
-                ))
+                idx_combined = int(
+                    torch.argmax(torch.abs(cosine_similarities.flatten()))
+                )
                 idx_cluster = idx_combined // len(current_differences)
                 idx_current = idx_combined % len(current_differences)
                 cluster_lists[idx_cluster].append(
@@ -1118,7 +1128,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 collage_path_new = os.path.join(
                     *[
                         collage_path_base + "_" + str(idx_cluster),
-                        embed_numberstring(idx, 7) + '.png',
+                        embed_numberstring(idx, 7) + ".png",
                     ]
                 )
                 shutil.copy(collage_path, collage_path_new)

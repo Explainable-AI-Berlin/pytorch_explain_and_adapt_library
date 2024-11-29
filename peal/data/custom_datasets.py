@@ -76,14 +76,14 @@ def plot_latents_with_arrows(
     cmap = cm.get_cmap("bwr")  # blue to red
 
     # Create a custom colormap for the decision boundary (0 -> light blue, 1 -> light red)
-    decision_cmap = ListedColormap(["lightcoral", "lightblue"])
+    #decision_cmap = ListedColormap(["lightcoral", "lightblue"])
 
     # Display the decision boundary grid as the background
     ax.imshow(
         decision_boundary,
         extent=[0, 1, 0, 1],  # Extend from x=0 to x=1 and y=0 to y=1
         origin="lower",  # Aligns the grid with the bottom-left of the plot
-        cmap=decision_cmap,  # Apply custom colormap
+        cmap=cmap,  # Apply custom colormap
         alpha=0.3,  # Make the background semi-transparent
     )
 
@@ -192,141 +192,6 @@ def plot_latents_with_arrows(
     ax.legend(
         handles=[original_marker, cf_marker, blue_patch, red_patch], loc="upper right"
     )
-
-    # Show the plot
-    plt.grid(True)
-    plt.savefig(filename)
-    plt.clf()
-
-
-def plot_latents_with_arrows_old(
-    original_latents,
-    counterfactual_latents,
-    filename,
-    y_target_start_confidence,
-    y_target_end_confidence,
-    decision_boundary,
-):
-    fig, ax = plt.subplots()
-
-    # Convert to numpy arrays for easy manipulation
-    original_latents = np.array(original_latents)
-    counterfactual_latents = np.array(counterfactual_latents)
-    y_target_start_confidence = np.array(y_target_start_confidence)
-    y_target_end_confidence = np.array(y_target_end_confidence)
-
-    # Define the colormap for the points: blue -> red
-    cmap = cm.get_cmap("bwr")  # blue to red
-
-    # Create a custom colormap for the decision boundary (0 -> light blue, 1 -> light red)
-    decision_cmap = ListedColormap(["lightblue", "lightcoral"])
-
-    # Display the decision boundary grid as the background
-    ax.imshow(
-        decision_boundary,
-        extent=[0, 1, 0, 1],  # Extend from x=0 to x=1 and y=0 to y=1
-        origin="lower",  # Aligns the grid with the bottom-left of the plot
-        cmap=decision_cmap,  # Apply custom colormap
-        alpha=0.3,  # Make the background semi-transparent
-    )
-
-    # Plot original latents and counterfactuals
-    for i, (orig, cf, start_conf, end_conf) in enumerate(
-        zip(
-            original_latents,
-            counterfactual_latents,
-            y_target_start_confidence,
-            y_target_end_confidence,
-        )
-    ):
-        # Get the color from the colormap based on confidence (blue -> red)
-        start_color = cmap(start_conf)  # Color for the original point
-        end_color = cmap(end_conf)  # Color for the counterfactual point
-
-        # Plot original point with darkblue border
-        ax.scatter(
-            orig[0],
-            orig[1],
-            facecolor=start_color,
-            edgecolor="darkblue",
-            label="Original" if i == 0 else "",
-        )
-
-        # Plot counterfactual point with darkred border
-        ax.scatter(
-            cf[0],
-            cf[1],
-            facecolor=end_color,
-            edgecolor="darkred",
-            label="Counterfactual" if i == 0 else "",
-        )
-
-        # Draw arrow between original and counterfactual points
-        ax.annotate(
-            "",
-            xy=(cf[0], cf[1]),
-            xytext=(orig[0], orig[1]),
-            arrowprops=dict(
-                fc="green", ec="green", edgecolor="yellow", arrowstyle="->", alpha=0.7
-            ),
-        )
-
-    # Setting limits for the plot (0 to 1 for both axes)
-    ax.set_xlim([0, 1])
-    ax.set_ylim([0, 1])
-
-    # Set ticks at 0.5 intervals
-    ax.set_xticks(np.arange(0, 1.1, 0.5))
-    ax.set_yticks(np.arange(0, 1.1, 0.5))
-
-    # Axis labels
-    ax.set_xlabel("Foreground Intensity")
-    ax.set_ylabel("Background Intensity")
-
-    # Add vertical dotted line for Foreground Intensity == 0.5
-    plt.axvline(x=0.5, color="black", linestyle="--")
-    plt.text(
-        1.05,
-        0.5,
-        "Confounding feature only",
-        rotation=270,
-        verticalalignment="center",
-    )
-
-    # Add horizontal dotted line for Background Intensity == 0.5
-    plt.axhline(y=0.5, color="black", linestyle="--")
-    plt.text(0.5, 1.05, "True feature only", horizontalalignment="center")
-
-    # Create neutral markers for the legend (gray fill color)
-    handles, labels = ax.get_legend_handles_labels()
-    neutral_marker = plt.Line2D(
-        [0],
-        [0],
-        marker="o",
-        color="w",
-        markerfacecolor="gray",
-        markeredgecolor="darkblue",
-        markersize=8,
-        label="Original",
-    )
-    cf_marker = plt.Line2D(
-        [0],
-        [0],
-        marker="o",
-        color="w",
-        markerfacecolor="gray",
-        markeredgecolor="darkred",
-        markersize=8,
-        label="Counterfactual",
-    )
-    by_label = dict(zip(labels, handles))
-
-    # Override handles with neutral markers
-    by_label["Original"] = neutral_marker
-    by_label["Counterfactual"] = cf_marker
-
-    # Display the updated legend
-    ax.legend(by_label.values(), by_label.keys(), loc="upper right")
 
     # Show the plot
     plt.grid(True)

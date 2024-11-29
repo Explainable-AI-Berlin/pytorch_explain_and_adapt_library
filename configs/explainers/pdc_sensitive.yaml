@@ -11,10 +11,9 @@ learning_rate: 100.0
 momentum: 0.999
 num_discretization_steps: 50
 optimizer: SGD
-replace_with_activation: leakysoftplus
 sampling_time_fraction: 0.3
 stochastic: fully
 temperature: 3.0
 visualize_gradients: true
 y_target_goal_confidence: null
-inpaint: 0.0
+replace_with_activation: leakysoftplus
