@@ -99,7 +99,7 @@ class PDCConfig(ExplainerConfig):
     """
     log_prob_regularization: float = 0.0
     """
-    Regularization between counterfactual and original in image space to keep similariy high.
+    Regularization between counterfactual and original in image space to keep similarity high.
     """
     img_regularization: float = 0.0
     """

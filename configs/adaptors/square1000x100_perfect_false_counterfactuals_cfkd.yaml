@@ -1,4 +1,4 @@
-# python run_cfkd.py --adaptor_config "<PEAL_BASE>/configs/adaptors/square1000x100_cfkd_perfect_false_counterfactuals_mask.yaml"
+# python run_cfkd.py --adaptor_config "<PEAL_BASE>/configs/adaptors/square1000x100_perfect_false_counterfactuals_cfkd.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  6

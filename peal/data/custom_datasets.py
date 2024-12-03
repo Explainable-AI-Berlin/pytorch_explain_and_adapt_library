@@ -185,8 +185,8 @@ def plot_latents_with_arrows(
     by_label["Counterfactual"] = cf_marker
 
     # Add explanation for the background colors in the legend
-    blue_patch = plt.Line2D([0], [0], color="lightblue", lw=4, label="Pred > 0.5")
-    red_patch = plt.Line2D([0], [0], color="lightcoral", lw=4, label="Pred < 0.5")
+    blue_patch = plt.Line2D([0], [0], color="blue", lw=4, label="Pred > 0.5")
+    red_patch = plt.Line2D([0], [0], color="red", lw=4, label="Pred < 0.5")
 
     # Display the updated legend
     ax.legend(
