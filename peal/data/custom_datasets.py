@@ -1,13 +1,15 @@
 import os
+import shutil
+import tarfile
 from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
 import torchvision
 import matplotlib.cm as cm
+import requests
 
 from torchvision.transforms import ToTensor
-from matplotlib.colors import ListedColormap
 from wilds import get_dataset
 
 
@@ -76,7 +78,7 @@ def plot_latents_with_arrows(
     cmap = cm.get_cmap("bwr")  # blue to red
 
     # Create a custom colormap for the decision boundary (0 -> light blue, 1 -> light red)
-    #decision_cmap = ListedColormap(["lightcoral", "lightblue"])
+    # decision_cmap = ListedColormap(["lightcoral", "lightblue"])
 
     # Display the decision boundary grid as the background
     ax.imshow(
@@ -207,7 +209,9 @@ class SquareDataset(Image2MixedDataset):
                 cdg.generate_dataset()
 
             else:
-                raise NotImplementedError("Only confounder_probability=0.5 can be used to generate the dataset")
+                raise NotImplementedError(
+                    "Only confounder_probability=0.5 can be used to generate the dataset"
+                )
 
         super(SquareDataset, self).__init__(config=config, **kwargs)
 
@@ -265,7 +269,9 @@ class SquareDataset(Image2MixedDataset):
             decision_boundary,
         )
 
-    def visualize_decision_boundary(self, predictor, batch_size, device, path, temperature=1.0):
+    def visualize_decision_boundary(
+        self, predictor, batch_size, device, path, temperature=1.0
+    ):
         print("visualize_decision_boundary")
 
         # Create the grid for plotting
@@ -305,7 +311,9 @@ class SquareDataset(Image2MixedDataset):
 
                 logits.append(predictor(torch.stack(current_batch).to(device)).detach())
                 logits = torch.cat(logits, dim=0).detach().cpu()
-                prediction_grid = torch.nn.Softmax(dim=1)(logits / temperature)[:,0].reshape(100, 100)
+                prediction_grid = torch.nn.Softmax(dim=1)(logits / temperature)[
+                    :, 0
+                ].reshape(100, 100)
                 prediction_grids.append(prediction_grid)
 
         """# Average the predictions across grids
@@ -348,7 +356,9 @@ class SquareDataset(Image2MixedDataset):
         plt.clf()"""
 
         # Average the predictions across grids
-        prediction_grid = torch.mean(torch.stack(prediction_grids).to(torch.float32), dim=0).numpy()
+        prediction_grid = torch.mean(
+            torch.stack(prediction_grids).to(torch.float32), dim=0
+        ).numpy()
 
         # Create the plot
         plt.figure()
@@ -359,7 +369,9 @@ class SquareDataset(Image2MixedDataset):
         contour_fill = plt.contourf(xx, yy, prediction_grid, levels=100, cmap=cmap)
 
         # Add contour lines with black color and thicker lines
-        contour_lines = plt.contour(xx, yy, prediction_grid, levels=10, colors='black', linewidths=1.5)
+        contour_lines = plt.contour(
+            xx, yy, prediction_grid, levels=10, colors="black", linewidths=1.5
+        )
 
         # Set axis labels
         plt.xlabel("Foreground Intensity")
@@ -518,3 +530,99 @@ class RxRx1AugmentedDataset(Image2MixedDataset):
                 f.write("\n".join(lines))
 
         super(RxRx1AugmentedDataset, self).__init__(config=config, **kwargs)
+
+
+class WaterbirdsDataset(Image2MixedDataset):
+    def __init__(self, config, **kwargs):
+        print("instantiate waterbirds dataset!")
+        dataset_labels = os.path.join(config.dataset_path, "data.csv")
+        if not os.path.exists(dataset_labels):
+            """original_dataset = get_dataset(dataset="waterbirds", download=True)
+            Path(os.path.join(config.dataset_path, "imgs")).mkdir(
+                parents=True, exist_ok=True
+            )
+            lines = ["img, label, confounder"]
+            for i in range(len(original_dataset)):
+                img, label, meta = original_dataset[i]
+                img_name = f"{embed_numberstring(i, 7)}.png"
+                img.save(f"{config.dataset_path}/imgs/{img_name}")
+                lines.append(f"{img_name}, {label}, {meta[0]}")
+
+            with open(f"{config.dataset_path}/data.csv", "w") as f:
+                f.write("\n".join(lines))"""
+
+            # Download the segmentations
+            download_path = os.path.join(config.dataset_path, "downloads")
+            Path(download_path).mkdir(parents=True, exist_ok=True)
+
+            if os.path.exists(
+                os.path.join(download_path, "segmentations", "200.Common_Yellowthroat")
+            ):
+                print("Found segmentation masks folder. Skipping downloading.")
+
+            else:
+                tar_file_path = os.path.join(download_path, "segmentations.tar.gz")
+                if not os.path.exists(tar_file_path):
+                    print("Download segmentation tar file")
+                    url = "https://data.caltech.edu/records/w9d68-gec53/files/segmentations.tgz"
+
+                    response = requests.get(url, stream=True)
+
+                    if response.status_code == 200:
+                        os.makedirs(download_path, exist_ok=True)
+
+                        with open(tar_file_path, "wb") as file:
+                            file.write(response.raw.read())
+
+                        print("Segmentations downloaded successfully!")
+
+                    else:
+                        raise Exception("Failed to download segmentations.")
+
+                with tarfile.open(tar_file_path, "r:gz") as tar:
+                    tar.extractall(path=download_path)
+                    print("segmentations extracted")
+
+            if os.path.exists(
+                os.path.join(download_path, "waterbird_complete95_forest2water2", "200.Common_Yellowthroat")
+            ):
+                print("Found waterbirds folder. Skipping downloading.")
+
+            else:
+                tar_file_path = os.path.join(download_path, "waterbirds.tar.gz")
+                if not os.path.exists(tar_file_path):
+                    print("Download waterbirds tar file")
+                    url = "https://nlp.stanford.edu/data/dro/waterbird_complete95_forest2water2.tar.gz"
+
+                    response = requests.get(url, stream=True)
+
+                    if response.status_code == 200:
+                        os.makedirs(download_path, exist_ok=True)
+
+                        with open(tar_file_path, "wb") as file:
+                            file.write(response.raw.read())
+
+                        print("Waterbirds downloaded successfully!")
+
+                    else:
+                        raise Exception("Failed to download waterbirds.")
+
+                with tarfile.open(tar_file_path, "r:gz") as tar:
+                    tar.extractall(path=download_path)
+                    print("waterbirds extracted")
+
+            shutil.move(
+                os.path.join(download_path, "waterbird_complete95_forest2water2"),
+                os.path.join(config.dataset_path, "imgs_filename"),
+            )
+            shutil.move(
+                os.path.join(download_path, "segmentations"),
+                os.path.join(config.dataset_path, "masks"),
+            )
+            shutil.move(
+                os.path.join(config.dataset_path, "imgs_filename", "metadata.csv"),
+                os.path.join(config.dataset_path, "data.csv"),
+            )
+            print('Downloading, extracting and positioning of files completed!')
+
+        super(WaterbirdsDataset, self).__init__(config=config, **kwargs)
