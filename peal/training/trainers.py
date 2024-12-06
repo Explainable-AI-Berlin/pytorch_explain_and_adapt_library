@@ -783,6 +783,24 @@ class ModelTrainer:
                     self.model.to("cpu"), os.path.join(self.model_path, "model.cpl")
                 )
                 val_accuracy_max = val_accuracy
+
+                dummy_input = next(iter(self.val_dataloaders[0]))[0]  # Batch size = 1, input size = 10
+                # Export to ONNX
+                onnx_file_path = os.path.join(self.model_path, "model.onnx")
+                torch.onnx.export(
+                    self.model,                     # Model to export
+                    dummy_input,               # Dummy input
+                    onnx_file_path,            # Output file
+                    export_params=True,        # Store the trained parameters
+                    opset_version=11,          # ONNX version to export (e.g., 11)
+                    do_constant_folding=True,  # Optimize constants
+                    input_names=['input'],     # Input tensor name(s)
+                    output_names=['output'],   # Output tensor name(s)
+                    dynamic_axes={             # Support variable-length axes (if applicable)
+                        'input': {0: 'batch_size'},
+                        'output': {0: 'batch_size'}
+                    }
+                )
                 self.model.to(self.device)
 
             # increase regularization and reset checkpoint if overfitting occurs

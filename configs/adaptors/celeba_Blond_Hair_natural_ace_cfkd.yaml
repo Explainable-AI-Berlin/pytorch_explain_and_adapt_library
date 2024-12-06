@@ -1,7 +1,7 @@
 # python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_natural_ace_cfkd.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
-batch_size                           :  2
+batch_size                           :  1
 tracking_level                       :  3
 min_train_samples                    :  900
 finetune_iterations                  :  0
@@ -16,8 +16,8 @@ data                                 :  <PEAL_BASE>/configs/data/celeba.yaml
 test_data                            :  <PEAL_BASE>/configs/data/celeba.yaml
 student                              :  $PEAL_RUNS/celeba/Blond_Hair/classifier_natural/model.cpl
 teacher                              :  $PEAL_RUNS/celeba/Blond_Hair/classifier_natural/model.cpl
-generator                            :  $PEAL_RUNS/celeba/ddpm/config.yaml
-base_dir                             :  $PEAL_RUNS/celeba/Blond_Hair/classifier_natural/ace_cfkd
+generator                            :  $PEAL_RUNS/celeba/ddpm2/config.yaml
+base_dir                             :  $PEAL_RUNS/celeba/Blond_Hair/classifier_natural/ace_cfkd2
 task:
   criterions:
     ce     : 1.0

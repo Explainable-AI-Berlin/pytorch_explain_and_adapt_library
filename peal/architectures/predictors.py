@@ -120,8 +120,12 @@ def get_predictor(predictor, device="cpu"):
     if isinstance(predictor, torch.nn.Module):
         return predictor, None
 
-    elif isinstance(predictor, str) and predictor[-4:] == ".cpl":
-        return torch.load(predictor, map_location=device), None
+    elif isinstance(predictor, str):
+        if predictor[-4:] == ".cpl":
+            return torch.load(predictor, map_location=device), None
+
+        elif predictor[-5:] == ".onnx":
+            return torch.onnx.load(predictor, map_location=device), None
 
     else:
         predictor_config = load_yaml_config(predictor)
