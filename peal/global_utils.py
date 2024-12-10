@@ -1,4 +1,6 @@
 # This whole file contains all the stuff, that is written too bad and had no clear position where it should be located in the project!
+import random
+
 import numpy as np
 import sys
 import types
@@ -434,7 +436,7 @@ def get_predictions(args):
     acc = 0
 
     for idx, sample in enumerate(tqdm(loader)):
-        if not args.max_samples is None and idx > args.max_samples:
+        if hasattr(args, "max_samples") and not args.max_samples is None and idx > args.max_samples:
             break
 
         if len(sample) == 3:
@@ -544,3 +546,14 @@ def extract_penultima_activation(x, predictor):
 
     feature_extractor = torch.nn.Sequential(*submodules[:-1])
     return feature_extractor(x)
+
+
+def set_random_seed(seed: int):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)  # If you are using multi-GPU.
+    torch.backends.cudnn.deterministic = True  # Ensure deterministic results.
+    torch.backends.cudnn.benchmark = False  # Disable the optimization for specific architectures.
+    os.environ['PYTHONHASHSEED'] = str(seed)

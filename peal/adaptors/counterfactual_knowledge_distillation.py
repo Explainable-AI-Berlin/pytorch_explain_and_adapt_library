@@ -29,7 +29,11 @@ from peal.data.dataloaders import (
     DataloaderMixer,
     create_dataloaders_from_datasource,
 )
-from peal.training.trainers import ModelTrainer, calculate_test_accuracy
+from peal.training.trainers import (
+    ModelTrainer,
+    calculate_test_accuracy,
+    distill_predictor,
+)
 from peal.explainers.counterfactual_explainer import (
     CounterfactualExplainer,
     PerfectFalseCounterfactualConfig,
@@ -154,7 +158,7 @@ class CFKDConfig(AdaptorConfig):
     """
     The attribution threshold.
     """
-    attribution_threshold: float = 0.001
+    attribution_threshold: float = 0.0
     """
     What batch_size is used for creating the counterfactuals?
     If use_confusion_matrix is deativated always use an even batch_size!!!
@@ -192,6 +196,7 @@ class CFKDConfig(AdaptorConfig):
     How aggressively to change the model based on the counterfactual samples. 0 -> No change, 1 -> Full change
     """
     mixing_ratio: float = 0.5
+    calculate_distilled_flip_rate: bool = True
     """
     What level of tracking is used.
     """
@@ -237,6 +242,7 @@ class CFKDConfig(AdaptorConfig):
         counterfactual_type: str = None,
         max_test_batches: Union[type(None), PositiveInt] = None,
         mixing_ratio: float = None,
+        calculate_distilled_flip_rate: bool = None,
         **kwargs,
     ):
         """
@@ -396,6 +402,11 @@ class CFKDConfig(AdaptorConfig):
             counterfactual_type
             if not counterfactual_type is None
             else self.counterfactual_type
+        )
+        self.calculate_distilled_flip_rate = (
+            calculate_distilled_flip_rate
+            if not calculate_distilled_flip_rate is None
+            else self.calculate_distilled_flip_rate
         )
         self.kwargs = kwargs
 
@@ -1148,14 +1159,6 @@ class CFKD(Adaptor):
             feedback
         )
 
-        """num_true_2sided = len(list(filter(lambda sample: sample == "true", feedback)))
-        num_false_2sided = len(list(filter(lambda sample: sample == "false", feedback)))
-        if num_true_2sided == 0:
-            fa_2sided = 0
-
-        else:
-            fa_2sided = num_true_2sided / (num_true_2sided + num_false_2sided)"""
-
         num_true_1sided = len(
             list(
                 filter(
@@ -1182,13 +1185,84 @@ class CFKD(Adaptor):
         else:
             fa_1sided = -1
 
-        fa_absolute = num_true_1sided / num_samples
-
         feedback_stats = {
             "flip_rate": flip_rate,
             "ood_rate": ood_rate,
             "feedback_accuracy": fa_1sided,
         }
+
+        if self.adaptor_config.calculate_distilled_flip_rate:
+            # distill into equivalent model
+            predictor_distillation = load_yaml_config(
+                "<PEAL_BASE>/configs/predictors/simple_distillation.yaml"
+            )
+            distilled_predictor = distill_predictor(
+                predictor_distillation,
+                os.path.join(
+                    self.base_dir, str(finetune_iteration), "distilled_predictor"
+                ),
+                self.student,
+                [self.train_dataloader.dataset, self.val_dataloader.dataset],
+            )
+
+            # add y_target_end_confidence_distilled_list
+            tracked_values["y_target_end_confidence_distilled_list"] = []
+            for idx in range(len(tracked_values["x_counterfactual_list"])):
+                x = tracked_values["x_counterfactual_list"][idx]
+                y = tracked_values["y_target_list"][idx]
+                y_target_end_confidence = (
+                    distilled_predictor(x.to(self.device).unsqueeze(0))
+                    .squeeze(0)
+                    .detach()
+                    .cpu()[y]
+                )
+                tracked_values["y_target_end_confidence_distilled_list"].append(
+                    y_target_end_confidence
+                )
+
+            # calculate distilled flip rate
+            flip_rate_distilled = len(
+                list(
+                    filter(
+                        lambda x: x > 0.5,
+                        tracked_values["y_target_end_confidence_distilled_list"],
+                    )
+                )
+            )
+            feedback_stats["flip_rate_distilled"] = flip_rate_distilled
+            num_true_1sided_distilled = len(
+                list(
+                    filter(
+                        lambda idx: feedback[idx] == "true"
+                        and tracked_values["y_target_end_confidence_distilled_list"][
+                            idx
+                        ]
+                        > 0.5,
+                        range(len(feedback)),
+                    )
+                )
+            )
+            num_false_1sided_distilled = len(
+                list(
+                    filter(
+                        lambda idx: feedback[idx] == "false"
+                        and tracked_values["y_target_end_confidence_distilled_list"][
+                            idx
+                        ]
+                        > 0.5,
+                        range(len(feedback)),
+                    )
+                )
+            )
+            if num_true_1sided_distilled + num_false_1sided_distilled > 0:
+                fa_1sided_distilled = num_true_1sided_distilled / (
+                    num_true_1sided_distilled + num_false_1sided_distilled
+                )
+
+            else:
+                fa_1sided_distilled = -1
+
+            feedback_stats["feedback_accuracy_distilled"] = fa_1sided_distilled
 
         return feedback, feedback_stats
 
@@ -1649,15 +1723,15 @@ class CFKD(Adaptor):
             self.explainer.explainer_config = original_explainer_config
             if self.adaptor_config.validation_runs > 1:
                 self.datastack.dataset._initialize_performance_metrics()
-                validation_stats["distance_to_manifold"] = (
-                    self.datastack.dataset.distribution_distance(
-                        x_counterfactual_collection
-                    )
+                validation_stats[
+                    "distance_to_manifold"
+                ] = self.datastack.dataset.distribution_distance(
+                    x_counterfactual_collection
                 )
-                validation_stats["pairwise_distance"] = (
-                    self.datastack.dataset.pair_wise_distance(
-                        x_list_collection, x_counterfactual_collection
-                    )
+                validation_stats[
+                    "pairwise_distance"
+                ] = self.datastack.dataset.pair_wise_distance(
+                    x_list_collection, x_counterfactual_collection
                 )
                 validation_stats["diversity"] = self.datastack.dataset.variance(
                     x_counterfactual_collection
@@ -1771,7 +1845,9 @@ class CFKD(Adaptor):
 
         if self.adaptor_config.explainer.use_clustering:
             validation_tracked_values = self.explainer.cluster_explanations(
-                validation_tracked_values, self.adaptor_config.batch_size, self.adaptor_config.explainer.num_attempts
+                validation_tracked_values,
+                self.adaptor_config.batch_size,
+                self.adaptor_config.explainer.num_attempts,
             )
 
         if hasattr(

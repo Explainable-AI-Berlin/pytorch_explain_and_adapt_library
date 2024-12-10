@@ -12,12 +12,12 @@ use_visualization                    :  True
 calculate_group_accuracies           :  True
 explainer                            :  <PEAL_BASE>/configs/explainers/pdc_sensitive.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
-data                                 :  <PEAL_BASE>/configs/data/square3_poisoned100.yaml
-test_data                            :  <PEAL_BASE>/configs/data/square3_unpoisoned.yaml
-student                              :  $PEAL_RUNS/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/model.cpl
-teacher                              :  $PEAL_RUNS/square3/colora_confounding_colorb/torchvision/classifier_unpoisoned/model.cpl
-generator                            :  $PEAL_RUNS/square3/ddpm/config.yaml
-base_dir                             :  $PEAL_RUNS/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_sensitive_cfkd
+data                                 :  <PEAL_BASE>/configs/data/square_poisoned100.yaml
+test_data                            :  <PEAL_BASE>/configs/data/square_unpoisoned.yaml
+student                              :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned100/model.cpl
+teacher                              :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_unpoisoned/model.cpl
+generator                            :  $PEAL_RUNS/square/ddpm/config.yaml
+base_dir                             :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_sensitive_cfkd
 task:
   criterions:
     ce     : 1.0

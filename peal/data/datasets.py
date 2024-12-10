@@ -142,9 +142,22 @@ class DataConfig(BaseModel):
     The path of the original dataset.
     """
     inverse: Union[type(None), str] = None
+    """
+    Where the label path is relative to the dataset path.
+    """
     label_rel_path: str = "data.csv"
+    """
+    The index where the name of the images is stored. TODO hacky!!!
+    """
     img_name_idx: int = 0
+    """
+    Whether the dataset contains hints or not.
+    """
     has_hints: bool = False
+    """
+    The seed used for generating the dataset.
+    """
+    seed: int = 0
 
 
 class SymbolicDataset(PealDataset):

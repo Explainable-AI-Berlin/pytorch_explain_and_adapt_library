@@ -1,6 +1,6 @@
-# python train_predictor.py --config "<PEAL_BASE>/configs/predictors/square3_classifier.yaml"
-model_path        : $PEAL_RUNS/square3/colora_confounding_colorb/torchvision/classifier_unpoisoned
-data              : <PEAL_BASE>/configs/data/square3_unpoisoned.yaml
+# python train_predictor.py --config "<PEAL_BASE>/configs/predictors/square_classifier.yaml"
+model_path        : $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_unpoisoned
+data              : <PEAL_BASE>/configs/data/square_unpoisoned.yaml
 training          : <PEAL_BASE>/configs/training/img_classifier.yaml
 architecture      : torchvision_resnet18
 task:

@@ -78,8 +78,8 @@ class DDPMConfig(GeneratorConfig):
     microbatch: int = -1  # -1 disables microbatches
     ema_rate: str = "0.9999"  # comma-separated list of EMA values
     log_interval: int = 10
-    save_interval: int = 10000
-    max_steps: int = 1000000
+    save_interval: int = 1000
+    max_steps: int = 10000
     resume_checkpoint: str = ""
     fp16_scale_growth: float = 1e-3
     output_path: str = "peal_runs/ddpm/outputs"
@@ -128,6 +128,7 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         self.predictor_distilled = None
         self.config = load_yaml_config(config)
 
+        print(torch.randint(0, 10, (5, 5)))
         self.dataset = get_datasets(self.config.data)[0]
 
         if not model_dir is None:

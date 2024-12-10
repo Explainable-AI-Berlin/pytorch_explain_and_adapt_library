@@ -445,9 +445,10 @@ class CounterfactualExplainer(ExplainerInterface):
             if not os.path.exists(distilled_path):
                 gradient_predictor = distill_predictor(
                     self.explainer_config,
-                    base_path,
+                    os.path.join(base_path, "explainer"),
                     self.predictor,
                     self.predictor_datasets,
+                    replace_with_activation=self.explainer_config.replace_with_activation,
                 )
 
             else:

@@ -1,7 +1,7 @@
 import argparse
 
 from peal.data.datasets import DataConfig
-from peal.global_utils import load_yaml_config, add_class_arguments, integrate_arguments
+from peal.global_utils import load_yaml_config, add_class_arguments, integrate_arguments, set_random_seed
 from peal.data.dataset_generators import ConfounderDatasetGenerator, SquareDatasetGenerator
 
 
@@ -13,6 +13,7 @@ def main():
 
     config = load_yaml_config(args.config, DataConfig)
     integrate_arguments(args, config, exclude=["config"])
+    set_random_seed(config.seed)
 
     if config.dataset_class == "celeba":
         cdg = ConfounderDatasetGenerator(**config.__dict__, data_config=config)

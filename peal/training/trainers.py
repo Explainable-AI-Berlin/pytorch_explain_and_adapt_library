@@ -152,6 +152,7 @@ class PredictorConfig:
     The name of the class.
     """
     base_path: str = None
+    seed: int = 0
 
     def __init__(
         self,
@@ -161,6 +162,7 @@ class PredictorConfig:
         data: Union[dict, DataConfig] = None,
         model_path: str = None,
         model_type: str = None,
+        seed: int = None,
         **kwargs
     ):
         if isinstance(architecture, dict):
@@ -189,6 +191,9 @@ class PredictorConfig:
 
         if not model_type is None:
             self.model_type = model_type
+
+        if not seed is None:
+            self.seed = seed
 
         self.kwargs = kwargs
 
@@ -834,13 +839,13 @@ class ModelTrainer:
 
             self.config.training.epoch += 1
 
-def distill_binary_dataset(explainer_config, base_path, predictor, predictor_datasets):
+def distill_binary_dataset(predictor_distillation, base_path, predictor, predictor_datasets):
     distillation_datasets = []
     for i in range(2):
         class_predictions_path = os.path.join(
-            base_path, "explainer", str(i) + "predictions.csv"
+            base_path, str(i) + "predictions.csv"
         )
-        Path(os.path.join(base_path, "explainer")).mkdir(exist_ok=True, parents=True)
+        Path(base_path).mkdir(exist_ok=True, parents=True)
         if not os.path.exists(class_predictions_path):
             predictor_datasets[i].enable_url()
             prediction_args = types.SimpleNamespace(
@@ -850,7 +855,6 @@ def distill_binary_dataset(explainer_config, base_path, predictor, predictor_dat
                 label_path=class_predictions_path,
                 partition="train",
                 label_query=0,
-                max_samples=explainer_config.max_samples,
             )
             get_predictions(prediction_args)
             predictor_datasets[i].disable_url()
@@ -867,22 +871,22 @@ def distill_binary_dataset(explainer_config, base_path, predictor, predictor_dat
             )[i]
         )
         distilled_predictor_config = load_yaml_config(
-            explainer_config.distilled_predictor, PredictorConfig
+            predictor_distillation, PredictorConfig
         )
         distilled_predictor_config.data = distilled_dataset_config
-        explainer_config.distilled_predictor = distilled_predictor_config
-        distillation_datasets[i].task_config = explainer_config.distilled_predictor.task
+        predictor_distillation = distilled_predictor_config
+        distillation_datasets[i].task_config = predictor_distillation.task
         distillation_datasets[i].task_config.x_selection = predictor_datasets[
             i
         ].task_config.x_selection
 
     return distillation_datasets
 
-def distill_1ofn_dataset(explainer_config, base_path, predictor, predictor_datasets):
+def distill_1ofn_dataset(predictor_distillation, base_path, predictor, predictor_datasets):
     distillation_datasets = []
     for i in range(2):
         class_predictions_path = os.path.join(
-            base_path, "explainer", "dataset_" + str(i)
+            base_path, "dataset_" + str(i)
         )
         if not os.path.exists(class_predictions_path):
             for sample_idx in range(predictor_datasets[i].__len__()):
@@ -909,41 +913,41 @@ def distill_1ofn_dataset(explainer_config, base_path, predictor, predictor_datas
             )[i]
         )
         distilled_predictor_config = load_yaml_config(
-            explainer_config.distilled_predictor, PredictorConfig
+            predictor_distillation, PredictorConfig
         )
         distilled_predictor_config.data = distilled_dataset_config
-        explainer_config.distilled_predictor = distilled_predictor_config
+        predictor_distillation = distilled_predictor_config
         distillation_datasets[i].task_config = predictor_datasets[i].task_config
 
     return distillation_datasets
 
-def distill_predictor(explainer_config, base_path, predictor, predictor_datasets):
+def distill_predictor(predictor_distillation, base_path, predictor, predictor_datasets, replace_with_activation=None):
     if isinstance(predictor_datasets[0], Image2MixedDataset):
         distillation_datasets = distill_binary_dataset(
-            explainer_config, base_path, predictor, predictor_datasets
+            predictor_distillation, base_path, predictor, predictor_datasets
         )
 
     elif isinstance(predictor_datasets[0], Image2ClassDataset):
         distillation_datasets = distill_1ofn_dataset(
-            explainer_config, base_path, predictor, predictor_datasets
+            predictor_distillation, base_path, predictor, predictor_datasets
         )
-        explainer_config.distilled_predictor.task = predictor_datasets[0].task_config
+        predictor_distillation.task = predictor_datasets[0].task_config
 
     else:
         raise Exception("Dataset type not available!")
 
     predictor_distilled = copy.deepcopy(predictor)
-    if explainer_config.replace_with_activation == "leakysoftplus":
+    if replace_with_activation == "leakysoftplus":
         predictor_distilled = replace_relu_with_leakysoftplus(predictor_distilled)
 
-    elif explainer_config.replace_with_activation == "leakyrelu":
+    elif replace_with_activation == "leakyrelu":
         predictor_distilled = replace_relu_with_leakyrelu(predictor_distilled)
 
     distillation_trainer = ModelTrainer(
-        config=explainer_config.distilled_predictor,
+        config=predictor_distillation,
         model=predictor_distilled,
         datasource=distillation_datasets,
-        model_path=os.path.join(base_path, "explainer", "distilled_predictor"),
+        model_path=os.path.join(base_path, "distilled_predictor"),
     )
     distillation_trainer.fit()
     return predictor_distilled

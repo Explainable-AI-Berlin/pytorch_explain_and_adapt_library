@@ -30,6 +30,7 @@ class ExplainerConfig(BaseModel):
     temperature: float = 3.0
     use_clustering: bool = False
     num_attempts: int = 1
+    seed: int = 0
 
 
 class ExplainerInterface:
