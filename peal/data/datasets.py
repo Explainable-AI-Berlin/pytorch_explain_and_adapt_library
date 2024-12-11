@@ -799,19 +799,31 @@ class Image2MixedDataset(ImageDataset):
         return_dict = {"x": img_tensor, "y": target}
 
         if self.hints_enabled:
+            option1 = os.path.join(self.root_dir, "masks", name)
             option2 = os.path.join(self.root_dir, "masks", name.split("/")[-1])
-            if os.path.exists(os.path.join(self.root_dir, "masks", name)):
+            option3 = option2[:-4] + ".png"
+            option4 = option1[:-4] + ".png"
+            if os.path.exists(option1):
                 mask = Image.open(os.path.join(self.root_dir, "masks", name))
 
             elif os.path.exists(option2):
                 mask = Image.open(option2)
 
+            elif os.path.exists(option3):
+                mask = Image.open(option3)
+
+            elif os.path.exists(option4):
+                mask = Image.open(option4)
+
             else:
+                assert not self.config.has_hints, "Hints not found despite claim that they exist!"
                 mask = Image.new("RGB", img.size, (0, 0, 0))
 
             torch.set_rng_state(state)
             mask_tensor = self.transform(mask)
             return_dict["hint"] = mask_tensor
+            if not mask_tensor.shape[0] == 3:
+                import pdb; pdb.set_trace()
 
         if self.groups_enabled:
             has_confounder = targets[

@@ -789,6 +789,7 @@ class ModelTrainer:
                 )
                 val_accuracy_max = val_accuracy
 
+                """
                 dummy_input = next(iter(self.val_dataloaders[0]))[0]  # Batch size = 1, input size = 10
                 # Export to ONNX
                 onnx_file_path = os.path.join(self.model_path, "model.onnx")
@@ -806,6 +807,7 @@ class ModelTrainer:
                         'output': {0: 'batch_size'}
                     }
                 )
+                """
                 self.model.to(self.device)
 
             # increase regularization and reset checkpoint if overfitting occurs

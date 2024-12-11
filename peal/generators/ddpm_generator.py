@@ -128,7 +128,6 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         self.predictor_distilled = None
         self.config = load_yaml_config(config)
 
-        print(torch.randint(0, 10, (5, 5)))
         self.dataset = get_datasets(self.config.data)[0]
 
         if not model_dir is None:

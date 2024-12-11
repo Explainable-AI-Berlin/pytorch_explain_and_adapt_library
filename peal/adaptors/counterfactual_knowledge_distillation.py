@@ -32,7 +32,7 @@ from peal.data.dataloaders import (
 from peal.training.trainers import (
     ModelTrainer,
     calculate_test_accuracy,
-    distill_predictor,
+    distill_predictor, PredictorConfig,
 )
 from peal.explainers.counterfactual_explainer import (
     CounterfactualExplainer,
@@ -1194,7 +1194,7 @@ class CFKD(Adaptor):
         if self.adaptor_config.calculate_distilled_flip_rate:
             # distill into equivalent model
             predictor_distillation = load_yaml_config(
-                "<PEAL_BASE>/configs/predictors/simple_distillation.yaml"
+                "<PEAL_BASE>/configs/predictors/simple_distillation.yaml", PredictorConfig
             )
             distilled_predictor = distill_predictor(
                 predictor_distillation,
