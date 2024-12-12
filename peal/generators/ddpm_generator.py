@@ -414,7 +414,7 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
             )
             if not os.path.exists(distilled_path):
                 gradient_predictor = distill_predictor(
-                    explainer_config, base_path, predictor, predictor_datasets
+                    explainer_config.distilled_predictor, base_path, predictor, predictor_datasets
                 )
 
             else:

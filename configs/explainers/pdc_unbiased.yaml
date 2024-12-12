@@ -17,7 +17,7 @@ temperature: 3.0
 visualize_gradients: true
 y_target_goal_confidence: null
 replace_with_activation: leakysoftplus
-inpaint: 0.2
+inpaint: 0.1 # 0.2
 mask_momentum: 0.2
 num_attempts: 2
 use_clustering: True

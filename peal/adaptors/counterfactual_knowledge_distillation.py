@@ -32,7 +32,8 @@ from peal.data.dataloaders import (
 from peal.training.trainers import (
     ModelTrainer,
     calculate_test_accuracy,
-    distill_predictor, PredictorConfig,
+    distill_predictor,
+    PredictorConfig,
 )
 from peal.explainers.counterfactual_explainer import (
     CounterfactualExplainer,
@@ -1194,16 +1195,27 @@ class CFKD(Adaptor):
         if self.adaptor_config.calculate_distilled_flip_rate:
             # distill into equivalent model
             predictor_distillation = load_yaml_config(
-                "<PEAL_BASE>/configs/predictors/simple_distillation.yaml", PredictorConfig
+                "<PEAL_BASE>/configs/predictors/simple_distillation.yaml",
+                PredictorConfig,
             )
-            distilled_predictor = distill_predictor(
-                predictor_distillation,
-                os.path.join(
-                    self.base_dir, str(finetune_iteration), "distilled_predictor"
-                ),
-                self.student,
-                [self.train_dataloader.dataset, self.val_dataloader.dataset],
+            distillation_path = os.path.join(
+                self.base_dir, str(finetune_iteration), "distilled_predictor"
             )
+            distilled_predictor_final = os.path.join(
+                distillation_path, "distilled_predictor", "model.cpl"
+            )
+            if not os.path.exists(distilled_predictor_final):
+                distilled_predictor = distill_predictor(
+                    predictor_distillation,
+                    distillation_path,
+                    self.student,
+                    [self.train_dataloader.dataset, self.val_dataloader.dataset],
+                )
+
+            else:
+                distilled_predictor = torch.load(
+                    distilled_predictor_final, map_location=self.device
+                )
 
             # add y_target_end_confidence_distilled_list
             tracked_values["y_target_end_confidence_distilled_list"] = []
@@ -1228,8 +1240,8 @@ class CFKD(Adaptor):
                         tracked_values["y_target_end_confidence_distilled_list"],
                     )
                 )
-            )
-            feedback_stats["flip_rate_distilled"] = flip_rate_distilled
+            ) / len(tracked_values["y_target_end_confidence_distilled_list"])
+            feedback_stats["flip_rate_distilled"] = float(flip_rate_distilled)
             num_true_1sided_distilled = len(
                 list(
                     filter(
@@ -1262,7 +1274,7 @@ class CFKD(Adaptor):
             else:
                 fa_1sided_distilled = -1
 
-            feedback_stats["feedback_accuracy_distilled"] = fa_1sided_distilled
+            feedback_stats["feedback_accuracy_distilled"] = float(fa_1sided_distilled)
 
         return feedback, feedback_stats
 
@@ -1723,15 +1735,15 @@ class CFKD(Adaptor):
             self.explainer.explainer_config = original_explainer_config
             if self.adaptor_config.validation_runs > 1:
                 self.datastack.dataset._initialize_performance_metrics()
-                validation_stats[
-                    "distance_to_manifold"
-                ] = self.datastack.dataset.distribution_distance(
-                    x_counterfactual_collection
+                validation_stats["distance_to_manifold"] = (
+                    self.datastack.dataset.distribution_distance(
+                        x_counterfactual_collection
+                    )
                 )
-                validation_stats[
-                    "pairwise_distance"
-                ] = self.datastack.dataset.pair_wise_distance(
-                    x_list_collection, x_counterfactual_collection
+                validation_stats["pairwise_distance"] = (
+                    self.datastack.dataset.pair_wise_distance(
+                        x_list_collection, x_counterfactual_collection
+                    )
                 )
                 validation_stats["diversity"] = self.datastack.dataset.variance(
                     x_counterfactual_collection

@@ -821,9 +821,13 @@ class Image2MixedDataset(ImageDataset):
 
             torch.set_rng_state(state)
             mask_tensor = self.transform(mask)
-            return_dict["hint"] = mask_tensor
             if not mask_tensor.shape[0] == 3:
-                import pdb; pdb.set_trace()
+                # TODO very very hacky
+                print("Mask tensor shape " + str(mask_tensor.shape) + " is not correct")
+                mask_tensor = torch.cat([mask_tensor, mask_tensor, mask_tensor])
+                mask_tensor = mask_tensor[:3]
+
+            return_dict["hint"] = mask_tensor
 
         if self.groups_enabled:
             has_confounder = targets[

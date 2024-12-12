@@ -549,15 +549,17 @@ class ModelTrainer:
 
             X = move_to_device(X, self.device)
             y_original = y
-            if self.config.training.label_smoothing > 0.0 and mode=="train":
+            if self.config.training.label_smoothing > 0.0 and mode == "train":
                 y_dist = torch.ones(y.size(0), self.config.task.output_channels)
-                y_dist *= self.config.training.label_smoothing / (self.config.task.output_channels - 1)
+                y_dist *= self.config.training.label_smoothing / (
+                    self.config.task.output_channels - 1
+                )
                 for i in range(y.size(0)):
                     y_dist[i, y[i]] = 1 - self.config.training.label_smoothing
 
                 y = torch.distributions.categorical.Categorical(y_dist).sample()
 
-            if self.config.training.use_mixup and mode=="train":
+            if self.config.training.use_mixup and mode == "train":
                 X, y = mixup(
                     X,
                     y,
@@ -565,7 +567,7 @@ class ModelTrainer:
                     self.config.task.output_channels,
                 )
 
-            if self.config.training.adv_training and mode=="train":
+            if self.config.training.adv_training and mode == "train":
                 noise = (
                     torch.randn_like(X, device=self.device)
                     * self.config.training.input_noise_std
@@ -841,12 +843,13 @@ class ModelTrainer:
 
             self.config.training.epoch += 1
 
-def distill_binary_dataset(predictor_distillation, base_path, predictor, predictor_datasets):
+
+def distill_binary_dataset(
+    predictor_distillation, base_path, predictor, predictor_datasets
+):
     distillation_datasets = []
     for i in range(2):
-        class_predictions_path = os.path.join(
-            base_path, str(i) + "predictions.csv"
-        )
+        class_predictions_path = os.path.join(base_path, str(i) + "predictions.csv")
         Path(base_path).mkdir(exist_ok=True, parents=True)
         if not os.path.exists(class_predictions_path):
             predictor_datasets[i].enable_url()
@@ -884,12 +887,13 @@ def distill_binary_dataset(predictor_distillation, base_path, predictor, predict
 
     return distillation_datasets
 
-def distill_1ofn_dataset(predictor_distillation, base_path, predictor, predictor_datasets):
+
+def distill_1ofn_dataset(
+    predictor_distillation, base_path, predictor, predictor_datasets
+):
     distillation_datasets = []
     for i in range(2):
-        class_predictions_path = os.path.join(
-            base_path, "dataset_" + str(i)
-        )
+        class_predictions_path = os.path.join(base_path, "dataset_" + str(i))
         if not os.path.exists(class_predictions_path):
             for sample_idx in range(predictor_datasets[i].__len__()):
                 X, y = predictor_datasets[i][sample_idx]
@@ -899,7 +903,9 @@ def distill_1ofn_dataset(predictor_distillation, base_path, predictor, predictor
                 Path(os.path.join(class_predictions_path, y_pred)).mkdir(
                     exist_ok=True, parents=True
                 )
-                sample_url = os.path.join(class_predictions_path, y_pred, str(sample_idx) + ".png")
+                sample_url = os.path.join(
+                    class_predictions_path, y_pred, str(sample_idx) + ".png"
+                )
                 X_default = predictor_datasets[i].project_to_pytorch_default(X)
                 torchvision.utils.save_image(X_default, sample_url)
 
@@ -923,7 +929,18 @@ def distill_1ofn_dataset(predictor_distillation, base_path, predictor, predictor
 
     return distillation_datasets
 
-def distill_predictor(predictor_distillation, base_path, predictor, predictor_datasets, replace_with_activation=None):
+
+def distill_predictor(
+    predictor_distillation,
+    base_path,
+    predictor,
+    predictor_datasets,
+    replace_with_activation=None,
+):
+    predictor_distillation = load_yaml_config(
+        predictor_distillation,
+        PredictorConfig,
+    )
     if isinstance(predictor_datasets[0], Image2MixedDataset):
         distillation_datasets = distill_binary_dataset(
             predictor_distillation, base_path, predictor, predictor_datasets
