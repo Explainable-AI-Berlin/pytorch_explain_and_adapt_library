@@ -1242,6 +1242,7 @@ class CFKD(Adaptor):
                 )
             ) / len(tracked_values["y_target_end_confidence_distilled_list"])
             feedback_stats["flip_rate_distilled"] = float(flip_rate_distilled)
+            print("flip_rate_distilled: " + str(flip_rate_distilled))
             num_true_1sided_distilled = len(
                 list(
                     filter(
@@ -1275,6 +1276,7 @@ class CFKD(Adaptor):
                 fa_1sided_distilled = -1
 
             feedback_stats["feedback_accuracy_distilled"] = float(fa_1sided_distilled)
+            print("feedback_accuracy_distilled: " + str(fa_1sided_distilled))
 
         return feedback, feedback_stats
 

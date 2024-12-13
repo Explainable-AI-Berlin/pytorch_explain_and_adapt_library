@@ -27,8 +27,8 @@ def create_bar_diagram(data, title, ax, colors):
 # Example usage:
 data = np.array(
     [
-        [21.0, 76.3],
-        [12.5, 95.2],
+        [21.0, 52.0],
+        [12.5, 66.7],
     ]
 )
 labels = ["ACE", "PDC"]
