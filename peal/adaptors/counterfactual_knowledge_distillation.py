@@ -1286,9 +1286,8 @@ class CFKD(Adaptor):
         feedback,
         y_source_list,
         y_target_list,
-        y_list,
         finetune_iteration,
-        config,
+        hint_list=None,
         mode="",
         **args,
     ):
@@ -1306,6 +1305,7 @@ class CFKD(Adaptor):
             return dataset_dir
         #
         x_list = []
+        hint_list_dataset = []
         y_counterfactual_list = []
         sample_names = []
         for sample_idx in range(len(feedback)):
@@ -1319,6 +1319,9 @@ class CFKD(Adaptor):
                     + str(sample_idx)
                 )
                 x_list.append(x_counterfactual_list[sample_idx])
+                if not hint_list is None:
+                    hint_list_dataset.append(hint_list[sample_idx])
+
                 y_counterfactual_list.append(int(y_target_list[sample_idx]))
                 sample_names.append(sample_name)
                 sample_idx += 1
@@ -1333,6 +1336,9 @@ class CFKD(Adaptor):
                     + str(sample_idx)
                 )
                 x_list.append(x_counterfactual_list[sample_idx])
+                if not hint_list is None:
+                    hint_list_dataset.append(hint_list[sample_idx])
+
                 y_counterfactual_list.append(int(y_source_list[sample_idx]))
 
                 sample_names.append(sample_name)
@@ -1342,6 +1348,7 @@ class CFKD(Adaptor):
             output_dir=dataset_dir,
             x_list=x_list,
             y_list=y_counterfactual_list,
+            hint_list=hint_list_dataset,
             sample_names=sample_names,
             classifier=self.student,
         )

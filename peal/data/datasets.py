@@ -400,12 +400,16 @@ class ImageDataset(PealDataset):
 
         return heatmap_list, collage_paths
 
-    def serialize_dataset(self, output_dir, x_list, y_list, sample_names=None, classifier=None):
+    def serialize_dataset(self, output_dir, x_list, y_list, hint_list=[], sample_names=None, classifier=None):
         # TODO this does not seem very clean
         for class_name in range(max(2, self.output_size)):
             Path(os.path.join(output_dir, "imgs", str(class_name))).mkdir(
                 parents=True, exist_ok=True
             )
+            if not len(hint_list) == 0:
+                Path(os.path.join(output_dir, "masks", str(class_name))).mkdir(
+                    parents=True, exist_ok=True
+                )
 
         data = []
         for idx, x in enumerate(x_list):
@@ -416,6 +420,12 @@ class ImageDataset(PealDataset):
             )
             img_name = os.path.join(str(class_name), sample_names[idx] + ".png")
             img.save(os.path.join(output_dir, "imgs", img_name))
+            if not len(hint_list) == 0:
+                mask = Image.fromarray(
+                    np.array(255 * hint_list[idx].cpu().numpy().transpose(1, 2, 0), dtype=np.uint8)
+                )
+                mask.save(os.path.join(output_dir, "masks", img_name))
+
             data.append(
                 [
                     img_name,

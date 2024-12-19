@@ -32,7 +32,8 @@ THRES=0.15
 WARMUP=30
 
 # generate counterfactuals explanations using FastDiME
-mpiexec -n 1 python -W ignore main.py --method $METHOD $MODEL_FLAGS $SAMPLE_FLAGS \
+#mpiexec -n 1
+python -W ignore main.py --method $METHOD $MODEL_FLAGS $SAMPLE_FLAGS \
   --dataset 'CelebA' --image_size $IMAGESIZE --num_batches $NUMBATCHES \
   --query_label $QUERYLABEL --target_label $TARGETLABEL \
   --output_path $OUTPUT_PATH --exp_name $EXPNAME --gpu $GPU --seed $SEED  \
@@ -41,4 +42,4 @@ mpiexec -n 1 python -W ignore main.py --method $METHOD $MODEL_FLAGS $SAMPLE_FLAG
   --dilation $DILATION --masking_threshold $THRES --warmup_step $WARMUP \
   --save_images True --save_x_t False --save_z_t False \
   --use_sampling_on_x_t True --use_logits $USE_LOGITS \
-  --num_chunks $C --chunk $c \
+  --num_chunks $C --chunk $c

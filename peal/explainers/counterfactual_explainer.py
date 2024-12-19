@@ -154,6 +154,7 @@ class ACEConfig(ExplainerConfig):
     Options: ['counterfactual', 'lrp']
     """
     explainer_type: str = "ACE"
+    subtype: str = "ACE"
     loss_fn: Union[type(None), str] = None
     predictor: Union[str, type(None), dict] = None
     generator: Union[type(None), GeneratorConfig] = None
