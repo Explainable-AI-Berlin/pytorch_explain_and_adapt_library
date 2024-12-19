@@ -40,17 +40,7 @@ class SegmentationMaskTeacher(TeacherInterface):
             else:
                 feedback.append("false")
             """
-            #
-            y_target_confidence_end = torch.nn.functional.softmax(
-                student(x_counterfactual_list[idx].unsqueeze(0).to(device))[0]
-            )[y_target_list[idx]]
             if (
-                not abs(y_target_confidence_end - y_target_end_confidence_list[idx])
-                < 0.01
-            ):
-                feedback.append("confidence missmatch!")
-
-            elif (
                 self.counterfactual_type == "1sided"
                 and y_list[idx] != y_source_list[idx]
             ):

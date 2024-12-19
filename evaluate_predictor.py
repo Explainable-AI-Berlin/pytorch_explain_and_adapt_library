@@ -1,6 +1,4 @@
 import argparse
-import copy
-
 import torch
 import os
 
@@ -8,7 +6,7 @@ from peal.architectures.predictors import TaskConfig
 from peal.data.datasets import DataConfig
 from peal.training.trainers import TrainingConfig, ModelTrainer, PredictorConfig
 from peal.data.dataloaders import create_dataloaders_from_datasource
-from peal.global_utils import load_yaml_config
+from peal.global_utils import load_yaml_config, set_random_seed
 from peal.training.trainers import calculate_test_accuracy
 
 
@@ -48,6 +46,7 @@ def main():
         model = ModelTrainer(predictor_config).model
         model.load_state_dict(model_weights)
 
+    set_random_seed(model_config.seed)
     model.eval()
     test_dataloader = create_dataloaders_from_datasource(model_config)[args.partition]
     correct, group_accuracies, group_distribution, groups, worst_group_accuracy = calculate_test_accuracy(

@@ -6,5 +6,4 @@ output_type             : multiclass
 output_size             : [2]
 confounding_factors     : [y, place]
 normalization           : [0.5,0.5]
-label_rel_path          : "metadata.csv"
 img_name_idx            : 1

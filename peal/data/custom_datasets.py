@@ -1,13 +1,15 @@
 import os
+import shutil
+import tarfile
 from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
 import torchvision
 import matplotlib.cm as cm
+import requests
 
 from torchvision.transforms import ToTensor
-from matplotlib.colors import ListedColormap
 from wilds import get_dataset
 
 
@@ -76,14 +78,14 @@ def plot_latents_with_arrows(
     cmap = cm.get_cmap("bwr")  # blue to red
 
     # Create a custom colormap for the decision boundary (0 -> light blue, 1 -> light red)
-    decision_cmap = ListedColormap(["lightcoral", "lightblue"])
+    # decision_cmap = ListedColormap(["lightcoral", "lightblue"])
 
     # Display the decision boundary grid as the background
     ax.imshow(
         decision_boundary,
         extent=[0, 1, 0, 1],  # Extend from x=0 to x=1 and y=0 to y=1
         origin="lower",  # Aligns the grid with the bottom-left of the plot
-        cmap=decision_cmap,  # Apply custom colormap
+        cmap=cmap,  # Apply custom colormap
         alpha=0.3,  # Make the background semi-transparent
     )
 
@@ -185,148 +187,13 @@ def plot_latents_with_arrows(
     by_label["Counterfactual"] = cf_marker
 
     # Add explanation for the background colors in the legend
-    blue_patch = plt.Line2D([0], [0], color="lightblue", lw=4, label="Pred > 0.5")
-    red_patch = plt.Line2D([0], [0], color="lightcoral", lw=4, label="Pred < 0.5")
+    blue_patch = plt.Line2D([0], [0], color="blue", lw=4, label="Pred > 0.5")
+    red_patch = plt.Line2D([0], [0], color="red", lw=4, label="Pred < 0.5")
 
     # Display the updated legend
     ax.legend(
         handles=[original_marker, cf_marker, blue_patch, red_patch], loc="upper right"
     )
-
-    # Show the plot
-    plt.grid(True)
-    plt.savefig(filename)
-    plt.clf()
-
-
-def plot_latents_with_arrows_old(
-    original_latents,
-    counterfactual_latents,
-    filename,
-    y_target_start_confidence,
-    y_target_end_confidence,
-    decision_boundary,
-):
-    fig, ax = plt.subplots()
-
-    # Convert to numpy arrays for easy manipulation
-    original_latents = np.array(original_latents)
-    counterfactual_latents = np.array(counterfactual_latents)
-    y_target_start_confidence = np.array(y_target_start_confidence)
-    y_target_end_confidence = np.array(y_target_end_confidence)
-
-    # Define the colormap for the points: blue -> red
-    cmap = cm.get_cmap("bwr")  # blue to red
-
-    # Create a custom colormap for the decision boundary (0 -> light blue, 1 -> light red)
-    decision_cmap = ListedColormap(["lightblue", "lightcoral"])
-
-    # Display the decision boundary grid as the background
-    ax.imshow(
-        decision_boundary,
-        extent=[0, 1, 0, 1],  # Extend from x=0 to x=1 and y=0 to y=1
-        origin="lower",  # Aligns the grid with the bottom-left of the plot
-        cmap=decision_cmap,  # Apply custom colormap
-        alpha=0.3,  # Make the background semi-transparent
-    )
-
-    # Plot original latents and counterfactuals
-    for i, (orig, cf, start_conf, end_conf) in enumerate(
-        zip(
-            original_latents,
-            counterfactual_latents,
-            y_target_start_confidence,
-            y_target_end_confidence,
-        )
-    ):
-        # Get the color from the colormap based on confidence (blue -> red)
-        start_color = cmap(start_conf)  # Color for the original point
-        end_color = cmap(end_conf)  # Color for the counterfactual point
-
-        # Plot original point with darkblue border
-        ax.scatter(
-            orig[0],
-            orig[1],
-            facecolor=start_color,
-            edgecolor="darkblue",
-            label="Original" if i == 0 else "",
-        )
-
-        # Plot counterfactual point with darkred border
-        ax.scatter(
-            cf[0],
-            cf[1],
-            facecolor=end_color,
-            edgecolor="darkred",
-            label="Counterfactual" if i == 0 else "",
-        )
-
-        # Draw arrow between original and counterfactual points
-        ax.annotate(
-            "",
-            xy=(cf[0], cf[1]),
-            xytext=(orig[0], orig[1]),
-            arrowprops=dict(
-                fc="green", ec="green", edgecolor="yellow", arrowstyle="->", alpha=0.7
-            ),
-        )
-
-    # Setting limits for the plot (0 to 1 for both axes)
-    ax.set_xlim([0, 1])
-    ax.set_ylim([0, 1])
-
-    # Set ticks at 0.5 intervals
-    ax.set_xticks(np.arange(0, 1.1, 0.5))
-    ax.set_yticks(np.arange(0, 1.1, 0.5))
-
-    # Axis labels
-    ax.set_xlabel("Foreground Intensity")
-    ax.set_ylabel("Background Intensity")
-
-    # Add vertical dotted line for Foreground Intensity == 0.5
-    plt.axvline(x=0.5, color="black", linestyle="--")
-    plt.text(
-        1.05,
-        0.5,
-        "Confounding feature only",
-        rotation=270,
-        verticalalignment="center",
-    )
-
-    # Add horizontal dotted line for Background Intensity == 0.5
-    plt.axhline(y=0.5, color="black", linestyle="--")
-    plt.text(0.5, 1.05, "True feature only", horizontalalignment="center")
-
-    # Create neutral markers for the legend (gray fill color)
-    handles, labels = ax.get_legend_handles_labels()
-    neutral_marker = plt.Line2D(
-        [0],
-        [0],
-        marker="o",
-        color="w",
-        markerfacecolor="gray",
-        markeredgecolor="darkblue",
-        markersize=8,
-        label="Original",
-    )
-    cf_marker = plt.Line2D(
-        [0],
-        [0],
-        marker="o",
-        color="w",
-        markerfacecolor="gray",
-        markeredgecolor="darkred",
-        markersize=8,
-        label="Counterfactual",
-    )
-    by_label = dict(zip(labels, handles))
-
-    # Override handles with neutral markers
-    by_label["Original"] = neutral_marker
-    by_label["Counterfactual"] = cf_marker
-
-    # Display the updated legend
-    ax.legend(by_label.values(), by_label.keys(), loc="upper right")
 
     # Show the plot
     plt.grid(True)
@@ -342,18 +209,21 @@ class SquareDataset(Image2MixedDataset):
                 cdg.generate_dataset()
 
             else:
-                raise NotImplementedError("Only confounder_probability=0.5 can be used to generate the dataset")
+                raise NotImplementedError(
+                    "Only confounder_probability=0.5 can be used to generate the dataset"
+                )
 
         super(SquareDataset, self).__init__(config=config, **kwargs)
 
     def global_counterfactual_visualization(
         self,
-        counterfactuals,
         filename,
-        num_samples,
+        x_list,
+        counterfactuals,
         y_target_start_confidence,
         y_target_end_confidence,
         y_list,
+        hint_list,
     ):
         y_start_confidence = list(
             map(
@@ -371,8 +241,9 @@ class SquareDataset(Image2MixedDataset):
         counterfactual_latents = []
         hints_enabled_buffer = self.hints_enabled
         self.hints_enabled = True
-        for idx in range(num_samples):
-            x, (y, hint) = self[idx]
+        for idx in range(len(x_list)):
+            x = x_list[idx]
+            hint = hint_list[idx]
             original_latents.append(
                 [self.check_foreground(x, hint), self.check_background(x, hint)]
             )
@@ -386,7 +257,7 @@ class SquareDataset(Image2MixedDataset):
         self.hints_enabled = hints_enabled_buffer
 
         path = filename.split("/")[:-1] + ["decision_boundary.npy"]
-        decision_boundary = np.load("/" + os.path.join(*path))
+        decision_boundary = np.load("/" + str(os.path.join(*path)))
         decision_boundary = np.transpose(decision_boundary, (1, 0))
 
         plot_latents_with_arrows(
@@ -398,7 +269,9 @@ class SquareDataset(Image2MixedDataset):
             decision_boundary,
         )
 
-    def visualize_decision_boundary(self, predictor, batch_size, device, path, temperature=1.0):
+    def visualize_decision_boundary(
+        self, predictor, batch_size, device, path, temperature=1.0
+    ):
         print("visualize_decision_boundary")
 
         # Create the grid for plotting
@@ -438,7 +311,9 @@ class SquareDataset(Image2MixedDataset):
 
                 logits.append(predictor(torch.stack(current_batch).to(device)).detach())
                 logits = torch.cat(logits, dim=0).detach().cpu()
-                prediction_grid = torch.nn.Softmax(dim=1)(logits / temperature)[:,0].reshape(100, 100)
+                prediction_grid = torch.nn.Softmax(dim=1)(logits / temperature)[
+                    :, 0
+                ].reshape(100, 100)
                 prediction_grids.append(prediction_grid)
 
         """# Average the predictions across grids
@@ -481,7 +356,9 @@ class SquareDataset(Image2MixedDataset):
         plt.clf()"""
 
         # Average the predictions across grids
-        prediction_grid = torch.mean(torch.stack(prediction_grids).to(torch.float32), dim=0).numpy()
+        prediction_grid = torch.mean(
+            torch.stack(prediction_grids).to(torch.float32), dim=0
+        ).numpy()
 
         # Create the plot
         plt.figure()
@@ -492,7 +369,9 @@ class SquareDataset(Image2MixedDataset):
         contour_fill = plt.contourf(xx, yy, prediction_grid, levels=100, cmap=cmap)
 
         # Add contour lines with black color and thicker lines
-        contour_lines = plt.contour(xx, yy, prediction_grid, levels=10, colors='black', linewidths=1.5)
+        contour_lines = plt.contour(
+            xx, yy, prediction_grid, levels=10, colors="black", linewidths=1.5
+        )
 
         # Set axis labels
         plt.xlabel("Foreground Intensity")
@@ -651,3 +530,99 @@ class RxRx1AugmentedDataset(Image2MixedDataset):
                 f.write("\n".join(lines))
 
         super(RxRx1AugmentedDataset, self).__init__(config=config, **kwargs)
+
+
+class WaterbirdsDataset(Image2MixedDataset):
+    def __init__(self, config, **kwargs):
+        print("instantiate waterbirds dataset!")
+        dataset_labels = os.path.join(config.dataset_path, "data.csv")
+        if not os.path.exists(dataset_labels):
+            """original_dataset = get_dataset(dataset="waterbirds", download=True)
+            Path(os.path.join(config.dataset_path, "imgs")).mkdir(
+                parents=True, exist_ok=True
+            )
+            lines = ["img, label, confounder"]
+            for i in range(len(original_dataset)):
+                img, label, meta = original_dataset[i]
+                img_name = f"{embed_numberstring(i, 7)}.png"
+                img.save(f"{config.dataset_path}/imgs/{img_name}")
+                lines.append(f"{img_name}, {label}, {meta[0]}")
+
+            with open(f"{config.dataset_path}/data.csv", "w") as f:
+                f.write("\n".join(lines))"""
+
+            # Download the segmentations
+            download_path = os.path.join(config.dataset_path, "downloads")
+            Path(download_path).mkdir(parents=True, exist_ok=True)
+
+            if os.path.exists(
+                os.path.join(download_path, "segmentations", "200.Common_Yellowthroat")
+            ):
+                print("Found segmentation masks folder. Skipping downloading.")
+
+            else:
+                tar_file_path = os.path.join(download_path, "segmentations.tar.gz")
+                if not os.path.exists(tar_file_path):
+                    print("Download segmentation tar file")
+                    url = "https://data.caltech.edu/records/w9d68-gec53/files/segmentations.tgz"
+
+                    response = requests.get(url, stream=True)
+
+                    if response.status_code == 200:
+                        os.makedirs(download_path, exist_ok=True)
+
+                        with open(tar_file_path, "wb") as file:
+                            file.write(response.raw.read())
+
+                        print("Segmentations downloaded successfully!")
+
+                    else:
+                        raise Exception("Failed to download segmentations.")
+
+                with tarfile.open(tar_file_path, "r:gz") as tar:
+                    tar.extractall(path=download_path)
+                    print("segmentations extracted")
+
+            if os.path.exists(
+                os.path.join(download_path, "waterbird_complete95_forest2water2", "200.Common_Yellowthroat")
+            ):
+                print("Found waterbirds folder. Skipping downloading.")
+
+            else:
+                tar_file_path = os.path.join(download_path, "waterbirds.tar.gz")
+                if not os.path.exists(tar_file_path):
+                    print("Download waterbirds tar file")
+                    url = "https://nlp.stanford.edu/data/dro/waterbird_complete95_forest2water2.tar.gz"
+
+                    response = requests.get(url, stream=True)
+
+                    if response.status_code == 200:
+                        os.makedirs(download_path, exist_ok=True)
+
+                        with open(tar_file_path, "wb") as file:
+                            file.write(response.raw.read())
+
+                        print("Waterbirds downloaded successfully!")
+
+                    else:
+                        raise Exception("Failed to download waterbirds.")
+
+                with tarfile.open(tar_file_path, "r:gz") as tar:
+                    tar.extractall(path=download_path)
+                    print("waterbirds extracted")
+
+            shutil.move(
+                os.path.join(download_path, "waterbird_complete95_forest2water2"),
+                os.path.join(config.dataset_path, "imgs_filename"),
+            )
+            shutil.move(
+                os.path.join(download_path, "segmentations"),
+                os.path.join(config.dataset_path, "masks"),
+            )
+            shutil.move(
+                os.path.join(config.dataset_path, "imgs_filename", "metadata.csv"),
+                os.path.join(config.dataset_path, "data.csv"),
+            )
+            print('Downloading, extracting and positioning of files completed!')
+
+        super(WaterbirdsDataset, self).__init__(config=config, **kwargs)

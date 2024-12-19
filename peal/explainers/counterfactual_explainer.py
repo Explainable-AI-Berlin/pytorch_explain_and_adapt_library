@@ -20,15 +20,13 @@ from tqdm import tqdm
 from peal.architectures.predictors import get_predictor, TaskConfig
 from peal.data.dataset_factory import get_datasets
 from peal.data.datasets import DataConfig
-from peal.dependencies.time.get_predictions import get_predictions
 from peal.generators.generator_factory import get_generator
 from peal.global_utils import (
     load_yaml_config,
-    get_project_resource_dir,
     is_port_in_use,
     dict_to_bar_chart,
-    high_contrast_heatmap,
     embed_numberstring,
+    extract_penultima_activation,
 )
 from peal.generators.interfaces import (
     InvertibleGenerator,
@@ -38,7 +36,7 @@ from peal.generators.interfaces import (
 from peal.data.interfaces import PealDataset
 from peal.explainers.interfaces import ExplainerInterface, ExplainerConfig
 from peal.teachers.human2model_teacher import DataStore
-from peal.training.trainers import PredictorConfig, ModelTrainer, distill_predictor
+from peal.training.trainers import distill_predictor
 from peal.visualization.visualize_counterfactual_gradients import visualize_step
 
 
@@ -95,13 +93,13 @@ class PDCConfig(ExplainerConfig):
     Regularizing factor of the L1 distance in latent space between the latent code of the
     original image and the counterfactual
     """
-    dist_l1: float = 1.0
+    dist_l1: float = 0.0
     """
     Keeps the counterfactual in the high density area of the generative model
     """
     log_prob_regularization: float = 0.0
     """
-    Regularization between counterfactual and original in image space to keep similariy high.
+    Regularization between counterfactual and original in image space to keep similarity high.
     """
     img_regularization: float = 0.0
     """
@@ -132,18 +130,18 @@ class PDCConfig(ExplainerConfig):
     Whether to use stochastic counterfactual search or not.
     """
     stochastic: Union[type(None), str] = "fully"
-    dilation: int = 17
-    inpaint: float = 0.5
+    dilation: int = 5
+    inpaint: float = 0.0
     """
     The activation function ReLU is replaced with: leakyrelu, leakysoftplus
     """
     replace_with_activation: str = "leakysoftplus"
     greedy: bool = False
     visualize_gradients: bool = False
-    num_attempts: int = 1
-    mask_momentum: float = 0.5
+    mask_momentum: float = 0.0
     momentum: float = 0.9
-    gradient_clipping: float = 0.01
+    gradient_clipping: float = 0.05
+    merge_clusters: str = "select_best"
 
 
 class ACEConfig(ExplainerConfig):
@@ -156,6 +154,7 @@ class ACEConfig(ExplainerConfig):
     Options: ['counterfactual', 'lrp']
     """
     explainer_type: str = "ACE"
+    subtype: str = "ACE"
     loss_fn: Union[type(None), str] = None
     predictor: Union[str, type(None), dict] = None
     generator: Union[type(None), GeneratorConfig] = None
@@ -446,10 +445,11 @@ class CounterfactualExplainer(ExplainerInterface):
             )
             if not os.path.exists(distilled_path):
                 gradient_predictor = distill_predictor(
-                    self.explainer_config,
-                    base_path,
+                    self.explainer_config.distilled_predictor,
+                    os.path.join(base_path, "explainer"),
                     self.predictor,
                     self.predictor_datasets,
+                    replace_with_activation=self.explainer_config.replace_with_activation,
                 )
 
             else:
@@ -665,12 +665,20 @@ class CounterfactualExplainer(ExplainerInterface):
 
             loss.backward()
             for sample_idx in range(z[0].size(0)):
-                norm = z[0].grad[sample_idx].norm(p=1.0) * self.explainer_config.learning_rate
-                clip_value = self.explainer_config.gradient_clipping * float(
-                    torch.prod(torch.tensor(list(z[0][sample_idx].shape)))
+                norm = (
+                    z[0].grad[sample_idx].norm(p=float("inf"))
+                    * self.explainer_config.learning_rate
                 )
-                if norm > clip_value:
-                    z[0].grad[sample_idx] = z[0].grad[sample_idx] * clip_value / norm
+                """clip_value = self.explainer_config.gradient_clipping * float(
+                    torch.prod(torch.tensor(list(z[0][sample_idx].shape)))
+                )"""
+                if norm > self.explainer_config.gradient_clipping:
+                    rescale_factor = (
+                        self.explainer_config.gradient_clipping
+                        / norm
+                        / self.explainer_config.learning_rate
+                    )
+                    z[0].grad[sample_idx] = z[0].grad[sample_idx] * rescale_factor
 
             if self.explainer_config.use_masking:
                 for sample_idx in range(len(target_confidences)):
@@ -737,11 +745,13 @@ class CounterfactualExplainer(ExplainerInterface):
                                 z[0].data[j] = z_old[j]
 
             if self.explainer_config.visualize_gradients:
-                gradients_path = str(os.path.join(
-                    base_path,
-                    mode + "_explainer_gradients",
-                    embed_numberstring(batch_idx, 4) + "_" + str(num_attempts),
-                ))
+                gradients_path = str(
+                    os.path.join(
+                        base_path,
+                        mode + "_explainer_gradients",
+                        embed_numberstring(batch_idx, 4) + "_" + str(num_attempts),
+                    )
+                )
                 Path(gradients_path).mkdir(parents=True, exist_ok=True)
                 visualize_step(
                     x=x_in,
@@ -1001,17 +1011,17 @@ class CounterfactualExplainer(ExplainerInterface):
         This function clusters the explanations.
         """
         explanations_list = []
-        for idx in range(explanations_dict["x_list"]):
+        for idx in range(len(explanations_dict["x_list"])):
             current_dict = {}
             for key in explanations_dict.keys():
                 current_dict[key] = explanations_dict[key][idx]
 
             explanations_list.append(current_dict)
 
-        explanations_list_by_source = n_clusters * []
+        explanations_list_by_source = [[] for i in range(n_clusters)]
         batch_counter = 0
         cluster_counter = 0
-        for i, elem in enumerate(explanations_list_by_source):
+        for i, elem in enumerate(explanations_list):
             if batch_counter == batch_size:
                 batch_counter = 0
                 cluster_counter += 1
@@ -1022,22 +1032,28 @@ class CounterfactualExplainer(ExplainerInterface):
             explanations_list_by_source[cluster_counter].append(explanations_list[i])
             batch_counter += 1
 
-        cluster_lists = n_clusters * []
+        """# TODO very hacky! should this better be done with hooks?
+        submodules = list(self.predictor.children())
+        while len(submodules) == 1:
+            submodules = list(submodules[0].children())
+
+        feature_extractor = nn.Sequential(*submodules[:-1])"""
 
         def extract_feature_difference(explanations):
             difference_list = []
-            activation_ref = self.predictor.feature_extractor(
-                explanations[0]["x_list"].to(self.device)
+            activation_ref = extract_penultima_activation(
+                explanations[0]["x_list"][None, ...].to(self.device), self.predictor
             )
-            for i in range(1, len(explanations)):
+            for i in range(len(explanations)):
                 assert (
                     torch.sum(explanations[0]["x_list"] != explanations[i]["x_list"])
                     == 0
                 )
-                a = self.predictor.feature_extractor(
-                    explanations[i]["x_counterfactual_list"].to(self.device)
+                activation_current = extract_penultima_activation(
+                    explanations[i]["x_counterfactual_list"][None, ...].to(self.device),
+                    self.predictor,
                 )
-                difference_list.append(a - activation_ref)
+                difference_list.append(activation_current - activation_ref)
 
             return difference_list
 
@@ -1045,16 +1061,22 @@ class CounterfactualExplainer(ExplainerInterface):
         cluster_means = extract_feature_difference(explanations_beginning)
         collage_path_ref = explanations_beginning[0]["collage_path_list"]
         collage_path_elements = collage_path_ref.split(os.sep)[:-1]
-        collage_path_base = os.path.join(
-            *([os.path.abspath(os.sep)] + collage_path_elements)
+        collage_path_base = str(
+            os.path.join(*([os.path.abspath(os.sep)] + collage_path_elements))
         )
+        cluster_lists = [[] for i in range(n_clusters)]
+        cluster_lists[0] = [explanations_list_by_source[0][0]]
+        cluster_lists[1] = [explanations_list_by_source[1][0]]
         for cluster_idx in range(len(cluster_means)):
             collage_path = explanations_beginning[cluster_idx]["collage_path_list"]
             Path(collage_path_base + "_" + str(cluster_idx)).mkdir(
                 parents=True, exist_ok=True
             )
             collage_path_new = os.path.join(
-                *[collage_path_base + "_" + str(cluster_idx), embed_numberstring(0, 7)]
+                *[
+                    collage_path_base + "_" + str(cluster_idx),
+                    embed_numberstring(0, 7) + ".png",
+                ]
             )
             shutil.copy(collage_path, collage_path_new)
 
@@ -1063,38 +1085,52 @@ class CounterfactualExplainer(ExplainerInterface):
                 [e[idx] for e in explanations_list_by_source]
             )
             # build outer product between cluster means and current differences
-            absolute_cosine_similarities = torch.zeros(
+            cosine_similarities = torch.zeros(
                 [len(cluster_means), len(current_differences)]
             )
             for i in range(len(cluster_means)):
-                for j in current_differences:
-                    absolute_cosine_similarities[i, j] = torch.nn.CosineSimilarity()(
-                        cluster_means[i], j
+                for j in range(len(current_differences)):
+                    cosine_similarities[i, j] = torch.nn.CosineSimilarity()(
+                        cluster_means[i], current_differences[j]
                     )
 
             # find the cluster with the highest similarity
             for i in range(len(cluster_means)):
-                idx_cluster, idx_current = torch.argmax(
-                    torch.abs(absolute_cosine_similarities)
+                idx_combined = int(
+                    torch.argmax(torch.abs(cosine_similarities.flatten()))
                 )
+                idx_cluster = idx_combined // len(current_differences)
+                idx_current = idx_combined % len(current_differences)
                 cluster_lists[idx_cluster].append(
                     explanations_list_by_source[idx_current][idx]
                 )
-                absolute_cosine_similarities[idx_cluster, :] = 0
-                absolute_cosine_similarities[:, idx_current] = 0
+                cosine_similarities[idx_cluster, :] = 0
+                cosine_similarities[:, idx_current] = 0
                 # update running mean
                 cluster_means[idx_cluster] = (
                     idx * cluster_means[idx_cluster]
-                    + torch.sign(absolute_cosine_similarities[idx_cluster, idx_current])
+                    + torch.sign(cosine_similarities[idx_cluster, idx_current])
                     * current_differences[idx_current]
                 ) / (idx + 1)
+                if hasattr(
+                    explanations_list_by_source[idx_current][idx], "cluster_list"
+                ):
+                    explanations_list_by_source[idx_current][idx][
+                        "cluster_list"
+                    ].append(idx_cluster)
+
+                else:
+                    explanations_list_by_source[idx_current][idx]["cluster_list"] = [
+                        idx_cluster
+                    ]
+
                 collage_path = explanations_list_by_source[idx_current][idx][
                     "collage_path_list"
                 ]
                 collage_path_new = os.path.join(
                     *[
                         collage_path_base + "_" + str(idx_cluster),
-                        embed_numberstring(idx, 7),
+                        embed_numberstring(idx, 7) + ".png",
                     ]
                 )
                 shutil.copy(collage_path, collage_path_new)
@@ -1113,7 +1149,34 @@ class CounterfactualExplainer(ExplainerInterface):
 
             cluster_dicts.append(cluster_dict)
 
-        return cluster_dicts
+        if self.explainer_config.merge_clusters == "select_best":
+            cluster_scores = []
+            for cluster_idx in range(len(cluster_dicts)):
+                sample_scores = []
+                for sample_idx in range(len(cluster_dicts[cluster_idx]["x_list"])):
+                    sample_scores.append(
+                        cluster_dicts[cluster_idx]["y_target_end_confidence_list"][
+                            sample_idx
+                        ]
+                    )
+
+                cluster_scores.append(torch.mean(torch.tensor(sample_scores)))
+
+            cluster_scores = torch.tensor(cluster_scores)
+            best_cluster_idx = torch.argmax(cluster_scores)
+            explanations_dict_out = cluster_dicts[best_cluster_idx]
+
+        elif self.explainer_config.merge_clusters == "concatenate":
+            explanations_dict_out = {}
+            for key in cluster_dicts[0].keys():
+                explanations_dict_out[key] = []
+                for cluster_idx in range(len(cluster_dicts)):
+                    explanations_dict_out[key] += cluster_dicts[cluster_idx][key]
+
+        else:
+            raise Exception("Merge cluster method not implemented!")
+
+        return explanations_dict_out
 
     def run(self, oracle_path=None, confounder_oracle_path=None):
         """
@@ -1157,7 +1220,7 @@ class CounterfactualExplainer(ExplainerInterface):
             y_confidence = torch.nn.Softmax(dim=-1)(
                 y_logits / self.explainer_config.temperature
             )
-            for y_target in range(self.predictor_datasets[1].output_size):
+            for y_target in range(self.predictor_datasets[1].output_size[-1]):
                 if y_target == y_pred:
                     continue
 

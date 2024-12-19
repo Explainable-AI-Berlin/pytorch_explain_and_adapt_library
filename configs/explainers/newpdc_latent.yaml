@@ -1,9 +1,0 @@
-# python -W ignore run_explainer.py --config "<PEAL_BASE>/configs/explainers/newpdc_latent.yaml"
-explainer_type : PDC
-category: explainer
-gradient_steps: 100
-learning_rate: 1e-02
-distilled_predictor: <PEAL_BASE>/configs/predictors/sensitive_distillation.yaml
-y_target_goal_confidence: 0.8
-dist_l1: 1.0e-08
-iterationwise_encoding: False

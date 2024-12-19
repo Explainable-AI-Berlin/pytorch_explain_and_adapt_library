@@ -10,14 +10,14 @@ continuous_learning                  :  "finetune"
 replace_model                        :  True
 use_visualization                    :  True
 calculate_group_accuracies           :  True
-explainer                            :  <PEAL_BASE>/configs/explainers/pdc_minimal.yaml
+explainer                            :  <PEAL_BASE>/configs/explainers/pdc_unbiased.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/waterbirds.yaml
 test_data                            :  <PEAL_BASE>/configs/data/waterbirds.yaml
-student                              :  $PEAL_RUNS/waterbirds/classifier_natural4/model.cpl
-teacher                              :  Baseline:false
-generator                            :  $PEAL_RUNS/waterbirds/ddpm2/config.yaml
-base_dir                             :  $PEAL_RUNS/waterbirds/classifier_natural4/pdc_cfkd
+student                              :  $PEAL_RUNS/waterbirds/classifier_natural/model.cpl
+teacher                              :  SegmentationMask
+generator                            :  $PEAL_RUNS/waterbirds/ddpm/config.yaml
+base_dir                             :  $PEAL_RUNS/waterbirds/classifier_natural/pdc_cfkd
 task:
   criterions:
     ce     : 1.0
@@ -25,4 +25,4 @@ task:
   output_type             : singleclass
   output_channels         : 2
   y_selection             : [y]
-  x_selection             : [""]
+  x_selection             : ["imgs_filename"]

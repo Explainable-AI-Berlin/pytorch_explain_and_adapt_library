@@ -10,7 +10,7 @@ continuous_learning                  :  "retrain"
 replace_model                        :  True
 use_visualization                    :  True
 calculate_group_accuracies           :  True
-explainer                            :  <PEAL_BASE>/configs/explainers/pdc_smooth.yaml
+explainer                            :  <PEAL_BASE>/configs/explainers/pdc_diverse.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/celeba.yaml
 test_data                            :  <PEAL_BASE>/configs/data/celeba.yaml
