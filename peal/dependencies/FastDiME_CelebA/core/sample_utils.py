@@ -3,19 +3,16 @@
 
 import os
 import itertools
-import matplotlib.pyplot as plt
 import numpy as np
 
 from PIL import Image
 from tqdm import tqdm
-from scipy import linalg
 from os import path as osp
 
 import torch
 import torch.nn as nn
 
 from torch.nn import functional as F
-import torchvision
 from torchvision.datasets import ImageFolder
 from torchvision.models import vgg19
 

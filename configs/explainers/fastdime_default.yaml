@@ -44,7 +44,7 @@ query_label: 31
 resblock_updown: true
 rescale_learned_sigmas: false
 rescale_timesteps: false
-save_images: true
+save_images: false
 save_x_t: false
 save_z_t: false
 scale_grads: false

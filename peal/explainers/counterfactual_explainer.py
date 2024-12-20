@@ -209,6 +209,66 @@ class ACEConfig(ExplainerConfig):
     The activation function ReLU is replaced with: leaky_relu, leaky_softplus
     """
     replace_with_activation: str = ""
+    # DiME params
+    guided_iterations: object = 9999999
+    image_size: object = 128
+    l1_loss: object = 0.05
+    l2_loss: object = 0.0
+    l_perc: object = 30.0
+    l_perc_layer: object = 18
+    learn_sigma: object = True
+    merge_and_eval: object = False
+    model_path: object = "models/ddpm-celeba.pt"
+    noise_schedule: object = "linear"
+    num_batches: object = 1
+    num_channels: object = 128
+    num_chunks: object = 1
+    num_head_channels: object = -1
+    num_heads: object = 4
+    num_heads_upsample: object = -1
+    num_res_blocks: object = 2
+    oracle_path: object = "models/oracle.pth"
+    output_path: object = "/path/to/results"
+    predict_xstart: object = False
+    query_label: object = 31
+    resblock_updown: object = True
+    rescale_learned_sigmas: object = False
+    rescale_timesteps: object = False
+    sampling_scale: object = 1.0
+    save_x_t: object = True
+    save_z_t: object = True
+    start_step: object = 60
+    target_label: object = -1
+    use_checkpoint: object = False
+    use_ddim: object = False
+    use_fp16: object = True
+    use_kl: object = False
+    use_logits: object = True
+    use_new_attention_order: object = False
+    use_sampling_on_x_t: object = True
+    use_scale_shift_norm: object = True
+    use_train: object = False
+    # FastDiME params
+    attention_resolutions: object = [32, 16, 8]
+    channel_mult: object = ""
+    class_cond: object = False
+    classifier_path: object = "/scratch/ppar/models/classifier.pth"
+    classifier_scales: object = [8, 10, 15]
+    data_dir: object = "/scratch/ppar/data/img_align_celeba/"
+    dataset: object = "CelebA"
+    diffusion_steps: object = 500
+    dilation: object = 5
+    dropout: object = 0.0
+    masking_threshold: object = 0.15
+    method: object = "fastdime"
+    n_samples: object = 1000
+    percentage: object = 0.5
+    scale_grads: object = False
+    self_optimized_masking: object = True
+    shortcut_label_name: object = "Smiling"
+    task_label: object = 39
+    task_label_name: object = "Young"
+    warmup_step: object = 30
 
 
 class TIMEConfig(ExplainerConfig):

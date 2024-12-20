@@ -46,6 +46,9 @@ from core.classifier.densenet import ClassificationModel
 
 import matplotlib
 
+from peal.data.interfaces import PealDataset
+from peal.dependencies.ace.guided_diffusion.image_datasets import BINARYDATASET
+
 matplotlib.use("Agg")  # to disable display
 
 # =======================================================
@@ -265,11 +268,12 @@ def main(args=None):
     if args is None:
         args = create_args()
         import yaml
+
         args_dict = vars(args)
 
         # Save dictionary to a YAML file
-        yaml_file = 'args.yaml'
-        with open(yaml_file, 'w') as file:
+        yaml_file = "args.yaml"
+        with open(yaml_file, "w") as file:
             yaml.dump(args_dict, file, default_flow_style=False)
 
     print(args)
@@ -292,71 +296,86 @@ def main(args=None):
     # ========================================
     # Load Dataset
 
-    if args.dataset == "CelebA":
-        dataset = CelebADataset(
-            image_size=args.image_size,
-            data_dir=args.data_dir,
-            partition="train" if args.use_train else "val",
-            random_crop=False,
-            random_flip=False,
-            query_label=args.query_label,
+
+    if isinstance(args.dataset, list):
+        loader = args.dataset
+
+    else:
+        if args.dataset == "CelebA":
+            dataset = CelebADataset(
+                image_size=args.image_size,
+                data_dir=args.data_dir,
+                partition="train" if args.use_train else "val",
+                random_crop=False,
+                random_flip=False,
+                query_label=args.query_label,
+            )
+
+        elif args.dataset == "CelebAMV":
+            dataset = CelebAMiniVal(
+                image_size=args.image_size,
+                data_dir=args.data_dir,
+                random_crop=False,
+                random_flip=False,
+                query_label=args.query_label,
+            )
+
+        if len(dataset) - args.batch_size * args.num_batches > 0:
+            dataset = SlowSingleLabel(
+                query_label=1 - args.target_label if args.target_label != -1 else -1,
+                dataset=dataset,
+                maxlen=args.batch_size * args.num_batches,
+            )
+
+        # breaks the dataset into chunks
+        dataset = ChunkedDataset(
+            dataset=dataset, chunk=args.chunk, num_chunks=args.num_chunks
         )
 
-    elif args.dataset == "CelebAMV":
-        dataset = CelebAMiniVal(
-            image_size=args.image_size,
-            data_dir=args.data_dir,
-            random_crop=False,
-            random_flip=False,
-            query_label=args.query_label,
+        print("Images on the dataset:", len(dataset))
+
+        loader = data.DataLoader(
+            dataset,
+            batch_size=args.batch_size,
+            shuffle=False,
+            num_workers=4,
+            pin_memory=True,
         )
-
-    if len(dataset) - args.batch_size * args.num_batches > 0:
-        dataset = SlowSingleLabel(
-            query_label=1 - args.target_label if args.target_label != -1 else -1,
-            dataset=dataset,
-            maxlen=args.batch_size * args.num_batches,
-        )
-
-    # breaks the dataset into chunks
-    dataset = ChunkedDataset(
-        dataset=dataset, chunk=args.chunk, num_chunks=args.num_chunks
-    )
-
-    print("Images on the dataset:", len(dataset))
-
-    loader = data.DataLoader(
-        dataset,
-        batch_size=args.batch_size,
-        shuffle=False,
-        num_workers=4,
-        pin_memory=True,
-    )
 
     # ========================================
     # load models
+    if hasattr(args, "model"):
+        print("using model and diffusion from args")
+        model = args.model
+        diffusion = args.diffusion
 
-    print("Loading Model and diffusion model")
-    model, diffusion = create_model_and_diffusion(
-        **args_to_dict(args, model_and_diffusion_defaults().keys())
-    )
-    model.load_state_dict(
-        dist_util.load_state_dict(args.model_path, map_location="cpu")
-    )
-    model.to(dist_util.dev())
-    if args.use_fp16:
-        model.convert_to_fp16()
-    model.eval()
+    else:
+        print("Loading Model and diffusion model")
+        model, diffusion = create_model_and_diffusion(
+            **args_to_dict(args, model_and_diffusion_defaults().keys())
+        )
+        model.load_state_dict(
+            dist_util.load_state_dict(args.model_path, map_location="cpu")
+        )
+        model.to(dist_util.dev())
+        if args.use_fp16:
+            model.convert_to_fp16()
+        model.eval()
 
     def model_fn(x, t, y=None):
         assert y is not None
         return model(x, t, y if args.class_cond else None)
 
-    print("Loading Classifier")
+    if hasattr(args, "classifier"):
+        print("using classifier from args")
+        classifier = args.classifier
 
-    classifier = ClassificationModel(args.classifier_path, args.query_label).to(
-        dist_util.dev()
-    )
+    else:
+        print("Loading Classifier")
+        classifier = ClassificationModel(args.classifier_path, args.query_label).to(
+            dist_util.dev()
+        )
+
     classifier.eval()
 
     # ========================================
@@ -398,32 +417,54 @@ def main(args=None):
         "target": [],
         "label": [],
     }
+    counterfactuals = []
 
     acc = 0
     n = 0
     classifier_scales = [float(x) for x in args.classifier_scales.split(",")]
 
-    print("Starting Image Generation")
+    if args.save_images:
+        print("Starting Image Generation")
+
     for idx, (indexes, img, lab) in enumerate(loader):
-        print(
-            f"[Chunk {args.chunk + 1} / {args.num_chunks}] {idx} / {min(args.num_batches, len(loader))} | Time: {int(time() - start_time)}s"
-        )
+        if args.save_images:
+            print(
+                f"[Chunk {args.chunk + 1} / {args.num_chunks}] {idx} / {min(args.num_batches, len(loader))}"
+                + "| Time: {int(time() - start_time)}s"
+            )
 
         img = img.to(dist_util.dev())
         I = (img / 2) + 0.5
-        lab = lab.to(dist_util.dev(), dtype=torch.long)
         t = torch.zeros(img.size(0), device=dist_util.dev(), dtype=torch.long)
+        if isinstance(lab, list):
+            lab, target = lab
+            lab = lab.to(
+                dist_util.dev(),
+                dtype=torch.float
+                if args.dataset in BINARYDATASET
+                or isinstance(args.dataset, PealDataset)
+                else torch.long,
+            )
+            target = target.to(
+                dist_util.dev(),
+                dtype=torch.float
+                if args.dataset in BINARYDATASET
+                or isinstance(args.dataset, PealDataset)
+                else torch.long,
+            )
 
-        # Initial Classification, no noise included
-        with torch.no_grad():
-            logits = classifier(img)
-            pred = (logits > 0).long()
+        else:
+            lab = lab.to(dist_util.dev(), dtype=torch.long)
+            # Initial Classification, no noise included
+            with torch.no_grad():
+                logits = classifier(img)
+                pred = (logits > 0).long()
 
-        acc += (pred == lab).sum().item()
+            acc += (pred == lab).sum().item()
+            # as the model is binary, the target will always be the inverse of the prediction
+            target = 1 - pred
+
         n += lab.size(0)
-
-        # as the model is binary, the target will always be the inverse of the prediction
-        target = 1 - pred
 
         t = torch.ones_like(t) * args.start_step
 
@@ -528,6 +569,7 @@ def main(args=None):
             stats["label"].append(lab.detach().cpu())
             stats["pred"].append(pred.detach().cpu())
 
+        counterfactuals.append(cf.detach().cpu())
         if args.save_images:
             save_imgs(
                 I.numpy(),
@@ -551,121 +593,124 @@ def main(args=None):
 
         current_idx += I.size(0)
 
-    # write summary for all four combinations
-    summary = {
-        "class-cor": {
+    if args.save_images:
+        # write summary for all four combinations
+        summary = {
+            "class-cor": {
+                "cf-cor": {"bkl": 0, "l_1": 0, "n": 0},
+                "cf-inc": {"bkl": 0, "l_1": 0, "n": 0},
+                "bkl": 0,
+                "l_1": 0,
+                "n": 0,
+            },
+            "class-inc": {
+                "cf-cor": {"bkl": 0, "l_1": 0, "n": 0},
+                "cf-inc": {"bkl": 0, "l_1": 0, "n": 0},
+                "bkl": 0,
+                "l_1": 0,
+                "n": 0,
+            },
             "cf-cor": {"bkl": 0, "l_1": 0, "n": 0},
             "cf-inc": {"bkl": 0, "l_1": 0, "n": 0},
+            "clean acc": 100 * acc / n,
+            "cf acc": stats["flipped"] / n,
             "bkl": 0,
             "l_1": 0,
             "n": 0,
-        },
-        "class-inc": {
-            "cf-cor": {"bkl": 0, "l_1": 0, "n": 0},
-            "cf-inc": {"bkl": 0, "l_1": 0, "n": 0},
-            "bkl": 0,
-            "l_1": 0,
-            "n": 0,
-        },
-        "cf-cor": {"bkl": 0, "l_1": 0, "n": 0},
-        "cf-inc": {"bkl": 0, "l_1": 0, "n": 0},
-        "clean acc": 100 * acc / n,
-        "cf acc": stats["flipped"] / n,
-        "bkl": 0,
-        "l_1": 0,
-        "n": 0,
-        "FVA": 0,
-        "MNAC": 0,
-    }
+            "FVA": 0,
+            "MNAC": 0,
+        }
 
-    for k in stats.keys():
-        if k in ["flipped", "n"]:
-            continue
-        stats[k] = torch.cat(stats[k]).numpy()
+        for k in stats.keys():
+            if k in ["flipped", "n"]:
+                continue
+            stats[k] = torch.cat(stats[k]).numpy()
 
-    for k in ["bkl", "l_1"]:
+        for k in ["bkl", "l_1"]:
 
-        summary["class-cor"]["cf-cor"][k] = mean(
+            summary["class-cor"]["cf-cor"][k] = mean(
+                stats[k][
+                    (stats["label"] == stats["pred"])
+                    & (stats["target"] == stats["cf pred"])
+                ]
+            )
+            summary["class-inc"]["cf-cor"][k] = mean(
+                stats[k][
+                    (stats["label"] != stats["pred"])
+                    & (stats["target"] == stats["cf pred"])
+                ]
+            )
+            summary["class-cor"]["cf-inc"][k] = mean(
+                stats[k][
+                    (stats["label"] == stats["pred"])
+                    & (stats["target"] != stats["cf pred"])
+                ]
+            )
+            summary["class-inc"]["cf-inc"][k] = mean(
+                stats[k][
+                    (stats["label"] != stats["pred"])
+                    & (stats["target"] != stats["cf pred"])
+                ]
+            )
+
+            summary["class-cor"][k] = mean(stats[k][stats["label"] == stats["pred"]])
+            summary["class-inc"][k] = mean(stats[k][stats["label"] != stats["pred"]])
+
+            summary["cf-cor"][k] = mean(stats[k][stats["target"] == stats["cf pred"]])
+            summary["cf-inc"][k] = mean(stats[k][stats["target"] != stats["cf pred"]])
+
+            summary[k] = mean(stats[k])
+
+        summary["class-cor"]["cf-cor"]["n"] = len(
             stats[k][
-                (stats["label"] == stats["pred"])
-                & (stats["target"] == stats["cf pred"])
+                (stats["label"] == stats["pred"]) & (stats["target"] == stats["cf pred"])
             ]
         )
-        summary["class-inc"]["cf-cor"][k] = mean(
+        summary["class-inc"]["cf-cor"]["n"] = len(
             stats[k][
-                (stats["label"] != stats["pred"])
-                & (stats["target"] == stats["cf pred"])
+                (stats["label"] != stats["pred"]) & (stats["target"] == stats["cf pred"])
             ]
         )
-        summary["class-cor"]["cf-inc"][k] = mean(
+        summary["class-cor"]["cf-inc"]["n"] = len(
             stats[k][
-                (stats["label"] == stats["pred"])
-                & (stats["target"] != stats["cf pred"])
+                (stats["label"] == stats["pred"]) & (stats["target"] != stats["cf pred"])
             ]
         )
-        summary["class-inc"]["cf-inc"][k] = mean(
+        summary["class-inc"]["cf-inc"]["n"] = len(
             stats[k][
-                (stats["label"] != stats["pred"])
-                & (stats["target"] != stats["cf pred"])
+                (stats["label"] != stats["pred"]) & (stats["target"] != stats["cf pred"])
             ]
         )
 
-        summary["class-cor"][k] = mean(stats[k][stats["label"] == stats["pred"]])
-        summary["class-inc"][k] = mean(stats[k][stats["label"] != stats["pred"]])
+        summary["class-cor"]["n"] = len(stats[k][stats["label"] == stats["pred"]])
+        summary["class-inc"]["n"] = len(stats[k][stats["label"] != stats["pred"]])
 
-        summary["cf-cor"][k] = mean(stats[k][stats["target"] == stats["cf pred"]])
-        summary["cf-inc"][k] = mean(stats[k][stats["target"] != stats["cf pred"]])
+        summary["cf-cor"]["n"] = len(stats[k][stats["target"] == stats["cf pred"]])
+        summary["cf-inc"]["n"] = len(stats[k][stats["target"] != stats["cf pred"]])
 
-        summary[k] = mean(stats[k])
+        summary["n"] = n
 
-    summary["class-cor"]["cf-cor"]["n"] = len(
-        stats[k][
-            (stats["label"] == stats["pred"]) & (stats["target"] == stats["cf pred"])
-        ]
-    )
-    summary["class-inc"]["cf-cor"]["n"] = len(
-        stats[k][
-            (stats["label"] != stats["pred"]) & (stats["target"] == stats["cf pred"])
-        ]
-    )
-    summary["class-cor"]["cf-inc"]["n"] = len(
-        stats[k][
-            (stats["label"] == stats["pred"]) & (stats["target"] != stats["cf pred"])
-        ]
-    )
-    summary["class-inc"]["cf-inc"]["n"] = len(
-        stats[k][
-            (stats["label"] != stats["pred"]) & (stats["target"] != stats["cf pred"])
-        ]
-    )
+        print("ACC ON THIS SET:", 100 * acc / n)
+        stats["acc"] = 100 * acc / n
 
-    summary["class-cor"]["n"] = len(stats[k][stats["label"] == stats["pred"]])
-    summary["class-inc"]["n"] = len(stats[k][stats["label"] != stats["pred"]])
+        prefix = (
+            f"chunk-{args.chunk}_num-chunks-{args.num_chunks}_"
+            if args.num_chunks != 1
+            else ""
+        )
+        torch.save(
+            stats,
+            osp.join(args.output_path, "Results", args.exp_name, prefix + "stats.pth"),
+        )
 
-    summary["cf-cor"]["n"] = len(stats[k][stats["target"] == stats["cf pred"]])
-    summary["cf-inc"]["n"] = len(stats[k][stats["target"] != stats["cf pred"]])
+        # save summary
+        with open(
+            osp.join(args.output_path, "Results", args.exp_name, prefix + "summary.yaml"),
+            "w",
+        ) as f:
+            yaml.dump(summary, f)
 
-    summary["n"] = n
-
-    print("ACC ON THIS SET:", 100 * acc / n)
-    stats["acc"] = 100 * acc / n
-
-    prefix = (
-        f"chunk-{args.chunk}_num-chunks-{args.num_chunks}_"
-        if args.num_chunks != 1
-        else ""
-    )
-    torch.save(
-        stats,
-        osp.join(args.output_path, "Results", args.exp_name, prefix + "stats.pth"),
-    )
-
-    # save summary
-    with open(
-        osp.join(args.output_path, "Results", args.exp_name, prefix + "summary.yaml"),
-        "w",
-    ) as f:
-        yaml.dump(summary, f)
+    return counterfactuals, []
 
 
 if __name__ == "__main__":

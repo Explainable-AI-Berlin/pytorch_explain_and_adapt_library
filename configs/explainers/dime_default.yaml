@@ -40,7 +40,7 @@ resblock_updown: true
 rescale_learned_sigmas: false
 rescale_timesteps: false
 sampling_scale: 1.0
-save_images: true
+save_images: false
 save_x_t: true
 save_z_t: true
 seed: 4

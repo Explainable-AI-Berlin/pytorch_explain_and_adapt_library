@@ -16,7 +16,7 @@ from typing import Union
 
 from peal.generators.interfaces import EditCapableGenerator, InvertibleGenerator
 from peal.global_utils import load_yaml_config, generate_smooth_mask
-from peal.dependencies.DiME.main import main as dime_main
+#from peal.dependencies.DiME.main import main as dime_main
 from peal.dependencies.FastDiME_CelebA.main import main as fastdime_main
 from peal.dependencies.ace.run_ace import main as ace_main
 from peal.dependencies.ace.guided_diffusion import logger
@@ -535,14 +535,18 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
             args.diffusion = self.diffusion
             args.model = self.model
             #
-            if args.subtype == "DiME":
-                x_counterfactuals_current, histories = dime_main(args=args)
-
-            elif args.subtype == "ACE":
+            if args.subtype == "ACE":
                 x_counterfactuals_current, histories = ace_main(args=args)
 
             elif args.subtype == "FastDiME":
                 x_counterfactuals_current, histories = fastdime_main(args=args)
+
+            else:
+                raise Exception(args.subtype + " does not exist!")
+
+            """elif args.subtype == "DiME":
+                # can be done with FastDiME implementation
+                x_counterfactuals_current, histories = dime_main(args=args)"""
 
             x_counterfactuals_current = torch.cat(x_counterfactuals_current, dim=0)
 
