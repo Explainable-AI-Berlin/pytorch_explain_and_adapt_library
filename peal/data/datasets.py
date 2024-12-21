@@ -149,15 +149,7 @@ class DataConfig(BaseModel):
     """
     The index where the name of the images is stored. TODO hacky!!!
     """
-    img_name_idx: int = 0
-    """
-    Whether the dataset contains hints or not.
-    """
-    has_hints: bool = False
-    """
-    The seed used for generating the dataset.
-    """
-    seed: int = 0
+    x_selection: str = "imgs"
 
 
 class SymbolicDataset(PealDataset):
@@ -765,18 +757,7 @@ class Image2MixedDataset(ImageDataset):
 
         name = self.keys[idx]
 
-        if (
-            not self.task_config is None
-            and hasattr(self.task_config, "x_selection")
-            and not self.task_config.x_selection is None
-            and not len(self.task_config.x_selection) == 0
-        ):
-            x_selection = self.task_config.x_selection[0]
-
-        else:
-            x_selection = "imgs"
-
-        img = Image.open(os.path.join(self.root_dir, x_selection, name))
+        img = Image.open(os.path.join(self.root_dir, self.config.x_selection, name))
         state = torch.get_rng_state()
         img_tensor = self.transform(img)
 

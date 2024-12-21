@@ -511,7 +511,14 @@ def main(args=None):
     if args.save_images:
         print("Starting Image Generation")
 
-    for idx, (indexes, img, lab, task_label) in enumerate(loader):
+    for idx, sample in enumerate(loader):
+        if len(sample) == 4:
+            indexes, img, lab, task_label = sample
+
+        elif len(sample) == 3:
+            indexes, img, lab = sample
+            task_label = 0
+
         if args.save_images:
             print(
                 f"[Chunk {args.chunk + 1} / {args.num_chunks}] {idx} / {min(args.num_batches, len(loader))}"

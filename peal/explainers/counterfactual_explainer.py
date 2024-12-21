@@ -47,7 +47,6 @@ class PDCConfig(ExplainerConfig):
 
     """
     The type of explanation that shall be used.
-    Options: ['counterfactual', 'lrp']
     """
     explanation_type: str = "PDCConfig"
     """
@@ -80,28 +79,14 @@ class PDCConfig(ExplainerConfig):
     """
     y_target_goal_confidence: Union[type(None), float] = None
     """
-    Whether samples in the current search batch are masked after reaching y_target_goal_confidence
-    or whether they are continued to be updated until the last surpasses the threshhold
+    Whether samples in the current search batch are masked after reaching y_target_goal_confidence.
+    Otherwise they are continued to be updated until the last surpasses the threshhold
     """
     use_masking: bool = True
     """
-    How much noise to inject into the image while passing through it in the forward pass.
-    Helps avoiding adversarial attacks in the case of a weak generator
-    """
-    img_noise_injection: float = 0.0
-    """
-    Regularizing factor of the L1 distance in latent space between the latent code of the
-    original image and the counterfactual
+    Regularizing factor that keeps changes between original image and counterfactual sparse.
     """
     dist_l1: float = 0.0
-    """
-    Keeps the counterfactual in the high density area of the generative model
-    """
-    log_prob_regularization: float = 0.0
-    """
-    Regularization between counterfactual and original in image space to keep similarity high.
-    """
-    img_regularization: float = 0.0
     """
     The batch size used for the counterfactual search
     """
@@ -127,26 +112,59 @@ class PDCConfig(ExplainerConfig):
     """
     iterationwise_encoding: bool = True
     """
-    Whether to use stochastic counterfactual search or not.
+    Whether to use stochastic counterfactual search (e.g. DDPM) or not (e.g. deterministic DDIM).
     """
     stochastic: Union[type(None), str] = "fully"
+    """
+    The level of dilation for the masking that is used for RePaint. If it is higher the mask is more coarse.
+    If it is lower the mask is more finegrained.
+    """
     dilation: int = 5
+    """
+    The threshold what is RePainted in the preexplanation. The repainting back to the original in the preexplanation
+    is done for everything that has changes below 100 * inpaint percent of the maximimum change between sample and
+    preexplanation.
+    """
     inpaint: float = 0.0
     """
     The activation function ReLU is replaced with: leakyrelu, leakysoftplus
+    This helps the distilled predictor to be more sensitive and smooth without saturating gradients.
     """
     replace_with_activation: str = "leakysoftplus"
+    """
+    Whether to only keep the best explanation while counterfactual search or not.
+    While the greedy solution tends to be more stable it has bigger problems with strong local optima.
+    """
     greedy: bool = False
+    """
+    Whether to visualize gradients for every step of the counterfactual search or not.
+    Helpful for debugging, but decreases speed and clutters disk.
+    """
     visualize_gradients: bool = False
+    """
+    Momentum term that prevents counterfactual search from changing the area that is changed for creating the
+    counterfactual to rapidly.
+    """
     mask_momentum: float = 0.0
+    """
+    Momentum term for the optimizer that does the updates of the preexplanations.
+    """
     momentum: float = 0.9
+    """
+    The maximum absolut value that gradient update step can change one input variable at once.
+    """
     gradient_clipping: float = 0.05
+    """
+    The strategy on how to merge clusters when calculating them.
+    E.g. select_best uses the cluster that does the most salient changes, while merge just merges all clusters.
+    """
     merge_clusters: str = "select_best"
 
 
 class ACEConfig(ExplainerConfig):
     """
-    This class defines the config of a ACEConfig.
+    This class defines the config of a ACE, DiME or FastDiME explainer.
+    This config is primarily for replicating results of related work.
     """
 
     """
@@ -169,7 +187,7 @@ class ACEConfig(ExplainerConfig):
     distilled_predictor: Union[type(None), str, dict] = None
     attempts: int = 1
     clip_denoised: bool = True  # Clipping noise
-    batch_size: int = 32  # Batch size
+    batch_size: int = 1  # Batch size
     gpu: str = "0"  # GPU index, should only be 1 gpu
     save_images: bool = False  # Saving all images
     num_samples: int = 500000000000  # useful to sample few examples
@@ -1251,8 +1269,13 @@ class CounterfactualExplainer(ExplainerInterface):
         if self.predictor_datasets[1].config.has_hints:
             self.predictor_datasets[1].enable_hints()
 
+        n = (
+            self.explainer_config.max_samples
+            if not self.explainer_config.max_samples is None
+            else len(self.predictor_datasets[1])
+        )
         pbar = tqdm(
-            total=self.explainer_config.max_samples
+            total=n
             * (
                 self.explainer_config.gradient_steps
                 if hasattr(self.explainer_config, "gradient_steps")
@@ -1282,6 +1305,13 @@ class CounterfactualExplainer(ExplainerInterface):
             )
             for y_target in range(self.predictor_datasets[1].output_size[-1]):
                 if y_target == y_pred:
+                    continue
+
+                if (
+                    not self.explainer_config.transition_restrictions is None
+                    and not [y_pred, y_target]
+                    in self.explainer_config.transition_restrictions
+                ):
                     continue
 
                 if batch is None:

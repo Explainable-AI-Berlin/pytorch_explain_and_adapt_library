@@ -55,7 +55,7 @@ from peal.data.datasets import DataConfig
 from peal.generators.interfaces import GeneratorConfig
 from peal.training.trainers import TrainingConfig, TaskConfig
 from peal.explainers.interfaces import ExplainerConfig
-from peal.explainers.counterfactual_explainer import ACEConfig
+from peal.explainers.counterfactual_explainer import PDCConfig
 from peal.adaptors.interfaces import AdaptorConfig, Adaptor
 from peal.global_utils import get_config_model
 
@@ -66,7 +66,7 @@ class CFKDConfig(AdaptorConfig):
     """
 
     """
-    The config template for an adaptor.
+    The adaptor_type for CFKDConfig has to be CFKD to find the CFKDConfig class when loading from a yaml file.
     """
     adaptor_type: str = "CFKD"
     """
@@ -81,46 +81,60 @@ class CFKDConfig(AdaptorConfig):
     max_validation_samples: PositiveInt = 100
     """
     The maximum number of test batches.
+    If set to None the test will be done on the full test set.
     """
     max_test_batches: Union[type(None), PositiveInt] = None
     """
     The number of finetune iterations when executing the adaptor.
+    If set to 0 only the explanation and no adaption is done.
     """
-    finetune_iterations: PositiveInt = 2
+    finetune_iterations: PositiveInt = 1
     """
     The config of the task the student model shall solve.
     """
-    task: TaskConfig = TaskConfig()
+    task: Union[TaskConfig, type(None)] = None
     """
     The config of the counterfactual explainer that is used.
+    All parameters regarding paths, where the generator is from etc in there are overwritten by CFKD and only
+    used if the information is not available for CFKD
     """
-    explainer: ExplainerConfig = ACEConfig()
+    explainer: ExplainerConfig = PDCConfig()
     """
-    The config of the trainer used for finetuning the student model.
+    The config of the training used for finetuning the student model.
+    If not set student config can be used.
     """
-    training: TrainingConfig = TrainingConfig()
+    training: Union[TrainingConfig, type(None)] = None
     """
     The config of the data used to create the counterfactuals from.
     """
     data: DataConfig = None
     """
     The config of the test data used evaluate the real progress on.
+    Often this data has a distribution shift compared to the training data or comes from a totally different data source.
+    Hence the option to give its own config.
+    If set to None the normal data config is taken.
     """
     test_data: DataConfig = None
     """
     The path of the student used.
+    Can be either the path to a PyTorch or an onnx model directly or the path to a predictor config or a PredictorConfig
+    object.
     """
-    student: str = None
+    student: Union[PredictorConfig, str, type(None)] = None
     """
     The type of teacher used.
     """
     teacher: str = "human@8000"
     """
-    The path of the generator used.
+    The config of the generator used.
+    This value will be overwritten if Generator is given via constructor directly.
+    If the Generator is not given via constructor and this value is set to None explainer config is searched for
+    generator config.
     """
-    generator: str = None
+    generator: Union[GeneratorConfig, type(None)] = None
     """
     The base directory where the run of CFKD is stored.
+    All the visualzations and the caching is stored here.
     """
     base_dir: str = "peal_runs/cfkd"
     """
@@ -129,9 +143,11 @@ class CFKDConfig(AdaptorConfig):
     current_iteration: PositiveInt = 0
     """
     Whether to continue training from the current student model or start training from scratch
-    again.
+    again. Can e.g. be "retrain", which retrains model on original data and counterfactuals from scratch,
+    "finetune", which starts of at the weights of the uncorrected student or "deep_feature_reweighting", which
+    only finetunes the last layer of the the uncorrected student.
     """
-    continuous_learning: str = "deep_feature_reweighting"
+    continuous_learning: str = "retrain"
     """
     Whether to select sample for counterfactual creation the model is not that confident about.
     """
@@ -143,26 +159,18 @@ class CFKDConfig(AdaptorConfig):
     """
     use_confusion_matrix: bool = False
     """
-    Whether to replace the model every iteration or not.
-    """
-    replace_model: bool = True
-    """
     Logging of the Feedback Accuracy.
     """
     best_feedback_accuracy: float = 0.0
     """
-    Whether to directly replace the model or wait one iteration.
-    The latter sometimes makes sense if the model strategy at some point can't be detected anymore
-    by the counterfactual explainer.
-    """
-    replacement_strategy: str = "delayed"
-    """
-    The attribution threshold.
+    The attribution threshold when using the SegmentationMask teacher.
+    Setting it to 0.0 means that every counterfactual that did on average bigger changes inside than outside the mask
+    is considered a True counterfactual and every counterfactual that does not is considered a false counterfactual.
+    If it is set higher the bar for True Counterfactual is set higher and if is set lower the bar is set lower as well.
     """
     attribution_threshold: float = 0.0
     """
     What batch_size is used for creating the counterfactuals?
-    If use_confusion_matrix is deativated always use an even batch_size!!!
     """
     batch_size: PositiveInt = 1
     """
@@ -170,48 +178,36 @@ class CFKDConfig(AdaptorConfig):
     """
     validation_runs: PositiveInt = 1
     """
-    The reference batch size when automatically adapting the batch_size to the vram
+    Whether to calculate group accuracies or not. This can only be done if confounding factors are known.
     """
     calculate_group_accuracies: bool = True
     """
-    The reference vram of the gpu when using adaptive batch_size.
-    """
-    gigabyte_vram: float = None
-    """
-    The reference input size when using adaptive batch_size.
-    """
-    assumed_input_size: list[PositiveInt] = None
-    """
-    Whether to overwrite the logs and intermediate results.
+    Whether to overwrite the logs and cache intermediate results.
+    If overwrite is set to False cached results are loaded. If CFKDConfig is stored as yaml on disk overwrite is 
+    automatically set to False so that CFKD can be continued at the last cached result.
+    Using this feature dramatically improves ability to debug!
     """
     overwrite: bool = True
     """
-    Whether to overwrite the logs and intermediate results.
+    Whether to visualize the current progress or not.
     """
     use_visualization: bool = False
-    """
-    What level of tracking is used.
-    """
-    tracking_level: int = 0
     """
     How aggressively to change the model based on the counterfactual samples. 0 -> No change, 1 -> Full change
     """
     mixing_ratio: float = 0.5
+    """
+    Whether to also calculate the flip rate for a distilled oracle. Distillation takes some time, but one can realize
+    how reliant on adversarial counterfactuals the model is.
+    """
     calculate_distilled_flip_rate: bool = True
     """
-    What level of tracking is used.
+    What type of counterfactuals are valid. 1sided means that we can only start from samples with correct prediction,
+    2sided also allows that we start from samples with wrong orignal prediction.
     """
     counterfactual_type: str = "1sided"
-    """
-    A dict containing all variables that could not be given with the current config structure
-    """
-    kwargs: dict = {}
-    """
-    The name of the class.
-    """
-    __name__: str = "peal.AdaptorConfig"
 
-    def __init__(
+    '''def __init__(
         self,
         training: Union[dict, TrainingConfig] = None,
         task: Union[dict, TaskConfig] = None,
@@ -409,7 +405,7 @@ class CFKDConfig(AdaptorConfig):
             if not calculate_distilled_flip_rate is None
             else self.calculate_distilled_flip_rate
         )
-        self.kwargs = kwargs
+        self.kwargs = kwargs'''
 
 
 class CFKD(Adaptor):
@@ -428,7 +424,6 @@ class CFKD(Adaptor):
         adaptor_config: Union[
             dict, str, Path, AdaptorConfig
         ] = "<PEAL_BASE>/configs/adaptors/symbolic_cfkd.yaml",
-        gigabyte_vram: float = None,
         overwrite: bool = None,
     ):
         """
@@ -474,15 +469,6 @@ class CFKD(Adaptor):
         self.student.eval()
         teacher = teacher if not teacher is None else self.adaptor_config.teacher
 
-        """self.output_size = integrate_data_config_into_adaptor_config(
-            self.adaptor_config, datasource, output_size
-        )"""
-
-        """set_adaptive_batch_size(
-            self.adaptor_config, gigabyte_vram, self.adaptor_config.min_train_samples
-        )"""
-
-        #
         # kind of dirty, but also very confusing if not done this way since validation batches are fed directly
         # into the explainer and thereby potentially causing VRAM overflows otherwise
         self.adaptor_config.training.val_batch_size = self.adaptor_config.batch_size
@@ -1744,15 +1730,15 @@ class CFKD(Adaptor):
             self.explainer.explainer_config = original_explainer_config
             if self.adaptor_config.validation_runs > 1:
                 self.datastack.dataset._initialize_performance_metrics()
-                validation_stats["distance_to_manifold"] = (
-                    self.datastack.dataset.distribution_distance(
-                        x_counterfactual_collection
-                    )
+                validation_stats[
+                    "distance_to_manifold"
+                ] = self.datastack.dataset.distribution_distance(
+                    x_counterfactual_collection
                 )
-                validation_stats["pairwise_distance"] = (
-                    self.datastack.dataset.pair_wise_distance(
-                        x_list_collection, x_counterfactual_collection
-                    )
+                validation_stats[
+                    "pairwise_distance"
+                ] = self.datastack.dataset.pair_wise_distance(
+                    x_list_collection, x_counterfactual_collection
                 )
                 validation_stats["diversity"] = self.datastack.dataset.variance(
                     x_counterfactual_collection
@@ -2091,28 +2077,6 @@ class CFKD(Adaptor):
                         os.path.join(self.base_dir, "visualization.png"),
                     ]
                 )
-
-            """if (
-                self.adaptor_config.replacement_strategy == "delayed"
-                and self.adaptor_config.replace_model
-            ):
-                torch.save(self.student, os.path.join(self.base_dir, "model.cpl"))
-
-            if (
-                validation_stats["feedback_accuracy"]
-                > self.adaptor_config.best_feedback_accuracy
-            ):
-                # self.adaptor_config["fa_1sided_prime"] = validation_stats["fa_1sided"]
-                self.adaptor_config.best_feedback_accuracy = validation_stats[
-                    "feedback_accuracy"
-                ]
-                if self.adaptor_config.replacement_strategy == "direct":
-                    torch.save(self.student, os.path.join(self.base_dir, "model.cpl"))
-
-                self.adaptor_config.replace_model = True
-
-            else:
-                self.adaptor_config.replace_model = False"""
 
             torch.save(self.student, os.path.join(self.base_dir, "model.cpl"))
 
