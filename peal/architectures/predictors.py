@@ -132,8 +132,13 @@ def get_predictor(predictor, device="cpu"):
 
     else:
         predictor_config = load_yaml_config(predictor)
-        model_path = os.path.join(predictor_config.model_path, "model.cpl")
-        predictor_out = torch.load(model_path, map_location=device)
+        if predictor_config.architecture == "torchvision_resnet18_imagenet":
+            predictor_out = torchvision.models.resnet18(pretrained=True)
+
+        else:
+            model_path = os.path.join(predictor_config.model_path, "model.cpl")
+            predictor_out = torch.load(model_path, map_location=device)
+
         return predictor_out, predictor_config
 
 

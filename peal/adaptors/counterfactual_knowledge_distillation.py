@@ -207,7 +207,7 @@ class CFKDConfig(AdaptorConfig):
     """
     counterfactual_type: str = "1sided"
 
-    '''def __init__(
+    def __init__(
         self,
         training: Union[dict, TrainingConfig] = None,
         task: Union[dict, TaskConfig] = None,
@@ -324,17 +324,6 @@ class CFKDConfig(AdaptorConfig):
             if not calculate_group_accuracies is None
             else self.calculate_group_accuracies
         )
-        self.gigabyte_vram = (
-            gigabyte_vram if not gigabyte_vram is None else self.gigabyte_vram
-        )
-        self.assumed_input_size = (
-            assumed_input_size
-            if not assumed_input_size is None
-            else self.assumed_input_size
-        )
-        self.replace_model = (
-            replace_model if not replace_model is None else self.replace_model
-        )
         self.continuous_learning = (
             continuous_learning
             if not continuous_learning is None
@@ -354,11 +343,6 @@ class CFKDConfig(AdaptorConfig):
             use_confusion_matrix
             if not use_confusion_matrix is None
             else self.use_confusion_matrix
-        )
-        self.replacement_strategy = (
-            replacement_strategy
-            if not replacement_strategy is None
-            else self.replacement_strategy
         )
         self.min_train_samples = (
             min_train_samples
@@ -405,7 +389,7 @@ class CFKDConfig(AdaptorConfig):
             if not calculate_distilled_flip_rate is None
             else self.calculate_distilled_flip_rate
         )
-        self.kwargs = kwargs'''
+        self.kwargs = kwargs
 
 
 class CFKD(Adaptor):

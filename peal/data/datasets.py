@@ -147,7 +147,9 @@ class DataConfig(BaseModel):
     """
     label_rel_path: str = "data.csv"
     """
-    The index where the name of the images is stored. TODO hacky!!!
+    The name of the folder where the images are stored.
+    The header of the column in the underlying csv either has to be called like this as well or the path to the images
+    has to be in the first column.
     """
     x_selection: str = "imgs"
 
@@ -901,10 +903,10 @@ class Image2ClassDataset(ImageDataset):
         """
         self.config = config
         if root_dir is None:
-            self.root_dir = os.path.join(config.dataset_path, "imgs")
+            self.root_dir = os.path.join(config.dataset_path, self.config.x_selection)
 
         else:
-            self.root_dir = os.path.join(root_dir, "imgs")
+            self.root_dir = os.path.join(root_dir, self.config.x_selection)
 
         if self.config.has_hints:
             self.mask_dir = os.path.join(self.root_dir, "masks")

@@ -77,7 +77,11 @@ def parse_csv(
     else:
         key_idx = config.img_name_idx"""
 
-    key_idx = attributes.index(config.x_selection)
+    if config.x_selection in attributes:
+        key_idx = attributes.index(config.x_selection)
+
+    else:
+        key_idx = 0
 
     if key_type == "name":
         attributes = attributes[key_idx + 1 :]

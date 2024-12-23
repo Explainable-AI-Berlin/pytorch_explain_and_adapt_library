@@ -48,7 +48,7 @@ class PDCConfig(ExplainerConfig):
     """
     The type of explanation that shall be used.
     """
-    explanation_type: str = "PDCConfig"
+    explainer_type: str = "PDCConfig"
     """
     The path to the predictor that shall be explained.
     """

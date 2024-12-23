@@ -1,0 +1,16 @@
+# python -W ignore run_explainer.py --config "<PEAL_BASE>/configs/explainers/imagenet_ace.yaml"
+predictor: <PEAL_BASE>/configs/predictors/imagenet_resnet18_classifier.yaml
+data_config: <PEAL_BASE>/configs/data/imagenet.yaml
+generator: $PEAL_RUNS/imagenet/ddpm256x256/config.yaml
+validate_generator: True
+transition_restrictions: [[248,269], [269,248]] # 248 -> Eskimo Dog, 250 -> Siberian Husky, 269 -> grey wolf, 270 -> white wolf
+explanations_dir: $PEAL_RUNS/imagenet/natural_classifier/ace_explanations
+max_samples: 10
+explainer_type : ACE
+category : explainer
+attack_iterations: 70
+sampling_time_fraction: 0.3
+dist_l1: 0.0
+y_target_goal_confidence: 1.1
+batch_size: 1
+attack_step: 5
