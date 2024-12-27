@@ -33,7 +33,6 @@ from peal.training.trainers import (
     ModelTrainer,
     calculate_test_accuracy,
     distill_predictor,
-    PredictorConfig,
 )
 from peal.explainers.counterfactual_explainer import (
     CounterfactualExplainer,
@@ -51,9 +50,10 @@ from peal.generators.generator_factory import get_generator
 from peal.training.training_utils import (
     calculate_validation_statistics,
 )
-from peal.data.datasets import DataConfig
+from peal.data.interfaces import DataConfig
 from peal.generators.interfaces import GeneratorConfig
-from peal.training.trainers import TrainingConfig, TaskConfig
+from peal.training.interfaces import TrainingConfig, PredictorConfig
+from peal.architectures.interfaces import TaskConfig
 from peal.explainers.interfaces import ExplainerConfig
 from peal.explainers.counterfactual_explainer import PDCConfig
 from peal.adaptors.interfaces import AdaptorConfig, Adaptor

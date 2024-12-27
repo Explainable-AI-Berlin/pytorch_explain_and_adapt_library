@@ -1,18 +1,13 @@
 
 import argparse
-import torch
-from torch.utils import data
 
-from torchvision import transforms
-from torchvision import datasets
-
-from core.image_datasets import CelebADataset, CelebAMiniVal, ShortcutCelebADataset, ShortcutCFDataset
+from .core.image_datasets import ShortcutCelebADataset, ShortcutCFDataset
 from torch.utils.data import Subset
 from torch.utils.data import DataLoader
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torchvision import datasets, models, transforms
+from torchvision import models
 from sklearn.metrics import roc_auc_score
 import numpy as np
 import random

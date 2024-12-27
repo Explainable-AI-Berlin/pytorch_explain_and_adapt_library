@@ -23,5 +23,5 @@ def main():
     cfkd = CFKD(adaptor_config=adaptor_config)
     cfkd.run()
 
-
-main()
+if __name__ == '__main__':
+    main()

@@ -659,7 +659,11 @@ def main(args=None):
             # evaluate the cf and check whether the model flipped the prediction
             with torch.no_grad():
                 cfsl = classifier(cfs)
-                cfsp = cfsl > 0
+                if len(cfsl.shape) == 2:
+                    cfsp = cfsl.argmax(-1)
+
+                else:
+                    cfsp = cfsl > 0
 
             if jdx == 0:
                 cf = cfs.clone().detach()
@@ -670,7 +674,12 @@ def main(args=None):
             for kdx in range(len(x_t_s)):
                 x_t_s[kdx][~transformed] = xs_t_s[kdx]
                 z_t_s[kdx][~transformed] = zs_t_s[kdx]
-            transformed[~transformed] = target[~transformed] == cfsp
+
+            try:
+                transformed[~transformed] = target[~transformed] == cfsp
+
+            except Exception:
+                import pdb; pdb.set_trace()
 
             if transformed.float().sum().item() == transformed.size(0):
                 break

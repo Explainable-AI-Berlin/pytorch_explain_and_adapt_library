@@ -16,10 +16,10 @@ from wilds import get_dataset
 from peal.data.dataset_generators import SquareDatasetGenerator
 from peal.data.datasets import (
     Image2ClassDataset,
-    DataConfig,
     Image2MixedDataset,
     ImageDataset,
 )
+from peal.data.interfaces import DataConfig
 from peal.global_utils import embed_numberstring
 from peal.data.dataset_generators import latent_to_square_image
 

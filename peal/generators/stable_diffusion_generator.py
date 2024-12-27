@@ -36,8 +36,8 @@ from peal.dependencies.time.training import textual_inversion_training
 from typing import Union
 
 from peal.generators.interfaces import GeneratorConfig
-from peal.data.datasets import DataConfig
-from peal.architectures.predictors import TaskConfig
+from peal.data.interfaces import DataConfig
+from peal.architectures.interfaces import TaskConfig
 
 
 class StableDiffusionConfig(GeneratorConfig):

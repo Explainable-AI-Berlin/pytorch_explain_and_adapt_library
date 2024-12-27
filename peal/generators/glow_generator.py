@@ -20,7 +20,7 @@ from peal.dependencies.glow.train import training
 from typing import Union
 
 from peal.generators.interfaces import GeneratorConfig
-from peal.data.datasets import DataConfig
+from peal.data.interfaces import DataConfig
 from peal.training.loggers import log_images_to_writer
 
 

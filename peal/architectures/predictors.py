@@ -2,119 +2,18 @@ import torch
 import os
 
 import torchvision
-from pydantic import BaseModel, PositiveInt
-from typing import Union
+from pydantic import PositiveInt
 
 from peal.architectures.basic_modules import Mean
+from peal.architectures.interfaces import ArchitectureConfig, FCConfig, VGGConfig, ResnetConfig, TransformerConfig
 from peal.architectures.module_blocks import (
     FCBlock,
     ResnetBlock,
     TransformerBlock,
     VGGBlock,
-    create_cnn_layer, ResnetConfig, FCConfig, VGGConfig, TransformerConfig,
-)
+    create_cnn_layer, )
 from peal.global_utils import load_yaml_config
 
-
-class TaskConfig(BaseModel):
-    """
-    A dict of critirion names (that have to be implemented in peal.training.criterions)
-    mapped to the weight.
-    Like this the loss function can be post_hoc attached without changing the code.
-    """
-
-    criterions: dict = {'ce' : 1.0, 'l2' : 1.0}
-    """
-    The output_type that either can just be the output_type of the dataset or could be some
-    possible subtype.
-    E.g. when having a binary multiclass dataset one could use as task binary single class
-    classification for one of the output variables.
-    """
-    output_type: str = "singleclass"
-    """
-    The output_channels that can be at most the output_channels of the dataset, but if a subtask is chosen
-    the output_channels has also be adapted accordingly
-    """
-    output_channels: PositiveInt = 2
-    """
-    Gives the option to select a subset of the input variables. Only works for symbolic data.
-    """
-    x_selection: Union[list[str], type(None)] = None
-    """
-    Gives the option to select a subset of the output_variables.
-    Can be used e.g. to transform binary multiclass into the subtask of predicting one of the
-    binary variables with single class classification.
-    """
-    y_selection: Union[list[str], type(None)] = None
-    """
-    kwargs: dict = {}
-    __name__: str = "peal.TaskConfig"
-
-    def __init__(
-        self,
-        criterions: dict = None,
-        output_type: str = None,
-        output_channels: PositiveInt = None,
-        x_selection: list[str] = None,
-        y_selection: list[str] = None,
-        **kwargs
-    ):
-        self.criterions = criterions if criterions is not None else self.criterions
-        self.output_type = output_type if output_type is not None else self.output_type
-        self.output_channels = output_channels if output_channels is not None else self.output_channels
-        self.x_selection = x_selection if x_selection is not None else self.x_selection
-        self.y_selection = y_selection if y_selection is not None else self.y_selection
-        self.kwargs = kwargs"""
-
-
-class ArchitectureConfig:
-    """
-    The config template for a neural architecture.
-    """
-
-    """
-    The layers of the architecture.
-    Elements of the list are tuples of the form (layer_type, *layer_config).
-    Options for list elements: ['fc', 'vgg','resnet','transformer']
-    """
-    layers: list
-    """
-    The activation function used in the architecture.
-    Options: ['ReLU', 'LeakyReLU', 'Softplus']
-    """
-    activation: str = "ReLU"
-    """
-    A dict containing all variables that could not be given with the current config structure
-    """
-    kwargs: dict = {}
-    """
-    The name of the class.
-    """
-    __name__: str = "peal.ArchitectureConfig"
-
-    def __init__(self, layers: list, activation: str = "ReLU", **kwargs):
-        self.activation = activation
-        self.kwargs = kwargs
-        self.layers = []
-        for layer in layers:
-            """
-            layer[0] contains the type of layer used:
-            Options: ['fc', 'vgg','resnet','transformer']
-            """
-            if layer[0] == "resnet":
-                self.layers.append(ResnetConfig(*layer[1:]))
-
-            elif layer[0] == "fc":
-                self.layers.append(FCConfig(*layer[1:]))
-
-            elif layer[0] == "vgg":
-                self.layers.append(VGGConfig(*layer[1:]))
-
-            elif layer[0] == "transformer":
-                self.layers.append(TransformerConfig(*layer[1:]))
-
-            else:
-                self.layers.append(layer[0])
 
 def get_predictor(predictor, device="cpu"):
     if isinstance(predictor, torch.nn.Module):
@@ -244,7 +143,7 @@ class SequentialModel(torch.nn.Sequential):
             layers.append(torch.nn.Dropout(dropout))
 
         if not output_channels is None:
-            last_layer_config = FCConfig(output_channels, tensor_dim=tensor_dim)
+            last_layer_config = FCConfig(num_neurons=output_channels, tensor_dim=tensor_dim)
             layers.append(FCBlock(last_layer_config, num_neurons_previous))#, activation))
             num_neurons_previous = output_channels
 

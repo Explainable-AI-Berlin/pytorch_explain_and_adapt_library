@@ -3,25 +3,21 @@ import torch
 import argparse
 import itertools
 import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
 import os.path as osp
 
 from PIL import Image
-from tqdm import tqdm
 from torch.utils import data
 from torchvision import models
-from torchvision import transforms
 
-from eval_utils.cout_metrics import evaluate
+from .eval_utils.cout_metrics import evaluate
 
-from models.dive.densenet import DiVEDenseNet121
-from models.steex.DecisionDensenetModel import DecisionDensenetModel
-from models.mnist import Net
+from .models.dive.densenet import DiVEDenseNet121
+from .models.steex.DecisionDensenetModel import DecisionDensenetModel
 
-from core.attacks_and_models import Normalizer
+#from .core.attacks_and_models import Normalizer
+Normalizer = lambda x: x
 
-from guided_diffusion.image_datasets import BINARYDATASET, MULTICLASSDATASETS
+from .guided_diffusion.image_datasets import BINARYDATASET, MULTICLASSDATASETS
 
 
 # create dataset to read the counterfactual results images
@@ -106,9 +102,10 @@ if __name__ == "__main__":
 
     ql = args.query_label
     if args.dataset in ["CelebA", "CelebAMV"]:
-        classifier = Normalizer(
+        """classifier = Normalizer(
             DiVEDenseNet121(args.weights_path, args.query_label), [0.5] * 3, [0.5] * 3
-        ).to(device)
+        ).to(device)"""
+        classifier = DiVEDenseNet121(args.weights_path, args.query_label)
 
     elif args.dataset == "CelebAHQ":
         assert args.query_label in [

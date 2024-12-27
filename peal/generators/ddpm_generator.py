@@ -32,7 +32,7 @@ from peal.data.dataset_factory import get_datasets
 from peal.explainers.counterfactual_explainer import ACEConfig
 from peal.training.loggers import log_images_to_writer
 from peal.generators.interfaces import GeneratorConfig
-from peal.data.datasets import DataConfig
+from peal.data.interfaces import DataConfig
 from peal.training.trainers import distill_predictor
 
 

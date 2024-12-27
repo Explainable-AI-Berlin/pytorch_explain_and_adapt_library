@@ -3,8 +3,6 @@ import torch
 import argparse
 import itertools
 import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
 import os.path as osp
 
 from PIL import Image
@@ -12,7 +10,7 @@ from tqdm import tqdm
 from torch.utils import data
 from torchvision import transforms
 
-from eval_utils.resnet50_facevgg2_FVA import resnet50, load_state_dict
+from .eval_utils.resnet50_facevgg2_FVA import resnet50, load_state_dict
 
 
 # create dataset to read the counterfactual results images

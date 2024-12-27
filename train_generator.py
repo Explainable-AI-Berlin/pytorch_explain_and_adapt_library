@@ -16,4 +16,5 @@ def main():
     generator = get_generator(generator_config)
     generator.train_model()
 
-main()
+if __name__ == '__main__':
+    main()

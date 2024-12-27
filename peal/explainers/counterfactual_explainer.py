@@ -17,9 +17,9 @@ from typing import Union
 
 from tqdm import tqdm
 
-from peal.architectures.predictors import get_predictor, TaskConfig
+from peal.architectures.predictors import get_predictor
+from peal.architectures.interfaces import TaskConfig
 from peal.data.dataset_factory import get_datasets
-from peal.data.datasets import DataConfig
 from peal.generators.generator_factory import get_generator
 from peal.global_utils import (
     load_yaml_config,
@@ -33,7 +33,7 @@ from peal.generators.interfaces import (
     EditCapableGenerator,
     GeneratorConfig,
 )
-from peal.data.interfaces import PealDataset
+from peal.data.interfaces import PealDataset, DataConfig
 from peal.explainers.interfaces import ExplainerInterface, ExplainerConfig
 from peal.teachers.human2model_teacher import DataStore
 from peal.training.trainers import distill_predictor
@@ -1303,7 +1303,7 @@ class CounterfactualExplainer(ExplainerInterface):
             y_confidence = torch.nn.Softmax(dim=-1)(
                 y_logits / self.explainer_config.temperature
             )
-            for y_target in range(self.predictor_datasets[1].output_size[-1]):
+            for y_target in range(self.predictor_datasets[1].task_config.output_channels):
                 if y_target == y_pred:
                     continue
 

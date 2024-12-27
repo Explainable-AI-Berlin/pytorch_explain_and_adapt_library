@@ -5,6 +5,7 @@ Train a diffusion model on images.
 import argparse
 import os
 
+from peal.data.interfaces import DataConfig
 from peal.dependencies.ace.guided_diffusion import logger
 from peal.dependencies.ace.guided_diffusion import dist_util
 from peal.dependencies.ace.guided_diffusion.image_datasets import load_data_celeba
@@ -20,7 +21,6 @@ from peal.dependencies.ace.guided_diffusion.train_util import TrainLoop
 from peal.data.dataset_factory import get_datasets
 from peal.data.dataloaders import get_dataloader
 from peal.global_utils import load_yaml_config
-from peal.configs.data.data_config import DataConfig
 
 
 def main():

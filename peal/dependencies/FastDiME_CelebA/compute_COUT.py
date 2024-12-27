@@ -3,21 +3,17 @@ import torch
 import argparse
 import itertools
 import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
 import os.path as osp
 
 from PIL import Image
-from tqdm import tqdm
 from torch.utils import data
 from torchvision import models
-from torchvision import transforms
 
-from eval_utils.cout_metrics import evaluate
-
-from models.dive.densenet import DiVEDenseNet121
-from models.steex.DecisionDensenetModel import DecisionDensenetModel
-from models.normalizer import Normalizer
+"""
+from .eval_utils.cout_metrics import evaluate
+from .models.dive.densenet import DiVEDenseNet121
+from .models.steex.DecisionDensenetModel import DecisionDensenetModel
+from .models.normalizer import Normalizer
 
 
 
@@ -134,3 +130,4 @@ if __name__ == '__main__':
                        loader,
                        device,
                        True) #in BINARYDATASET)
+"""

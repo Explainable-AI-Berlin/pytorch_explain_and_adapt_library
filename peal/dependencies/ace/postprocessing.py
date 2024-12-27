@@ -1,59 +1,34 @@
 import os
-import yaml
-import copy
-import math
 import random
 import argparse
 import itertools
 import numpy as np
 import os.path as osp
-import matplotlib.pyplot as plt
 
 from PIL import Image
 from time import time
 from os import path as osp
-from multiprocessing import Pool
 
 import torch
 
 from torch.utils import data
 from torch.nn import functional as F
 
-from torchvision import transforms
-from torchvision import datasets
-from torchvision import models
-
 # Diffusion Model imports
-from guided_diffusion import dist_util
-from guided_diffusion.script_util import (
+from .guided_diffusion import dist_util
+from .guided_diffusion.script_util import (
     model_and_diffusion_defaults,
-    diffusion_defaults,
     create_model_and_diffusion,
-    create_gaussian_diffusion,
-    create_classifier,
     args_to_dict,
     add_dict_to_argparser,
 )
-from guided_diffusion.sample_utils import (
-    get_DiME_iterative_sampling,
-    clean_class_cond_fn,
-    dist_cond_fn,
-    ImageSaver,
-    SlowSingleLabel,
-    load_from_DDP_model,
-    PerceptualLoss,
-    ChunkedDataset,
-)
-from guided_diffusion.gaussian_diffusion import _extract_into_tensor
-from guided_diffusion.image_datasets import BINARYDATASET, MULTICLASSDATASETS
+from .guided_diffusion.image_datasets import BINARYDATASET, MULTICLASSDATASETS
 
 # core imports
-from core.utils import print_dict, merge_all_chunks
-from core.metrics import accuracy, loic_flip, get_prediction
-from core.attacks_and_models import Normalizer, joint_classifier_ddpm, get_attack
+from .core.metrics import get_prediction
 
 # model imports
-from models import get_classifier
+from .models import get_classifier
 
 import matplotlib
 
