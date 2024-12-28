@@ -1,6 +1,8 @@
 explainer_type : ACE
 category : explainer
-subtype: DiME
+subtype: FastDiME
+method: dime
+num_attempts: 2
 attention_resolutions: 32,16,8
 batch_size: 50
 channel_mult: ''

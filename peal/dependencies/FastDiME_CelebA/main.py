@@ -427,11 +427,15 @@ def main(args=None):
     # Distance losses
 
     if args.l_perc != 0:
-        print("Loading Perceptual Loss")
-        vggloss = PerceptualLoss(layer=args.l_perc_layer, c=args.l_perc).to(
-            dist_util.dev()
-        )
-        vggloss.eval()
+        if not hasattr(args, "vggloss") or args.vggloss is None:
+            print("Loading Perceptual Loss")
+            vggloss = PerceptualLoss(layer=args.l_perc_layer, c=args.l_perc).to(
+                dist_util.dev()
+            )
+            vggloss.eval()
+
+        else:
+            vggloss = args.vggloss
 
     else:
         vggloss = None
@@ -694,48 +698,50 @@ def main(args=None):
             if args.save_z_t:
                 z_t_saver(z_t_s, indexes=indexes)
 
-        with torch.no_grad():
-            logits_cf = classifier(cf)
-            pred_cf = (logits_cf > 0).long()
+        counterfactuals.append(cf.detach().cpu())
+        if args.save_images:
+            with torch.no_grad():
+                logits_cf = classifier(cf)
+                pred_cf = (logits_cf > 0).long()
 
-            # process images
-            cf = ((cf + 1) * 127.5).clamp(0, 255).to(torch.uint8)
-            cf = cf.permute(0, 2, 3, 1)
-            cf = cf.contiguous().cpu()
+                # process images
+                cf = ((cf + 1) * 127.5).clamp(0, 255).to(torch.uint8)
+                cf = cf.permute(0, 2, 3, 1)
+                cf = cf.contiguous().cpu()
 
-            I = (I * 255).to(torch.uint8)
-            I = I.permute(0, 2, 3, 1)
-            I = I.contiguous().cpu()
+                I = (I * 255).to(torch.uint8)
+                I = I.permute(0, 2, 3, 1)
+                I = I.contiguous().cpu()
 
-            noise_img = ((noise_img + 1) * 127.5).clamp(0, 255).to(torch.uint8)
-            noise_img = noise_img.permute(0, 2, 3, 1)
-            noise_img = noise_img.contiguous().cpu()
+                noise_img = ((noise_img + 1) * 127.5).clamp(0, 255).to(torch.uint8)
+                noise_img = noise_img.permute(0, 2, 3, 1)
+                noise_img = noise_img.contiguous().cpu()
 
-            # add metrics
-            dist_cf = torch.sigmoid(logits_cf)
-            dist_cf[target == 0] = 1 - dist_cf[target == 0]
-            bkl = (1 - dist_cf).detach().cpu()
+                # add metrics
+                dist_cf = torch.sigmoid(logits_cf)
+                dist_cf[target == 0] = 1 - dist_cf[target == 0]
+                bkl = (1 - dist_cf).detach().cpu()
 
-            cf_output = torch.sigmoid(logits_cf)
-            original_output = torch.sigmoid(logits)
-            mad = torch.abs(original_output - cf_output).detach().cpu()
+                cf_output = torch.sigmoid(logits_cf)
+                original_output = torch.sigmoid(logits)
+                mad = torch.abs(original_output - cf_output).detach().cpu()
 
-            # dists
-            I_f = (I.to(dtype=torch.float) / 255).view(I.size(0), -1)
-            cf_f = (cf.to(dtype=torch.float) / 255).view(I.size(0), -1)
-            l_1 = (I_f - cf_f).abs().mean(dim=1).detach().cpu()
+                # dists
+                I_f = (I.to(dtype=torch.float) / 255).view(I.size(0), -1)
+                cf_f = (cf.to(dtype=torch.float) / 255).view(I.size(0), -1)
+                l_1 = (I_f - cf_f).abs().mean(dim=1).detach().cpu()
 
-            stats["l_1"].append(l_1)
-            stats["n"] += I.size(0)
-            stats["bkl"].append(bkl)
-            stats["mad"].append(mad)
-            stats["flipped"] += (pred_cf == target).sum().item()
-            stats["cf pred"].append(pred_cf.detach().cpu())
-            stats["target"].append(target.detach().cpu())
-            stats["label"].append(lab.detach().cpu())
-            stats["pred"].append(pred.detach().cpu())
+                stats["l_1"].append(l_1)
+                stats["n"] += I.size(0)
+                stats["bkl"].append(bkl)
+                stats["mad"].append(mad)
+                stats["flipped"] += (pred_cf == target).sum().item()
+                stats["cf pred"].append(pred_cf.detach().cpu())
+                stats["target"].append(target.detach().cpu())
+                stats["label"].append(lab.detach().cpu())
+                stats["pred"].append(pred.detach().cpu())
 
-        counterfactuals.append(cf.detach().numpy())
+
         if args.save_images:
             if "Shortcut" not in args.dataset:
                 save_imgs(

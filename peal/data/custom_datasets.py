@@ -626,3 +626,8 @@ class WaterbirdsDataset(Image2MixedDataset):
             print('Downloading, extracting and positioning of files completed!')
 
         super(WaterbirdsDataset, self).__init__(config=config, **kwargs)
+
+
+class CelebADataset(Image2MixedDataset):
+    def __init__(self, config, **kwargs):
+        super(CelebADataset, self).__init__(config=config, **kwargs)

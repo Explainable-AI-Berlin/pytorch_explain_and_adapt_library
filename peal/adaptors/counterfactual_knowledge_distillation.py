@@ -480,6 +480,12 @@ class CFKD(Adaptor):
                 * explainer_config.num_discretization_steps
             )
 
+        elif (
+            hasattr(explainer_config, "timestep_respacing")
+            and not explainer_config.timestep_respacing is None
+        ):
+            timestep_respacing = explainer_config.timestep_respacing
+
         else:
             timestep_respacing = None
 
@@ -1714,15 +1720,15 @@ class CFKD(Adaptor):
             self.explainer.explainer_config = original_explainer_config
             if self.adaptor_config.validation_runs > 1:
                 self.datastack.dataset._initialize_performance_metrics()
-                validation_stats[
-                    "distance_to_manifold"
-                ] = self.datastack.dataset.distribution_distance(
-                    x_counterfactual_collection
+                validation_stats["distance_to_manifold"] = (
+                    self.datastack.dataset.distribution_distance(
+                        x_counterfactual_collection
+                    )
                 )
-                validation_stats[
-                    "pairwise_distance"
-                ] = self.datastack.dataset.pair_wise_distance(
-                    x_list_collection, x_counterfactual_collection
+                validation_stats["pairwise_distance"] = (
+                    self.datastack.dataset.pair_wise_distance(
+                        x_list_collection, x_counterfactual_collection
+                    )
                 )
                 validation_stats["diversity"] = self.datastack.dataset.variance(
                     x_counterfactual_collection

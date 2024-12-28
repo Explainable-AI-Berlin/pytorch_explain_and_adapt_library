@@ -1,6 +1,8 @@
 explainer_type : ACE
 category : explainer
 subtype: FastDiME
+method: fastdime
+num_attempts: 2
 attention_resolutions: 32,16,8
 batch_size: 10
 channel_mult: ''
@@ -25,7 +27,6 @@ l_perc_layer: 18
 learn_sigma: true
 masking_threshold: 0.15
 merge_and_eval: false
-method: fastdime
 model_path: /scratch/ppar/models/ddpm-celeba.pt
 n_samples: 1000
 noise_schedule: linear
