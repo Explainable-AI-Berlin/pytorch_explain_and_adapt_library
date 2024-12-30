@@ -1060,16 +1060,20 @@ class CounterfactualExplainer(ExplainerInterface):
             batch_out = batch
 
         if self.tracking_level > 0:
-            (
-                batch_out["x_attribution_list"],
-                batch_out["collage_path_list"],
-            ) = self.predictor_datasets[1].generate_contrastive_collage(
-                target_confidence_goal=target_confidence_goal,
-                base_path=base_path,
-                predictor=self.predictor,
-                start_idx=start_idx * self.explainer_config.num_attempts,
-                **batch_out,
-            )
+            try:
+                (
+                    batch_out["x_attribution_list"],
+                    batch_out["collage_path_list"],
+                ) = self.predictor_datasets[1].generate_contrastive_collage(
+                    target_confidence_goal=target_confidence_goal,
+                    base_path=base_path,
+                    predictor=self.predictor,
+                    start_idx=start_idx * self.explainer_config.num_attempts,
+                    **batch_out,
+                )
+
+            except Exception:
+                import pdb; pdb.set_trace()
 
         else:
             x_attribution_list = []

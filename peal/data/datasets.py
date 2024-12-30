@@ -295,9 +295,6 @@ class ImageDataset(PealDataset):
         Args:
             generator (Generator): The generator
         """
-        if True:
-            return {"fid": 0.0}
-
         if batch_size is None:
             if hasattr(generator, "config"):
                 batch_size = generator.config.batch_size

@@ -22,6 +22,7 @@ from peal.data.datasets import (
 from peal.data.interfaces import DataConfig
 from peal.global_utils import embed_numberstring
 from peal.data.dataset_generators import latent_to_square_image
+from peal.dependencies.FastDiME_CelebA.eval_utils.oracle_metrics import OracleMetrics
 
 
 class MnistDataset(Image2ClassDataset):
@@ -415,6 +416,11 @@ class SquareDataset(Image2MixedDataset):
         intensity_background = torch.sum((1 - hint) * x) / torch.sum(1 - hint)
         return intensity_background
 
+    def sample_to_latent(self, x, hint):
+        return torch.tensor(
+            [self.check_foreground(x, hint), self.check_background(x, hint)]
+        )
+
     def generate_contrastive_collage(
         self,
         x_list: list,
@@ -584,7 +590,11 @@ class WaterbirdsDataset(Image2MixedDataset):
                     print("segmentations extracted")
 
             if os.path.exists(
-                os.path.join(download_path, "waterbird_complete95_forest2water2", "200.Common_Yellowthroat")
+                os.path.join(
+                    download_path,
+                    "waterbird_complete95_forest2water2",
+                    "200.Common_Yellowthroat",
+                )
             ):
                 print("Found waterbirds folder. Skipping downloading.")
 
@@ -623,7 +633,7 @@ class WaterbirdsDataset(Image2MixedDataset):
                 os.path.join(config.dataset_path, "imgs_filename", "metadata.csv"),
                 os.path.join(config.dataset_path, "data.csv"),
             )
-            print('Downloading, extracting and positioning of files completed!')
+            print("Downloading, extracting and positioning of files completed!")
 
         super(WaterbirdsDataset, self).__init__(config=config, **kwargs)
 
@@ -631,3 +641,22 @@ class WaterbirdsDataset(Image2MixedDataset):
 class CelebADataset(Image2MixedDataset):
     def __init__(self, config, **kwargs):
         super(CelebADataset, self).__init__(config=config, **kwargs)
+        # these weights have to be downloaded and placed from the ACE repository manually
+        ORACLEPATH = "pretrained_models/oracle.pth"
+        if os.path.exists():
+            self.oracle = OracleMetrics(weights_path=ORACLEPATH)
+            self.oracle.eval()
+
+    def sample_to_latent(self, sample, mask=None):
+        self.oracle.oracle.to(sample.device)
+        sample_inflated = False
+        if not len(sample.shape) == 3:
+            sample_inflated = True
+            sample = sample.unsqueeze(0)
+
+        latent = self.oracle.oracle(sample)
+
+        if sample_inflated:
+            latent = latent[0]
+
+        return latent

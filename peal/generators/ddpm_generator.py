@@ -445,11 +445,11 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         args = SimpleNamespace(**args)
         args.output_path = self.counterfactual_path
         args.batch_size = x_in.shape[0]
-        if args.l_perc != 0:
+        if explainer_config.l_perc != 0:
             if self.vggloss is None:
                 print("Loading VGG loss!")
                 self.vggloss = PerceptualLoss(
-                    layer=args.l_perc_layer, c=args.l_perc
+                    layer=explainer_config.l_perc_layer, c=explainer_config.l_perc
                 ).to(self.device)
                 self.vggloss.eval()
 
@@ -594,7 +594,7 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
                 y_target_end_confidence = torch.cat(
                     [y_target_end_confidence, y_target_end_confidence_current], 0
                 )
-                x_in_out = torch.cat([x_in_out, x_in], 0)
+                x_in_out = torch.cat([x_in_out, torch.clone(x_in)], 0)
                 """for i in range(x_in.shape[0]):
                     if y_target_end_confidence[i] < 0.51:
                         x_counterfactuals[i] = x_counterfactuals_current[i]
@@ -610,6 +610,6 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
             list(x_counterfactuals),
             list(x_in_out - x_counterfactuals),
             list(y_target_end_confidence),
-            list(x_in_out),
+            list(x_in),
             list(histories),
         )

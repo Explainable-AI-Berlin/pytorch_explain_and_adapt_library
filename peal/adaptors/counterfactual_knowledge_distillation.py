@@ -1254,6 +1254,70 @@ class CFKD(Adaptor):
             feedback_stats["feedback_accuracy_distilled"] = float(fa_1sided_distilled)
             print("feedback_accuracy_distilled: " + str(fa_1sided_distilled))
 
+        if self.adaptor_config.tracking_level >= 3:
+            latent_differences = None
+            if hasattr(self.dataloaders_val[0].dataset, "sample_to_latent"):
+                latents_original = [
+                    self.dataloaders_val[0].dataset.sample_to_latent(e)
+                    for e in tracked_values["x_list"]
+                ]
+                latents_counterfactual = []
+                latents_differences = []
+                for c in range(self.adaptor_config.explainer.num_attempts):
+                    latents_counterfactual.append(
+                        [
+                            self.dataloaders_val[0].dataset.sample_to_latent(e)
+                            for e in tracked_values["x_list"]
+                        ]
+                    )
+                    latents_differences.append(
+                        latents_original[c] - latents_counterfactual[c]
+                    )
+
+            elif "hint_list" in self.tracked_keys:
+                latent_differences = []
+                for c in range(self.adaptor_config.explainer.num_attempts):
+                    x_difference_list = [
+                        tracked_values["x_counterfactual_list"][i]
+                        - tracked_values["x_list"][i]
+                        for i in range(len(tracked_values["x_list"]))
+                    ]
+                    foreground_change = [
+                        torch.sum(
+                            torch.abs(x_difference_list[i] * tracked_values["hints"][i])
+                            / torch.sum(tracked_values["hints"][i])
+                        )
+                        for i in range(len(tracked_values["hints"]))
+                    ]
+                    background_change = [
+                        torch.sum(
+                            torch.abs(
+                                x_difference_list[i]
+                                * torch.abs(1 - tracked_values["hints"][i])
+                            )
+                            / torch.sum(torch.abs(1 - tracked_values["hints"][i]))
+                        )
+                        for i in range(len(tracked_values["hints"]))
+                    ]
+                    latent_differences.append(
+                        torch.tensor([foreground_change, background_change])
+                    )
+
+            if not latent_differences is None:
+                latent_differences_lmax_through_l1 = torch.mean(torch.tensor([
+                    latent_differences[0][i].abs().max()
+                    / latent_differences[0][i].abs().mean()
+                    for i in range(len(latent_differences[0]))
+                ]))
+                feedback_stats["lmax_through_l1"] = float(latent_differences_lmax_through_l1)
+                print("flip_rate_distilled: " + str(latent_differences_lmax_through_l1))
+                latent_differences_variance = torch.mean(torch.tensor([
+                    torch.norm(latent_differences[1][i] - latent_differences[0][i])
+                    for i in range(len(latent_differences[0]))
+                ]))
+                feedback_stats["latent_differences_variance"] = float(latent_differences_variance)
+                print("latent_differences_variance: " + str(latent_differences_variance))
+
         return feedback, feedback_stats
 
     def create_dataset(
@@ -1265,7 +1329,7 @@ class CFKD(Adaptor):
         finetune_iteration,
         hint_list=None,
         mode="",
-        **args,
+        **kwargs,
     ):
         assert (
             len(x_counterfactual_list)
