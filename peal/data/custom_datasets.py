@@ -643,14 +643,14 @@ class CelebADataset(Image2MixedDataset):
         super(CelebADataset, self).__init__(config=config, **kwargs)
         # these weights have to be downloaded and placed from the ACE repository manually
         ORACLEPATH = "pretrained_models/oracle.pth"
-        if os.path.exists():
-            self.oracle = OracleMetrics(weights_path=ORACLEPATH)
+        if os.path.exists(ORACLEPATH):
+            self.oracle = OracleMetrics(weights_path=ORACLEPATH, device="cpu")
             self.oracle.eval()
 
     def sample_to_latent(self, sample, mask=None):
         self.oracle.oracle.to(sample.device)
         sample_inflated = False
-        if not len(sample.shape) == 3:
+        if not len(sample.shape) == 4:
             sample_inflated = True
             sample = sample.unsqueeze(0)
 

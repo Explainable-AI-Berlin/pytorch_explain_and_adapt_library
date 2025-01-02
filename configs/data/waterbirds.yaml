@@ -6,6 +6,6 @@ input_size              : [3, 128, 128]
 output_type             : multiclass
 output_size             : [2]
 confounding_factors     : [y, place]
-img_name_idx            : 1
 has_hints               : True
 invariances             : ["hflipping", "rotation10", "random_resize10"]
+x_selection             : img_filename

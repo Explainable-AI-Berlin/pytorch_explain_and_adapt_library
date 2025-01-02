@@ -1073,7 +1073,9 @@ class CounterfactualExplainer(ExplainerInterface):
                 )
 
             except Exception:
-                import pdb; pdb.set_trace()
+                import pdb
+
+                pdb.set_trace()
 
         else:
             x_attribution_list = []
@@ -1113,13 +1115,6 @@ class CounterfactualExplainer(ExplainerInterface):
 
             explanations_list_by_source[cluster_counter].append(explanations_list[i])
             batch_counter += 1
-
-        """# TODO very hacky! should this better be done with hooks?
-        submodules = list(self.predictor.children())
-        while len(submodules) == 1:
-            submodules = list(submodules[0].children())
-
-        feature_extractor = nn.Sequential(*submodules[:-1])"""
 
         def extract_feature_difference(explanations):
             difference_list = []
@@ -1231,34 +1226,137 @@ class CounterfactualExplainer(ExplainerInterface):
 
             cluster_dicts.append(cluster_dict)
 
-        if self.explainer_config.merge_clusters == "select_best":
-            cluster_scores = []
-            for cluster_idx in range(len(cluster_dicts)):
-                sample_scores = []
-                for sample_idx in range(len(cluster_dicts[cluster_idx]["x_list"])):
-                    sample_scores.append(
-                        cluster_dicts[cluster_idx]["y_target_end_confidence_list"][
-                            sample_idx
+        cluster_scores = []
+        for cluster_idx in range(len(cluster_dicts)):
+            sample_scores = []
+            for sample_idx in range(len(cluster_dicts[cluster_idx]["x_list"])):
+                sample_scores.append(
+                    cluster_dicts[cluster_idx]["y_target_end_confidence_list"][
+                        sample_idx
+                    ]
+                )
+
+            cluster_scores.append(torch.mean(torch.tensor(sample_scores)))
+
+        try:
+            sorted_cluster_idxs = torch.tensor(cluster_scores).argsort()
+            sorted_cluster_idxs = [int(sorted_cluster_idxs[-1-i]) for i in range(self.explainer_config.num_attempts)]
+
+        except Exception:
+            import pdb; pdb.set_trace()
+
+        explanations_dict_out = cluster_dicts[sorted_cluster_idxs[0]]
+
+        if self.explainer_config.merge_clusters == "concatenate":
+            for key in cluster_dicts[0].keys():
+                for cluster_idx in range(1, len(cluster_dicts)):
+                    explanations_dict_out[key] += cluster_dicts[cluster_idx][key]
+
+        for i in range(len(sorted_cluster_idxs)):
+            explanations_dict_out["clusters" + str(i)] = cluster_dicts[
+                sorted_cluster_idxs[i]
+            ]["x_counterfactual_list"]
+
+        return explanations_dict_out
+
+    def calculate_latent_difference_stats(self, explanations_dict):
+        tracked_stats = {}
+        if self.explainer_config.tracking_level >= 3:
+            latent_differences = None
+            if hasattr(self.predictor_datasets[1], "sample_to_latent"):
+                latents_original = [
+                    self.predictor_datasets[1].sample_to_latent(e.to(self.device)).cpu()
+                    for e in explanations_dict["x_list"][:len(explanations_dict["clusters0"])]
+                ]
+                latents_counterfactual = []
+                latent_differences = []
+                for c in range(self.explainer_config.num_attempts):
+                    latents_counterfactual.append(
+                        [
+                            self.predictor_datasets[1].sample_to_latent(e.to(self.device)).cpu()
+                            for e in explanations_dict["clusters" + str(c)]
+                        ]
+                    )
+                    latent_differences.append(
+                        [
+                            latents_counterfactual[c][i] - latents_original[i]
+                            for i in range(len(latents_original))
                         ]
                     )
 
-                cluster_scores.append(torch.mean(torch.tensor(sample_scores)))
+            elif "hint_list" in explanations_dict.keys():
+                latent_differences = []
+                for c in range(self.explainer_config.num_attempts):
+                    x_difference_list = [
+                        explanations_dict["clusters" + str(c)][i]
+                        - explanations_dict["x_list"][i]
+                        for i in range(len(explanations_dict["clusters0"]))
+                    ]
+                    foreground_change = [
+                        torch.sum(
+                            torch.abs(
+                                x_difference_list[i] * explanations_dict["hint_list"][i]
+                            )
+                            / torch.sum(explanations_dict["hint_list"][i])
+                        )
+                        for i in range(len(explanations_dict["hint_list"]))
+                    ]
+                    background_change = [
+                        torch.sum(
+                            torch.abs(
+                                x_difference_list[i]
+                                * torch.abs(1 - explanations_dict["hint_list"][i])
+                            )
+                            / torch.sum(torch.abs(1 - explanations_dict["hint_list"][i]))
+                        )
+                        for i in range(len(explanations_dict["hint_list"]))
+                    ]
+                    latent_differences.append(
+                        torch.tensor([foreground_change, background_change])
+                    )
 
-            cluster_scores = torch.tensor(cluster_scores)
-            best_cluster_idx = torch.argmax(cluster_scores)
-            explanations_dict_out = cluster_dicts[best_cluster_idx]
+            if not latent_differences is None:
+                latent_differences_l1_through_lmax = 1.0 - float(
+                    torch.mean(
+                        torch.tensor(
+                            [
+                                latent_differences[0][i].abs().mean()
+                                / latent_differences[0][i].abs().max()
+                                for i in range(len(latent_differences[0]))
+                            ]
+                        )
+                    )
+                )
+                tracked_stats["latent_differences_l1_through_lmax"] = (
+                    latent_differences_l1_through_lmax
+                )
+                print(
+                    "latent_differences_l1_through_lmax: "
+                    + str(latent_differences_l1_through_lmax)
+                )
+                if self.explainer_config.num_attempts >= 2:
+                    latent_differences_variance = float(
+                        torch.mean(
+                            torch.tensor(
+                                [
+                                    torch.norm(
+                                        latent_differences[1][i]
+                                        - latent_differences[0][i]
+                                    )
+                                    for i in range(len(latent_differences[0]))
+                                ]
+                            )
+                        )
+                    )
+                    tracked_stats["latent_differences_variance"] = (
+                        latent_differences_variance
+                    )
+                    print(
+                        "latent_differences_variance: "
+                        + str(latent_differences_variance)
+                    )
 
-        elif self.explainer_config.merge_clusters == "concatenate":
-            explanations_dict_out = {}
-            for key in cluster_dicts[0].keys():
-                explanations_dict_out[key] = []
-                for cluster_idx in range(len(cluster_dicts)):
-                    explanations_dict_out[key] += cluster_dicts[cluster_idx][key]
-
-        else:
-            raise Exception("Merge cluster method not implemented!")
-
-        return explanations_dict_out
+        return tracked_stats
 
     def run(self, oracle_path=None, confounder_oracle_path=None):
         """
@@ -1307,7 +1405,9 @@ class CounterfactualExplainer(ExplainerInterface):
             y_confidence = torch.nn.Softmax(dim=-1)(
                 y_logits / self.explainer_config.temperature
             )
-            for y_target in range(self.predictor_datasets[1].task_config.output_channels):
+            for y_target in range(
+                self.predictor_datasets[1].task_config.output_channels
+            ):
                 if y_target == y_pred:
                     continue
 

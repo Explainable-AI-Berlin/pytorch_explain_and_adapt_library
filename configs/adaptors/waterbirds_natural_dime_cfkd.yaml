@@ -1,4 +1,4 @@
-# python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/waterbirds_natural_ace_cfkd.yaml"
+# python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/waterbirds_natural_dime_cfkd.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  2
@@ -9,14 +9,14 @@ max_validation_samples               :  100
 continuous_learning                  :  "finetune"
 use_visualization                    :  True
 calculate_group_accuracies           :  True
-explainer                            :  <PEAL_BASE>/configs/explainers/ace_default.yaml
+explainer                            :  <PEAL_BASE>/configs/explainers/dime_default.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/waterbirds.yaml
 test_data                            :  <PEAL_BASE>/configs/data/waterbirds.yaml
 student                              :  $PEAL_RUNS/waterbirds/classifier_natural/model.cpl
 teacher                              :  SegmentationMask
 generator                            :  $PEAL_RUNS/waterbirds/ddpm/config.yaml
-base_dir                             :  $PEAL_RUNS/waterbirds/classifier_natural/ace_cfkd
+base_dir                             :  $PEAL_RUNS/waterbirds/classifier_natural/dime_cfkd
 task:
   criterions:
     ce     : 1.0

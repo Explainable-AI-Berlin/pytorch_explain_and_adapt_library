@@ -435,6 +435,7 @@ class CFKD(Adaptor):
         """
         # TODO make sure to use seeds everywhere!
         self.adaptor_config = load_yaml_config(adaptor_config, AdaptorConfig)
+        self.adaptor_config.explainer.tracking_level = self.adaptor_config.tracking_level
         self.base_dir = (
             base_dir if not base_dir is None else self.adaptor_config.base_dir
         )
@@ -1168,7 +1169,11 @@ class CFKD(Adaptor):
             "feedback_accuracy": fa_1sided,
         }
 
-        if self.adaptor_config.calculate_distilled_flip_rate:
+        if self.adaptor_config.tracking_level >= 3:
+            tracked_stats = self.explainer.calculate_latent_difference_stats(tracked_values)
+            for key in tracked_stats.keys():
+                feedback_stats[key] = tracked_stats[key]
+
             # distill into equivalent model
             predictor_distillation = load_yaml_config(
                 "<PEAL_BASE>/configs/predictors/simple_distillation.yaml",
@@ -1253,70 +1258,6 @@ class CFKD(Adaptor):
 
             feedback_stats["feedback_accuracy_distilled"] = float(fa_1sided_distilled)
             print("feedback_accuracy_distilled: " + str(fa_1sided_distilled))
-
-        if self.adaptor_config.tracking_level >= 3:
-            latent_differences = None
-            if hasattr(self.dataloaders_val[0].dataset, "sample_to_latent"):
-                latents_original = [
-                    self.dataloaders_val[0].dataset.sample_to_latent(e)
-                    for e in tracked_values["x_list"]
-                ]
-                latents_counterfactual = []
-                latents_differences = []
-                for c in range(self.adaptor_config.explainer.num_attempts):
-                    latents_counterfactual.append(
-                        [
-                            self.dataloaders_val[0].dataset.sample_to_latent(e)
-                            for e in tracked_values["x_list"]
-                        ]
-                    )
-                    latents_differences.append(
-                        latents_original[c] - latents_counterfactual[c]
-                    )
-
-            elif "hint_list" in self.tracked_keys:
-                latent_differences = []
-                for c in range(self.adaptor_config.explainer.num_attempts):
-                    x_difference_list = [
-                        tracked_values["x_counterfactual_list"][i]
-                        - tracked_values["x_list"][i]
-                        for i in range(len(tracked_values["x_list"]))
-                    ]
-                    foreground_change = [
-                        torch.sum(
-                            torch.abs(x_difference_list[i] * tracked_values["hints"][i])
-                            / torch.sum(tracked_values["hints"][i])
-                        )
-                        for i in range(len(tracked_values["hints"]))
-                    ]
-                    background_change = [
-                        torch.sum(
-                            torch.abs(
-                                x_difference_list[i]
-                                * torch.abs(1 - tracked_values["hints"][i])
-                            )
-                            / torch.sum(torch.abs(1 - tracked_values["hints"][i]))
-                        )
-                        for i in range(len(tracked_values["hints"]))
-                    ]
-                    latent_differences.append(
-                        torch.tensor([foreground_change, background_change])
-                    )
-
-            if not latent_differences is None:
-                latent_differences_lmax_through_l1 = torch.mean(torch.tensor([
-                    latent_differences[0][i].abs().max()
-                    / latent_differences[0][i].abs().mean()
-                    for i in range(len(latent_differences[0]))
-                ]))
-                feedback_stats["lmax_through_l1"] = float(latent_differences_lmax_through_l1)
-                print("flip_rate_distilled: " + str(latent_differences_lmax_through_l1))
-                latent_differences_variance = torch.mean(torch.tensor([
-                    torch.norm(latent_differences[1][i] - latent_differences[0][i])
-                    for i in range(len(latent_differences[0]))
-                ]))
-                feedback_stats["latent_differences_variance"] = float(latent_differences_variance)
-                print("latent_differences_variance: " + str(latent_differences_variance))
 
         return feedback, feedback_stats
 
@@ -1782,24 +1723,6 @@ class CFKD(Adaptor):
                 for key in validation_stats[0].keys()
             }
             self.explainer.explainer_config = original_explainer_config
-            if self.adaptor_config.validation_runs > 1:
-                self.datastack.dataset._initialize_performance_metrics()
-                validation_stats["distance_to_manifold"] = (
-                    self.datastack.dataset.distribution_distance(
-                        x_counterfactual_collection
-                    )
-                )
-                validation_stats["pairwise_distance"] = (
-                    self.datastack.dataset.pair_wise_distance(
-                        x_list_collection, x_counterfactual_collection
-                    )
-                )
-                validation_stats["diversity"] = self.datastack.dataset.variance(
-                    x_counterfactual_collection
-                )
-                validation_stats["validity"] = self.datastack.dataset.flip_rate(
-                    y_confidence_list
-                )
 
             if self.adaptor_config.tracking_level > 0:
                 os.makedirs(

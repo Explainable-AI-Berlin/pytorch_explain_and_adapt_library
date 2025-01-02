@@ -3,6 +3,7 @@ category : explainer
 subtype: FastDiME
 method: dime
 num_attempts: 2
+use_clustering: true
 attention_resolutions: 32,16,8
 batch_size: 50
 channel_mult: ''

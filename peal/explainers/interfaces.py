@@ -50,6 +50,10 @@ class ExplainerConfig(BaseModel):
     """
     use_clustering: bool = False
     """
+    How to merge clusters of explanations?
+    """
+    merge_clusters: str = "best"
+    """
     The number of counterfactuals created for the same sample.
     """
     num_attempts: int = 1
