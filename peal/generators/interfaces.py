@@ -27,6 +27,7 @@ class GeneratorConfig(BaseModel):
     The name of the class.
     """
     current_fid: float = float('inf')
+    seed: int = 0
 
 class Generator(nn.Module):
     def sample_x(self, batch_size=1):

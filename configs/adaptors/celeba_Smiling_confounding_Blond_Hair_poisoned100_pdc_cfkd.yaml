@@ -10,7 +10,7 @@ continuous_learning                  :  "retrain"
 replace_model                        :  True
 use_visualization                    :  True
 calculate_group_accuracies           :  True
-explainer                            :  <PEAL_BASE>/configs/explainers/square_pdc_minimal.yaml
+explainer                            :  <PEAL_BASE>/configs/explainers/pdc_sparse.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/celeba_Smiling_confounding_Blond_Hair_poisoned100.yaml
 test_data                            :  <PEAL_BASE>/configs/data/celeba.yaml

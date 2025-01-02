@@ -12,8 +12,8 @@ use_visualization                    :  True
 calculate_group_accuracies           :  True
 explainer                            : <PEAL_BASE>/configs/explainers/Young_vs_Smiling_pdc.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
-data                                 :  <PEAL_BASE>/configs/data/Male_confounding_Blond_Hair_celeba_natural.yaml
-test_data                            :  <PEAL_BASE>/configs/data/Male_confounding_Blond_Hair_celeba_natural.yaml
+data                                 :  <PEAL_BASE>/configs/data/celeba_Male_confounding_Blond_Hair_natural.yaml
+test_data                            :  <PEAL_BASE>/configs/data/celeba_Male_confounding_Blond_Hair_natural.yaml
 student                              :  $PEAL_RUNS/celeba/Male_confounding_Blond_Hair/unregularized0/classifier_natural/model.cpl
 teacher                              :  human@8000
 generator                            :  $PEAL_RUNS/celeba/ddpm/config.yaml

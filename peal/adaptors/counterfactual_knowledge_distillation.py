@@ -29,7 +29,12 @@ from peal.data.dataloaders import (
     DataloaderMixer,
     create_dataloaders_from_datasource,
 )
-from peal.training.trainers import ModelTrainer, calculate_test_accuracy
+from peal.training.trainers import (
+    ModelTrainer,
+    calculate_test_accuracy,
+    distill_predictor,
+    PredictorConfig,
+)
 from peal.explainers.counterfactual_explainer import (
     CounterfactualExplainer,
     PerfectFalseCounterfactualConfig,
@@ -154,7 +159,7 @@ class CFKDConfig(AdaptorConfig):
     """
     The attribution threshold.
     """
-    attribution_threshold: float = 0.001
+    attribution_threshold: float = 0.0
     """
     What batch_size is used for creating the counterfactuals?
     If use_confusion_matrix is deativated always use an even batch_size!!!
@@ -192,6 +197,7 @@ class CFKDConfig(AdaptorConfig):
     How aggressively to change the model based on the counterfactual samples. 0 -> No change, 1 -> Full change
     """
     mixing_ratio: float = 0.5
+    calculate_distilled_flip_rate: bool = True
     """
     What level of tracking is used.
     """
@@ -237,6 +243,7 @@ class CFKDConfig(AdaptorConfig):
         counterfactual_type: str = None,
         max_test_batches: Union[type(None), PositiveInt] = None,
         mixing_ratio: float = None,
+        calculate_distilled_flip_rate: bool = None,
         **kwargs,
     ):
         """
@@ -396,6 +403,11 @@ class CFKDConfig(AdaptorConfig):
             counterfactual_type
             if not counterfactual_type is None
             else self.counterfactual_type
+        )
+        self.calculate_distilled_flip_rate = (
+            calculate_distilled_flip_rate
+            if not calculate_distilled_flip_rate is None
+            else self.calculate_distilled_flip_rate
         )
         self.kwargs = kwargs
 
@@ -1148,14 +1160,6 @@ class CFKD(Adaptor):
             feedback
         )
 
-        """num_true_2sided = len(list(filter(lambda sample: sample == "true", feedback)))
-        num_false_2sided = len(list(filter(lambda sample: sample == "false", feedback)))
-        if num_true_2sided == 0:
-            fa_2sided = 0
-
-        else:
-            fa_2sided = num_true_2sided / (num_true_2sided + num_false_2sided)"""
-
         num_true_1sided = len(
             list(
                 filter(
@@ -1182,13 +1186,97 @@ class CFKD(Adaptor):
         else:
             fa_1sided = -1
 
-        fa_absolute = num_true_1sided / num_samples
-
         feedback_stats = {
             "flip_rate": flip_rate,
             "ood_rate": ood_rate,
             "feedback_accuracy": fa_1sided,
         }
+
+        if self.adaptor_config.calculate_distilled_flip_rate:
+            # distill into equivalent model
+            predictor_distillation = load_yaml_config(
+                "<PEAL_BASE>/configs/predictors/simple_distillation.yaml",
+                PredictorConfig,
+            )
+            distillation_path = os.path.join(
+                self.base_dir, str(finetune_iteration), "distilled_predictor"
+            )
+            distilled_predictor_final = os.path.join(
+                distillation_path, "distilled_predictor", "model.cpl"
+            )
+            if not os.path.exists(distilled_predictor_final):
+                distilled_predictor = distill_predictor(
+                    predictor_distillation,
+                    distillation_path,
+                    self.student,
+                    [self.train_dataloader.dataset, self.val_dataloader.dataset],
+                )
+
+            else:
+                distilled_predictor = torch.load(
+                    distilled_predictor_final, map_location=self.device
+                )
+
+            # add y_target_end_confidence_distilled_list
+            tracked_values["y_target_end_confidence_distilled_list"] = []
+            for idx in range(len(tracked_values["x_counterfactual_list"])):
+                x = tracked_values["x_counterfactual_list"][idx]
+                y = tracked_values["y_target_list"][idx]
+                y_target_end_confidence = (
+                    distilled_predictor(x.to(self.device).unsqueeze(0))
+                    .squeeze(0)
+                    .detach()
+                    .cpu()[y]
+                )
+                tracked_values["y_target_end_confidence_distilled_list"].append(
+                    y_target_end_confidence
+                )
+
+            # calculate distilled flip rate
+            flip_rate_distilled = len(
+                list(
+                    filter(
+                        lambda x: x > 0.5,
+                        tracked_values["y_target_end_confidence_distilled_list"],
+                    )
+                )
+            ) / len(tracked_values["y_target_end_confidence_distilled_list"])
+            feedback_stats["flip_rate_distilled"] = float(flip_rate_distilled)
+            print("flip_rate_distilled: " + str(flip_rate_distilled))
+            num_true_1sided_distilled = len(
+                list(
+                    filter(
+                        lambda idx: feedback[idx] == "true"
+                        and tracked_values["y_target_end_confidence_distilled_list"][
+                            idx
+                        ]
+                        > 0.5,
+                        range(len(feedback)),
+                    )
+                )
+            )
+            num_false_1sided_distilled = len(
+                list(
+                    filter(
+                        lambda idx: feedback[idx] == "false"
+                        and tracked_values["y_target_end_confidence_distilled_list"][
+                            idx
+                        ]
+                        > 0.5,
+                        range(len(feedback)),
+                    )
+                )
+            )
+            if num_true_1sided_distilled + num_false_1sided_distilled > 0:
+                fa_1sided_distilled = num_true_1sided_distilled / (
+                    num_true_1sided_distilled + num_false_1sided_distilled
+                )
+
+            else:
+                fa_1sided_distilled = -1
+
+            feedback_stats["feedback_accuracy_distilled"] = float(fa_1sided_distilled)
+            print("feedback_accuracy_distilled: " + str(fa_1sided_distilled))
 
         return feedback, feedback_stats
 
@@ -1198,9 +1286,8 @@ class CFKD(Adaptor):
         feedback,
         y_source_list,
         y_target_list,
-        y_list,
         finetune_iteration,
-        config,
+        hint_list=None,
         mode="",
         **args,
     ):
@@ -1218,6 +1305,7 @@ class CFKD(Adaptor):
             return dataset_dir
         #
         x_list = []
+        hint_list_dataset = []
         y_counterfactual_list = []
         sample_names = []
         for sample_idx in range(len(feedback)):
@@ -1231,6 +1319,9 @@ class CFKD(Adaptor):
                     + str(sample_idx)
                 )
                 x_list.append(x_counterfactual_list[sample_idx])
+                if not hint_list is None:
+                    hint_list_dataset.append(hint_list[sample_idx])
+
                 y_counterfactual_list.append(int(y_target_list[sample_idx]))
                 sample_names.append(sample_name)
                 sample_idx += 1
@@ -1245,6 +1336,9 @@ class CFKD(Adaptor):
                     + str(sample_idx)
                 )
                 x_list.append(x_counterfactual_list[sample_idx])
+                if not hint_list is None:
+                    hint_list_dataset.append(hint_list[sample_idx])
+
                 y_counterfactual_list.append(int(y_source_list[sample_idx]))
 
                 sample_names.append(sample_name)
@@ -1254,6 +1348,7 @@ class CFKD(Adaptor):
             output_dir=dataset_dir,
             x_list=x_list,
             y_list=y_counterfactual_list,
+            hint_list=hint_list_dataset,
             sample_names=sample_names,
             classifier=self.student,
         )
@@ -1769,28 +1864,36 @@ class CFKD(Adaptor):
                 )
             )
 
-        validation_feedback, validation_feedback_stats = self.retrieve_feedback(
-            tracked_values=validation_tracked_values,
-            finetune_iteration=finetune_iteration,
-            mode="validation",
-        )
+        if self.adaptor_config.explainer.use_clustering:
+            validation_tracked_values = self.explainer.cluster_explanations(
+                validation_tracked_values,
+                self.adaptor_config.batch_size,
+                self.adaptor_config.explainer.num_attempts,
+            )
 
         if hasattr(
             self.dataloaders_val[0].dataset, "global_counterfactual_visualization"
         ):
             self.dataloaders_val[0].dataset.global_counterfactual_visualization(
-                validation_tracked_values["x_counterfactual_list"],
                 os.path.join(
                     self.base_dir,
                     str(finetune_iteration),
                     "val_counterfactuals_global.png",
                 ),
-                self.adaptor_config.max_validation_samples,
+                validation_tracked_values["x_list"],
+                validation_tracked_values["x_counterfactual_list"],
                 validation_tracked_values["y_target_start_confidence_list"],
                 validation_tracked_values["y_target_end_confidence_list"],
                 validation_tracked_values["y_target_list"],
+                validation_tracked_values["hint_list"],
             )
             print("global counterfactual visualization saved!!!")
+
+        validation_feedback, validation_feedback_stats = self.retrieve_feedback(
+            tracked_values=validation_tracked_values,
+            finetune_iteration=finetune_iteration,
+            mode="validation",
+        )
 
         self.create_dataset(
             feedback=validation_feedback,

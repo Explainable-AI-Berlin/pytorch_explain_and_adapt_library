@@ -16,6 +16,8 @@ from typing import Union
 
 from peal.generators.interfaces import EditCapableGenerator, InvertibleGenerator
 from peal.global_utils import load_yaml_config, generate_smooth_mask
+from peal.dependencies.DiME.main import main as dime_main
+from peal.dependencies.FastDiME_CelebA.main import main as fastdime_main
 from peal.dependencies.ace.run_ace import main as ace_main
 from peal.dependencies.ace.guided_diffusion import logger
 from peal.dependencies.ace.guided_diffusion.resample import (
@@ -78,8 +80,8 @@ class DDPMConfig(GeneratorConfig):
     microbatch: int = -1  # -1 disables microbatches
     ema_rate: str = "0.9999"  # comma-separated list of EMA values
     log_interval: int = 10
-    save_interval: int = 10000
-    max_steps: int = 1000000
+    save_interval: int = 1000
+    max_steps: int = 10000
     resume_checkpoint: str = ""
     fp16_scale_growth: float = 1e-3
     output_path: str = "peal_runs/ddpm/outputs"
@@ -97,7 +99,6 @@ class DDPMConfig(GeneratorConfig):
     x_selection: Union[list, type(None)] = None
     is_trained: bool = False
     best_fid: float = 1e9
-    is_loaded: bool = False
 
 
 def load_state_dict(path, **kwargs):
@@ -415,7 +416,7 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
             )
             if not os.path.exists(distilled_path):
                 gradient_predictor = distill_predictor(
-                    explainer_config, base_path, predictor, predictor_datasets
+                    explainer_config.distilled_predictor, base_path, predictor, predictor_datasets
                 )
 
             else:
@@ -534,7 +535,15 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
             args.diffusion = self.diffusion
             args.model = self.model
             #
-            x_counterfactuals_current, histories = ace_main(args=args)
+            if args.subtype == "DiME":
+                x_counterfactuals_current, histories = dime_main(args=args)
+
+            elif args.subtype == "ACE":
+                x_counterfactuals_current, histories = ace_main(args=args)
+
+            elif args.subtype == "FastDiME":
+                x_counterfactuals_current, histories = fastdime_main(args=args)
+
             x_counterfactuals_current = torch.cat(x_counterfactuals_current, dim=0)
 
             device = [p for p in predictor.parameters()][0].device

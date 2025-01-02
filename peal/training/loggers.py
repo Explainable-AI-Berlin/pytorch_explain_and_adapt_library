@@ -148,7 +148,13 @@ class Logger:
         if len(
             set(["ce", "bce"]).intersection(self.config.task.criterions.keys())
         ) >= 1 and not isinstance(self.model, InvertibleGenerator):
-            accuracy = torch.cat(self.correct).mean().item()
+            try:
+                accuracy = torch.cat(self.correct).mean().item()
+
+            except Exception:
+                import pdb
+
+                pdb.set_trace()
             self.writer.add_scalar(
                 "epoch_" + mode + "_accuracy",
                 accuracy,
