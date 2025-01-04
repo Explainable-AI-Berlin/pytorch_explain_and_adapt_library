@@ -418,7 +418,7 @@ class SquareDataset(Image2MixedDataset):
 
     def sample_to_latent(self, x, hint):
         return torch.tensor(
-            [self.check_foreground(x, hint), self.check_background(x, hint)]
+            [self.check_foreground(x.to(hint), hint), self.check_background(x.to(hint), hint)]
         )
 
     def generate_contrastive_collage(
@@ -654,7 +654,7 @@ class CelebADataset(Image2MixedDataset):
             sample_inflated = True
             sample = sample.unsqueeze(0)
 
-        latent = self.oracle.oracle(sample)
+        latent = self.oracle.oracle(sample)[1]
 
         if sample_inflated:
             latent = latent[0]

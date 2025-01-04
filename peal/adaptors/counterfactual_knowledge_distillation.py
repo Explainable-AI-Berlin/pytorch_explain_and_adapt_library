@@ -197,11 +197,6 @@ class CFKDConfig(AdaptorConfig):
     """
     mixing_ratio: float = 0.5
     """
-    Whether to also calculate the flip rate for a distilled oracle. Distillation takes some time, but one can realize
-    how reliant on adversarial counterfactuals the model is.
-    """
-    calculate_distilled_flip_rate: bool = True
-    """
     What type of counterfactuals are valid. 1sided means that we can only start from samples with correct prediction,
     2sided also allows that we start from samples with wrong orignal prediction.
     """
@@ -239,7 +234,6 @@ class CFKDConfig(AdaptorConfig):
         counterfactual_type: str = None,
         max_test_batches: Union[type(None), PositiveInt] = None,
         mixing_ratio: float = None,
-        calculate_distilled_flip_rate: bool = None,
         **kwargs,
     ):
         """
@@ -383,11 +377,6 @@ class CFKDConfig(AdaptorConfig):
             counterfactual_type
             if not counterfactual_type is None
             else self.counterfactual_type
-        )
-        self.calculate_distilled_flip_rate = (
-            calculate_distilled_flip_rate
-            if not calculate_distilled_flip_rate is None
-            else self.calculate_distilled_flip_rate
         )
         self.kwargs = kwargs
 
@@ -729,9 +718,6 @@ class CFKD(Adaptor):
 
             else:
                 print("no visualization!!!")
-                import pdb
-
-                pdb.set_trace()
 
         else:
             writer = SummaryWriter(log_dir)
@@ -1168,6 +1154,7 @@ class CFKD(Adaptor):
             "ood_rate": ood_rate,
             "feedback_accuracy": fa_1sided,
         }
+        print("flip_rate: " + str(flip_rate))
 
         if self.adaptor_config.tracking_level >= 3:
             tracked_stats = self.explainer.calculate_latent_difference_stats(tracked_values)

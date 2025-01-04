@@ -1240,10 +1240,15 @@ class CounterfactualExplainer(ExplainerInterface):
 
         try:
             sorted_cluster_idxs = torch.tensor(cluster_scores).argsort()
-            sorted_cluster_idxs = [int(sorted_cluster_idxs[-1-i]) for i in range(self.explainer_config.num_attempts)]
+            sorted_cluster_idxs = [
+                int(sorted_cluster_idxs[-1 - i])
+                for i in range(self.explainer_config.num_attempts)
+            ]
 
         except Exception:
-            import pdb; pdb.set_trace()
+            import pdb
+
+            pdb.set_trace()
 
         explanations_dict_out = cluster_dicts[sorted_cluster_idxs[0]]
 
@@ -1264,17 +1269,39 @@ class CounterfactualExplainer(ExplainerInterface):
         if self.explainer_config.tracking_level >= 3:
             latent_differences = None
             if hasattr(self.predictor_datasets[1], "sample_to_latent"):
-                latents_original = [
-                    self.predictor_datasets[1].sample_to_latent(e.to(self.device)).cpu()
-                    for e in explanations_dict["x_list"][:len(explanations_dict["clusters0"])]
-                ]
+                latents_original = []
+                for i, e in enumerate(
+                    explanations_dict["x_list"][: len(explanations_dict["clusters0"])]
+                ):
+                    hint = (
+                        explanations_dict["hint_list"][i]
+                        if "hint_list" in explanations_dict.keys()
+                        else None
+                    )
+                    latents_original.append(
+                        self.predictor_datasets[1]
+                        .sample_to_latent(e.to(self.device), hint)
+                        .cpu()
+                    )
+
                 latents_counterfactual = []
                 latent_differences = []
                 for c in range(self.explainer_config.num_attempts):
                     latents_counterfactual.append(
                         [
-                            self.predictor_datasets[1].sample_to_latent(e.to(self.device)).cpu()
-                            for e in explanations_dict["clusters" + str(c)]
+                            self.predictor_datasets[1]
+                            .sample_to_latent(
+                                e.to(self.device),
+                                (
+                                    explanations_dict["hint_list"][i]
+                                    if "hint_list" in explanations_dict.keys()
+                                    else None
+                                ),
+                            )
+                            .cpu()
+                            for i, e in enumerate(
+                                explanations_dict["clusters" + str(c)]
+                            )
                         ]
                     )
                     latent_differences.append(
@@ -1307,7 +1334,9 @@ class CounterfactualExplainer(ExplainerInterface):
                                 x_difference_list[i]
                                 * torch.abs(1 - explanations_dict["hint_list"][i])
                             )
-                            / torch.sum(torch.abs(1 - explanations_dict["hint_list"][i]))
+                            / torch.sum(
+                                torch.abs(1 - explanations_dict["hint_list"][i])
+                            )
                         )
                         for i in range(len(explanations_dict["hint_list"]))
                     ]
@@ -1316,45 +1345,36 @@ class CounterfactualExplainer(ExplainerInterface):
                     )
 
             if not latent_differences is None:
-                latent_differences_l1_through_lmax = 1.0 - float(
-                    torch.mean(
-                        torch.tensor(
-                            [
-                                latent_differences[0][i].abs().mean()
-                                / latent_differences[0][i].abs().max()
-                                for i in range(len(latent_differences[0]))
-                            ]
+                latent_sparsities = []
+                for i in range(len(latent_differences[0])):
+                    latent_sparsities.append(
+                        (
+                            latent_differences[0][i].abs().sum()
+                            - latent_differences[0][i].abs().max()
                         )
+                        / (len(latent_differences[0][i]) - 1)
+                        / latent_differences[0][i].abs().max()
                     )
-                )
-                tracked_stats["latent_differences_l1_through_lmax"] = (
-                    latent_differences_l1_through_lmax
-                )
-                print(
-                    "latent_differences_l1_through_lmax: "
-                    + str(latent_differences_l1_through_lmax)
-                )
+
+                latent_sparsity = 1.0 - float(torch.mean(torch.tensor(latent_sparsities)))
+                tracked_stats["latent_sparsity"] = latent_sparsity
+                print("latent_sparsity: " + str(latent_sparsity))
                 if self.explainer_config.num_attempts >= 2:
-                    latent_differences_variance = float(
+                    latent_diversity = 1.0 - float(
                         torch.mean(
                             torch.tensor(
                                 [
-                                    torch.norm(
-                                        latent_differences[1][i]
-                                        - latent_differences[0][i]
+                                    torch.nn.CosineSimilarity(dim=0)(
+                                        latent_differences[1][i],
+                                        latent_differences[0][i],
                                     )
                                     for i in range(len(latent_differences[0]))
                                 ]
                             )
                         )
                     )
-                    tracked_stats["latent_differences_variance"] = (
-                        latent_differences_variance
-                    )
-                    print(
-                        "latent_differences_variance: "
-                        + str(latent_differences_variance)
-                    )
+                    tracked_stats["latent_diversity"] = latent_diversity
+                    print("latent_diversity: " + str(latent_diversity))
 
         return tracked_stats
 

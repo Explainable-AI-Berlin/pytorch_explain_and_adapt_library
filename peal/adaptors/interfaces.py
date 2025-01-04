@@ -1,3 +1,4 @@
+from typing import Union
 
 class Adaptor:
     def run(self):
@@ -23,7 +24,7 @@ class AdaptorConfig:
     """
     The seed of all randomness to make results reproducible.
     """
-    seed: int = 0
+    seed: Union[int, type(None)] = None
     """
     How many intermediate results are cached an visualized.
     Goes from 0 = None over 1 = caching only to 2 = essential visualizations to 3 = all.
