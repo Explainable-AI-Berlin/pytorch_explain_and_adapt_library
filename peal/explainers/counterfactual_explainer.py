@@ -655,7 +655,9 @@ class CounterfactualExplainer(ExplainerInterface):
                 z_encoded, t=self.explainer_config.sampling_time_fraction
             )
             img_default = self.generator.dataset.project_to_pytorch_default(img_decoded)
-            img_default = torch.clamp(img_default, 0, 1)
+            if self.predictor_datasets[1].config.normalization is None:
+                img_default = torch.clamp(img_default, 0, 1)
+
             img_predictor = torchvision.transforms.Resize(
                 self.predictor_datasets[1].config.input_size[1:]
             )(img_default)
@@ -845,6 +847,7 @@ class CounterfactualExplainer(ExplainerInterface):
                         gradients_path, embed_numberstring(i, 4) + ".png"
                     ),
                     boolmask_in=boolmask_in,
+                    project_to_pytorch_default=self.predictor_datasets[1].project_to_pytorch_default,
                 )
 
         if not self.explainer_config.iterationwise_encoding:

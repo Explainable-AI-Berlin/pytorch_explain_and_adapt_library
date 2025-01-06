@@ -698,7 +698,7 @@ def main(args=None):
             if args.save_z_t:
                 z_t_saver(z_t_s, indexes=indexes)
 
-        counterfactuals.append(cf.detach().cpu())
+        counterfactuals.append(torch.clamp(cf.detach().cpu(), 0 , 1))
         if args.save_images:
             with torch.no_grad():
                 logits_cf = classifier(cf)
