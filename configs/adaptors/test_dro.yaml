@@ -1,4 +1,4 @@
 adaptor_type  : "DRO"
 category      : "adaptor"
 predictor     : <PEAL_BASE>/configs/predictors/follicle_cut_classifier.yaml
-max_epochs    : 42
+seed          : 1
