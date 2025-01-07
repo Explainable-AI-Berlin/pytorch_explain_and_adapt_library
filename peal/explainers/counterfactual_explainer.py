@@ -1,4 +1,5 @@
 import copy
+import math
 import os
 import shutil
 import threading
@@ -68,7 +69,7 @@ class PDCConfig(ExplainerConfig):
     """
     The optimizer used for searching the counterfactual
     """
-    optimizer: str = "SGD"
+    optimizer: str = "Adam"
     """
     The learning rate used for finding the counterfactual
     """
@@ -847,7 +848,9 @@ class CounterfactualExplainer(ExplainerInterface):
                         gradients_path, embed_numberstring(i, 4) + ".png"
                     ),
                     boolmask_in=boolmask_in,
-                    project_to_pytorch_default=self.predictor_datasets[1].project_to_pytorch_default,
+                    project_to_pytorch_default=self.predictor_datasets[
+                        1
+                    ].project_to_pytorch_default,
                 )
 
         if not self.explainer_config.iterationwise_encoding:
@@ -1175,17 +1178,24 @@ class CounterfactualExplainer(ExplainerInterface):
                     )
 
             # find the cluster with the highest similarity
+            cosine_similarities_abs = torch.abs(cosine_similarities)
             for i in range(len(cluster_means)):
-                idx_combined = int(
-                    torch.argmax(torch.abs(cosine_similarities.flatten()))
-                )
+                idx_combined = int(torch.argmax(cosine_similarities_abs.flatten()))
                 idx_cluster = idx_combined // len(current_differences)
                 idx_current = idx_combined % len(current_differences)
+                if len(cluster_lists[idx_cluster]) > len(
+                    cluster_lists[abs(1 - idx_cluster)]
+                ):
+                    print("cluster list lengths are not matching!")
+                    import pdb
+
+                    pdb.set_trace()
+
                 cluster_lists[idx_cluster].append(
                     explanations_list_by_source[idx_current][idx]
                 )
-                cosine_similarities[idx_cluster, :] = 0
-                cosine_similarities[:, idx_current] = 0
+                cosine_similarities_abs[idx_cluster, :] = -1
+                cosine_similarities_abs[:, idx_current] = -1
                 # update running mean
                 cluster_means[idx_cluster] = (
                     idx * cluster_means[idx_cluster]
@@ -1241,17 +1251,11 @@ class CounterfactualExplainer(ExplainerInterface):
 
             cluster_scores.append(torch.mean(torch.tensor(sample_scores)))
 
-        try:
-            sorted_cluster_idxs = torch.tensor(cluster_scores).argsort()
-            sorted_cluster_idxs = [
-                int(sorted_cluster_idxs[-1 - i])
-                for i in range(self.explainer_config.num_attempts)
-            ]
-
-        except Exception:
-            import pdb
-
-            pdb.set_trace()
+        sorted_cluster_idxs = torch.tensor(cluster_scores).argsort()
+        sorted_cluster_idxs = [
+            int(sorted_cluster_idxs[-1 - i])
+            for i in range(self.explainer_config.num_attempts)
+        ]
 
         explanations_dict_out = cluster_dicts[sorted_cluster_idxs[0]]
 
@@ -1290,23 +1294,30 @@ class CounterfactualExplainer(ExplainerInterface):
                 latents_counterfactual = []
                 latent_differences = []
                 for c in range(self.explainer_config.num_attempts):
-                    latents_counterfactual.append(
-                        [
-                            self.predictor_datasets[1]
-                            .sample_to_latent(
-                                e.to(self.device),
-                                (
-                                    explanations_dict["hint_list"][i]
-                                    if "hint_list" in explanations_dict.keys()
-                                    else None
-                                ),
-                            )
-                            .cpu()
-                            for i, e in enumerate(
-                                explanations_dict["clusters" + str(c)]
-                            )
-                        ]
-                    )
+                    try:
+                        latents_counterfactual.append(
+                            [
+                                self.predictor_datasets[1]
+                                .sample_to_latent(
+                                    e.to(self.device),
+                                    (
+                                        explanations_dict["hint_list"][i]
+                                        if "hint_list" in explanations_dict.keys()
+                                        else None
+                                    ),
+                                )
+                                .cpu()
+                                for i, e in enumerate(
+                                    explanations_dict["clusters" + str(c)]
+                                )
+                            ]
+                        )
+
+                    except Exception:
+                        import pdb
+
+                        pdb.set_trace()
+
                     latent_differences.append(
                         [
                             latents_counterfactual[c][i] - latents_original[i]
@@ -1350,16 +1361,23 @@ class CounterfactualExplainer(ExplainerInterface):
             if not latent_differences is None:
                 latent_sparsities = []
                 for i in range(len(latent_differences[0])):
-                    latent_sparsities.append(
-                        (
-                            latent_differences[0][i].abs().sum()
-                            - latent_differences[0][i].abs().max()
-                        )
-                        / (len(latent_differences[0][i]) - 1)
-                        / latent_differences[0][i].abs().max()
-                    )
+                    if latent_differences[0][i].abs().max() == 0.0:
+                        latent_sparsity = 0.0
 
-                latent_sparsity = 1.0 - float(torch.mean(torch.tensor(latent_sparsities)))
+                    else:
+                        latent_sparsity = float(
+                            (
+                                latent_differences[0][i].abs().sum()
+                                - latent_differences[0][i].abs().max()
+                            )
+                            / (len(latent_differences[0][i]) - 1)
+                            / latent_differences[0][i].abs().max()
+                        )
+                        latent_sparsities.append(latent_sparsity)
+
+                latent_sparsity = 1.0 - float(
+                    torch.mean(torch.tensor(latent_sparsities))
+                )
                 tracked_stats["latent_sparsity"] = latent_sparsity
                 print("latent_sparsity: " + str(latent_sparsity))
                 if self.explainer_config.num_attempts >= 2:
