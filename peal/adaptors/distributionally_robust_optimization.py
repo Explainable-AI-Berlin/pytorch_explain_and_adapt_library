@@ -25,7 +25,7 @@ It is not possible to simply write a criterion that implements DRO for two reaso
 Idea (DOESN'T WORK): Given a training config, and the datasets which are defined within it, for the dataset, select
     return_dict=True and groups_enabled=True. This will hopefully allow for the use of group information in a criterion.
 
-New idea: Use code from the ModelTrainer class (essentially all of it), and modify it to apply DRO
+New idea: Use code from the ModelTrainer class (essentially all of it), and modify it to apply DRO. This seems to work
 
 
 Groups can be enabled in the existing Dataset class (groups_enabled). Adds "has_confounder" entry to the
@@ -104,16 +104,13 @@ class DROConfig(AdaptorConfig):
     """
     predictor: PredictorConfig = None
     """
-    The base directory where the run of GroupDRO is stored.
+    The path where the model is to be stored. Explicitly overwrites model_path in predictor.
     """
-    base_dir: str = "peal_runs/dro"
+    model_path: str = None
     """
-    Number of epochs to train model for.
+    Sets the seed of the run. Expliticly overwrites the seed parameter in predictor.
     """
-    max_epochs: PositiveInt = None
-    """
-    
-    """
+    seed: int = 0
     """
     A dict containing all variables that could not be given with the current config structure
     """
@@ -188,9 +185,14 @@ class DRO(Adaptor):
         #
         if model_path is not None:
             self.model_path = model_path
-
+        ### BEGIN: DRO Alterations
+        elif self.adaptor_config.model_path is not None:
+            self.model_path = self.adaptor_config.model_path
         else:
-            self.model_path = self.config.model_path
+            self.model_path = Path(self.config.model_path)
+            name = "DRO_" + str(self.model_path.name)
+            self.model_path = str(self.model_path.with_name(name))
+        ### END: DRO Alterations
 
         if model is None:
             if (
@@ -241,10 +243,10 @@ class DRO(Adaptor):
             config=self.config, datasource=datasource
         )
 
-        # BEGIN: DRO Alterations
+        ### BEGIN: DRO Alterations
         self.train_dataloader.dataset.enable_groups()
         self.val_dataloaders.dataset.enable_groups()
-        # END: DRO Alterations
+        ### END: DRO Alterations
 
         if self.config.training.train_on_test:
             self.train_dataloader = test_dataloader
