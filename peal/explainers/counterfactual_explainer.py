@@ -716,9 +716,11 @@ class CounterfactualExplainer(ExplainerInterface):
 
             if num_attempts == 1:
                 dist_l1 = self.explainer_config.dist_l1
+                current_inpaint = self.explainer_config.inpaint
 
             else:
                 dist_l1 = 0.0
+                current_inpaint = 0.00001
 
             loss += dist_l1 * torch.mean(torch.stack(l1_losses))
             if not pbar is None:
@@ -774,7 +776,7 @@ class CounterfactualExplainer(ExplainerInterface):
 
             if self.explainer_config.iterationwise_encoding:
                 z_old = torch.clone(z[0])
-                if self.explainer_config.inpaint > 0.0:
+                if current_inpaint > 0.0:
                     z[0].grad = boolmask_in * z[0].grad
 
             optimizer.step()
@@ -789,7 +791,7 @@ class CounterfactualExplainer(ExplainerInterface):
                             self.device
                         ),  # TODO seems to be in generator normalization
                         pe=z[0].to(self.device),
-                        inpaint=self.explainer_config.inpaint,
+                        inpaint=current_inpaint,
                         dilation=self.explainer_config.dilation,
                         t=self.explainer_config.sampling_time_fraction,
                         stochastic=True,

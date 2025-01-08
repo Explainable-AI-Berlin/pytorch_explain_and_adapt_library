@@ -1,7 +1,7 @@
 # python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_pdc_unbiased_cfkd.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
-batch_size                           :  4
+batch_size                           :  2
 tracking_level                       :  3
 min_train_samples                    :  900
 finetune_iterations                  :  0
