@@ -73,7 +73,7 @@ class PDCConfig(ExplainerConfig):
     """
     The learning rate used for finding the counterfactual
     """
-    learning_rate: float = 0.0001
+    learning_rate: float = 1.0
     """
     The desired target confidence.
     Consider the tradeoff between minimality and clarity of counterfactual
@@ -587,7 +587,8 @@ class CounterfactualExplainer(ExplainerInterface):
             z = [z]
 
         if self.explainer_config.optimizer == "Adam":
-            optimizer = torch.optim.Adam(z, lr=self.explainer_config.learning_rate)
+            #optimizer = torch.optim.Adam(z, lr=self.explainer_config.learning_rate)
+            optimizer = torch.optim.RMSprop(z, lr=self.explainer_config.learning_rate)
 
         elif self.explainer_config.optimizer == "SGD":
             optimizer = torch.optim.SGD(

@@ -18,7 +18,7 @@ def visualize_step(
 ):
     clean_img_new = 0.5 * z[0].data.detach().cpu() + 0.5
     x = project_to_pytorch_default(x)
-    img_predictor = project_to_pytorch_default(img_predictor)
+    img_predictor_renormalized = project_to_pytorch_default(img_predictor)
     original_vs_counterfactual = []
     for it in range(x.shape[0]):
         original_vs_counterfactual.append(high_contrast_heatmap(x[it], pe[it])[0])
@@ -45,7 +45,7 @@ def visualize_step(
             torch.ones_like(x),
             z_encoded.detach().cpu(),
             torch.ones_like(x),
-            img_predictor.cpu().detach(),
+            img_predictor_renormalized.cpu().detach(),
             # torch.ones_like(x),
             # torch.stack(gradient_img),
             torch.ones_like(x),
