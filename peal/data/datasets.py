@@ -146,6 +146,9 @@ class DataConfig(BaseModel):
     img_name_idx: int = 0
     has_hints: bool = False
     full_confounder_config: Union[type(None), list[float]] = None
+    color_target: list[int] = None
+    color_prob: float = None
+    raw_path: str = None
 
 
 class SymbolicDataset(PealDataset):
@@ -893,6 +896,7 @@ class Image2ClassDataset(ImageDataset):
             self.urls_with_hints = []
 
         self.hints_enabled = False
+        self.url_enabled = False
         self.task_config = task_config
         self.transform = transform
         self.return_dict = return_dict
@@ -963,6 +967,23 @@ class Image2ClassDataset(ImageDataset):
         self.string_description_enabled = self.string_description_enabled_buffer
         self.tokenizer = None
 
+    def enable_class_restriction(self, class_idx: Union[int, list[int]]):
+        self.backup_urls = copy.deepcopy(self.urls)
+        self.urls = []
+        for target_str, file in self.backup_urls:
+            try:
+                if int(target_str) in class_idx:
+                    self.urls.append((target_str, file))
+            except TypeError:
+                if int(target_str) == class_idx:
+                    self.urls.append((target_str, file))
+        print("enabled class restriction for target class:", str(class_idx))
+
+    def disable_class_restriction(self):
+        if hasattr(self, "backup_urls"):
+            self.urls = copy.deepcopy(self.backup_urls)
+        print("disabled class restriction")
+
     @property
     def output_size(self):
         return self.config.output_size
@@ -1021,9 +1042,9 @@ class Image2ClassDataset(ImageDataset):
 
         # target = torch.zeros([len(self.idx_to_name)], dtype=torch.float32)
         # target[self.idx_to_name.index(target_str)] = 1.0
-        return_dict = {}
+        return_dict = {"x": img}
         target = torch.tensor(self.idx_to_name.index(target_str))
-        return_dict["target"] = target
+        return_dict["y"] = target
 
         if self.hints_enabled:
             mask = Image.open(os.path.join(self.mask_dir, file))
@@ -1043,8 +1064,11 @@ class Image2ClassDataset(ImageDataset):
                     return_tensors="pt",
                 ).input_ids)
 
+        if self.url_enabled:
+            return_dict["url"] = file
+
         if self.return_dict:
-            return img, return_dict
+            return return_dict
 
         else:
-            return img, tuple(return_dict.values())
+            return tuple(return_dict.values())

@@ -1,0 +1,22 @@
+adaptor_type: "PClArC"
+model_path: $PEAL_RUNS/mnist_colored/cprob80-ctarget0/model.cpl
+data: <PEAL_BASE>/configs/data/mnist_colored/mnist_colored-cprob80-ctarget0.yaml
+base_dir: $PEAL_RUNS/mnist_colored/cprob80-ctarget0/pclarc
+category: "adaptor"
+projection_type: 'svm' # 'pcav', 'svm', 'simple'
+projection_location: [5, 6, 7, 8, -2] # 0 for input, -1 for penultimate layer
+unpoisoned_data: <PEAL_BASE>/configs/data/mnist_colored/mnist_colored-cprob0.yaml
+poisoned_data: <PEAL_BASE>/configs/data/mnist_colored/mnist_colored-cprob80-ctarget0123456789.yaml
+correction_strength: [0.5, 0.7, 0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5, 1.7, 2, 2.5, 3, 5, 10]
+task:
+  y_selection: [ClassA, ClassB]
+  output_type: 'multiclass'
+  criterions:
+    l2: 1.0
+training:
+  test_batch_size: 32
+  train_batch_size: 32
+  val_batch_size: 32
+  learning_rate: 2.0e-05
+  optimizer: "sgd"
+  max_epochs: 1

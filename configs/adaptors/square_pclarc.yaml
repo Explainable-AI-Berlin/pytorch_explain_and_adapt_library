@@ -1,13 +1,13 @@
 adaptor_type: "PClArC"
-model_path: $PEAL_RUNS/square2/colora_confounding_colorb/torchvision/classifier_unbalanced/model.cpl
+model_path: $PEAL_RUNS/square2/colora_confounding_colorb/torchvision/classifier_unbalanced/035-015-015-035/model.cpl
 data: <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_unbalanced.yaml
-# data: <PEAL_BASE>/configs/data/square.yaml
 training: <PEAL_BASE>/configs/training/rrclarc_collect_relevances.yaml
-base_dir: $PEAL_RUNS/square2/colora_confounding_colorb/torchvision/classifier_unbalanced/pclarc
+base_dir: $PEAL_RUNS/square2/colora_confounding_colorb/torchvision/classifier_unbalanced/035-015-015-035/pclarc
 category: "adaptor"
-projection_type: 'svm' # ['svm', 'simple']
-projection_location: 'features' # ['input', 'features']
+projection_type: 'pcav' # ['pcav', 'svm', 'simple']
+projection_location: [5, 7, -2] # 0 for input, -1 for penultimate layer
 unpoisoned_data: <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_unpoisoned.yaml
+correction_strength: [0.1, 0.25, 0.5, 0.7, 0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 2, 2.5, 3, 5, 10, 20]
 task:
   y_selection: [ClassA, ClassB]
   output_type: 'multiclass'

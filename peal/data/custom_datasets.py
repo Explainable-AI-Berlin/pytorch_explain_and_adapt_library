@@ -1,10 +1,11 @@
 import os
+import random
 from pathlib import Path
-import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
 import torchvision
+from PIL import Image
 from torchvision.transforms import ToTensor
 
 from peal.data.dataset_generators import SquareDatasetGenerator
@@ -315,9 +316,13 @@ class CircleDataset(SymbolicDataset):
 
 class MnistDataset(Image2ClassDataset):
     def __init__(self, config: DataConfig, **kwargs):
+
         if not os.path.exists(config.dataset_path):
+            raw_path = config.dataset_path if config.raw_path is None else config.raw_path
+
+            random.seed(0)
             mnist_dataset_train = torchvision.datasets.MNIST(
-                root=config.dataset_path + "_train_raw",
+                root=raw_path + "_train_raw",
                 train=True,
                 download=True,
                 transform=None,
@@ -330,17 +335,36 @@ class MnistDataset(Image2ClassDataset):
                 if not os.path.exists(f"{img_dir}/{label}"):
                     os.makedirs(f"{img_dir}/{label}")
 
+                if (config.color_target is not None
+                    and config.color_prob is not None
+                    and label in config.color_target
+                    and random.random() < config.color_prob):
+                        img = np.asarray(img)
+                        zeros = np.zeros(img.shape, dtype=np.uint8)
+                        img = np.stack([img, zeros, zeros], axis=2)
+                        img = Image.fromarray(img)
+
                 img.save(f"{img_dir}/{label}/{idxs[label]}.png")
                 idxs[label] += 1
 
             mnist_dataset_val = torchvision.datasets.MNIST(
-                root=config.dataset_path + "_val_raw",
+                root=raw_path + "_val_raw",
                 train=False,
                 download=True,
                 transform=None,
             )
             for i in range(len(mnist_dataset_val)):
                 img, label = mnist_dataset_val[i]
+
+                if (config.color_target is not None
+                        and config.color_prob is not None
+                        and label in config.color_target
+                        and random.random() < config.color_prob):
+                    img = np.asarray(img)
+                    zeros = np.zeros(img.shape, dtype=np.uint8)
+                    img = np.stack([img, zeros, zeros], axis=2)
+                    img = Image.fromarray(img)
+
                 img.save(f"{img_dir}/{label}/{idxs[label]}.png")
                 idxs[label] += 1
 

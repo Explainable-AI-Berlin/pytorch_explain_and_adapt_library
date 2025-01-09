@@ -8,6 +8,7 @@ import torchvision.models
 from PIL import Image
 
 import torch
+from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 from zennit.attribution import Gradient
 from zennit.composites import EpsilonPlusFlat
@@ -18,7 +19,6 @@ from peal.adaptors.interfaces import Adaptor, AdaptorConfig
 from peal.architectures.predictors import TaskConfig, TorchvisionModel
 from peal.data.dataloaders import create_dataloaders_from_datasource
 from peal.data.datasets import DataConfig
-from peal.dependencies.ace.core.metrics import accuracy
 from peal.explainers.lrp_explainer import LRPExplainer
 from peal.teachers.virelay_teacher import VirelayTeacher
 from peal.training.trainers import TrainingConfig
@@ -131,7 +131,7 @@ class RRClArC(Adaptor):
         self.teacher = VirelayTeacher(2)
 
         self.activation = torch.tensor([0])
-        self.hook_handle = self.register_feature_extractor()
+        #self.hook_handle = self.register_feature_extractor()
 
     def register_feature_extractor(self):
 
@@ -302,6 +302,7 @@ class RRClArC(Adaptor):
         print("t: ", t.shape)
         t_centered = t - t.mean()
         actvs_centered = actvs - actvs.mean(dim=0)[None]
+        actvs_centered = actvs_centered.flatten(start_dim=1)
         covar = (actvs_centered * t_centered[:, None]).sum(dim=0) / (t.shape[0] - 1)
         vary = torch.sum(t_centered ** 2, dim=0) / (t.shape[0] - 1)
         w = (covar / vary)[None]
@@ -339,6 +340,7 @@ class RRClArC(Adaptor):
                                                create_graph=True,
                                                retain_graph=True,
                                                grad_outputs=torch.ones_like(y_hat))[0]
+                    grad = torch.mean(grad, dim=(2, 3)).expand_as(grad)
                     grad = grad.flatten(start_dim=1)
 
                     rr_loss = ((grad * cav).sum(1) ** 2).mean(0)
@@ -352,6 +354,7 @@ class RRClArC(Adaptor):
                     optimizer.step()
 
     def run(self, *args, **kwargs):
+        pathlib.Path(self.adaptor_config.base_dir).mkdir(exist_ok=True)
         self.model.eval()
 
         train_dataloader, val_dataloader, test_dataloader = create_dataloaders_from_datasource(self.adaptor_config)
@@ -360,28 +363,17 @@ class RRClArC(Adaptor):
         train_dataloader.dataset.url_enabled = True
         train_dataloader.dataset.enable_class_restriction(0)
 
-        # targets = []
-        # predictions = []
-        # for batch in train_dataloader:
-        #     x = batch["x"].to(self.device)
-        #     y = batch["y"][:,0].to(self.device)
-        #     targets.append(y)
-        #
-        #     prediction = self.model(x)
-        #     predictions.append(prediction.argmax(1))
-        #
-        # targets = torch.cat(targets, 0)
-        # predictions = torch.cat(predictions, 0)
-        # print("accuracy: ", torch.mean((predictions == targets).float()).item())
-        # exit()
+        self._run(train_dataloader)
+        exit()
+
         test_dataloader.dataset.enable_idx()
         test_dataloader.dataset.return_dict = True
         test_dataloader.dataset.url_enabled = True
 
         # train_dataloader.dataset.visualize_decision_boundary(self.model, 32, self.device, os.path.join(self.adaptor_config.base_dir, "decision_boundary_corrected.png"))
+        # exit()
 
-
-        activations, annotations, targets = self.calculate_annotations_and_activations(test_dataloader, self.model)
+        # activations, annotations, targets = self.calculate_annotations_and_activations(test_dataloader, self.model)
         activations, annotations, targets = self.annotations_and_activations_simplified(train_dataloader)
         cav = self.calculate_cav(activations, annotations)
 
@@ -393,94 +385,95 @@ class RRClArC(Adaptor):
         print("saving corrected model to: " + corrected_model_path)
         torch.save(self.model.to("cpu"), corrected_model_path)
 
+    def _run(self, dataloader):
+        feature_extractor, downstream_head = split_model_at_penultima(self.model)
+        # print("original model: ", self.model)
+        print("\n~~~\nfeature extractor:", feature_extractor)
+        print("\n~~~\ndownstream head: ", downstream_head)
 
-# def collect_relevances_and_activations(self, class_id: int):
-#     self.model.eval()
-#
-#     # TODO: only load data with corresponding class_id
-#     train_dataloader, val_dataloader, test_dataloader = create_dataloaders_from_datasource(self.adaptor_config)
-#     train_dataloader.dataset.enable_idx()
-#     train_dataloader.dataset.return_dict = True
-#     train_dataloader.dataset.url_enabled = True
-#
-#     assert isinstance(train_dataloader.dataset, SquareDataset), "Only SquareDataset supported"
-#
-#
-#
-#     # attribution = CondAttribution(self.model)
-#     # canonizers = get_canonizer('resnet18')  # TODO: currently only supports resnet18 predictors
-#     # composite = EpsilonPlusFlat(canonizers)
-#     # cc = ChannelConcept()
-#
-#     layer_names = ["last_conv"]
-#     conv_layers = ["last_conv"]
-#     crvs = dict(zip(layer_names, [[] for _ in layer_names]))
-#     relevances_all = dict(zip(layer_names, [[] for _ in layer_names]))
-#     cavs_max = dict(zip(layer_names, [[] for _ in layer_names]))
-#     cavs_mean = dict(zip(layer_names, [[] for _ in layer_names]))
-#     smpls = []
-#     output = []
-#
-#     i=0
-#     for batch_idx, batch in enumerate(tqdm(train_dataloader)):
-#
-#         print(batch["url"])
-#         i += 1
-#         if i > 100:
-#             exit()
-#         continue
-#
-#         # TODO: check if this is enough or if real indices of samples are needed
-#         sample_idxs = batch["idx"]
-#         x = batch["x"].to(self.device).requires_grad_()
-#         out = self.model(x).detach()
-#         condition = [{"y": c_id} for c_id in out.argmax(1)]
-#         print(batch["y"])
-#         ## print( batch["x"])
-#         print(out)
-#         print("\n~~~~~~~~~~~\n")
-#         assert out.argmax(1).item() == batch["y"].item(), "Model prediction does not match ground truth label"
-#
-#         attr = attribution(x, condition, composite, record_layer=layer_names, init_rel=1)
-#
-#         non_zero = ((attr.heatmap.sum((1, 2)).abs().detach().cpu() > 0) * (out.argmax(1) == class_id)).numpy()
-#         samples_nz = sample_idxs[non_zero]
-#         output.append(out[non_zero])
-#
-#         layer_names_ = [l for l in layer_names if l in attr.relevances.keys()]
-#         conv_layers_ = [l for l in conv_layers if l in attr.relevances.keys()]
-#
-#         if samples_nz.size:
-#             smpls += [s for s in samples_nz]
-#             rels = [cc.attribute(attr.relevances[layer][non_zero], abs_norm=True) for layer in layer_names_]
-#             acts_max = [
-#                 attr.activations[layer][non_zero].flatten(start_dim=2).max(2)[0] if layer in conv_layers_ else
-#                 attr.activations[layer][non_zero] for layer in layer_names_]
-#             acts_mean = [attr.activations[layer][non_zero].mean((2, 3)) if layer in conv_layers_ else
-#                          attr.activations[layer][non_zero] for layer in layer_names_]
-#             for l, r, amax, amean in zip(layer_names_, rels, acts_max, acts_mean):
-#                 crvs[l] += r.detach().cpu()
-#                 cavs_max[l] += amax.detach().cpu()
-#                 cavs_mean[l] += amean.detach().cpu()
-#
-#     path = self.adaptor_config.base_dir
-#     os.makedirs(path, exist_ok=True)
-#
-#     print("saving as", f"{path}/class_{class_id}.pth")
-#
-#     str_class_id = 'all' if class_id is None else class_id
-#     torch.save({"samples": smpls,
-#                 "output": output,
-#                 "crvs": crvs,
-#                 "relevances_all": relevances_all,
-#                 "cavs_max": cavs_max,
-#                 "cavs_mean": cavs_mean},
-#                f"{path}/class_{str_class_id}.pth")
-#     for layer in layer_names:
-#         torch.save({"samples": smpls,
-#                     "output": output,
-#                     "crvs": crvs[layer],
-#                     "relevances_all": relevances_all[layer],
-#                     "cavs_max": cavs_max[layer],
-#                     "cavs_mean": cavs_mean[layer]},
-#                    f"{path}/{layer}_class_{str_class_id}.pth")
+        activations = []
+        targets = []
+        annotations = []
+
+        with tqdm(enumerate(dataloader)) as pbar:
+            for it, batch in pbar:
+                pbar.set_description(
+                    f'calculating activations and annotations: {it * dataloader.batch_size}/{len(dataloader.dataset)}')
+                x = batch["x"].to(self.device)
+                activations.append(feature_extractor(x).detach())
+                targets.append(batch["y"][:, 0].detach())
+                annotations.append(batch["y"][:, 1].detach())
+                # if it > 25:
+                #     break
+
+        activations = torch.cat(activations, dim=0)
+        targets = torch.cat(targets, 0).to(self.device)
+        assert torch.all(targets == 0), "Only class 0 supported"
+        annotations = torch.cat(annotations, dim=0).to(self.device)
+        annotations[annotations == 0] = -1
+
+        num_artifact_samples = torch.sum(annotations == 1).item()
+        print(f"Number of artifact samples: {num_artifact_samples}; Number of non-artifact samples: {len(annotations) - num_artifact_samples}")
+
+        cav = self.calculate_cav(activations, annotations)
+        print("cav shape: ", cav.shape)
+
+        dataloader = DataLoader(TensorDataset(activations, targets), batch_size=32, shuffle=True)
+        downstream_head.train()
+        optimizer = torch.optim.SGD(downstream_head.parameters(), lr=0.00001)
+        for epoch in range(50):
+            with tqdm(enumerate(dataloader)) as pbar:
+                for it, batch in pbar:
+                    optimizer.zero_grad()
+                    representation = batch[0].to(self.device)
+                    representation.requires_grad = True
+                    y = batch[1].to(self.device)
+
+                    prediction = downstream_head(representation)
+
+                    #y_hat = (prediction * torch.sign(0.5 - torch.rand_like(prediction))).sum(1)
+                    y_hat = prediction.sum(1)
+                    grad = torch.autograd.grad(outputs=y_hat,
+                                               inputs=representation,
+                                               create_graph=True,
+                                               retain_graph=True,
+                                               grad_outputs=torch.ones_like(y_hat))[0]
+                    grad = grad.flatten(start_dim=1)
+
+                    rr_loss = ((grad * cav).sum(1) ** 2).mean(0)
+                    ce_loss = torch.nn.functional.cross_entropy(prediction, y.to(torch.long))
+                    accuracy = torch.mean((prediction.argmax(1) == y).float()).item()
+
+                    pbar.set_description(f'epoch {epoch}: accuracy={accuracy}, rr_loss={rr_loss}, ce_loss={ce_loss}')
+                    loss = self.adaptor_config.lamb * rr_loss + ce_loss
+
+                    loss.backward()
+                    optimizer.step()
+
+        self.model = torch.nn.Sequential(*[feature_extractor, downstream_head])
+        corrected_model_path = os.path.join(self.adaptor_config.base_dir, "corrected_model-3.cpl")
+        print("saving corrected model to: " + corrected_model_path)
+        torch.save(self.model.to("cpu"), corrected_model_path)
+
+def split_model_at_penultima(model):
+    '''
+    Splits a model at the penultima layer
+    '''
+    children_list = list(model.children()) # extract_all_children(model)
+    feature_extractor = torch.nn.Sequential(*children_list[:-3])
+    downstream_head = torch.nn.Sequential(*children_list[-3:])
+    return feature_extractor, downstream_head
+
+def extract_all_children(model):
+    '''
+    Extracts all children of a model
+    '''
+    children = []
+    for child in model.children():
+        if isinstance(child, torch.nn.Sequential):
+            children.extend(extract_all_children(child))
+
+        else:
+            children.append(child)
+
+    return children
