@@ -2,7 +2,7 @@ import argparse
 import torch
 
 from peal.explainers.explainer_factory import get_explainer
-from peal.global_utils import load_yaml_config
+from peal.global_utils import load_yaml_config, set_random_seed
 
 
 def main():
@@ -14,6 +14,7 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     config = load_yaml_config(args.config)
+    set_random_seed(config.seed)
 
     explainer = get_explainer(config)
     explanations_dict = explainer.run(args.oracle_path, args.confounder_oracle_path)

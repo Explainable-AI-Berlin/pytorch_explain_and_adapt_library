@@ -1,7 +1,7 @@
 # python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_ace_leakysoftplus_cfkd.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
-batch_size                           :  6
+batch_size                           :  3
 tracking_level                       :  3
 min_train_samples                    :  900
 finetune_iterations                  :  0
@@ -13,7 +13,7 @@ calculate_group_accuracies           :  True
 explainer                            :  <PEAL_BASE>/configs/explainers/square_ace_leakysoftplus.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_poisoned100.yaml
-test_data                            :  <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_unpoisoned.yaml
+test_data                            :  <PEAL_BASE>/configs/data/square_test.yaml
 student                              :  $PEAL_RUNS/square2/colora_confounding_colorb/torchvision/classifier_poisoned100/model.cpl
 teacher                              :  $PEAL_RUNS/square2/colora_confounding_colorb/torchvision/classifier_unpoisoned/model.cpl
 generator                            :  $PEAL_RUNS/square2/ddpm/config.yaml

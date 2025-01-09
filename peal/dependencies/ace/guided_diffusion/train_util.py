@@ -20,6 +20,7 @@ from pathlib import Path
 from torch.utils.tensorboard import SummaryWriter
 
 from . import dist_util, logger
+from .dist_util import load_state_dict
 from .fp16_util import MixedPrecisionTrainer
 from .nn import update_ema
 from .resample import LossAwareSampler, UniformSampler
@@ -219,7 +220,10 @@ class TrainLoop:
                 x = self.data.dataloader.dataset.project_to_pytorch_default(
                     batch
                 )
-                imgs_cat = th.cat([x.cpu(), imgs.cpu()], dim=0)
+                nrow = int(th.sqrt(torch.tensor(x.shape[0])))
+                n_buffer = nrow + x.shape[0] - nrow * nrow
+                buffer = torch.zeros_like(x.cpu())[:n_buffer]
+                imgs_cat = th.cat([x.cpu(), buffer, imgs.cpu()], dim=0)
                 torchvision.utils.save_image(
                     imgs_cat,
                     os.path.join(
@@ -228,7 +232,7 @@ class TrainLoop:
                             "outputs", f"{(self.step+self.resume_step):06d}.png"
                         ),
                     ),
-                    nrow=10,
+                    nrow=nrow,
                 )
                 train_generator_performance = (
                     self.data.dataloader.dataset.track_generator_performance(
@@ -244,6 +248,26 @@ class TrainLoop:
                 self.save()
                 save_yaml_config(
                     pbar.config, os.path.join(self.model_dir, "config.yaml")
+                )
+
+                th.save(self.model.state_dict(), os.path.join(self.model_dir, f"final.cpl"))
+                print('reload model!')
+                self.model.load_state_dict(
+                    torch.load(os.path.join(self.model_dir, f"final.cpl"), map_location=dist_util.dev())
+                )
+                imgs_reloaded = self.data.dataloader.dataset.project_to_pytorch_default(
+                    self.diffusion.p_sample_loop(self.model, batch.shape)
+                )
+                imgs_cat = th.cat([x.cpu(), buffer, imgs_reloaded.cpu()], dim=0)
+                torchvision.utils.save_image(
+                    imgs_cat,
+                    os.path.join(
+                        copy.deepcopy(self.model_dir),
+                        os.path.join(
+                            "outputs", f"reloaded_{(self.step+self.resume_step):06d}.png"
+                        ),
+                    ),
+                    nrow=nrow,
                 )
 
                 # Run for a finite amount of time in integration tests.
@@ -339,9 +363,10 @@ class TrainLoop:
             ):
                 pbar.config.best_fid = pbar.config.current_fid
                 with bf.BlobFile(
-                    bf.join(copy.deepcopy(self.model_dir), f"final.pt"), "wb"
+                    bf.join(copy.deepcopy(self.model_dir), f"final_best_fid.pt"), "wb"
                 ) as f:
                     th.save(state_dict, f)
+
             """else:
                 filename = os.path.join(
                     f"ema", f"{rate}_{(self.step+self.resume_step):06d}.pt"

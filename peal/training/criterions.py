@@ -1,8 +1,25 @@
 import torch
 import math
 import numpy as np
+import torch.nn.functional as F
 
 from torch import nn
+
+def cross_entropy_loss(input, target, size_average=True):
+    input = F.log_softmax(input, dim=1)
+    loss = -torch.sum(input * target)
+    if size_average:
+        return loss / input.size(0)
+    else:
+        return loss
+
+
+class OnehotCrossEntropyLoss(object):
+    def __init__(self, size_average=True):
+        self.size_average = size_average
+
+    def __call__(self, input, target):
+        return cross_entropy_loss(input, target, self.size_average)
 
 
 def orthogonality_criterion(model, pred, y):
@@ -184,6 +201,9 @@ class AdversarialCriterion(nn.Module):
 
 
 def cross_entropy_criterion(model, y_pred, y_target):
+    if y_pred.shape == y_target.shape:
+        return OnehotCrossEntropyLoss()(y_pred, y_target)
+
     if isinstance(y_pred, tuple):
         y_pred = y_pred[0]
 

@@ -142,9 +142,23 @@ class DataConfig(BaseModel):
     The path of the original dataset.
     """
     inverse: Union[type(None), str] = None
+    """
+    Where the label path is relative to the dataset path.
+    """
     label_rel_path: str = "data.csv"
+    """
+    The index where the name of the images is stored. TODO hacky!!!
+    """
     img_name_idx: int = 0
+    """
+    Whether the dataset contains hints or not.
+    """
     has_hints: bool = False
+    """
+    The seed used for generating the dataset.
+    """
+    seed: int = 0
+
     full_confounder_config: Union[type(None), list[float]] = None
     color_target: list[int] = None
     color_prob: float = None
@@ -391,12 +405,16 @@ class ImageDataset(PealDataset):
 
         return heatmap_list, collage_paths
 
-    def serialize_dataset(self, output_dir, x_list, y_list, sample_names=None, classifier=None):
+    def serialize_dataset(self, output_dir, x_list, y_list, hint_list=[], sample_names=None, classifier=None):
         # TODO this does not seem very clean
         for class_name in range(max(2, self.output_size)):
             Path(os.path.join(output_dir, "imgs", str(class_name))).mkdir(
                 parents=True, exist_ok=True
             )
+            if not len(hint_list) == 0:
+                Path(os.path.join(output_dir, "masks", str(class_name))).mkdir(
+                    parents=True, exist_ok=True
+                )
 
         data = []
         for idx, x in enumerate(x_list):
@@ -407,6 +425,12 @@ class ImageDataset(PealDataset):
             )
             img_name = os.path.join(str(class_name), sample_names[idx] + ".png")
             img.save(os.path.join(output_dir, "imgs", img_name))
+            if not len(hint_list) == 0:
+                mask = Image.fromarray(
+                    np.array(255 * hint_list[idx].cpu().numpy().transpose(1, 2, 0), dtype=np.uint8)
+                )
+                mask.save(os.path.join(output_dir, "masks", img_name))
+
             data.append(
                 [
                     img_name,
@@ -790,18 +814,34 @@ class Image2MixedDataset(ImageDataset):
         return_dict = {"x": img_tensor, "y": target}
 
         if self.hints_enabled:
+            option1 = os.path.join(self.root_dir, "masks", name)
             option2 = os.path.join(self.root_dir, "masks", name.split("/")[-1])
-            if os.path.exists(os.path.join(self.root_dir, "masks", name)):
+            option3 = option2[:-4] + ".png"
+            option4 = option1[:-4] + ".png"
+            if os.path.exists(option1):
                 mask = Image.open(os.path.join(self.root_dir, "masks", name))
 
             elif os.path.exists(option2):
                 mask = Image.open(option2)
 
+            elif os.path.exists(option3):
+                mask = Image.open(option3)
+
+            elif os.path.exists(option4):
+                mask = Image.open(option4)
+
             else:
+                assert not self.config.has_hints, "Hints not found despite claim that they exist!"
                 mask = Image.new("RGB", img.size, (0, 0, 0))
 
             torch.set_rng_state(state)
             mask_tensor = self.transform(mask)
+            if not mask_tensor.shape[0] == 3:
+                # TODO very very hacky
+                print("Mask tensor shape " + str(mask_tensor.shape) + " is not correct")
+                mask_tensor = torch.cat([mask_tensor, mask_tensor, mask_tensor])
+                mask_tensor = mask_tensor[:3]
+
             return_dict["hint"] = mask_tensor
 
         if self.groups_enabled:
@@ -941,6 +981,9 @@ class Image2ClassDataset(ImageDataset):
         ):
             self.set_task_specific_urls()
 
+        self.class_restriction_enabled = False
+        self.backup_urls = copy.deepcopy(self.urls)
+
     def class_idx_to_name(self, class_idx):
         return self.idx_to_name[class_idx]
 
@@ -1023,6 +1066,21 @@ class Image2ClassDataset(ImageDataset):
 
         return len(self.urls)
 
+    def enable_class_restriction(self, class_idx):
+        self.backup_urls = copy.deepcopy(self.urls)
+        self.urls = []
+        self.class_restriction_enabled = True
+        for url in self.backup_urls:
+            if url[0] == self.idx_to_name[class_idx]:
+                self.urls.append(url)
+
+    def disable_class_restriction(self):
+        if hasattr(self, "backup_urls"):
+            self.urls = copy.deepcopy(self.backup_urls)
+
+        self.class_restriction_enabled = False
+
+
     def __getitem__(self, idx):
         if (
             not self.task_config is None
@@ -1069,6 +1127,9 @@ class Image2ClassDataset(ImageDataset):
 
         if self.return_dict:
             return return_dict
+
+        elif len(return_dict.values()):
+            return img, list(return_dict.values())[0]
 
         else:
             return tuple(return_dict.values())

@@ -10,13 +10,15 @@ import platform
 import numpy as np
 
 from pathlib import Path
+
+import torchvision.utils
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 from pydantic import BaseModel, PositiveInt
 from typing import Union
 
 from peal.data.dataset_factory import get_datasets
-from peal.data.datasets import DataConfig
+from peal.data.datasets import DataConfig, Image2MixedDataset, Image2ClassDataset
 from peal.dependencies.attacks.attacks import PGD_L2
 from peal.global_utils import (
     orthogonal_initialization,
@@ -24,17 +26,21 @@ from peal.global_utils import (
     load_yaml_config,
     save_yaml_config,
     reset_weights,
-    requires_grad_, get_predictions, replace_relu_with_leakysoftplus, replace_relu_with_leakyrelu,
+    requires_grad_,
+    get_predictions,
+    replace_relu_with_leakysoftplus,
+    replace_relu_with_leakyrelu,
 )
 from peal.training.loggers import log_images_to_writer
 from peal.training.loggers import Logger
 from peal.training.criterions import get_criterions
-from peal.data.dataloaders import create_dataloaders_from_datasource
+from peal.data.dataloaders import create_dataloaders_from_datasource, DataloaderMixer
 from peal.generators.interfaces import Generator
 from peal.architectures.predictors import (
     SequentialModel,
     ArchitectureConfig,
-    TaskConfig, TorchvisionModel,
+    TaskConfig,
+    TorchvisionModel,
 )
 
 
@@ -97,10 +103,10 @@ class TrainingConfig(BaseModel):
     attack_epsilon: float = 1.0
     attack_num_steps: int = 5
     train_on_test: bool = False
-    """
-    A dict containing all variables that could not be given with the current config structure
-    """
-    kwargs: dict = {}
+    class_balanced: bool = False
+    use_mixup: bool = False
+    mixup_alpha: float = 1.0
+    label_smoothing: float = 0.0
 
 
 class PredictorConfig:
@@ -119,7 +125,9 @@ class PredictorConfig:
     """
     The config of the architecture of the model.
     """
-    architecture: Union[ArchitectureConfig, types.SimpleNamespace, str, type(None)] = None
+    architecture: Union[ArchitectureConfig, types.SimpleNamespace, str, type(None)] = (
+        None
+    )
     """
     The config of the data used for training the model.
     """
@@ -144,6 +152,7 @@ class PredictorConfig:
     The name of the class.
     """
     base_path: str = None
+    seed: int = 0
 
     def __init__(
         self,
@@ -153,6 +162,7 @@ class PredictorConfig:
         data: Union[dict, DataConfig] = None,
         model_path: str = None,
         model_type: str = None,
+        seed: int = None,
         **kwargs
     ):
         if isinstance(architecture, dict):
@@ -182,7 +192,30 @@ class PredictorConfig:
         if not model_type is None:
             self.model_type = model_type
 
+        if not seed is None:
+            self.seed = seed
+
         self.kwargs = kwargs
+
+
+def onehot(label, n_classes):
+    one_hots = torch.zeros(label.size(0), n_classes).to(label.device)
+    return one_hots.scatter_(1, label.to(torch.int64).view(-1, 1), 1)
+
+
+def mixup(data, targets, alpha, n_classes):
+    indices = torch.randperm(data.size(0))
+    data2 = data[indices].to(data)
+    targets2 = targets[indices].to(data)
+
+    targets_onehot = onehot(targets.to(data), n_classes)
+    targets2_onehot = onehot(targets2, n_classes)
+
+    lam = torch.FloatTensor([np.random.beta(alpha, alpha)]).to(data)
+    data = data * lam + data2 * (1 - lam)
+    targets_new = targets_onehot * lam + targets2_onehot * (1 - lam)
+
+    return data, targets_new
 
 
 def calculate_test_accuracy(
@@ -248,7 +281,7 @@ def calculate_test_accuracy(
             correct / test_dataloader.dataset.__len__(),
             group_accuracies,
             group_distribution,
-            groups[:,1],
+            groups[:, 1],
             worst_group_accuracy,
         )
 
@@ -312,8 +345,13 @@ class ModelTrainer:
                     self.config.training.dropout,
                 )
 
-            elif isinstance(self.config.architecture, str) and self.config.architecture[:12] == "torchvision_":
-                self.model = TorchvisionModel(self.config.architecture[12:], output_channels)
+            elif (
+                isinstance(self.config.architecture, str)
+                and self.config.architecture[:12] == "torchvision_"
+            ):
+                self.model = TorchvisionModel(
+                    self.config.architecture[12:], output_channels
+                )
 
             else:
                 raise Exception("Architecture not available!")
@@ -340,6 +378,34 @@ class ModelTrainer:
         if not isinstance(self.val_dataloaders, list):
             self.val_dataloaders = [self.val_dataloaders]
 
+        if self.config.training.class_balanced:
+            new_train_dataloaders = []
+            new_val_dataloaders = []
+            for i in range(self.config.task.output_channels):
+                train_dataloader_copy = copy.deepcopy(self.train_dataloader)
+                val_dataloader_copy = copy.deepcopy(self.val_dataloaders[0])
+                train_dataloader_copy.dataset.enable_class_restriction(i)
+                val_dataloader_copy.dataset.enable_class_restriction(i)
+                new_train_dataloaders.append(train_dataloader_copy)
+                new_val_dataloaders.append(val_dataloader_copy)
+
+            new_config = copy.deepcopy(self.config.training)
+            new_config.steps_per_epoch = 200
+            new_config.concatenate_batches = True
+            self.train_dataloader = DataloaderMixer(
+                new_config, new_train_dataloaders[0]
+            )
+            for i in range(1, len(new_train_dataloaders)):
+                # TODO this only works for two classes!
+                self.train_dataloader.append(
+                    new_train_dataloaders[i], weight_added_dataloader=0.5
+                )
+
+            self.val_dataloaders = new_val_dataloaders
+            self.val_dataloader_weights = [1.0 / len(self.val_dataloaders)] * len(
+                self.val_dataloaders
+            )
+
         #
         if optimizer is None:
             param_list = [param for param in self.model.parameters()]
@@ -362,7 +428,10 @@ class ModelTrainer:
             print("trainable parameters: ", len(param_list))
             if self.config.training.optimizer == "sgd":
                 self.optimizer = torch.optim.SGD(
-                    param_list, lr=self.config.training.learning_rate, momentum=0.9, weight_decay=0.0001
+                    param_list,
+                    lr=self.config.training.learning_rate,
+                    momentum=0.9,
+                    weight_decay=0.0001,
                 )
                 lambda1 = lambda epoch: 0.95**epoch
                 self.scheduler = torch.optim.lr_scheduler.LambdaLR(
@@ -464,13 +533,7 @@ class ModelTrainer:
             else:
                 source_distibution = None
 
-            try:
-                X, y = sample
-
-            except Exception:
-                import pdb
-
-                pdb.set_trace()
+            X, y = sample
 
             # TODO this is a dirty fix!!!
             if isinstance(y, list) or isinstance(y, tuple):
@@ -485,8 +548,26 @@ class ModelTrainer:
                 y = self.logger.test_y
 
             X = move_to_device(X, self.device)
+            y_original = y
+            if self.config.training.label_smoothing > 0.0 and mode == "train":
+                y_dist = torch.ones(y.size(0), self.config.task.output_channels)
+                y_dist *= self.config.training.label_smoothing / (
+                    self.config.task.output_channels - 1
+                )
+                for i in range(y.size(0)):
+                    y_dist[i, y[i]] = 1 - self.config.training.label_smoothing
 
-            if self.config.training.adv_training:
+                y = torch.distributions.categorical.Categorical(y_dist).sample()
+
+            if self.config.training.use_mixup and mode == "train":
+                X, y = mixup(
+                    X,
+                    y,
+                    self.config.training.mixup_alpha,
+                    self.config.task.output_channels,
+                )
+
+            if self.config.training.adv_training and mode == "train":
                 noise = (
                     torch.randn_like(X, device=self.device)
                     * self.config.training.input_noise_std
@@ -523,7 +604,7 @@ class ModelTrainer:
 
             loss_logs["loss"] = loss.detach().item()
 
-            self.logger.log_step(mode, pred, y, loss_logs)
+            self.logger.log_step(mode, pred, y_original, loss_logs)
 
             # Backpropagation
             loss.backward()
@@ -563,9 +644,9 @@ class ModelTrainer:
         print("Training Config: " + str(self.config))
         if not continue_training:
             if "orthogonality" in self.config.task.criterions.keys():
-                print('Orthogonal intialization!!!')
-                print('Orthogonal intialization!!!')
-                print('Orthogonal intialization!!!')
+                print("Orthogonal intialization!!!")
+                print("Orthogonal intialization!!!")
+                print("Orthogonal intialization!!!")
                 orthogonal_initialization(self.model)
 
             else:
@@ -709,6 +790,26 @@ class ModelTrainer:
                     self.model.to("cpu"), os.path.join(self.model_path, "model.cpl")
                 )
                 val_accuracy_max = val_accuracy
+
+                """
+                dummy_input = next(iter(self.val_dataloaders[0]))[0]  # Batch size = 1, input size = 10
+                # Export to ONNX
+                onnx_file_path = os.path.join(self.model_path, "model.onnx")
+                torch.onnx.export(
+                    self.model,                     # Model to export
+                    dummy_input,               # Dummy input
+                    onnx_file_path,            # Output file
+                    export_params=True,        # Store the trained parameters
+                    opset_version=11,          # ONNX version to export (e.g., 11)
+                    do_constant_folding=True,  # Optimize constants
+                    input_names=['input'],     # Input tensor name(s)
+                    output_names=['output'],   # Output tensor name(s)
+                    dynamic_axes={             # Support variable-length axes (if applicable)
+                        'input': {0: 'batch_size'},
+                        'output': {0: 'batch_size'}
+                    }
+                )
+                """
                 self.model.to(self.device)
 
             # increase regularization and reset checkpoint if overfitting occurs
@@ -743,17 +844,13 @@ class ModelTrainer:
             self.config.training.epoch += 1
 
 
-def distill_predictor(
-    explainer_config, base_path, predictor, predictor_datasets
+def distill_binary_dataset(
+    predictor_distillation, base_path, predictor, predictor_datasets
 ):
     distillation_datasets = []
     for i in range(2):
-        class_predictions_path = os.path.join(
-            base_path, "explainer", str(i) + "predictions.csv"
-        )
-        Path(os.path.join(base_path, "explainer")).mkdir(
-            exist_ok=True, parents=True
-        )
+        class_predictions_path = os.path.join(base_path, str(i) + "predictions.csv")
+        Path(base_path).mkdir(exist_ok=True, parents=True)
         if not os.path.exists(class_predictions_path):
             predictor_datasets[i].enable_url()
             prediction_args = types.SimpleNamespace(
@@ -763,7 +860,6 @@ def distill_predictor(
                 label_path=class_predictions_path,
                 partition="train",
                 label_query=0,
-                max_samples=explainer_config.max_samples,
             )
             get_predictions(prediction_args)
             predictor_datasets[i].disable_url()
@@ -780,29 +876,97 @@ def distill_predictor(
             )[i]
         )
         distilled_predictor_config = load_yaml_config(
-            explainer_config.distilled_predictor, PredictorConfig
+            predictor_distillation, PredictorConfig
         )
         distilled_predictor_config.data = distilled_dataset_config
-        explainer_config.distilled_predictor = distilled_predictor_config
-        distillation_datasets[
-            i
-        ].task_config = explainer_config.distilled_predictor.task
+        predictor_distillation = distilled_predictor_config
+        distillation_datasets[i].task_config = predictor_distillation.task
         distillation_datasets[i].task_config.x_selection = predictor_datasets[
             i
         ].task_config.x_selection
 
+    return distillation_datasets
+
+
+def distill_1ofn_dataset(
+    predictor_distillation, base_path, predictor, predictor_datasets
+):
+    distillation_datasets = []
+    for i in range(2):
+        class_predictions_path = os.path.join(base_path, "dataset_" + str(i))
+        if not os.path.exists(class_predictions_path):
+            for sample_idx in range(predictor_datasets[i].__len__()):
+                X, y = predictor_datasets[i][sample_idx]
+                # get device of predictor torch.nn.Module
+                device = next(predictor.parameters()).device
+                y_pred = str(int(predictor(X.unsqueeze(0).to(device))[0].argmax(-1)))
+                Path(os.path.join(class_predictions_path, y_pred)).mkdir(
+                    exist_ok=True, parents=True
+                )
+                sample_url = os.path.join(
+                    class_predictions_path, y_pred, str(sample_idx) + ".png"
+                )
+                X_default = predictor_datasets[i].project_to_pytorch_default(X)
+                torchvision.utils.save_image(X_default, sample_url)
+
+        distilled_dataset_config = copy.deepcopy(predictor_datasets[i].config)
+        distilled_dataset_config.split = [1.0, 1.0] if i == 0 else [0.0, 1.0]
+        distilled_dataset_config.img_name_idx = 0
+        distilled_dataset_config.confounding_factors = None
+        distilled_dataset_config.confounder_probability = None
+        distilled_dataset_config.dataset_class = None
+        distillation_datasets.append(
+            get_datasets(
+                config=distilled_dataset_config, data_dir=class_predictions_path
+            )[i]
+        )
+        distilled_predictor_config = load_yaml_config(
+            predictor_distillation, PredictorConfig
+        )
+        distilled_predictor_config.data = distilled_dataset_config
+        predictor_distillation = distilled_predictor_config
+        distillation_datasets[i].task_config = predictor_datasets[i].task_config
+
+    return distillation_datasets
+
+
+def distill_predictor(
+    predictor_distillation,
+    base_path,
+    predictor,
+    predictor_datasets,
+    replace_with_activation=None,
+):
+    predictor_distillation = load_yaml_config(
+        predictor_distillation,
+        PredictorConfig,
+    )
+    if isinstance(predictor_datasets[0], Image2MixedDataset):
+        distillation_datasets = distill_binary_dataset(
+            predictor_distillation, base_path, predictor, predictor_datasets
+        )
+
+    elif isinstance(predictor_datasets[0], Image2ClassDataset):
+        distillation_datasets = distill_1ofn_dataset(
+            predictor_distillation, base_path, predictor, predictor_datasets
+        )
+        predictor_distillation.task = predictor_datasets[0].task_config
+
+    else:
+        raise Exception("Dataset type not available!")
+
     predictor_distilled = copy.deepcopy(predictor)
-    if explainer_config.replace_with_activation == "leakysoftplus":
+    if replace_with_activation == "leakysoftplus":
         predictor_distilled = replace_relu_with_leakysoftplus(predictor_distilled)
 
-    elif explainer_config.replace_with_activation == "leakyrelu":
+    elif replace_with_activation == "leakyrelu":
         predictor_distilled = replace_relu_with_leakyrelu(predictor_distilled)
 
     distillation_trainer = ModelTrainer(
-        config=explainer_config.distilled_predictor,
+        config=predictor_distillation,
         model=predictor_distilled,
         datasource=distillation_datasets,
-        model_path=os.path.join(base_path, "explainer", "distilled_predictor"),
+        model_path=os.path.join(base_path, "distilled_predictor"),
     )
     distillation_trainer.fit()
     return predictor_distilled

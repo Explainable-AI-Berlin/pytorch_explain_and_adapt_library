@@ -1,8 +1,7 @@
-learning_rate: 1.0e-05
-max_epochs: 50
-optimizer: adamw
-test_batch_size: 32
-train_batch_size: 32
-val_batch_size: 32
-concatenate_batches: True
-iterations_per_epoch: 1000
+train_batch_size        : 128
+val_batch_size          : 128
+test_batch_size         : 128
+max_epochs              : 10
+learning_rate           : 0.01
+optimizer               : sgd
+class_balanced          : True

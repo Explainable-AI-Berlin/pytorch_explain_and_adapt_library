@@ -15,3 +15,4 @@ class AdaptorConfig:
     The category of the config.
     """
     category: str = 'adaptor'
+    seed: int = 0

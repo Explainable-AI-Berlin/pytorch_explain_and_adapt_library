@@ -1,0 +1,9 @@
+# python train_predictor.py --config "<PEAL_BASE>/configs/predictors/square_all_attributes_classifier.yaml"
+model_path        : $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_all_attributes
+data              : <PEAL_BASE>/configs/data/square_unpoisoned.yaml
+training          : <PEAL_BASE>/configs/training/img_classifier.yaml
+architecture      : torchvision_resnet18
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0

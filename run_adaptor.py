@@ -1,6 +1,6 @@
 import argparse
 
-from peal.global_utils import load_yaml_config
+from peal.global_utils import load_yaml_config, set_random_seed
 from peal.adaptors.adaptor_factory import get_adaptor
 
 
@@ -10,6 +10,7 @@ def main():
     args = parser.parse_args()
 
     adaptor_config = load_yaml_config(args.config)
+    set_random_seed(adaptor_config.seed)
 
     adaptor = get_adaptor(adaptor_config)
     adaptor.run()

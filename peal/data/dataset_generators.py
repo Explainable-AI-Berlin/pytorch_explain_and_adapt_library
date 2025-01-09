@@ -9,7 +9,6 @@ import pandas as pd
 
 from pathlib import Path
 
-import pygame
 import torch
 import torchvision
 from PIL import Image
@@ -408,14 +407,11 @@ class ConfounderDatasetGenerator:
                 axis=0,
             )
             mask_np = np.array(
-                np.abs(
-                    np.array(copyright_tag_bg, dtype=np.float32) / 255 - 1
-                )
-                * 128,
+                np.abs(np.array(copyright_tag_bg, dtype=np.float32) / 255 - 1) * 128,
                 dtype=np.uint8,
             )
             np.zeros_like(mask_np)
-            mask_np[134:177, 60:178-60] = 255
+            mask_np[134:177, 60 : 178 - 60] = 255
             mask = Image.fromarray(mask_np)
 
         num_samples = (
@@ -822,11 +818,19 @@ class CircleDatasetGenerator:
         return self
 
 
-def latent_to_square_image(color_a, color_b, position_x=None, position_y=None, SIZE_INNER = 8, SIZE_BORDER = 2, noise=None):
+def latent_to_square_image(
+    color_a,
+    color_b,
+    position_x=None,
+    position_y=None,
+    SIZE_INNER=8,
+    SIZE_BORDER=2,
+    noise=None,
+):
     SIZE_ADDED = SIZE_INNER + 2 * SIZE_BORDER
     img = np.ones([64, 64, 3], dtype=np.float32) * color_b
     if noise is None:
-        noise = np.random.randn(*img.shape) * 10
+        noise = np.random.randn(*img.shape) * 20
 
     if position_x is None:
         position_x = int((64 - SIZE_ADDED) / 2)
@@ -848,20 +852,25 @@ def latent_to_square_image(color_a, color_b, position_x=None, position_y=None, S
         0,
         255,
     )
+    foreground = np.concatenate(
+        [
+            color_a * np.ones([SIZE_INNER, SIZE_INNER, 1]),
+            np.zeros([SIZE_INNER, SIZE_INNER, 2]),
+        ],
+        axis=-1,
+    )
     img[
-        position_x + SIZE_BORDER: position_x + SIZE_ADDED - SIZE_BORDER,
+        position_x + SIZE_BORDER : position_x + SIZE_ADDED - SIZE_BORDER,
         position_y + SIZE_BORDER : position_y + SIZE_ADDED - SIZE_BORDER,
     ] = np.clip(
-        color_a
-        + noise[
-            position_x + SIZE_BORDER : position_x + SIZE_ADDED - SIZE_BORDER,
-            position_y + SIZE_BORDER : position_y + SIZE_ADDED - SIZE_BORDER,
-        ],
+        foreground
+        + noise[position_x + SIZE_BORDER : position_x + SIZE_ADDED - SIZE_BORDER, position_y + SIZE_BORDER : position_y + SIZE_ADDED - SIZE_BORDER],
         0,
         255,
     )
     img = Image.fromarray(img.astype(dtype=np.uint8))
     return img, noise
+
 
 class SquareDatasetGenerator:
     """ """
@@ -938,9 +947,13 @@ class SquareDatasetGenerator:
                 position_y = np.random.randint(0, int(num_positions / 2))
 
             sample_name = embed_numberstring(sample_idx, 8) + ".png"
-            img, noise = latent_to_square_image(position_x, position_y, color_a, color_b)
+            img, noise = latent_to_square_image(
+                position_x=position_x, position_y=position_y, color_a=color_a, color_b=color_b
+            )
             img.save(os.path.join(self.data_config.dataset_path, "imgs", sample_name))
-            img_inverse, noise = latent_to_square_image(position_x, position_y, color_a, 255 - color_b, noise=noise)
+            img_inverse, noise = latent_to_square_image(
+                position_x=position_x, position_y=position_y, color_a=color_a, color_b=255 - color_b, noise=noise
+            )
             """img_inverse = np.abs(img_base - 255)
             img_inverse[
                 position_x : position_x + SIZE_ADDED,
@@ -1022,3 +1035,13 @@ class SquareDatasetGenerator:
                     ),
                     "w",
                 ).write("\n".join(lines_out_inverse))
+
+        open(
+            os.path.join(self.data_config.dataset_path, "data.csv"), "w"
+        ).write("\n".join(lines_out))
+        open(
+            os.path.join(
+                self.data_config.dataset_path + "_inverse", "data.csv"
+            ),
+            "w",
+        ).write("\n".join(lines_out_inverse))

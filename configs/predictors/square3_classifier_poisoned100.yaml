@@ -1,0 +1,12 @@
+# python train_predictor.py --config "<PEAL_BASE>/configs/predictors/square_classifier_poisoned100.yaml"
+'model_path'        : '$PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned100'
+'data'              : '<PEAL_BASE>/configs/data/square_poisoned100.yaml'
+'training'          : '<PEAL_BASE>/configs/training/img_classifier.yaml'
+'architecture'      : torchvision_resnet18
+'task':
+  'criterions':
+    'ce'     : 1.0
+    'l2'     : 1.0
+  'output_type'             : 'singleclass'
+  'output_channels'         : 2
+  'y_selection'             : ['ClassA']

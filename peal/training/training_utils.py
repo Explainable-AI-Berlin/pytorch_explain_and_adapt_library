@@ -62,9 +62,15 @@ def calculate_validation_statistics(
     )
     pbar.stored_values = {}
 
-    print('start iteration over validation dataset!')
+    print("start iteration over validation dataset!")
     for it, (x, y) in enumerate(dataloader):
-        pred_confidences = torch.nn.Softmax(dim=-1)(model(x.to(device))).detach().cpu()
+        pred_confidences = (
+            torch.nn.Softmax(dim=-1)(
+                model(x.to(device)) / explainer.explainer_config.temperature
+            )
+            .detach()
+            .cpu()
+        )
         y_pred = logits_to_prediction(pred_confidences)
         if "hint_list" in tracked_keys or "idx_list" in tracked_keys:
             y_res = y[1:]
@@ -112,7 +118,7 @@ def calculate_validation_statistics(
             base_path=base_path,
             remove_below_threshold=False,
             pbar=pbar,
-            mode="Validation",
+            mode="validation",
             start_idx=it * dataloader.batch_size,
             # dataloader=dataloader,
         )

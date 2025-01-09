@@ -251,6 +251,9 @@ def process_confounder_data_controlled(
         key, instances_tensor, attribute, confounder = extract_instances_tensor(
             idx=idx, line=line
         )
+        if confounder >= 2 or attribute >= 2:
+            continue
+
         if set_negative_to_zero:
             data[key] = torch.maximum(
                 torch.zeros_like(instances_tensor),
