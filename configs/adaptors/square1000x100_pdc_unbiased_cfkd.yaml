@@ -7,9 +7,9 @@ min_train_samples                    :  900
 finetune_iterations                  :  0
 max_validation_samples               :  100
 continuous_learning                  :  "retrain"
-use_visualization                    :  True
+use_visualization                    :  False
 calculate_group_accuracies           :  True
-explainer                            :  <PEAL_BASE>/configs/explainers/pdc_unbiased.yaml
+explainer                            :  <PEAL_BASE>/configs/explainers/pdc_default64x64.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/square_poisoned100.yaml
 test_data                            :  <PEAL_BASE>/configs/data/square_unpoisoned.yaml

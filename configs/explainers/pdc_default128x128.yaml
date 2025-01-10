@@ -1,5 +1,5 @@
 category: explainer
-dilation: 5
+dilation: 9
 dist_l1: 0.0001 # 0.0
 distilled_predictor: <PEAL_BASE>/configs/predictors/sensitive_distillation.yaml
 explainer_type: PDC
@@ -7,17 +7,17 @@ explanation_type: PDCConfig
 gradient_steps: 50
 greedy: false
 iterationwise_encoding: true
-learning_rate: 0.1
+learning_rate: 200
 momentum: 0.999
 num_discretization_steps: 50
-optimizer: Adam
+optimizer: SGD
 sampling_time_fraction: 0.3
 stochastic: fully
 temperature: 3.0
 visualize_gradients: true
 y_target_goal_confidence: null
 replace_with_activation: leakysoftplus
-inpaint: 0.1 #0.1
+inpaint: 0.2 #0.1
 mask_momentum: 0.2
 num_attempts: 2
 use_clustering: True
