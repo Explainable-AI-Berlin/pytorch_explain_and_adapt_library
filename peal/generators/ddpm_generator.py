@@ -550,6 +550,7 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
             args.original_classifier = predictor
             args.diffusion = self.diffusion
             args.model = self.model
+            args.seed += idx
             #
             if args.subtype == "ACE":
                 x_counterfactuals_current, histories = ace_main(args=args)

@@ -587,7 +587,7 @@ class CounterfactualExplainer(ExplainerInterface):
             z = [z]
 
         if self.explainer_config.optimizer == "Adam":
-            #optimizer = torch.optim.Adam(z, lr=self.explainer_config.learning_rate)
+            # optimizer = torch.optim.Adam(z, lr=self.explainer_config.learning_rate)
             optimizer = torch.optim.RMSprop(z, lr=self.explainer_config.learning_rate)
 
         elif self.explainer_config.optimizer == "SGD":
@@ -1362,19 +1362,24 @@ class CounterfactualExplainer(ExplainerInterface):
                     )
 
             if not latent_differences is None:
+                latent_differences_valid = []
+                for i, e in enumerate(latent_differences):
+                    if explanations_dict["y_target_end_confidence_distilled_list"][i] > 0.5:
+                        latent_differences_valid.append(e)
+
                 latent_sparsities = []
-                for i in range(len(latent_differences[0])):
-                    if latent_differences[0][i].abs().max() == 0.0:
+                for i in range(len(latent_differences_valid[0])):
+                    if latent_differences_valid[0][i].abs().max() == 0.0:
                         latent_sparsity = 0.0
 
                     else:
                         latent_sparsity = float(
                             (
-                                latent_differences[0][i].abs().sum()
-                                - latent_differences[0][i].abs().max()
+                                latent_differences_valid[0][i].abs().sum()
+                                - latent_differences_valid[0][i].abs().max()
                             )
-                            / (len(latent_differences[0][i]) - 1)
-                            / latent_differences[0][i].abs().max()
+                            / (len(latent_differences_valid[0][i]) - 1)
+                            / latent_differences_valid[0][i].abs().max()
                         )
                         latent_sparsities.append(latent_sparsity)
 
@@ -1388,11 +1393,13 @@ class CounterfactualExplainer(ExplainerInterface):
                         torch.mean(
                             torch.tensor(
                                 [
-                                    torch.nn.CosineSimilarity(dim=0)(
-                                        latent_differences[1][i],
-                                        latent_differences[0][i],
+                                    torch.abs(
+                                        torch.nn.CosineSimilarity(dim=0)(
+                                            latent_differences_valid[1][i],
+                                            latent_differences_valid[0][i],
+                                        )
                                     )
-                                    for i in range(len(latent_differences[0]))
+                                    for i in range(len(latent_differences_valid[0]))
                                 ]
                             )
                         )

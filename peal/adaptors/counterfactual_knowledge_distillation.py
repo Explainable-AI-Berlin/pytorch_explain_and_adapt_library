@@ -1157,9 +1157,6 @@ class CFKD(Adaptor):
         print("flip_rate: " + str(flip_rate))
 
         if self.adaptor_config.tracking_level >= 3:
-            tracked_stats = self.explainer.calculate_latent_difference_stats(tracked_values)
-            for key in tracked_stats.keys():
-                feedback_stats[key] = tracked_stats[key]
 
             # distill into equivalent model
             predictor_distillation = load_yaml_config(
@@ -1245,6 +1242,9 @@ class CFKD(Adaptor):
 
             feedback_stats["feedback_accuracy_distilled"] = float(fa_1sided_distilled)
             print("feedback_accuracy_distilled: " + str(fa_1sided_distilled))
+            tracked_stats = self.explainer.calculate_latent_difference_stats(tracked_values)
+            for key in tracked_stats.keys():
+                feedback_stats[key] = tracked_stats[key]
 
         return feedback, feedback_stats
 

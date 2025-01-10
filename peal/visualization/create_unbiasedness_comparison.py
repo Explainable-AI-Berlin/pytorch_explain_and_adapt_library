@@ -31,7 +31,7 @@ if __name__ == "__main__":
             [0.33, 0.2, -0.0, 1.02],
         ]
     )
-    labels = ["ACE", "DiME", "FastDiME", "PDC"]
+    labels = ["ACE", "DiME", "FastDiME", "PDC (ours)"]
     titles = ["Waterbirds", "Square"]
     colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"]
 

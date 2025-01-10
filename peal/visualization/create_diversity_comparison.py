@@ -27,11 +27,11 @@ if __name__ == "__main__":
     # Example usage:
     data = np.array(
         [
-            [-0.0, -0.0, -0.0, 1.01],
-            [-0.0, -0.0, -0.0, 1.04],
+            [-0.0, -0.0, -0.0, 0.76],
+            [-0.0, -0.0, -0.0, 0.91],
         ]
     )
-    labels = ["DiME", "ACE", "FastDiME", "PDC"]
+    labels = ["ACE", "DiME", "FastDiME", "PDC (ours)"]
     titles = ["Waterbirds", "Square"]
     colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"]
 

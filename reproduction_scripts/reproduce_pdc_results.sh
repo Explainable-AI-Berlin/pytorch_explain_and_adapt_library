@@ -39,7 +39,8 @@ python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_pdc_div
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_pdc_unbiased_cfkd.yaml"
 # you can the the global visualization in $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_unbiased_cfkd/0/val_counterfactuals_global.png
 # you can see the collages in $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_unbiased_cfkd/0/validation_collages0_0
-
+# square unbiased is also used for reporting the metrics from the experiments
+# metrics: tensorboard --logdir $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_unbiased_cfkd/logs
 
 # Reproduce the results on CelebA
 
@@ -53,10 +54,22 @@ python train_predictor.py --config "<PEAL_BASE>/configs/predictors/celeba_classi
 # get the explanations for ACE
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Smiling_natural_ace_cfkd.yaml"
 # you can see the collages in $PEAL_BASE/celeba/Smiling/classifier_natural/ace_cfkd/0/validation_collages0
+# metrics: tensorboard --logdir $PEAL_BASE/celeba/Smiling/classifier_natural/ace_cfkd/logs
+
+# get the explanations for dime
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Smiling_natural_dime_cfkd.yaml"
+# you can see the collages in $PEAL_BASE/celeba/Smiling/classifier_natural/dime_cfkd/0/validation_collages0
+# metrics: tensorboard --logdir $PEAL_BASE/celeba/Smiling/classifier_natural/dime_cfkd/logs
+
+# get the explanations for fastdime
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Smiling_natural_fastdime_cfkd.yaml"
+# you can see the collages in $PEAL_BASE/celeba/Smiling/classifier_natural/fastdime_cfkd/0/validation_collages0
+# metrics: tensorboard --logdir $PEAL_BASE/celeba/Smiling/classifier_natural/fastdime_cfkd/logs
 
 # get the explanations for PDC
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Smiling_natural_pdc_cfkd.yaml"
 # you can see the collages in $PEAL_BASE/celeba/Smiling/classifier_natural/pdc_cfkd/0/validation_collages0
+# metrics: tensorboard --logdir $PEAL_BASE/celeba/Smiling/classifier_natural/pdc_cfkd/logs
 
 # Blond_Hair
 # Train the classifier that shall be analyzed
@@ -65,10 +78,22 @@ python train_predictor.py --config "<PEAL_BASE>/configs/predictors/celeba_classi
 # get the explanations for ACE
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_natural_ace_cfkd.yaml"
 # you can see the collages in $PEAL_BASE/celeba/Blond_Hair/classifier_natural/ace_cfkd/0/validation_collages0
+# metrics: tensorboard --logdir $PEAL_BASE/celeba/Blond_Hair/classifier_natural/ace_cfkd/logs
+
+# get the explanations for dime
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_natural_dime_cfkd.yaml"
+# you can see the collages in $PEAL_BASE/celeba/Blond_Hair/classifier_natural/dime_cfkd/0/validation_collages0
+# metrics: tensorboard --logdir $PEAL_BASE/celeba/Blond_Hair/classifier_natural/dime_cfkd/logs
+
+# get the explanations for fastdime
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_natural_fastdime_cfkd.yaml"
+# you can see the collages in $PEAL_BASE/celeba/Blond_Hair/classifier_natural/fastdime_cfkd/0/validation_collages0
+# metrics: tensorboard --logdir $PEAL_BASE/celeba/Blond_Hair/classifier_natural/fastdime_cfkd/logs
 
 # get the explanations for PDC
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_natural_pdc_cfkd.yaml"
 # you can see the collages in $PEAL_BASE/celeba/Blond_Hair/classifier_natural/pdc_cfkd/0/validation_collages0
+# metrics: tensorboard --logdir $PEAL_BASE/celeba/Blond_Hair/classifier_natural/pdc_cfkd/logs
 
 # Reproduce the results on Waterbirds
 
@@ -81,8 +106,20 @@ python train_predictor.py --config "<PEAL_BASE>/configs/predictors/waterbirds_cl
 # get the explanations for ACE
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/waterbirds_natural_ace_cfkd.yaml"
 # you can see the collages in $PEAL_BASE/waterbirds/classifier_natural/ace_cfkd/0/validation_collages0
+# metrics: tensorboard --logdir $PEAL_BASE/waterbirds/classifier_natural/ace_cfkd/logs
+
+# get the explanations for dime
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/waterbirds_natural_dime_cfkd.yaml"
+# you can see the collages in $PEAL_BASE/waterbirds/classifier_natural/dime_cfkd/0/validation_collages0
+# metrics: tensorboard --logdir $PEAL_BASE/waterbirds/classifier_natural/dime_cfkd/logs
+
+# get the explanations for fastdime
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/waterbirds_natural_fastdime_cfkd.yaml"
+# you can see the collages in $PEAL_BASE/waterbirds/classifier_natural/fastdime_cfkd/0/validation_collages0
+# metrics: tensorboard --logdir $PEAL_BASE/waterbirds/classifier_natural/fastdime_cfkd/logs
 
 # get the explanations for PDC
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/waterbirds_natural_pdc_cfkd.yaml"
 # you can see the collages in $PEAL_BASE/waterbirds/classifier_natural/pdc_cfkd/0/validation_collages0
+# metrics: tensorboard --logdir $PEAL_BASE/waterbirds/classifier_natural/pdc_cfkd/logs
 
