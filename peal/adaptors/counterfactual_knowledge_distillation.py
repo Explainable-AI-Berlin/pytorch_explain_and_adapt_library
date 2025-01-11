@@ -424,7 +424,9 @@ class CFKD(Adaptor):
         """
         # TODO make sure to use seeds everywhere!
         self.adaptor_config = load_yaml_config(adaptor_config, AdaptorConfig)
-        self.adaptor_config.explainer.tracking_level = self.adaptor_config.tracking_level
+        self.adaptor_config.explainer.tracking_level = (
+            self.adaptor_config.tracking_level
+        )
         self.base_dir = (
             base_dir if not base_dir is None else self.adaptor_config.base_dir
         )
@@ -1198,14 +1200,15 @@ class CFKD(Adaptor):
                 )
 
             # calculate distilled flip rate
-            flip_rate_distilled = len(
-                list(
-                    filter(
-                        lambda x: x > 0.5,
-                        tracked_values["y_target_end_confidence_distilled_list"],
-                    )
+            flipped_samples = list(
+                filter(
+                    lambda x: x > 0.5,
+                    tracked_values["y_target_end_confidence_distilled_list"],
                 )
-            ) / len(tracked_values["y_target_end_confidence_distilled_list"])
+            )
+            flip_rate_distilled = len(flipped_samples) / len(
+                tracked_values["y_target_end_confidence_distilled_list"]
+            )
             feedback_stats["flip_rate_distilled"] = float(flip_rate_distilled)
             print("flip_rate_distilled: " + str(flip_rate_distilled))
             num_true_1sided_distilled = len(
@@ -1242,7 +1245,9 @@ class CFKD(Adaptor):
 
             feedback_stats["feedback_accuracy_distilled"] = float(fa_1sided_distilled)
             print("feedback_accuracy_distilled: " + str(fa_1sided_distilled))
-            tracked_stats = self.explainer.calculate_latent_difference_stats(tracked_values)
+            tracked_stats = self.explainer.calculate_latent_difference_stats(
+                tracked_values
+            )
             for key in tracked_stats.keys():
                 feedback_stats[key] = tracked_stats[key]
 

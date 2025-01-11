@@ -1143,68 +1143,89 @@ class CounterfactualExplainer(ExplainerInterface):
 
             return difference_list
 
-        explanations_beginning = [e[0] for e in explanations_list_by_source]
-        cluster_means = extract_feature_difference(explanations_beginning)
-        collage_path_ref = explanations_beginning[0]["collage_path_list"]
-        collage_path_elements = collage_path_ref.split(os.sep)[:-1]
-        collage_path_base = str(
-            os.path.join(*([os.path.abspath(os.sep)] + collage_path_elements))
-        )
         cluster_lists = [[] for i in range(n_clusters)]
-        cluster_lists[0] = [explanations_list_by_source[0][0]]
-        cluster_lists[1] = [explanations_list_by_source[1][0]]
-        for cluster_idx in range(len(cluster_means)):
-            collage_path = explanations_beginning[cluster_idx]["collage_path_list"]
-            Path(collage_path_base + "_" + str(cluster_idx)).mkdir(
-                parents=True, exist_ok=True
+        if self.explainer_config.merge_clusters == "activation_clusters":
+            explanations_beginning = [e[0] for e in explanations_list_by_source]
+            cluster_means = extract_feature_difference(explanations_beginning)
+            cluster_lists[0] = [explanations_list_by_source[0][0]]
+            cluster_lists[1] = [explanations_list_by_source[1][0]]
+            collage_path_ref = explanations_beginning[0]["collage_path_list"]
+            collage_path_elements = collage_path_ref.split(os.sep)[:-1]
+            collage_path_base = str(
+                os.path.join(*([os.path.abspath(os.sep)] + collage_path_elements))
             )
-            collage_path_new = os.path.join(
-                *[
-                    collage_path_base + "_" + str(cluster_idx),
-                    embed_numberstring(0, 7) + ".png",
-                ]
-            )
-            shutil.copy(collage_path, collage_path_new)
+            for cluster_idx in range(len(cluster_means)):
+                collage_path = explanations_beginning[cluster_idx]["collage_path_list"]
+                Path(collage_path_base + "_" + str(cluster_idx)).mkdir(
+                    parents=True, exist_ok=True
+                )
+                collage_path_new = os.path.join(
+                    *[
+                        collage_path_base + "_" + str(cluster_idx),
+                        embed_numberstring(0, 7) + ".png",
+                    ]
+                )
+                shutil.copy(collage_path, collage_path_new)
 
-        for idx in range(1, len(explanations_list_by_source[0])):
-            current_differences = extract_feature_difference(
-                [e[idx] for e in explanations_list_by_source]
-            )
-            # build outer product between cluster means and current differences
-            cosine_similarities = torch.zeros(
-                [len(cluster_means), len(current_differences)]
-            )
-            for i in range(len(cluster_means)):
-                for j in range(len(current_differences)):
-                    cosine_similarities[i, j] = torch.nn.CosineSimilarity()(
-                        cluster_means[i], current_differences[j]
+        for idx in range(len(explanations_list_by_source[0])):
+            if self.explainer_config.merge_clusters == "highest_activation":
+                current_activations = []
+                for source_idx in range(len(explanations_list_by_source)):
+                    current_activations.append(
+                        explanations_list_by_source[source_idx][idx][
+                            "y_target_end_confidence_list"
+                        ]
                     )
 
-            # find the cluster with the highest similarity
-            cosine_similarities_abs = torch.abs(cosine_similarities)
-            for i in range(len(cluster_means)):
-                idx_combined = int(torch.argmax(cosine_similarities_abs.flatten()))
-                idx_cluster = idx_combined // len(current_differences)
-                idx_current = idx_combined % len(current_differences)
+                current_activations = torch.tensor(current_activations)
+                activations_order = torch.argsort(current_activations)
+
+            elif self.explainer_config.merge_clusters == "representation_clusters":
+                if idx == 0:
+                    continue
+
+                current_differences = extract_feature_difference(
+                    [e[idx] for e in explanations_list_by_source]
+                )
+                # build outer product between cluster means and current differences
+                cosine_similarities = torch.zeros(
+                    [len(cluster_means), len(current_differences)]
+                )
+                for i in range(len(cluster_means)):
+                    for j in range(len(current_differences)):
+                        cosine_similarities[i, j] = torch.nn.CosineSimilarity()(
+                            cluster_means[i], current_differences[j]
+                        )
+
+                # find the cluster with the highest similarity
+                cosine_similarities_abs = torch.abs(cosine_similarities)
+
+            for i in range(n_clusters):
+                if self.explainer_config.merge_clusters == "representation_clusters":
+                    idx_combined = int(torch.argmax(cosine_similarities_abs.flatten()))
+                    idx_cluster = idx_combined // len(current_differences)
+                    idx_current = idx_combined % len(current_differences)
+                    cosine_similarities_abs[idx_cluster, :] = -1
+                    cosine_similarities_abs[:, idx_current] = -1
+                    # update running mean
+                    cluster_means[idx_cluster] = (
+                        idx * cluster_means[idx_cluster]
+                        + torch.sign(cosine_similarities[idx_cluster, idx_current])
+                        * current_differences[idx_current]
+                    ) / (idx + 1)
+
+                elif self.explainer_config.merge_clusters == "highest_activation":
+                    idx_cluster = activations_order[i]
+                    idx_current = i
+
                 if len(cluster_lists[idx_cluster]) > len(
                     cluster_lists[abs(1 - idx_cluster)]
                 ):
-                    print("cluster list lengths are not matching!")
-                    import pdb
-
-                    pdb.set_trace()
+                    raise Exception("cluster list lengths are not matching!")
 
                 cluster_lists[idx_cluster].append(
                     explanations_list_by_source[idx_current][idx]
                 )
-                cosine_similarities_abs[idx_cluster, :] = -1
-                cosine_similarities_abs[:, idx_current] = -1
-                # update running mean
-                cluster_means[idx_cluster] = (
-                    idx * cluster_means[idx_cluster]
-                    + torch.sign(cosine_similarities[idx_cluster, idx_current])
-                    * current_differences[idx_current]
-                ) / (idx + 1)
                 if hasattr(
                     explanations_list_by_source[idx_current][idx], "cluster_list"
                 ):
@@ -1216,6 +1237,20 @@ class CounterfactualExplainer(ExplainerInterface):
                     explanations_list_by_source[idx_current][idx]["cluster_list"] = [
                         idx_cluster
                     ]
+
+                if self.explainer_config.merge_clusters == "highest_activation":
+                    collage_path_ref = explanations_list_by_source[idx_current][idx][
+                        "collage_path_list"
+                    ]
+                    collage_path_elements = collage_path_ref.split(os.sep)[:-1]
+                    collage_path_base = str(
+                        os.path.join(
+                            *([os.path.abspath(os.sep)] + collage_path_elements)
+                        )
+                    )
+                    Path(collage_path_base + "_" + str(idx_cluster)).mkdir(
+                        parents=True, exist_ok=True
+                    )
 
                 collage_path = explanations_list_by_source[idx_current][idx][
                     "collage_path_list"
@@ -1275,7 +1310,6 @@ class CounterfactualExplainer(ExplainerInterface):
         return explanations_dict_out
 
     def calculate_latent_difference_stats(self, explanations_dict):
-        tracked_stats = {}
         if self.explainer_config.tracking_level >= 3:
             latent_differences = None
             if hasattr(self.predictor_datasets[1], "sample_to_latent"):
@@ -1297,29 +1331,23 @@ class CounterfactualExplainer(ExplainerInterface):
                 latents_counterfactual = []
                 latent_differences = []
                 for c in range(self.explainer_config.num_attempts):
-                    try:
-                        latents_counterfactual.append(
-                            [
-                                self.predictor_datasets[1]
-                                .sample_to_latent(
-                                    e.to(self.device),
-                                    (
-                                        explanations_dict["hint_list"][i]
-                                        if "hint_list" in explanations_dict.keys()
-                                        else None
-                                    ),
-                                )
-                                .cpu()
-                                for i, e in enumerate(
-                                    explanations_dict["clusters" + str(c)]
-                                )
-                            ]
-                        )
-
-                    except Exception:
-                        import pdb
-
-                        pdb.set_trace()
+                    latents_counterfactual.append(
+                        [
+                            self.predictor_datasets[1]
+                            .sample_to_latent(
+                                e.to(self.device),
+                                (
+                                    explanations_dict["hint_list"][i]
+                                    if "hint_list" in explanations_dict.keys()
+                                    else None
+                                ),
+                            )
+                            .cpu()
+                            for i, e in enumerate(
+                                explanations_dict["clusters" + str(c)]
+                            )
+                        ]
+                    )
 
                     latent_differences.append(
                         [
@@ -1358,55 +1386,77 @@ class CounterfactualExplainer(ExplainerInterface):
                         for i in range(len(explanations_dict["hint_list"]))
                     ]
                     latent_differences.append(
-                        torch.tensor([foreground_change, background_change])
+                        torch.transpose(
+                            torch.tensor([foreground_change, background_change]), 0, 1
+                        )
                     )
 
             if not latent_differences is None:
+                for latent_difference in latent_differences:
+                    assert len(latent_difference) == len(explanations_dict["clusters0"])
+
                 latent_differences_valid = []
-                for i, e in enumerate(latent_differences):
-                    if explanations_dict["y_target_end_confidence_distilled_list"][i] > 0.5:
-                        latent_differences_valid.append(e)
+                for i in range(len(latent_differences[0])):
+                    if (
+                        explanations_dict["y_target_end_confidence_distilled_list"][i]
+                        > 0.5
+                    ):
+                        latent_difference_current = []
+                        for j in range(len(latent_differences)):
+                            latent_difference_current.append(latent_differences[j][i])
 
-                latent_sparsities = []
-                for i in range(len(latent_differences_valid[0])):
-                    if latent_differences_valid[0][i].abs().max() == 0.0:
-                        latent_sparsity = 0.0
+                        latent_differences_valid.append(latent_difference_current)
 
-                    else:
-                        latent_sparsity = float(
-                            (
-                                latent_differences_valid[0][i].abs().sum()
-                                - latent_differences_valid[0][i].abs().max()
+                if len(latent_differences_valid) == 0:
+                    latent_sparsity = 0.0
+                    latent_diversity = 0.0
+                    import pdb
+
+                    pdb.set_trace()
+
+                else:
+                    latent_sparsities = []
+                    for i in range(len(latent_differences_valid[0])):
+                        if latent_differences_valid[0][i].abs().max() == 0.0:
+                            latent_sparsity = 0.0
+
+                        else:
+                            latent_sparsity = float(
+                                (
+                                    latent_differences_valid[0][i].abs().sum()
+                                    - latent_differences_valid[0][i].abs().max()
+                                )
+                                / (len(latent_differences_valid[0][i]) - 1)
+                                / latent_differences_valid[0][i].abs().max()
                             )
-                            / (len(latent_differences_valid[0][i]) - 1)
-                            / latent_differences_valid[0][i].abs().max()
-                        )
+
                         latent_sparsities.append(latent_sparsity)
 
-                latent_sparsity = 1.0 - float(
-                    torch.mean(torch.tensor(latent_sparsities))
-                )
-                tracked_stats["latent_sparsity"] = latent_sparsity
-                print("latent_sparsity: " + str(latent_sparsity))
-                if self.explainer_config.num_attempts >= 2:
-                    latent_diversity = 1.0 - float(
-                        torch.mean(
-                            torch.tensor(
-                                [
-                                    torch.abs(
-                                        torch.nn.CosineSimilarity(dim=0)(
-                                            latent_differences_valid[1][i],
-                                            latent_differences_valid[0][i],
-                                        )
-                                    )
-                                    for i in range(len(latent_differences_valid[0]))
-                                ]
-                            )
-                        )
+                    latent_sparsity = 1.0 - float(
+                        torch.mean(torch.tensor(latent_sparsities))
                     )
-                    tracked_stats["latent_diversity"] = latent_diversity
-                    print("latent_diversity: " + str(latent_diversity))
+                    if self.explainer_config.num_attempts >= 2:
+                        cosine_similiarities_list = [
+                            torch.abs(
+                                torch.nn.CosineSimilarity(dim=0)(
+                                    latent_differences_valid[1][i],
+                                    latent_differences_valid[0][i],
+                                )
+                            )
+                            for i in range(len(latent_differences_valid[0]))
+                        ]
+                        cosine_similiarities = torch.tensor(cosine_similiarities_list)
+                        latent_diversity = 1.0 - float(torch.mean(cosine_similiarities))
+                        import pdb; pdb.set_trace()
 
+                    else:
+                        latent_diversity = 0.0
+
+        tracked_stats = {}
+        tracked_stats["latent_sparsity"] = latent_sparsity
+        print("latent_sparsity: " + str(latent_sparsity))
+        tracked_stats["latent_diversity"] = latent_diversity
+        print("latent_diversity: " + str(latent_diversity))
         return tracked_stats
 
     def run(self, oracle_path=None, confounder_oracle_path=None):

@@ -27,8 +27,8 @@ if __name__ == "__main__":
     # Example usage:
     data = np.array(
         [
-            [-0.0, -0.0, -0.0, 0.76],
-            [-0.0, -0.0, -0.0, 0.91],
+            [0.0, 0.0, -0.0, 0.76],
+            [0.01, 0.0, -0.0, 0.91],
         ]
     )
     labels = ["ACE", "DiME", "FastDiME", "PDC (ours)"]

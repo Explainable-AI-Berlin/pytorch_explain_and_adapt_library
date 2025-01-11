@@ -11,36 +11,68 @@ python train_generator.py --config "<PEAL_BASE>/configs/generators/square_ddpm.y
 python train_predictor.py --config "<PEAL_BASE>/configs/predictors/square3_classifier_poisoned100.yaml"
 
 # get the explanations for ACE
-python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_ace_cfkd.yaml"
-# you can the the global visualization in $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/ace_cfkd/0/val_counterfactuals_global.png
-# you can see the collages in $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/ace_cfkd/0/validation_collages0
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_ace_pe_cfkd.yaml"
+# you can the the global visualization in
+# $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/ace_pe_cfkd/0/val_counterfactuals_global.png
+# you can see the collages in $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/ace_pe_cfkd/0/validation_collages0
 
 # get the explanations for non-adversarial PDC
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_pdc_nonadversarial_cfkd.yaml"
-# you can the the global visualization in $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_nonadversarial_cfkd/0/val_counterfactuals_global.png
+# you can the the global visualization in
+# $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_nonadversarial_cfkd/0/val_counterfactuals_global.png
 # you can see the collages in $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_nonadversarial_cfkd/0/validation_collages0
 
 # get the explanations for sensitive PDC
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_pdc_sensitive_cfkd.yaml"
-# you can the the global visualization in $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_sensitive_cfkd/0/val_counterfactuals_global.png
+# you can the the global visualization in
+# $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_sensitive_cfkd/0/val_counterfactuals_global.png
 # you can see the collages in $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_sensitive_cfkd/0/validation_collages0
 
 # get the explanations for sparse PDC
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_pdc_sparse_cfkd.yaml"
-# you can the the global visualization in $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_sparse_cfkd/0/val_counterfactuals_global.png
+# you can the the global visualization in
+# $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_sparse_cfkd/0/val_counterfactuals_global.png
 # you can see the collages in $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_sparse_cfkd/0/validation_collages0
 
 # get the explanations for diverse PDC
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_pdc_diverse_cfkd.yaml"
-# you can the the global visualization in $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_diverse_cfkd/0/val_counterfactuals_global.png
+# you can the the global visualization in
+# $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_diverse_cfkd/0/val_counterfactuals_global.png
 # you can see the collages in $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_diverse_cfkd/0/validation_collages0
 
 # get the explanations for unbiased PDC
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_pdc_unbiased_cfkd.yaml"
-# you can the the global visualization in $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_unbiased_cfkd/0/val_counterfactuals_global.png
+# you can the the global visualization in
+# $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_unbiased_cfkd/0/val_counterfactuals_global.png
 # you can see the collages in $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_unbiased_cfkd/0/validation_collages0_0
 # square unbiased is also used for reporting the metrics from the experiments
 # metrics: tensorboard --logdir $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_unbiased_cfkd/logs
+
+# get the explanations for unbiased PDC
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_ace_cfkd.yaml"
+# you can the the global visualization in
+# $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/ace_cfkd/0/val_counterfactuals_global.png
+# you can see the collages in $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/ace_cfkd/0/validation_collages0_0
+# square unbiased is also used for reporting the metrics from the experiments
+# metrics: tensorboard --logdir $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/ace_cfkd/logs
+
+# get the explanations for unbiased PDC
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_dime_cfkd.yaml"
+# you can the the global visualization in
+# $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/dime_cfkd/0/val_counterfactuals_global.png
+# you can see the collages in $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/dime_cfkd/0/validation_collages0_0
+# square unbiased is also used for reporting the metrics from the experiments
+# metrics: tensorboard --logdir $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/dime_cfkd/logs
+
+# get the explanations for unbiased PDC
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_fastdime_cfkd.yaml"
+# you can the the global visualization in
+# $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/fastdime_cfkd/0/val_counterfactuals_global.png
+# you can see the collages in $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/fastdime_cfkd/0/validation_collages0_0
+# square unbiased is also used for reporting the metrics from the experiments
+# metrics: tensorboard --logdir $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/fastdime_cfkd/logs
+
+
 
 # Reproduce the results on CelebA
 
