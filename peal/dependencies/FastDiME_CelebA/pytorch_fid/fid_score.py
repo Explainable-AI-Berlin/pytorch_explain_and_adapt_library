@@ -49,6 +49,7 @@ except ImportError:
     def tqdm(x):
         return x
 
+'''
 from pytorch_fid.inception import InceptionV3
 
 parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
@@ -320,3 +321,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+'''

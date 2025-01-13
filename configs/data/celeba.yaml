@@ -1,4 +1,5 @@
 dataset_path            : $PEAL_DATA/celeba
+dataset_class           : CelebADataset
 num_samples             : 202599
 input_type              : image
 input_size              : [3, 128, 128]

@@ -1,6 +1,6 @@
 from typing import Union
 
-from peal.data.datasets import DataConfig
+from peal.data.interfaces import DataConfig
 from peal.editors.interfaces import EditorConfig
 
 

@@ -16,3 +16,5 @@ stochastic: fully
 temperature: 3.0
 visualize_gradients: true
 y_target_goal_confidence: null
+num_attempts: 2
+allow_overlap: true

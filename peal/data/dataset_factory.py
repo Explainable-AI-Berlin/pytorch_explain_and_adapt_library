@@ -5,7 +5,7 @@ from torchvision import transforms
 from torchvision.transforms import ToTensor
 from torchvision.transforms import v2
 
-from peal.architectures.predictors import TaskConfig
+from peal.architectures.interfaces import TaskConfig
 from peal.global_utils import (
     load_yaml_config,
     get_project_resource_dir,
@@ -25,8 +25,7 @@ from peal.data.datasets import (
     Image2ClassDataset,
     SymbolicDataset,
 )
-from peal.data.interfaces import PealDataset
-from peal.data.datasets import DataConfig
+from peal.data.interfaces import PealDataset, DataConfig
 
 
 def get_datasets(

@@ -17,7 +17,7 @@ test_data                            :  <PEAL_BASE>/configs/data/celeba.yaml
 student                              :  $PEAL_RUNS/celeba/Blond_Hair/classifier_natural/model.cpl
 teacher                              :  $PEAL_RUNS/celeba/Blond_Hair/classifier_natural/model.cpl
 generator                            :  $PEAL_RUNS/celeba/ddpm/config.yaml
-base_dir                             :  $PEAL_RUNS/celeba/Blond_Hair/classifier_natural/ace_cfkd2
+base_dir                             :  $PEAL_RUNS/celeba/Blond_Hair/classifier_natural/ace_cfkd
 task:
   criterions:
     ce     : 1.0

@@ -3,8 +3,6 @@ import torch
 import argparse
 import itertools
 import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
 import os.path as osp
 
 from PIL import Image
@@ -12,10 +10,11 @@ from tqdm import tqdm
 from torch.utils import data
 from torchvision import transforms
 
-from core.attacks_and_models import Normalizer
+#from core.attacks_and_models import Normalizer
+Normalizer = lambda x: x
 
-from eval_utils.oracle_celeba_metrics import OracleMetrics
-from eval_utils.oracle_celebahq_metrics import OracleResnet
+from .eval_utils.oracle_celeba_metrics import OracleMetrics
+from .eval_utils.oracle_celebahq_metrics import OracleResnet
 
 
 BINARYDATASET = ["CelebA", "CelebAHQ", "CelebAMV", "BDD"]

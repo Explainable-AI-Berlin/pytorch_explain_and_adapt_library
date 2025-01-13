@@ -10,14 +10,14 @@ continuous_learning                  :  "finetune"
 replace_model                        :  True
 use_visualization                    :  True
 calculate_group_accuracies           :  True
-explainer                            :  <PEAL_BASE>/configs/explainers/pdc_unbiased.yaml
+explainer                            :  <PEAL_BASE>/configs/explainers/pdc_default128x128_2.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/waterbirds.yaml
 test_data                            :  <PEAL_BASE>/configs/data/waterbirds.yaml
 student                              :  $PEAL_RUNS/waterbirds/classifier_natural/model.cpl
 teacher                              :  SegmentationMask
 generator                            :  $PEAL_RUNS/waterbirds/ddpm/config.yaml
-base_dir                             :  $PEAL_RUNS/waterbirds/classifier_natural/pdc_cfkd
+base_dir                             :  $PEAL_RUNS/waterbirds/classifier_natural/pdc_cfkd_2
 task:
   criterions:
     ce     : 1.0

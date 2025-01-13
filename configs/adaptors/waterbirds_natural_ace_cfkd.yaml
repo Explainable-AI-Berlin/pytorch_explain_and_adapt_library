@@ -7,7 +7,6 @@ min_train_samples                    :  400
 finetune_iterations                  :  0
 max_validation_samples               :  100
 continuous_learning                  :  "finetune"
-replace_model                        :  True
 use_visualization                    :  True
 calculate_group_accuracies           :  True
 explainer                            :  <PEAL_BASE>/configs/explainers/ace_default.yaml

@@ -18,10 +18,11 @@ def main():
 
     adaptor_config = load_yaml_config(args.config, CFKDConfig)
     integrate_arguments(args, adaptor_config, exclude=["config"])
-    set_random_seed(adaptor_config.seed)
+    if not adaptor_config.seed is None:
+        set_random_seed(adaptor_config.seed)
 
     cfkd = CFKD(adaptor_config=adaptor_config)
     cfkd.run()
 
-
-main()
+if __name__ == '__main__':
+    main()
