@@ -685,7 +685,7 @@ class CFKD(Adaptor):
 
             if (
                 isinstance(self.val_dataloader.dataset, ImageDataset)
-                and self.adaptor_config.use_visualization
+                and self.adaptor_config.tracking_level >= 4
             ):
                 print("visualizing sample!!!")
                 generator_sample = self.generator.sample_x()
@@ -795,7 +795,7 @@ class CFKD(Adaptor):
         visualization_path = os.path.join(self.base_dir, "visualization.png")
         if (
             self.output_size == 2
-            and self.adaptor_config.use_visualization
+            and self.adaptor_config.tracking_level >= 4
             and not os.path.exists(visualization_path)
         ):
             print("visualize progress!!!")
@@ -1241,7 +1241,7 @@ class CFKD(Adaptor):
                 )
 
             else:
-                fa_1sided_distilled = -1
+                fa_1sided_distilled = 0.0
 
             feedback_stats["feedback_accuracy_distilled"] = float(fa_1sided_distilled)
             print("feedback_accuracy_distilled: " + str(fa_1sided_distilled))
@@ -1825,8 +1825,31 @@ class CFKD(Adaptor):
                 self.adaptor_config.batch_size,
                 self.adaptor_config.explainer.num_attempts,
             )
+            if self.adaptor_config.tracking_level > 0:
+                validation_cluster_values_path = os.path.join(
+                    self.base_dir, str(finetune_iteration), "validation_tracked_cluster_values.npz"
+                )
+                with open(
+                    validation_cluster_values_path,
+                    "wb",
+                ) as f:
+                    tracked_values_file = {}
+                    for key in self.tracked_keys:
+                        if isinstance(validation_tracked_values[key][0], torch.Tensor):
+                            tracked_values_file[key] = torch.stack(
+                                validation_tracked_values[key], dim=0
+                            ).numpy()
 
-        if hasattr(
+                        elif isinstance(
+                            validation_tracked_values[key][0], int
+                        ) or isinstance(validation_tracked_values[key][0], float):
+                            tracked_values_file[key] = np.array(
+                                validation_tracked_values[key]
+                            )
+
+                    np.savez(f, **tracked_values_file)
+
+        if self.adaptor_config.tracking_level > 0 and hasattr(
             self.dataloaders_val[0].dataset, "global_counterfactual_visualization"
         ):
             self.dataloaders_val[0].dataset.global_counterfactual_visualization(
@@ -2037,7 +2060,7 @@ class CFKD(Adaptor):
             )
             if (
                 self.output_size == 2
-                and self.adaptor_config.use_visualization
+                and self.adaptor_config.tracking_level >= 4
                 and not os.path.exists(visualization_path)
             ):
                 self.visualize_progress(

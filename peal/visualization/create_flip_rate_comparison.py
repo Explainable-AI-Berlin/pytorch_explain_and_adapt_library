@@ -53,14 +53,14 @@ if __name__ == "__main__":
         [[0.7, 0.9], [0.6, 0.8], [0.5, 0.7], [0.8, 1.0]],  # Square
     ])"""
     data = np.array([
-        [[0.97, 1.0], [0.84, 1.0], [0.77, 1.0], [0.44, 0.53]],
-        [[0.18, 0.37], [0.5, 0.88], [0.3, 0.69], [1.01, 1.01]],
-        [[0.18, 0.49], [0.23, 0.66], [0.28, 0.51], [0.63, 0.73]],
-        [[0.05, 0.10], [0.05, 0.64], [0.02, 0.4], [0.77, 0.8]],
+        [[0.97, 0.99], [0.91, 1.0], [0.78, 1.0], [0.75, 0.81]],
+        [[0.41, 0.51], [0.59, 0.92], [0.39, 0.75], [0.89, 0.91]],
+        [[0.2, 0.59], [0.29, 0.74], [0.3, 0.67], [0.78, 0.94]],
+        [[0.03, 0.04], [0.21, 0.35], [0.06, 0.26], [0.93, 0.94]],
     ])
     labels = ["ACE", "DiME", "FastDiME", "PDC (ours)"]
     titles = ["Smiling", "Blond_Hair", "Waterbirds", "Square"]
-    base_colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"]
+    base_colors = ["#1f44b4", "#1f77b4", "#1faab4", "#d62728"]
 
     fig, axs = plt.subplots(1, len(titles), figsize=(16, 6), sharey=True)
 
@@ -75,10 +75,9 @@ if __name__ == "__main__":
     fig.legend(
         handles=legend_elements,
         loc="upper center",
-        bbox_to_anchor=(0.5, 1.05),
+        bbox_to_anchor=(0.5, 0.95),
         ncol=len(labels),
-        fontsize=8,
-        title="Methods"
+        fontsize=12,
     )
 
     plt.tight_layout()

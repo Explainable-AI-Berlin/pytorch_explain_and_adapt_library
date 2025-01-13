@@ -66,6 +66,7 @@ class ExplainerConfig(BaseModel):
     Helpful in the case of datasets with a lot of classes and heavy modes like ImageNet.
     """
     transition_restrictions: Union[list, type(None)] = None
+    clustering_strategy: str = "highest_activation"
 
 
 class ExplainerInterface:

@@ -14,31 +14,31 @@ def create_bar_diagram(data, title, ax, colors):
     x = np.arange(len(data))
     width = 1.0  # Make bars touch each other
     rects = ax.bar(x, data, width, color=colors)
-    ax.bar_label(rects, fmt="%.1f", label_type="edge", fontsize=6, padding=1)
+    ax.bar_label(rects, fmt="%.2f", label_type="edge", fontsize=10, padding=3)
     ax.set_xticks([])  # Remove x-axis ticks
     ax.set_yticks([])
     for spine in ax.spines.values():
         spine.set_visible(False)
 
     # Add title below the plot
-    ax.text(0.5, -0.1, title, transform=ax.transAxes, ha="center", va="top", fontsize=8)
+    ax.text(0.5, -0.25, title, transform=ax.transAxes, ha="center", va="top", fontsize=12)
 
 if __name__ == "__main__":
     # Example usage:
     data = np.array(
         [
-            [0.79, 0.73, 0.74, 0.76],
-            [0.76, 0.72, 0.73, 1.01],
-            [0.85, 0.44, 0.43, 1.01],
-            [0.80, 0.95, 0.9, 0.82],
+            [0.79, 0.73, 0.71, 0.76],
+            [0.76, 0.72, 0.72, 0.79],
+            [0.76, 0.27, 0.32, 0.44],
+            [1.0, 0.85, 0.85, 0.87],
         ]
     )
     labels = ["ACE", "DiME", "FastDiME", "PDC (ours)"]
     titles = ["Smiling", "Blond_Hair", "Waterbirds", "Square"]
-    colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"]
+    colors = ["#1f44b4", "#1f77b4", "#1faab4", "#d62728"]
 
     fig, axs = plt.subplots(1, data.shape[0], figsize=(25, 4))  # Reduced height from 6 to 4
-    plt.subplots_adjust(wspace=0.3, bottom=0.2)  # Adjusted bottom margin
+    plt.subplots_adjust(wspace=0.3, bottom=0.4)  # Adjusted bottom margin
 
     for i in range(data.shape[0]):
         create_bar_diagram(data[i], titles[i], ax=axs[i], colors=colors)
@@ -50,13 +50,13 @@ if __name__ == "__main__":
     fig.legend(
         legend_elements,
         labels,
-        loc="upper center",
-        bbox_to_anchor=(0.5, 1.05),
+        loc="lower center",
+        bbox_to_anchor=(0.5, 0.9),  # Positioned legend below the plot
         ncol=4,
-        fontsize=8,
-        title_fontsize=10,
+        fontsize=12,  # Increased font size
+        title_fontsize=14,  # Increased title font size
     )
 
     plt.tight_layout()
-    plt.subplots_adjust(top=0.85)  # Adjust top margin for legend
+    plt.subplots_adjust(top=0.85)  # Adjust top margin for overall layout
     plt.show()

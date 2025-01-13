@@ -1,5 +1,8 @@
 from typing import Union
 
+from pydantic import BaseModel
+
+
 class Adaptor:
     def run(self):
         """

@@ -159,7 +159,8 @@ class PDCConfig(ExplainerConfig):
     The strategy on how to merge clusters when calculating them.
     E.g. select_best uses the cluster that does the most salient changes, while merge just merges all clusters.
     """
-    merge_clusters: str = "select_best"
+    merge_clusters: str = "best"
+    allow_overlap: bool = False
 
 
 class ACEConfig(ExplainerConfig):
@@ -491,7 +492,7 @@ class CounterfactualExplainer(ExplainerInterface):
         Returns:
             _type_: _description_
         """
-        if num_attempts > 1:
+        if num_attempts > 1 and not self.explainer_config.allow_overlap:
             (
                 previous_counterfactual_list,
                 previous_attributions_list,
@@ -715,7 +716,7 @@ class CounterfactualExplainer(ExplainerInterface):
 
                     pdb.set_trace()
 
-            if num_attempts == 1:
+            if num_attempts == 1 or self.explainer_config.allow_overlap:
                 dist_l1 = self.explainer_config.dist_l1
                 current_inpaint = self.explainer_config.inpaint
 
@@ -1144,7 +1145,7 @@ class CounterfactualExplainer(ExplainerInterface):
             return difference_list
 
         cluster_lists = [[] for i in range(n_clusters)]
-        if self.explainer_config.merge_clusters == "activation_clusters":
+        if self.explainer_config.clustering_strategy == "activation_clusters":
             explanations_beginning = [e[0] for e in explanations_list_by_source]
             cluster_means = extract_feature_difference(explanations_beginning)
             cluster_lists[0] = [explanations_list_by_source[0][0]]
@@ -1168,7 +1169,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 shutil.copy(collage_path, collage_path_new)
 
         for idx in range(len(explanations_list_by_source[0])):
-            if self.explainer_config.merge_clusters == "highest_activation":
+            if self.explainer_config.clustering_strategy == "highest_activation":
                 current_activations = []
                 for source_idx in range(len(explanations_list_by_source)):
                     current_activations.append(
@@ -1180,7 +1181,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 current_activations = torch.tensor(current_activations)
                 activations_order = torch.argsort(current_activations)
 
-            elif self.explainer_config.merge_clusters == "representation_clusters":
+            elif self.explainer_config.clustering_strategy == "representation_clusters":
                 if idx == 0:
                     continue
 
@@ -1201,7 +1202,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 cosine_similarities_abs = torch.abs(cosine_similarities)
 
             for i in range(n_clusters):
-                if self.explainer_config.merge_clusters == "representation_clusters":
+                if self.explainer_config.clustering_strategy == "representation_clusters":
                     idx_combined = int(torch.argmax(cosine_similarities_abs.flatten()))
                     idx_cluster = idx_combined // len(current_differences)
                     idx_current = idx_combined % len(current_differences)
@@ -1214,7 +1215,7 @@ class CounterfactualExplainer(ExplainerInterface):
                         * current_differences[idx_current]
                     ) / (idx + 1)
 
-                elif self.explainer_config.merge_clusters == "highest_activation":
+                elif self.explainer_config.clustering_strategy == "highest_activation":
                     idx_cluster = activations_order[i]
                     idx_current = i
 
@@ -1238,7 +1239,7 @@ class CounterfactualExplainer(ExplainerInterface):
                         idx_cluster
                     ]
 
-                if self.explainer_config.merge_clusters == "highest_activation":
+                if self.explainer_config.clustering_strategy == "highest_activation":
                     collage_path_ref = explanations_list_by_source[idx_current][idx][
                         "collage_path_list"
                     ]
@@ -1248,7 +1249,7 @@ class CounterfactualExplainer(ExplainerInterface):
                             *([os.path.abspath(os.sep)] + collage_path_elements)
                         )
                     )
-                    Path(collage_path_base + "_" + str(idx_cluster)).mkdir(
+                    Path(collage_path_base + "_" + str(int(idx_cluster))).mkdir(
                         parents=True, exist_ok=True
                     )
 
@@ -1257,7 +1258,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 ]
                 collage_path_new = os.path.join(
                     *[
-                        collage_path_base + "_" + str(idx_cluster),
+                        collage_path_base + "_" + str(int(idx_cluster)),
                         embed_numberstring(idx, 7) + ".png",
                     ]
                 )
@@ -1306,6 +1307,9 @@ class CounterfactualExplainer(ExplainerInterface):
             explanations_dict_out["clusters" + str(i)] = cluster_dicts[
                 sorted_cluster_idxs[i]
             ]["x_counterfactual_list"]
+            explanations_dict_out["cluster_confidence" + str(i)] = cluster_dicts[
+                sorted_cluster_idxs[i]
+            ]["y_target_end_confidence_list"]
 
         return explanations_dict_out
 
@@ -1410,24 +1414,21 @@ class CounterfactualExplainer(ExplainerInterface):
                 if len(latent_differences_valid) == 0:
                     latent_sparsity = 0.0
                     latent_diversity = 0.0
-                    import pdb
-
-                    pdb.set_trace()
 
                 else:
                     latent_sparsities = []
-                    for i in range(len(latent_differences_valid[0])):
-                        if latent_differences_valid[0][i].abs().max() == 0.0:
+                    for i in range(len(latent_differences_valid)):
+                        if latent_differences_valid[i][0].abs().max() == 0.0:
                             latent_sparsity = 0.0
 
                         else:
                             latent_sparsity = float(
                                 (
-                                    latent_differences_valid[0][i].abs().sum()
-                                    - latent_differences_valid[0][i].abs().max()
+                                    latent_differences_valid[i][0].abs().sum()
+                                    - latent_differences_valid[i][0].abs().max()
                                 )
-                                / (len(latent_differences_valid[0][i]) - 1)
-                                / latent_differences_valid[0][i].abs().max()
+                                / (len(latent_differences_valid[i][0]) - 1)
+                                / latent_differences_valid[i][0].abs().max()
                             )
 
                         latent_sparsities.append(latent_sparsity)
@@ -1439,15 +1440,14 @@ class CounterfactualExplainer(ExplainerInterface):
                         cosine_similiarities_list = [
                             torch.abs(
                                 torch.nn.CosineSimilarity(dim=0)(
-                                    latent_differences_valid[1][i],
-                                    latent_differences_valid[0][i],
+                                    latent_differences_valid[i][0],
+                                    latent_differences_valid[i][1],
                                 )
                             )
-                            for i in range(len(latent_differences_valid[0]))
+                            for i in range(len(latent_differences_valid))
                         ]
                         cosine_similiarities = torch.tensor(cosine_similiarities_list)
                         latent_diversity = 1.0 - float(torch.mean(cosine_similiarities))
-                        import pdb; pdb.set_trace()
 
                     else:
                         latent_diversity = 0.0

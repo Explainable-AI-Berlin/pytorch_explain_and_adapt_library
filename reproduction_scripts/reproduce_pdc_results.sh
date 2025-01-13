@@ -11,7 +11,7 @@ python train_generator.py --config "<PEAL_BASE>/configs/generators/square_ddpm.y
 python train_predictor.py --config "<PEAL_BASE>/configs/predictors/square3_classifier_poisoned100.yaml"
 
 # get the explanations for ACE
-python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_ace_pe_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_ace_pe_only_cfkd.yaml"
 # you can the the global visualization in
 # $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/ace_pe_cfkd/0/val_counterfactuals_global.png
 # you can see the collages in $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/ace_pe_cfkd/0/validation_collages0

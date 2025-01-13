@@ -17,3 +17,5 @@ temperature: 3.0
 visualize_gradients: true
 y_target_goal_confidence: null
 replace_with_activation: leakysoftplus
+num_attempts: 2
+allow_overlap: true
