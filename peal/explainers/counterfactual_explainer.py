@@ -1172,11 +1172,15 @@ class CounterfactualExplainer(ExplainerInterface):
             if self.explainer_config.clustering_strategy == "highest_activation":
                 current_activations = []
                 for source_idx in range(len(explanations_list_by_source)):
-                    current_activations.append(
-                        explanations_list_by_source[source_idx][idx][
-                            "y_target_end_confidence_list"
-                        ]
-                    )
+                    try:
+                        current_activations.append(
+                            explanations_list_by_source[source_idx][idx][
+                                "y_target_end_confidence_list"
+                            ]
+                        )
+
+                    except Exception as exp:
+                        import pdb; pdb.set_trace()
 
                 current_activations = torch.tensor(current_activations)
                 activations_order = torch.argsort(current_activations)
@@ -1298,18 +1302,18 @@ class CounterfactualExplainer(ExplainerInterface):
 
         explanations_dict_out = cluster_dicts[sorted_cluster_idxs[0]]
 
+        for i in range(len(sorted_cluster_idxs)):
+            explanations_dict_out["clusters" + str(int(i))] = copy.deepcopy(cluster_dicts[
+                sorted_cluster_idxs[i]
+            ]["x_counterfactual_list"])
+            explanations_dict_out["cluster_confidence" + str(int(i))] = copy.deepcopy(cluster_dicts[
+                sorted_cluster_idxs[i]
+            ]["y_target_end_confidence_list"])
+
         if self.explainer_config.merge_clusters == "concatenate":
             for key in cluster_dicts[0].keys():
                 for cluster_idx in range(1, len(cluster_dicts)):
-                    explanations_dict_out[key] += cluster_dicts[cluster_idx][key]
-
-        for i in range(len(sorted_cluster_idxs)):
-            explanations_dict_out["clusters" + str(i)] = cluster_dicts[
-                sorted_cluster_idxs[i]
-            ]["x_counterfactual_list"]
-            explanations_dict_out["cluster_confidence" + str(i)] = cluster_dicts[
-                sorted_cluster_idxs[i]
-            ]["y_target_end_confidence_list"]
+                    explanations_dict_out[key] += cluster_dicts[sorted_cluster_idxs[cluster_idx]][key]
 
         return explanations_dict_out
 
@@ -1319,7 +1323,7 @@ class CounterfactualExplainer(ExplainerInterface):
             if hasattr(self.predictor_datasets[1], "sample_to_latent"):
                 latents_original = []
                 for i, e in enumerate(
-                    explanations_dict["x_list"][: len(explanations_dict["clusters0"])]
+                    explanations_dict["x_list"][:len(explanations_dict["clusters0"])]
                 ):
                     hint = (
                         explanations_dict["hint_list"][i]
@@ -1353,12 +1357,16 @@ class CounterfactualExplainer(ExplainerInterface):
                         ]
                     )
 
-                    latent_differences.append(
-                        [
-                            latents_counterfactual[c][i] - latents_original[i]
-                            for i in range(len(latents_original))
-                        ]
-                    )
+                    try:
+                        latent_differences.append(
+                            [
+                                latents_counterfactual[c][i] - latents_original[i]
+                                for i in range(len(latents_original))
+                            ]
+                        )
+
+                    except Exception as exp:
+                        import pdb; pdb.set_trace()
 
             elif "hint_list" in explanations_dict.keys():
                 latent_differences = []

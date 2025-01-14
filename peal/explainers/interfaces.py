@@ -48,7 +48,7 @@ class ExplainerConfig(BaseModel):
     """
     Whether to cluster the explanations and return most salient ones.
     """
-    use_clustering: bool = False
+    use_clustering: bool = True
     """
     How to merge clusters of explanations?
     """
