@@ -650,6 +650,10 @@ class GroupDRO(Adaptor):
             if mode == "train":
                 self.optimizer.step()
 
+            for criterion in loss_criterions:
+                if hasattribute(criterion, reset_stats):
+                    loss_criterions[criterion].reset_stats()
+
         #
         accuracy = self.logger.log_epoch(mode, pbar=pbar)
 
