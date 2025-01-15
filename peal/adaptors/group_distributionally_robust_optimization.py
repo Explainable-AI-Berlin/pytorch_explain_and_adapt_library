@@ -25,21 +25,30 @@ It is not possible to simply write a criterion that implements DRO for two reaso
 Idea (DOESN'T WORK): Given a training config, and the datasets which are defined within it, for the dataset, select
     return_dict=True and groups_enabled=True. This will hopefully allow for the use of group information in a criterion.
 
-New idea: Use code from the ModelTrainer class (essentially all of it), and modify it to apply DRO. This seems to work
-
+New idea: Use code from the ModelTrainer class (essentially all of it), and modify it to apply DRO. This seems to work.
 
 Groups can be enabled in the existing Dataset class (groups_enabled). Adds "has_confounder" entry to the
 returned item dictionary. To enable groups in a PEAL dataset, call dataset.enable_groups().
 
-
-Training should continue as normal, we just need to adjust the loss criterion.
-
-
-What is needed in the GroupDRO adaptor?
-
 Predictor Config -- Contains the dataset (DataConfig), training procedure (TrainingConfig), and architecture
     (ArchitectureConfig),
 
+Current problems:
+    - When trying to replicate dro results, process is killed before one epoch completes, this is also true when
+      running train_predictor.py with this dataset. The iteration the process is killed on is not consistent. For
+      DRO it's killed a bit after iteration 900, and with train_predictor it's just after iteration 900 and 1200,
+      given two runs.
+      POTENTIAL SOLUTION: Replace current DRO calculation with the loss computer found in the Gorup_DRO repository
+
+Limitations:
+    - The DRO loss computer requires the loss of individual samples, rather than just the aggregate batch loss. This
+      reduces the number of loss functions that this method is able to work with from criterions.py, as with any
+      loss in criterions.py it has to be redefines to output the loss of individual samples. For now only losses
+      which directly come from torch's nn module are available for this adaptor.
+    - The cross entropy loss *FOR NOW* only supports the case that the target is not encoded in a one-hot format,
+      or rather, it explicitly uses nn.CrossEntropyLoss().
+    - The LossComputer method get_group_stats in peal/dependencies/group_dro/loss.py expects group labels to be
+      non-negative integers.
 """
 
 import copy
@@ -77,7 +86,7 @@ from peal.global_utils import (
 )
 from peal.training.loggers import log_images_to_writer
 from peal.training.loggers import Logger
-from peal.training.criterions import get_criterions
+from peal.training.criterions import get_criterions, available_criterions
 from peal.training.trainers import PredictorConfig
 from peal.data.dataloaders import create_dataloaders_from_datasource, DataloaderMixer
 from peal.generators.interfaces import Generator
@@ -89,8 +98,20 @@ from peal.architectures.predictors import (
 )
 from peal.adaptors.interfaces import Adaptor, AdaptorConfig
 
+from torch import nn
 
-class DROConfig(AdaptorConfig):
+from peal.dependencies.group_dro.loss import LossComputer
+
+
+dro_criterions = {
+    "ce": nn.CrossEntropyLoss(reduction='none'),
+    "bce": nn.BCEWithLogitsLoss(reduction='none'),
+    "mse": nn.MSELoss(reduction='none'),
+    "mae": nn.MSELoss(reduction='none'),
+}
+
+
+class GroupDROConfig(AdaptorConfig):
     """
     Config template for running the DRO adaptor.
     """
@@ -98,11 +119,26 @@ class DROConfig(AdaptorConfig):
     """
     The config template for an adaptor
     """
-    adaptor_type: str = "DRO"
+    adaptor_type: str = "GroupDRO"
     """
     The config of the predictor to be adapted.
     """
     predictor: PredictorConfig = None
+    """
+    Parameters for the Gorup_DRO loss computer
+    """
+    is_robust: bool = False
+    alpha: float = None
+    gamma: float = 0.1
+    adj: float = None
+    min_var_weight: float = 0 # I'm guessing this is a float
+    step_size: float = 0.01
+    normalize_loss: bool = False
+    btl: bool = False
+    """
+    Resets weights if true.
+    """
+    reset_weights: bool = True
     """
     The path where the model is to be stored. Explicitly overwrites model_path in predictor.
     """
@@ -118,11 +154,22 @@ class DROConfig(AdaptorConfig):
     """
     The name of the class.
     """
-    __name__: str = "peal.DROConfig"
+    __name__: str = "peal.GroupDROConfig"
 
     def __init__(
         self,
         predictor: Union[dict, PredictorConfig] = None,
+        is_robust: bool = False,
+        alpha: float = None,
+        gamma: float = 0.1,
+        adj: float = None,
+        min_var_weight: float = 0,
+        step_size: float = 0.01,
+        normalize_loss: bool = False,
+        btl: bool = False,
+        reset_weights: bool = True,
+        model_path: str = None,
+        seed: int = 0,
         **kwargs,
     ):
         """
@@ -143,11 +190,23 @@ class DROConfig(AdaptorConfig):
         else:
             raise TypeErorr(f"predictor is of type {type(predictor)}; expecting type dict or PredictorConfig")
 
+        self.is_robust = is_robust
+        self.alpha = alpha
+        self.gamma = gamma
+        self.adj = adj
+        self.min_var_weight = min_var_weight
+        self.step_size = step_size
+        self.normalize_loss = normalize_loss
+        self.btl = btl
+
+        self.reset_weights = reset_weights
+        self.model_path = model_path
+        self.seed = seed
         self.kwargs = kwargs
 
 
 
-class DRO(Adaptor):
+class GroupDRO(Adaptor):
     """
     DRO Adaptor docstring.
     """
@@ -177,6 +236,7 @@ class DRO(Adaptor):
     ):
 
         self.adaptor_config = load_yaml_config(adaptor_config, AdaptorConfig)
+        self.reset_weights = self.adaptor_config.reset_weights
         config = self.adaptor_config.predictor
         self.config = load_yaml_config(config)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -243,11 +303,6 @@ class DRO(Adaptor):
             config=self.config, datasource=datasource
         )
 
-        ### BEGIN: DRO Alterations
-        self.train_dataloader.dataset.enable_groups()
-        self.val_dataloaders.dataset.enable_groups()
-        ### END: DRO Alterations
-
         if self.config.training.train_on_test:
             self.train_dataloader = test_dataloader
 
@@ -256,6 +311,12 @@ class DRO(Adaptor):
 
         if not isinstance(self.val_dataloaders, list):
             self.val_dataloaders = [self.val_dataloaders]
+
+        ### BEGIN: DRO Alterations
+        self.train_dataloader.dataset.enable_groups()
+        for vd in self.val_dataloaders:
+            vd.dataset.enable_groups()
+        ### END: DRO Alterations
 
         if self.config.training.class_balanced:
             new_train_dataloaders = []
@@ -344,6 +405,7 @@ class DRO(Adaptor):
         if not model_path is None:
             self.config.model_path = model_path
 
+        """
         if criterions is None:
             criterions = get_criterions(config)
             self.criterions = {}
@@ -359,6 +421,42 @@ class DRO(Adaptor):
 
         else:
             self.criterions = criterions
+        """
+
+        ### BEGIN: DRO Adaptations
+        # Repackage criterions
+        self.regularization_criterions = {}
+        self.train_criterions = {}
+        self.val_criterions = {}
+        if isinstance(self.val_dataloaders, list) or isinstance(self.val_dataloaders, tuple):
+            self.val_criterions = len(self.val_dataloaders) * [{}]
+
+        construct_loss_computer = lambda dro_cr, d_set: LossComputer(
+            dro_cr,
+            self.adaptor_config.is_robust,
+            d_set,
+            self.adaptor_config.alpha,
+            self.adaptor_config.gamma,
+            self.adaptor_config.adj,
+            self.adaptor_config.min_var_weight,
+            self.adaptor_config.step_size,
+            self.adaptor_config.normalize_loss,
+            self.adaptor_config.btl
+        )
+
+        for criterion_key in self.config.task.criterions.keys():
+            if criterion_key in ["l1", "l2", "orthogonality"]:
+                self.regularization_criterions[criterion_key] = available_criterions[criterion_key]
+            elif criterion_key in dro_criterions:
+                dro_criterion = dro_criterions[criterion_key]
+                self.train_criterions[criterion_key] = construct_loss_computer(
+                    dro_criterion, self.train_dataloader.dataset
+                )
+                for i, dataloader in enumerate(self.val_dataloaders):
+                    self.val_criterions[i][criterion_key] = construct_loss_computer(dro_criterion, dataloader.dataset)
+            else:
+                raise RuntimeError(f"Criterion {criterion_key} is not implemented for use in the GroupDRO adaptor")
+        ### END: DRO Adaptations
 
         if logger is None:
             self.logger = Logger(
@@ -366,7 +464,7 @@ class DRO(Adaptor):
                 model=self.model,
                 optimizer=self.optimizer,
                 base_dir=self.model_path,
-                criterions=self.criterions,
+                criterions=self.val_criterions[0],
                 val_dataloader=self.val_dataloaders[0],
                 writer=None,
             )
@@ -397,7 +495,7 @@ class DRO(Adaptor):
         self.fit(continue_training=continue_training, is_initialized=is_initialized)
 
 
-    def run_epoch(self, dataloader, mode="train", pbar=None):
+    def run_epoch(self, dataloader, loss_criterions, mode="train", pbar=None):
         """ """
         sources = {}
         for batch_idx, sample in enumerate(dataloader):
@@ -486,9 +584,24 @@ class DRO(Adaptor):
             loss_logs = {}
 
             ### BEGIN: DRO Alterations
-            groups = y + dataloader.dataset.output_size * has_confounder
-            unique_groups = torch.unique(groups)
+            group_idx = y + dataloader.dataset.output_size * has_confounder
 
+            for criterion in self.regularization_criterions.keys():
+                criterion_loss = self.config.task.criterions[
+                    criterion
+                ] * self.regularization_criterions[criterion](self.model, pred, y.to(self.device))
+
+                loss_logs[criterion] = criterion_loss.detach().item()
+                loss += criterion_loss
+
+            for criterion in loss_criterions:
+                criterion_loss = self.config.task.criterions[
+                    criterion
+                ] * loss_criterions[criterion].loss(pred, y.to(self.device), group_idx.to(self.device))
+
+                loss_logs[criterion] = criterion_loss.detach().item()
+                loss += criterion_loss
+            """
             for criterion in self.config.task.criterions.keys():
 
                 if criterion in ["l1", "l2", "orthogonality"]:
@@ -496,25 +609,14 @@ class DRO(Adaptor):
                         criterion
                     ] * self.criterions[criterion](self.model, pred, y.to(self.device)) * self.regularization_level
                 else:
-                    group_criterion_loss = torch.zeros(unique_groups.shape)
-
-                    for i, g in enumerate(unique_groups):
-                        group_y = y[groups==g]
-                        group_pred = pred[groups==g]
-
-                        group_criterion_loss[i] = self.config.task.criterions[
-                            criterion
-                        ] * self.criterions[criterion](self.model, group_pred, group_y.to(self.device))
-
-                    criterion_loss = torch.max(group_criterion_loss)
-
-                # if criterion in ["l1", "l2", "orthogonality"]:
-                #    criterion_loss *= self.regularization_level
-
-                ### END: DRO Alterations
+                    criterion_loss = self.config.task.criterions[
+                        criterion
+                    ] * self.criterions[criterion].loss(pred, y.to(self.device), group_idx)
 
                 loss_logs[criterion] = criterion_loss.detach().item()
                 loss += criterion_loss
+            """
+            ### END: DRO Alterations
 
             loss_logs["loss"] = loss.detach().item()
 
@@ -556,7 +658,11 @@ class DRO(Adaptor):
     def fit(self, continue_training=False, is_initialized=False):
         """ """
         print("Training Config: " + str(self.config))
-        if not continue_training:
+
+
+        ### BEGIN: DRO Alterations
+        if (not continue_training) and self.reset_weights:
+        ### END: DRO Alterations
             if "orthogonality" in self.config.task.criterions.keys():
                 print("Orthogonal intialization!!!")
                 print("Orthogonal intialization!!!")
@@ -625,7 +731,7 @@ class DRO(Adaptor):
         for idx, val_dataloader in enumerate(self.val_dataloaders):
             if len(val_dataloader) >= 1:
                 val_loss, val_accuracy_current = self.run_epoch(
-                    val_dataloader, mode="validation_" + str(idx), pbar=pbar
+                    val_dataloader, self.val_criterions[idx], mode="validation_" + str(idx), pbar=pbar
                 )
                 val_accuracy += self.val_dataloader_weights[idx] * val_accuracy_current
 
@@ -642,7 +748,7 @@ class DRO(Adaptor):
             #
             self.model.train()
             train_loss, train_accuracy = self.run_epoch(
-                self.train_dataloader, pbar=pbar
+                self.train_dataloader, self.train_criterions, pbar=pbar
             )
             if isinstance(self.model, Generator):
                 train_generator_performance = (
@@ -663,7 +769,7 @@ class DRO(Adaptor):
             for idx, val_dataloader in enumerate(self.val_dataloaders):
                 if len(val_dataloader) >= 1:
                     val_loss, val_accuracy_current = self.run_epoch(
-                        val_dataloader, mode="validation_" + str(idx), pbar=pbar
+                        val_dataloader, self.val_criterions[idx], mode="validation_" + str(idx), pbar=pbar
                     )
                     val_accuracy += (
                         self.val_dataloader_weights[idx] * val_accuracy_current
