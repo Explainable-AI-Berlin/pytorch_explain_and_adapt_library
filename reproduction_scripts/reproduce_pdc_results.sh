@@ -1,6 +1,7 @@
 # This script is meant to be able to reproduce the results of the PDC paper (ARXIV_LINK).
 # The results were reproduced with the following software versions: (GIT_HASH)
 # the batch sizes are optimized for a GPU with 80gb VRAM, but can be decreased for smaller GPUs
+# this script was executed at commit 94c3dc8
 
 # Reproduce the results on the square dataset
 

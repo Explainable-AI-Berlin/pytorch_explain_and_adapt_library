@@ -1102,14 +1102,13 @@ class CFKD(Adaptor):
 
         # TODO this is not correct for calculating training stats.
         if mode == "validation":
-            num_samples = min(
-                self.adaptor_config.max_validation_samples,
-                len(self.val_dataloader.dataset),
-            )
+            num_samples = len(tracked_values["y_list"])
 
         else:
             num_samples = -1
 
+        # TODO this seems like a bug!
+        feedback = feedback[:num_samples]
         flip_rate = (
             len(
                 list(
@@ -1121,9 +1120,7 @@ class CFKD(Adaptor):
             )
             / num_samples
         )
-        ood_rate = len(list(filter(lambda sample: sample == "ood", feedback))) / len(
-            feedback
-        )
+        ood_rate = len(list(filter(lambda sample: sample == "ood", feedback))) / num_samples
 
         num_true_1sided = len(
             list(
@@ -1206,9 +1203,7 @@ class CFKD(Adaptor):
                     tracked_values["y_target_end_confidence_distilled_list"],
                 )
             )
-            flip_rate_distilled = len(flipped_samples) / len(
-                tracked_values["y_target_end_confidence_distilled_list"]
-            )
+            flip_rate_distilled = len(flipped_samples) / num_samples
             feedback_stats["flip_rate_distilled"] = float(flip_rate_distilled)
             print("flip_rate_distilled: " + str(flip_rate_distilled))
             num_true_1sided_distilled = len(
@@ -1219,7 +1214,7 @@ class CFKD(Adaptor):
                             idx
                         ]
                         > 0.5,
-                        range(len(feedback)),
+                        range(num_samples),
                     )
                 )
             )
@@ -1231,7 +1226,7 @@ class CFKD(Adaptor):
                             idx
                         ]
                         > 0.5,
-                        range(len(feedback)),
+                        range(num_samples),
                     )
                 )
             )
@@ -1834,7 +1829,7 @@ class CFKD(Adaptor):
                     "wb",
                 ) as f:
                     tracked_values_file = {}
-                    for key in self.tracked_keys:
+                    for key in validation_tracked_values.keys():
                         if isinstance(validation_tracked_values[key][0], torch.Tensor):
                             tracked_values_file[key] = torch.stack(
                                 validation_tracked_values[key], dim=0

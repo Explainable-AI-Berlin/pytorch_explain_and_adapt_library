@@ -28,7 +28,7 @@ if __name__ == "__main__":
     data = np.array(
         [
             [0.0, 0.19, 0.4, 0.33],
-            [0.0, 0.59, 0.0, 1.02],
+            [0.0, 0.59, 0.0, 1.08],
         ]
     )
     labels = ["ACE", "DiME", "FastDiME", "PDC (ours)"]
