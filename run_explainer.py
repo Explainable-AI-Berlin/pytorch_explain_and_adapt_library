@@ -33,5 +33,5 @@ def main():
         confounder_oracle = torch.load(args.confounder_oracle_path, map_location=device)
         # evaluate the explanations with the confounder oracle
 
-
-main()
+if __name__ == '__main__':
+    main()

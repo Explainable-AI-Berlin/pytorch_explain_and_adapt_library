@@ -13,10 +13,8 @@ from tqdm import tqdm
 from torch.utils import data
 from torchvision import transforms
 
-from core.attacks_and_models import Normalizer
-
-from eval_utils.oracle_celeba_metrics import OracleMetrics
-from eval_utils.oracle_celebahq_metrics import OracleResnet
+from .eval_utils.oracle_celeba_metrics import OracleMetrics
+from .eval_utils.oracle_celebahq_metrics import OracleResnet
 
 
 def arguments():

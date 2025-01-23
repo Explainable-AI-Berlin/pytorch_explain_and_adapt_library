@@ -1,0 +1,9 @@
+dataset_class           : Image2ClassDataset
+dataset_path            : /home/space/datasets/imagenet/2012/train_set
+num_samples             : 1300000
+input_type              : image
+input_size              : [3, 256, 256]
+output_type             : singleclass
+output_size             : [1000]
+downsize                : Resize
+x_selection             : ""

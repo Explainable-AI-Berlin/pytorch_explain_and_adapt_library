@@ -19,13 +19,12 @@ from zennit.torchvision import ResNetCanonizer
 
 from peal.adaptors.interfaces import Adaptor, AdaptorConfig
 from peal.adaptors.pclarc import get_perfect_annotations_mnist, split_model
-from peal.architectures.predictors import TaskConfig, TorchvisionModel
+from peal.architectures.interfaces import TaskConfig
+from peal.architectures.predictors import TorchvisionModel
 from peal.data.dataloaders import create_dataloaders_from_datasource, get_dataloader
 from peal.data.dataset_factory import get_datasets
-from peal.data.datasets import DataConfig
-from peal.explainers.lrp_explainer import LRPExplainer
-from peal.teachers.virelay_teacher import VirelayTeacher
-from peal.training.trainers import TrainingConfig
+from peal.data.interfaces import DataConfig
+from peal.training.interfaces import TrainingConfig
 
 grad_in_fc = None
 grad_out_avgpool = None
@@ -41,6 +40,8 @@ class RRClArCConfig(AdaptorConfig):
     category: str = "adaptor"
 
     adaptor_type: str = "RRClArC"
+
+    seed: int = 0
 
     model_path: str
 

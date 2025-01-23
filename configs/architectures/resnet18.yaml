@@ -1,9 +1,10 @@
-'layers' : [
-  ['vgg', 64, 2, True],
-  ['resnet', 64, 2, True],
-  ['resnet', 128, 2, True],
-  ['resnet', 256, 2, True],
-  ['resnet', 512, 2, True],
-  ['mean'],
+config_name : ArchitectureConfig
+layers : [
+  {config_name: VGGConfig, num_neurons: 64, num_blocks: 2},
+  {config_name: ResnetConfig, num_neurons: 64, num_blocks: 2},
+  {config_name: ResnetConfig, num_neurons: 128, num_blocks: 2},
+  {config_name: ResnetConfig, num_neurons: 256, num_blocks: 2},
+  {config_name: ResnetConfig, num_neurons: 512, num_blocks: 2},
+  mean
 ]
-'activation'              : 'ReLU'
+activation : ReLU

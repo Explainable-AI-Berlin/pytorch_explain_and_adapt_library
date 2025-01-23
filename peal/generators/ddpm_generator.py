@@ -14,9 +14,11 @@ from types import SimpleNamespace
 from torch.utils.tensorboard import SummaryWriter
 from typing import Union
 
+from peal.dependencies.FastDiME_CelebA.core.sample_utils import PerceptualLoss
 from peal.generators.interfaces import EditCapableGenerator, InvertibleGenerator
 from peal.global_utils import load_yaml_config, generate_smooth_mask
-from peal.dependencies.DiME.main import main as dime_main
+
+# from peal.dependencies.DiME.main import main as dime_main
 from peal.dependencies.FastDiME_CelebA.main import main as fastdime_main
 from peal.dependencies.ace.run_ace import main as ace_main
 from peal.dependencies.ace.guided_diffusion import logger
@@ -32,7 +34,7 @@ from peal.data.dataset_factory import get_datasets
 from peal.explainers.counterfactual_explainer import ACEConfig
 from peal.training.loggers import log_images_to_writer
 from peal.generators.interfaces import GeneratorConfig
-from peal.data.datasets import DataConfig
+from peal.data.interfaces import DataConfig
 from peal.training.trainers import distill_predictor
 
 
@@ -171,6 +173,7 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
 
         self.config.is_trained = True
         self.noise_fn = torch.randn_like if self.config.stochastic else torch.zeros_like
+        self.vggloss = None
 
     def sample_x(self, batch_size=None, renormalize=True):
         if batch_size is None:
@@ -416,7 +419,10 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
             )
             if not os.path.exists(distilled_path):
                 gradient_predictor = distill_predictor(
-                    explainer_config.distilled_predictor, base_path, predictor, predictor_datasets
+                    explainer_config.distilled_predictor,
+                    base_path,
+                    predictor,
+                    predictor_datasets,
                 )
 
             else:
@@ -439,17 +445,27 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         args = SimpleNamespace(**args)
         args.output_path = self.counterfactual_path
         args.batch_size = x_in.shape[0]
+        if explainer_config.l_perc != 0:
+            if self.vggloss is None:
+                print("Loading VGG loss!")
+                self.vggloss = PerceptualLoss(
+                    layer=explainer_config.l_perc_layer, c=explainer_config.l_perc
+                ).to(self.device)
+                self.vggloss.eval()
+
+            args.vggloss = self.vggloss
         #
         x_counterfactuals = None
-        for idx in range(explainer_config.attempts):
+        x_in_out = torch.clone(x_in)
+        for idx in range(explainer_config.num_attempts):
             # a0_0 = a_min + (a_max - a_min) / 2
-            # a1_0 = a_min + 0 * (a_max - a_min) / (explainer_config.attempts - 1)
-            # a1_1 = a_min + 1 * (a_max - a_min) / (explainer_config.attempts - 1)
-            # a2_0 = a_min + 0 * (a_max - a_min) / (explainer_config.attempts - 1)
-            # a2_0 = a_min + 1 * (a_max - a_min) / (explainer_config.attempts - 1)
-            # a2_0 = a_min + 2 * (a_max - a_min) / (explainer_config.attempts - 1)
-            if explainer_config.attempts > 1:
-                multiplier = idx / (explainer_config.attempts - 1)
+            # a1_0 = a_min + 0 * (a_max - a_min) / (explainer_config.num_attempts - 1)
+            # a1_1 = a_min + 1 * (a_max - a_min) / (explainer_config.num_attempts - 1)
+            # a2_0 = a_min + 0 * (a_max - a_min) / (explainer_config.num_attempts - 1)
+            # a2_0 = a_min + 1 * (a_max - a_min) / (explainer_config.num_attempts - 1)
+            # a2_0 = a_min + 2 * (a_max - a_min) / (explainer_config.num_attempts - 1)
+            if explainer_config.num_attempts > 1:
+                multiplier = idx / (explainer_config.num_attempts - 1)
 
             else:
                 multiplier = 0.5
@@ -488,7 +504,7 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
                 else explainer_config.dist_l1[0]
                 * (
                     (explainer_config.dist_l1[1] / explainer_config.dist_l1[0])
-                    ** (1 / (explainer_config.attempts - 1))
+                    ** (1 / (explainer_config.num_attempts - 1))
                 )
                 ** idx
             )
@@ -500,7 +516,7 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
                 else explainer_config.dist_l1[0]
                 * (
                     (explainer_config.dist_l2[1] / explainer_config.dist_l2[0])
-                    ** (1 / (explainer_config.attempts - 1))
+                    ** (1 / (explainer_config.num_attempts - 1))
                 )
                 ** idx
             )
@@ -534,15 +550,20 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
             args.original_classifier = predictor
             args.diffusion = self.diffusion
             args.model = self.model
+            args.seed += idx
             #
-            if args.subtype == "DiME":
-                x_counterfactuals_current, histories = dime_main(args=args)
-
-            elif args.subtype == "ACE":
+            if args.subtype == "ACE":
                 x_counterfactuals_current, histories = ace_main(args=args)
 
             elif args.subtype == "FastDiME":
                 x_counterfactuals_current, histories = fastdime_main(args=args)
+
+            else:
+                raise Exception(args.subtype + " does not exist!")
+
+            """elif args.subtype == "DiME":
+                # can be done with FastDiME implementation
+                x_counterfactuals_current, histories = dime_main(args=args)"""
 
             x_counterfactuals_current = torch.cat(x_counterfactuals_current, dim=0)
 
@@ -568,7 +589,14 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
                 y_target_end_confidence = y_target_end_confidence_current
 
             else:
-                for i in range(x_in.shape[0]):
+                x_counterfactuals = torch.cat(
+                    [x_counterfactuals, x_counterfactuals_current], 0
+                )
+                y_target_end_confidence = torch.cat(
+                    [y_target_end_confidence, y_target_end_confidence_current], 0
+                )
+                x_in_out = torch.cat([x_in_out, torch.clone(x_in)], 0)
+                """for i in range(x_in.shape[0]):
                     if y_target_end_confidence[i] < 0.51:
                         x_counterfactuals[i] = x_counterfactuals_current[i]
                         y_target_end_confidence[i] = y_target_end_confidence_current[i]
@@ -577,11 +605,11 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
             print("num_successful")
             print(num_successful)
             if num_successful == x_in.shape[0]:
-                break
+                break"""
 
         return (
             list(x_counterfactuals),
-            list(x_in - x_counterfactuals),
+            list(x_in_out - x_counterfactuals),
             list(y_target_end_confidence),
             list(x_in),
             list(histories),

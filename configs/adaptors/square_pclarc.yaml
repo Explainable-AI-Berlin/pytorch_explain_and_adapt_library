@@ -4,7 +4,7 @@ data: <PEAL_BASE>/configs/data/square_poisoned098.yaml
 base_dir: $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned098/pclarc
 category: "adaptor"
 projection_type: 'pcav' # ['pcav', 'svm', 'simple']
-projection_location: [5, 6, 7, 8, 9, 10, -2] # 0 for input, -1 for penultimate layer
+projection_location: [-2] # 0 for input, -1 for penultimate layer
 unpoisoned_data: <PEAL_BASE>/configs/data/square_unpoisoned.yaml
 correction_strength: [1]
 task:

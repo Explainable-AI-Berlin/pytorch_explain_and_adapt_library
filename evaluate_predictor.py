@@ -2,9 +2,10 @@ import argparse
 import torch
 import os
 
-from peal.architectures.predictors import TaskConfig
-from peal.data.datasets import DataConfig
-from peal.training.trainers import TrainingConfig, ModelTrainer, PredictorConfig
+from peal.architectures.interfaces import TaskConfig
+from peal.data.interfaces import DataConfig
+from peal.training.trainers import ModelTrainer
+from peal.training.interfaces import TrainingConfig, PredictorConfig
 from peal.data.dataloaders import create_dataloaders_from_datasource
 from peal.global_utils import load_yaml_config, set_random_seed
 from peal.training.trainers import calculate_test_accuracy
@@ -59,4 +60,5 @@ def main():
     print("Groups: " + str(groups))
     print("Worst group accuracy: " + str(worst_group_accuracy))
 
-main()
+if __name__ == '__main__':
+    main()

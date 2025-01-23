@@ -1,9 +1,11 @@
 # python -W ignore run_explainer.py --config "<PEAL_BASE>/configs/explainers/ace_pe_only.yaml"
 explainer_type : ACE
 category : explainer
-attack_iterations: 50
+attack_iterations: 100
 sampling_time_fraction: 0.3
-sampling_inpaint: 0.5
+sampling_inpaint: 0.7
 attack_step: 1
 dist_l1: 0.001
 y_target_goal_confidence: 1.1
+num_attempts: 2
+use_clustering: true

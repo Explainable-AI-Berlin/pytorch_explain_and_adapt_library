@@ -1,16 +1,16 @@
 # python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Smiling_natural_pdc_cfkd.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
-batch_size                           :  1
+batch_size                           :  3
 tracking_level                       :  3
 min_train_samples                    :  900
 finetune_iterations                  :  0
+max_test_batches                     :  10
 max_validation_samples               :  100
 continuous_learning                  :  "retrain"
-replace_model                        :  True
-use_visualization                    :  True
+use_visualization                    :  False
 calculate_group_accuracies           :  True
-explainer                            :  <PEAL_BASE>/configs/explainers/pdc_sparse.yaml
+explainer                            :  <PEAL_BASE>/configs/explainers/pdc_default64x64.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/celeba.yaml
 test_data                            :  <PEAL_BASE>/configs/data/celeba.yaml

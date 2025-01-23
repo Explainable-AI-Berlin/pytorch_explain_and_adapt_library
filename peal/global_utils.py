@@ -18,8 +18,13 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 
 from pkg_resources import resource_filename
+from pydantic import BaseModel
 from tqdm import tqdm
 from pathlib import Path
+
+from peal.architectures.interfaces import TaskConfig, ArchitectureConfig
+from peal.data.interfaces import DataConfig
+from peal.training.interfaces import TrainingConfig
 
 
 def dict_to_bar_chart(input_dict, name):
@@ -61,12 +66,16 @@ def find_subclasses(base_class, directory):
     project_base_dir = get_project_resource_dir()
     for dirpath, dirnames, filenames in os.walk(directory):
         for filename in filenames:
+            current_path = os.path.join(dirpath, filename)
             if filename.endswith(".py"):
                 module_path = os.path.relpath(
                     os.path.join(dirpath, filename), project_base_dir
                 )
                 module_name = module_path.replace("/", ".")[:-3]
                 check_module(module_name)
+
+            elif os.path.isdir(current_path):
+                subclasses.extend(find_subclasses(base_class, current_path))
 
     for importer, package_name, _ in pkgutil.iter_modules():
         if package_name.startswith(directory):
@@ -250,33 +259,44 @@ def _load_yaml_config(config_path):
 
 
 def get_config_model(config_data):
-    config_class_str = config_data[config_data["category"] + "_type"] + "Config"
+    if "config_name" in config_data.keys():
+        subclass_dir = os.path.join(
+            get_project_resource_dir(),
+            "peal",
+        )
+        class_list = find_subclasses(BaseModel, subclass_dir)
+        class_dict = {c.__name__: c for c in class_list}
+        config_model = class_dict[config_data["config_name"]]
+        return config_model
 
-    module_path = os.path.join(
-        "peal",
-        config_data["category"] + "s",
-    )
-    superclass_dir = os.path.join(module_path, "interfaces")
-    superclass_module_name = superclass_dir.replace("/", ".")
-    module = importlib.import_module(superclass_module_name)
-    superclass = None
-    for name, obj in inspect.getmembers(module):
-        if inspect.isclass(obj):
-            if (
-                obj.__name__[-6:] == "Config"
-                and obj.__module__ == superclass_module_name
-            ):
-                superclass = obj
+    else:
+        config_class_str = config_data[config_data["category"] + "_type"] + "Config"
 
-    subclass_dir = os.path.join(
-        get_project_resource_dir(),
-        module_path,
-    )
-    class_list = find_subclasses(superclass, subclass_dir)
-    class_dict = {c.__name__: c for c in class_list}
-    config_model = class_dict[config_class_str]
+        module_path = os.path.join(
+            "peal",
+            config_data["category"] + "s",
+        )
+        superclass_dir = os.path.join(module_path, "interfaces")
+        superclass_module_name = superclass_dir.replace("/", ".")
+        module = importlib.import_module(superclass_module_name)
+        superclass = None
+        for name, obj in inspect.getmembers(module):
+            if inspect.isclass(obj):
+                if (
+                    obj.__name__[-6:] == "Config"
+                    and obj.__module__ == superclass_module_name
+                ):
+                    superclass = obj
 
-    return config_model
+        subclass_dir = os.path.join(
+            get_project_resource_dir(),
+            module_path,
+        )
+        class_list = find_subclasses(superclass, subclass_dir)
+        class_dict = {c.__name__: c for c in class_list}
+        config_model = class_dict[config_class_str]
+
+        return config_model
 
 
 def load_yaml_config(config_path, config_model=None, return_namespace=True):
@@ -284,8 +304,11 @@ def load_yaml_config(config_path, config_model=None, return_namespace=True):
     if (
         config_model is None
         and isinstance(config_data, dict)
-        and "category" in config_data.keys()
-        and config_data["category"] + "_type" in config_data.keys()
+        and (
+            "category" in config_data.keys()
+            and config_data["category"] + "_type" in config_data.keys()
+            or "config_name" in config_data.keys()
+        )
     ):
         config_model = get_config_model(config_data)
 
@@ -298,6 +321,11 @@ def load_yaml_config(config_path, config_model=None, return_namespace=True):
                 config_data[key] = load_yaml_config(
                     config_data[key], return_namespace=False
                 )
+
+            elif isinstance(config_data[key], list):
+                for idx in range(len(config_data[key])):
+                    if isinstance(config_data[key][idx], dict):
+                        config_data[key][idx] = load_yaml_config(config_data[key][idx])
 
         config = config_model(**config_data)
 
@@ -436,7 +464,11 @@ def get_predictions(args):
     acc = 0
 
     for idx, sample in enumerate(tqdm(loader)):
-        if hasattr(args, "max_samples") and not args.max_samples is None and idx > args.max_samples:
+        if (
+            hasattr(args, "max_samples")
+            and not args.max_samples is None
+            and idx > args.max_samples
+        ):
             break
 
         if len(sample) == 3:
@@ -555,5 +587,7 @@ def set_random_seed(seed: int):
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)  # If you are using multi-GPU.
     torch.backends.cudnn.deterministic = True  # Ensure deterministic results.
-    torch.backends.cudnn.benchmark = False  # Disable the optimization for specific architectures.
-    os.environ['PYTHONHASHSEED'] = str(seed)
+    torch.backends.cudnn.benchmark = (
+        False  # Disable the optimization for specific architectures.
+    )
+    os.environ["PYTHONHASHSEED"] = str(seed)

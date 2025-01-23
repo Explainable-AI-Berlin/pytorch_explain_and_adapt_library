@@ -3,31 +3,22 @@ import yaml
 import math
 import random
 import argparse
-import itertools
 import numpy as np
 import os.path as osp
-import matplotlib.pyplot as plt
-
-from PIL import Image
-from time import time
-from os import path as osp
-from multiprocessing import Pool
-
 import torch
 from torch.utils import data
 
-from torchvision import transforms
-from torchvision import datasets
+from time import time
+from os import path as osp
 
-from peal.dependencies.FastDiME_CelebA.core import dist_util
-from peal.dependencies.FastDiME_CelebA.core.script_util import (
+from .core import dist_util
+from .core.script_util import (
     model_and_diffusion_defaults,
     create_model_and_diffusion,
-    create_classifier,
     args_to_dict,
     add_dict_to_argparser,
 )
-from peal.dependencies.FastDiME_CelebA.core.sample_utils import (
+from .core.sample_utils import (
     get_DiME_iterative_sampling,
     get_FastDiME_iterative_sampling,
     get_GMD_iterative_sampling,
@@ -36,16 +27,19 @@ from peal.dependencies.FastDiME_CelebA.core.sample_utils import (
     ImageSaver,
     ImageSaverCF,
     SlowSingleLabel,
-    Normalizer,
-    load_from_DDP_model,
     PerceptualLoss,
     X_T_Saver,
     Z_T_Saver,
     ChunkedDataset,
     generate_mask,
 )
-from peal.dependencies.FastDiME_CelebA.core.classifier.densenet import ClassificationModel
+
+# from core.image_datasets import CelebADataset, CelebAMiniVal, ShortcutCelebADataset
+from .core.classifier.densenet import ClassificationModel
 import matplotlib
+
+from peal.data.interfaces import PealDataset
+from peal.dependencies.ace.guided_diffusion.image_datasets import BINARYDATASET
 
 matplotlib.use("Agg")  # to disable display
 
@@ -278,17 +272,22 @@ def main(args=None):
         args = create_args()
 
         import yaml
+
         args_dict = vars(args)
 
         # Save dictionary to a YAML file
-        yaml_file = 'args.yaml'
-        with open(yaml_file, 'w') as file:
+        yaml_file = "args.yaml"
+        with open(yaml_file, "w") as file:
             yaml.dump(args_dict, file, default_flow_style=False)
 
-        import pdb; pdb.set_trace()
+        import pdb
+
+        pdb.set_trace()
 
     # print(args)
-    os.makedirs(osp.join(args.output_path, "Results", args.exp_name), exist_ok=True)
+    if args.save_images:
+        os.makedirs(osp.join(args.output_path, "Results", args.exp_name), exist_ok=True)
+
     print()
     print(f"PID: {os.getpid()}\n")
 
@@ -306,117 +305,138 @@ def main(args=None):
     torch.manual_seed(args.seed)
     random.seed(args.seed)
     np.random.seed(args.seed)
+    counterfactuals = []
 
     # ========================================
     # Load Dataset
-
-    if args.dataset == "CelebA":
-        dataset = CelebADataset(
-            image_size=args.image_size,
-            data_dir=args.data_dir,
-            partition="train" if args.use_train else "val",
-            random_crop=False,
-            random_flip=False,
-            query_label=args.query_label,
-        )
-
-    elif "CelebAMV" in args.dataset:
-        if args.dataset == "CelebAMV":
-            csv_file = "utils/minival.csv"
-        elif args.dataset == "CelebAMV4":
-            csv_file = "utils/minival4k.csv"
-
-        dataset = CelebAMiniVal(
-            image_size=args.image_size,
-            data_dir=args.data_dir,
-            csv_file=csv_file,
-            random_crop=False,
-            random_flip=False,
-            query_label=args.query_label,
-        )
-
-    elif args.dataset == "ShortcutCelebA":
-        dataset = ShortcutCelebADataset(
-            image_size=args.image_size,
-            data_dir=args.data_dir,
-            partition="train" if args.use_train else "val",
-            random_crop=False,
-            random_flip=False,
-            query_label=31,
-            task_label=39,
-            shortcut_label_name="Smiling",
-            task_label_name="Young",
-            percentage=0.5,
-            n_samples=1000,
-        )
-
-        save_cf_imgs = (
-            ImageSaverCF(args.output_path, args.exp_name, extention=".jpg")
-            if args.save_images
-            else None
-        )
+    if isinstance(args.dataset, list):
+        loader = args.dataset
 
     else:
+        if args.dataset == "CelebA":
+            dataset = CelebADataset(
+                image_size=args.image_size,
+                data_dir=args.data_dir,
+                partition="train" if args.use_train else "val",
+                random_crop=False,
+                random_flip=False,
+                query_label=args.query_label,
+            )
 
-        raise Exception(f"dataset {args.dataset} not implemented")
+        elif "CelebAMV" in args.dataset:
+            if args.dataset == "CelebAMV":
+                csv_file = "utils/minival.csv"
+            elif args.dataset == "CelebAMV4":
+                csv_file = "utils/minival4k.csv"
 
-    if len(dataset) - args.batch_size * args.num_batches > 0:
-        dataset = SlowSingleLabel(
-            query_label=1 - args.target_label if args.target_label != -1 else -1,
-            dataset=dataset,
-            maxlen=args.batch_size * args.num_batches,
+            dataset = CelebAMiniVal(
+                image_size=args.image_size,
+                data_dir=args.data_dir,
+                csv_file=csv_file,
+                random_crop=False,
+                random_flip=False,
+                query_label=args.query_label,
+            )
+
+        elif args.dataset == "ShortcutCelebA":
+            dataset = ShortcutCelebADataset(
+                image_size=args.image_size,
+                data_dir=args.data_dir,
+                partition="train" if args.use_train else "val",
+                random_crop=False,
+                random_flip=False,
+                query_label=31,
+                task_label=39,
+                shortcut_label_name="Smiling",
+                task_label_name="Young",
+                percentage=0.5,
+                n_samples=1000,
+            )
+
+            save_cf_imgs = (
+                ImageSaverCF(args.output_path, args.exp_name, extention=".jpg")
+                if args.save_images
+                else None
+            )
+
+        else:
+
+            raise Exception(f"dataset {args.dataset} not implemented")
+
+        if len(dataset) - args.batch_size * args.num_batches > 0:
+            dataset = SlowSingleLabel(
+                query_label=1 - args.target_label if args.target_label != -1 else -1,
+                dataset=dataset,
+                maxlen=args.batch_size * args.num_batches,
+            )
+
+        # breaks the dataset into chunks
+        dataset = ChunkedDataset(
+            dataset=dataset, chunk=args.chunk, num_chunks=args.num_chunks
         )
 
-    # breaks the dataset into chunks
-    dataset = ChunkedDataset(
-        dataset=dataset, chunk=args.chunk, num_chunks=args.num_chunks
-    )
+        print("Images on the dataset:", len(dataset))
 
-    print("Images on the dataset:", len(dataset))
-
-    loader = data.DataLoader(
-        dataset,
-        batch_size=args.batch_size,
-        shuffle=False,
-        num_workers=4,
-        pin_memory=True,
-    )
+        loader = data.DataLoader(
+            dataset,
+            batch_size=args.batch_size,
+            shuffle=False,
+            num_workers=4,
+            pin_memory=True,
+        )
 
     # ========================================
     # load models
 
-    print("Loading Model and diffusion model")
-    model, diffusion = create_model_and_diffusion(
-        **args_to_dict(args, model_and_diffusion_defaults().keys())
-    )
-    model.load_state_dict(
-        dist_util.load_state_dict(args.model_path, map_location="cpu")
-    )
+    if not hasattr(args, "model"):
+        print("Loading Model and diffusion model")
+        model, diffusion = create_model_and_diffusion(
+            **args_to_dict(args, model_and_diffusion_defaults().keys())
+        )
+        model.load_state_dict(
+            dist_util.load_state_dict(args.model_path, map_location="cpu")
+        )
+
+    else:
+        model = args.model
+        diffusion = args.diffusion
+
     model.to(dist_util.dev())
     if args.use_fp16:
         model.convert_to_fp16()
+
     model.eval()
 
     def model_fn(x, t, y=None):
         assert y is not None
         return model(x, t, y if args.class_cond else None)
 
-    print("Loading Classifier")
+    if hasattr(args, "classifier"):
+        print("using classifier from args")
+        classifier = args.classifier
 
-    classifier = ClassificationModel(args.classifier_path, args.query_label).to(
-        dist_util.dev()
-    )
+    else:
+        print("Loading Classifier")
+        classifier = ClassificationModel(args.classifier_path, args.query_label).to(
+            dist_util.dev()
+        )
+
     classifier.eval()
 
     # ========================================
     # Distance losses
 
     if args.l_perc != 0:
-        print("Loading Perceptual Loss")
-        vggloss = PerceptualLoss(layer=args.l_perc_layer, c=args.l_perc).to(
-            dist_util.dev()
-        )
-        vggloss.eval()
+        if not hasattr(args, "vggloss") or args.vggloss is None:
+            print("Loading Perceptual Loss")
+            vggloss = PerceptualLoss(layer=args.l_perc_layer, c=args.l_perc).to(
+                dist_util.dev()
+            )
+            vggloss.eval()
+
+        else:
+            vggloss = args.vggloss
+
     else:
         vggloss = None
 
@@ -492,28 +512,62 @@ def main(args=None):
     n = 0
     classifier_scales = [float(x) for x in args.classifier_scales.split(",")]
 
-    print("Starting Image Generation")
-    for idx, (indexes, img, lab, task_label) in enumerate(loader):
-        print(
-            f"[Chunk {args.chunk + 1} / {args.num_chunks}] {idx} / {min(args.num_batches, len(loader))} | Time: {int(time() - start_time)}s"
-        )
+    if args.save_images:
+        print("Starting Image Generation")
+
+    for idx, sample in enumerate(loader):
+        if len(sample) == 4:
+            indexes, img, lab, task_label = sample
+
+        elif len(sample) == 3:
+            indexes, img, lab = sample
+            task_label = 0
+
+        if args.save_images:
+            print(
+                f"[Chunk {args.chunk + 1} / {args.num_chunks}] {idx} / {min(args.num_batches, len(loader))}"
+                + " | Time: {int(time() - start_time)}s"
+            )
+
         # print(idx, indexes)
         img = img.to(dist_util.dev())
         I = (img / 2) + 0.5
-        lab = lab.to(dist_util.dev(), dtype=torch.long)
         t = torch.zeros(img.size(0), device=dist_util.dev(), dtype=torch.long)
+        if isinstance(lab, list):
+            lab, target = lab
+            lab = lab.to(
+                dist_util.dev(),
+                dtype=(
+                    torch.float
+                    if args.dataset in BINARYDATASET
+                    or isinstance(args.dataset, PealDataset)
+                    else torch.long
+                ),
+            )
+            target = target.to(
+                dist_util.dev(),
+                dtype=(
+                    torch.float
+                    if args.dataset in BINARYDATASET
+                    or isinstance(args.dataset, PealDataset)
+                    else torch.long
+                ),
+            )
 
-        # Initial Classification, no noise included
-        with torch.no_grad():
-            logits = classifier(img)
-            pred = (logits > 0).long()
+        else:
+            lab = lab.to(dist_util.dev(), dtype=torch.long)
 
-        acc += (pred == lab).sum().item()
+            # Initial Classification, no noise included
+            with torch.no_grad():
+                logits = classifier(img)
+                pred = (logits > 0).long()
+
+            acc += (pred == lab).sum().item()
+
+            # as the model is binary, the target will always be the inverse of the prediction
+            target = 1 - pred
+
         n += lab.size(0)
-
-        # as the model is binary, the target will always be the inverse of the prediction
-        target = 1 - pred
-
         t = torch.ones_like(t) * args.start_step
 
         # add noise to the input image
@@ -609,7 +663,11 @@ def main(args=None):
             # evaluate the cf and check whether the model flipped the prediction
             with torch.no_grad():
                 cfsl = classifier(cfs)
-                cfsp = cfsl > 0
+                if len(cfsl.shape) == 2:
+                    cfsp = cfsl.argmax(-1)
+
+                else:
+                    cfsp = cfsl > 0
 
             if jdx == 0:
                 cf = cfs.clone().detach()
@@ -620,7 +678,12 @@ def main(args=None):
             for kdx in range(len(x_t_s)):
                 x_t_s[kdx][~transformed] = xs_t_s[kdx]
                 z_t_s[kdx][~transformed] = zs_t_s[kdx]
-            transformed[~transformed] = target[~transformed] == cfsp
+
+            try:
+                transformed[~transformed] = target[~transformed] == cfsp
+
+            except Exception:
+                import pdb; pdb.set_trace()
 
             if transformed.float().sum().item() == transformed.size(0):
                 break
@@ -628,52 +691,56 @@ def main(args=None):
         batch_end_time = time()
         batch_times.append(batch_end_time - batch_start_time)
 
-        if args.save_x_t:
-            x_t_saver(x_t_s, indexes=indexes)
+        if args.save_images:
+            if args.save_x_t:
+                x_t_saver(x_t_s, indexes=indexes)
 
-        if args.save_z_t:
-            z_t_saver(z_t_s, indexes=indexes)
+            if args.save_z_t:
+                z_t_saver(z_t_s, indexes=indexes)
 
-        with torch.no_grad():
-            logits_cf = classifier(cf)
-            pred_cf = (logits_cf > 0).long()
+        counterfactuals.append(torch.clamp(cf.detach().cpu(), 0 , 1))
+        if args.save_images:
+            with torch.no_grad():
+                logits_cf = classifier(cf)
+                pred_cf = (logits_cf > 0).long()
 
-            # process images
-            cf = ((cf + 1) * 127.5).clamp(0, 255).to(torch.uint8)
-            cf = cf.permute(0, 2, 3, 1)
-            cf = cf.contiguous().cpu()
+                # process images
+                cf = ((cf + 1) * 127.5).clamp(0, 255).to(torch.uint8)
+                cf = cf.permute(0, 2, 3, 1)
+                cf = cf.contiguous().cpu()
 
-            I = (I * 255).to(torch.uint8)
-            I = I.permute(0, 2, 3, 1)
-            I = I.contiguous().cpu()
+                I = (I * 255).to(torch.uint8)
+                I = I.permute(0, 2, 3, 1)
+                I = I.contiguous().cpu()
 
-            noise_img = ((noise_img + 1) * 127.5).clamp(0, 255).to(torch.uint8)
-            noise_img = noise_img.permute(0, 2, 3, 1)
-            noise_img = noise_img.contiguous().cpu()
+                noise_img = ((noise_img + 1) * 127.5).clamp(0, 255).to(torch.uint8)
+                noise_img = noise_img.permute(0, 2, 3, 1)
+                noise_img = noise_img.contiguous().cpu()
 
-            # add metrics
-            dist_cf = torch.sigmoid(logits_cf)
-            dist_cf[target == 0] = 1 - dist_cf[target == 0]
-            bkl = (1 - dist_cf).detach().cpu()
+                # add metrics
+                dist_cf = torch.sigmoid(logits_cf)
+                dist_cf[target == 0] = 1 - dist_cf[target == 0]
+                bkl = (1 - dist_cf).detach().cpu()
 
-            cf_output = torch.sigmoid(logits_cf)
-            original_output = torch.sigmoid(logits)
-            mad = torch.abs(original_output - cf_output).detach().cpu()
+                cf_output = torch.sigmoid(logits_cf)
+                original_output = torch.sigmoid(logits)
+                mad = torch.abs(original_output - cf_output).detach().cpu()
 
-            # dists
-            I_f = (I.to(dtype=torch.float) / 255).view(I.size(0), -1)
-            cf_f = (cf.to(dtype=torch.float) / 255).view(I.size(0), -1)
-            l_1 = (I_f - cf_f).abs().mean(dim=1).detach().cpu()
+                # dists
+                I_f = (I.to(dtype=torch.float) / 255).view(I.size(0), -1)
+                cf_f = (cf.to(dtype=torch.float) / 255).view(I.size(0), -1)
+                l_1 = (I_f - cf_f).abs().mean(dim=1).detach().cpu()
 
-            stats["l_1"].append(l_1)
-            stats["n"] += I.size(0)
-            stats["bkl"].append(bkl)
-            stats["mad"].append(mad)
-            stats["flipped"] += (pred_cf == target).sum().item()
-            stats["cf pred"].append(pred_cf.detach().cpu())
-            stats["target"].append(target.detach().cpu())
-            stats["label"].append(lab.detach().cpu())
-            stats["pred"].append(pred.detach().cpu())
+                stats["l_1"].append(l_1)
+                stats["n"] += I.size(0)
+                stats["bkl"].append(bkl)
+                stats["mad"].append(mad)
+                stats["flipped"] += (pred_cf == target).sum().item()
+                stats["cf pred"].append(pred_cf.detach().cpu())
+                stats["target"].append(target.detach().cpu())
+                stats["label"].append(lab.detach().cpu())
+                stats["pred"].append(pred.detach().cpu())
+
 
         if args.save_images:
             if "Shortcut" not in args.dataset:
@@ -692,6 +759,7 @@ def main(args=None):
                     l_1,
                     indexes=indexes.numpy(),
                 )
+
             else:
                 save_cf_imgs(
                     I.numpy(),
@@ -709,141 +777,151 @@ def main(args=None):
 
         if (idx + 1) == min(args.num_batches, len(loader)):
             print(
-                f"[Chunk {args.chunk + 1} / {args.num_chunks}] {idx + 1} / {min(args.num_batches, len(loader))} | Time: {int(time() - start_time)}s"
+                f"[Chunk {args.chunk + 1} / {args.num_chunks}] {idx + 1} / {min(args.num_batches, len(loader))}"
+                + " | Time: {int(time() - start_time)}s"
             )
             print("\nDone")
             break
 
         current_idx += I.size(0)
 
-    # Calculate mean and std of batch times
-    mean_batch_time = np.mean(batch_times)
-    std_batch_time = np.std(batch_times)
+    if args.save_images:
+        # Calculate mean and std of batch times
+        mean_batch_time = np.mean(batch_times)
+        std_batch_time = np.std(batch_times)
 
-    print()
-    print(f"Method {args.method}")
-    print(f"Mean time per batch: {np.round(mean_batch_time,1)}s")
-    print(f"Std time per batch: {np.round(std_batch_time,1)}s")
-    print()
+        print()
+        print(f"Method {args.method}")
+        print(f"Mean time per batch: {np.round(mean_batch_time,1)}s")
+        print(f"Std time per batch: {np.round(std_batch_time,1)}s")
+        print()
 
-    # write summary for all four combinations
-    summary = {
-        "class-cor": {
+        # write summary for all four combinations
+        summary = {
+            "class-cor": {
+                "cf-cor": {"bkl": 0, "mad": 0, "l_1": 0, "n": 0},
+                "cf-inc": {"bkl": 0, "mad": 0, "l_1": 0, "n": 0},
+                "bkl": 0,
+                "mad": 0,
+                "l_1": 0,
+                "n": 0,
+            },
+            "class-inc": {
+                "cf-cor": {"bkl": 0, "mad": 0, "l_1": 0, "n": 0},
+                "cf-inc": {"bkl": 0, "mad": 0, "l_1": 0, "n": 0},
+                "bkl": 0,
+                "l_1": 0,
+                "mad": 0,
+                "n": 0,
+            },
             "cf-cor": {"bkl": 0, "mad": 0, "l_1": 0, "n": 0},
             "cf-inc": {"bkl": 0, "mad": 0, "l_1": 0, "n": 0},
+            "clean acc": 100 * acc / n,
+            "cf acc": stats["flipped"] / n,
             "bkl": 0,
             "mad": 0,
             "l_1": 0,
             "n": 0,
-        },
-        "class-inc": {
-            "cf-cor": {"bkl": 0, "mad": 0, "l_1": 0, "n": 0},
-            "cf-inc": {"bkl": 0, "mad": 0, "l_1": 0, "n": 0},
-            "bkl": 0,
-            "l_1": 0,
-            "mad": 0,
-            "n": 0,
-        },
-        "cf-cor": {"bkl": 0, "mad": 0, "l_1": 0, "n": 0},
-        "cf-inc": {"bkl": 0, "mad": 0, "l_1": 0, "n": 0},
-        "clean acc": 100 * acc / n,
-        "cf acc": stats["flipped"] / n,
-        "bkl": 0,
-        "mad": 0,
-        "l_1": 0,
-        "n": 0,
-        "FVA": 0,
-        "MNAC": 0,
-    }
+            "FVA": 0,
+            "MNAC": 0,
+        }
 
-    for k in stats.keys():
-        if k in ["flipped", "n"]:
-            continue
-        stats[k] = torch.cat(stats[k]).numpy()
+        for k in stats.keys():
+            if k in ["flipped", "n"]:
+                continue
+            stats[k] = torch.cat(stats[k]).numpy()
 
-    for k in ["bkl", "mad", "l_1"]:
+        for k in ["bkl", "mad", "l_1"]:
 
-        summary["class-cor"]["cf-cor"][k] = mean(
+            summary["class-cor"]["cf-cor"][k] = mean(
+                stats[k][
+                    (stats["label"] == stats["pred"])
+                    & (stats["target"] == stats["cf pred"])
+                ]
+            )
+            summary["class-inc"]["cf-cor"][k] = mean(
+                stats[k][
+                    (stats["label"] != stats["pred"])
+                    & (stats["target"] == stats["cf pred"])
+                ]
+            )
+            summary["class-cor"]["cf-inc"][k] = mean(
+                stats[k][
+                    (stats["label"] == stats["pred"])
+                    & (stats["target"] != stats["cf pred"])
+                ]
+            )
+            summary["class-inc"]["cf-inc"][k] = mean(
+                stats[k][
+                    (stats["label"] != stats["pred"])
+                    & (stats["target"] != stats["cf pred"])
+                ]
+            )
+
+            summary["class-cor"][k] = mean(stats[k][stats["label"] == stats["pred"]])
+            summary["class-inc"][k] = mean(stats[k][stats["label"] != stats["pred"]])
+
+            summary["cf-cor"][k] = mean(stats[k][stats["target"] == stats["cf pred"]])
+            summary["cf-inc"][k] = mean(stats[k][stats["target"] != stats["cf pred"]])
+
+            summary[k] = mean(stats[k])
+
+        summary["class-cor"]["cf-cor"]["n"] = len(
             stats[k][
                 (stats["label"] == stats["pred"])
                 & (stats["target"] == stats["cf pred"])
             ]
         )
-        summary["class-inc"]["cf-cor"][k] = mean(
+        summary["class-inc"]["cf-cor"]["n"] = len(
             stats[k][
                 (stats["label"] != stats["pred"])
                 & (stats["target"] == stats["cf pred"])
             ]
         )
-        summary["class-cor"]["cf-inc"][k] = mean(
+        summary["class-cor"]["cf-inc"]["n"] = len(
             stats[k][
                 (stats["label"] == stats["pred"])
                 & (stats["target"] != stats["cf pred"])
             ]
         )
-        summary["class-inc"]["cf-inc"][k] = mean(
+        summary["class-inc"]["cf-inc"]["n"] = len(
             stats[k][
                 (stats["label"] != stats["pred"])
                 & (stats["target"] != stats["cf pred"])
             ]
         )
 
-        summary["class-cor"][k] = mean(stats[k][stats["label"] == stats["pred"]])
-        summary["class-inc"][k] = mean(stats[k][stats["label"] != stats["pred"]])
+        summary["class-cor"]["n"] = len(stats[k][stats["label"] == stats["pred"]])
+        summary["class-inc"]["n"] = len(stats[k][stats["label"] != stats["pred"]])
 
-        summary["cf-cor"][k] = mean(stats[k][stats["target"] == stats["cf pred"]])
-        summary["cf-inc"][k] = mean(stats[k][stats["target"] != stats["cf pred"]])
+        summary["cf-cor"]["n"] = len(stats[k][stats["target"] == stats["cf pred"]])
+        summary["cf-inc"]["n"] = len(stats[k][stats["target"] != stats["cf pred"]])
 
-        summary[k] = mean(stats[k])
+        summary["n"] = n
 
-    summary["class-cor"]["cf-cor"]["n"] = len(
-        stats[k][
-            (stats["label"] == stats["pred"]) & (stats["target"] == stats["cf pred"])
-        ]
-    )
-    summary["class-inc"]["cf-cor"]["n"] = len(
-        stats[k][
-            (stats["label"] != stats["pred"]) & (stats["target"] == stats["cf pred"])
-        ]
-    )
-    summary["class-cor"]["cf-inc"]["n"] = len(
-        stats[k][
-            (stats["label"] == stats["pred"]) & (stats["target"] != stats["cf pred"])
-        ]
-    )
-    summary["class-inc"]["cf-inc"]["n"] = len(
-        stats[k][
-            (stats["label"] != stats["pred"]) & (stats["target"] != stats["cf pred"])
-        ]
-    )
+        print("ACC ON THIS SET:", 100 * acc / n)
+        stats["acc"] = 100 * acc / n
 
-    summary["class-cor"]["n"] = len(stats[k][stats["label"] == stats["pred"]])
-    summary["class-inc"]["n"] = len(stats[k][stats["label"] != stats["pred"]])
+        prefix = (
+            f"chunk-{args.chunk}_num-chunks-{args.num_chunks}_"
+            if args.num_chunks != 1
+            else ""
+        )
+        torch.save(
+            stats,
+            osp.join(args.output_path, "Results", args.exp_name, prefix + "stats.pth"),
+        )
 
-    summary["cf-cor"]["n"] = len(stats[k][stats["target"] == stats["cf pred"]])
-    summary["cf-inc"]["n"] = len(stats[k][stats["target"] != stats["cf pred"]])
+        # save summary
+        with open(
+            osp.join(
+                args.output_path, "Results", args.exp_name, prefix + "summary.yaml"
+            ),
+            "w",
+        ) as f:
+            yaml.dump(summary, f)
 
-    summary["n"] = n
-
-    print("ACC ON THIS SET:", 100 * acc / n)
-    stats["acc"] = 100 * acc / n
-
-    prefix = (
-        f"chunk-{args.chunk}_num-chunks-{args.num_chunks}_"
-        if args.num_chunks != 1
-        else ""
-    )
-    torch.save(
-        stats,
-        osp.join(args.output_path, "Results", args.exp_name, prefix + "stats.pth"),
-    )
-
-    # save summary
-    with open(
-        osp.join(args.output_path, "Results", args.exp_name, prefix + "summary.yaml"),
-        "w",
-    ) as f:
-        yaml.dump(summary, f)
+    return counterfactuals, []
 
 
 if __name__ == "__main__":

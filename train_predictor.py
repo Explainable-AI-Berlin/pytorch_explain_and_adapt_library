@@ -1,7 +1,9 @@
 import argparse
+import sys
 
 from peal.global_utils import load_yaml_config, add_class_arguments, integrate_arguments, set_random_seed
-from peal.training.trainers import ModelTrainer, PredictorConfig
+from peal.training.trainers import ModelTrainer
+from peal.training.interfaces import PredictorConfig
 
 
 def main():
@@ -10,7 +12,13 @@ def main():
     add_class_arguments(parser, PredictorConfig)
     args = parser.parse_args()
 
-    config = load_yaml_config(args.config, PredictorConfig)
+    if hasattr(args, "config"):
+        config = args.config
+
+    else:
+        config = sys.argv[-1]
+
+    config = load_yaml_config(config, PredictorConfig)
     integrate_arguments(args, config, exclude=["config"])
     set_random_seed(config.seed)
 
@@ -19,5 +27,5 @@ def main():
         continue_training=config.is_loaded, is_initialized=config.is_loaded
     )
 
-
-main()
+if __name__ == '__main__':
+    main()

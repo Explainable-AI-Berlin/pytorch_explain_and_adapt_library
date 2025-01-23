@@ -14,11 +14,11 @@ from torchvision.models import ResNet
 from tqdm import tqdm
 
 from peal.adaptors.interfaces import AdaptorConfig, Adaptor
-from peal.architectures.predictors import TaskConfig
+from peal.architectures.interfaces import TaskConfig
 from peal.data.dataloaders import create_dataloaders_from_datasource, get_dataloader
 from peal.data.dataset_factory import get_datasets
-from peal.data.datasets import DataConfig
-from peal.training.trainers import TrainingConfig
+from peal.data.interfaces import DataConfig
+from peal.training.interfaces import TrainingConfig
 
 
 class PClArCConfig(AdaptorConfig):
@@ -26,6 +26,8 @@ class PClArCConfig(AdaptorConfig):
     category: str = "adaptor"
 
     adaptor_type: str = "PClArC"
+
+    seed: int = 0
 
     model_path: str
 

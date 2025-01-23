@@ -31,7 +31,8 @@ from zennit.torchvision import VGGCanonizer, ResNetCanonizer
 from zennit.image import imgify
 from torchvision.transforms import ToTensor
 
-from peal.architectures.predictors import get_predictor, TaskConfig
+from peal.architectures.predictors import get_predictor
+from peal.architectures.interfaces import TaskConfig
 from peal.data.dataset_factory import get_datasets
 from peal.global_utils import load_yaml_config
 
