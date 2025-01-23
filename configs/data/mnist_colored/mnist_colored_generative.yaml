@@ -1,5 +1,5 @@
 dataset_class           : MnistDataset
-dataset_path            : $PEAL_DATA/mnist-cprob10-ctarget0
+dataset_path            : $PEAL_DATA/mnist-cprob50-ctarget0123456789
 raw_path                : $PEAL_DATA/mnist
 num_samples             : 10000
 input_type              : image
@@ -7,5 +7,15 @@ input_size              : [3, 28, 28]
 output_type             : singleclass
 output_size             : [10]
 downsize                : Resize
+normalization           : [0.5,0.5]
 coloring:
-  - [0, 0.1] # [class, coloring prob]
+  - [0, 0.5] # [class, coloring prob]
+  - [1, 0.5]
+  - [2, 0.5]
+  - [3, 0.5]
+  - [4, 0.5]
+  - [5, 0.5]
+  - [6, 0.5]
+  - [7, 0.5]
+  - [8, 0.5]
+  - [9, 0.5]

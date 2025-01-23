@@ -3,46 +3,35 @@ import yaml
 import math
 import random
 import argparse
-import itertools
 import numpy as np
 import os.path as osp
-import matplotlib.pyplot as plt
 
-from PIL import Image
 from time import time
 from os import path as osp
-from multiprocessing import Pool
 
 import torch
 from torch.utils import data
 
-from torchvision import transforms
-from torchvision import datasets
-
-from core import dist_util
-from core.script_util import (
+from peal.dependencies.DiME.core import dist_util
+from peal.dependencies.DiME.core.script_util import (
     model_and_diffusion_defaults,
     create_model_and_diffusion,
-    create_classifier,
     args_to_dict,
     add_dict_to_argparser,
 )
-from core.sample_utils import (
+from peal.dependencies.DiME.core.sample_utils import (
     get_DiME_iterative_sampling,
     clean_class_cond_fn,
     dist_cond_fn,
     ImageSaver,
     SlowSingleLabel,
-    Normalizer,
-    load_from_DDP_model,
     PerceptualLoss,
     X_T_Saver,
     Z_T_Saver,
     ChunkedDataset,
 )
-from core.image_datasets import CelebADataset, CelebAMiniVal
-from core.gaussian_diffusion import _extract_into_tensor
-from core.classifier.densenet import ClassificationModel
+from peal.dependencies.DiME.core.image_datasets import CelebADataset, CelebAMiniVal
+from peal.dependencies.DiME.core.classifier.densenet import ClassificationModel
 
 import matplotlib
 

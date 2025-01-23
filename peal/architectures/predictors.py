@@ -47,6 +47,10 @@ class TaskConfig(BaseModel):
     """
     y_selection: Union[list[str], type(None)] = None
     """
+    Gives the option to only use samples from one or more specified classes
+    """
+    class_restriction: Union[int ,list[int], type(None)] = None
+    """
     kwargs: dict = {}
     __name__: str = "peal.TaskConfig"
 

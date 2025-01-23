@@ -7,5 +7,5 @@ input_size              : [3, 28, 28]
 output_type             : singleclass
 output_size             : [10]
 downsize                : Resize
-color_target            : [0]
-color_prob              : 0.3
+coloring:
+  - [0, 0.3] # [class, coloring prob]

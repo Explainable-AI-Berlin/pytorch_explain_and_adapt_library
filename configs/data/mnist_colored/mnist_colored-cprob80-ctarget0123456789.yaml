@@ -7,5 +7,14 @@ input_size              : [3, 28, 28]
 output_type             : singleclass
 output_size             : [10]
 downsize                : Resize
-color_target            : [0,1,2,3,4,5,6,7,8,9]
-color_prob              : 0.8
+coloring:
+  - [0, 0.8] # [class, coloring prob]
+  - [1, 0.8]
+  - [2, 0.8]
+  - [3, 0.8]
+  - [4, 0.8]
+  - [5, 0.8]
+  - [6, 0.8]
+  - [7, 0.8]
+  - [8, 0.8]
+  - [9, 0.8]

@@ -1,0 +1,22 @@
+category: "adaptor"
+adaptor_type: "RRClArC"
+base_dir: $PEAL_RUNS/mnist_colored/cprob50-ctarget0/rrclarc
+model_path: $PEAL_RUNS/mnist_colored/cprob50-ctarget0/model.cpl
+data: <PEAL_BASE>/configs/data/mnist_colored/mnist_colored-cprob50-ctarget0.yaml
+unpoisoned_data: <PEAL_BASE>/configs/data/mnist_colored/mnist_colored-cprob0.yaml
+poisoned_data: <PEAL_BASE>/configs/data/mnist_colored/mnist_colored-cprob50-ctarget0123456789.yaml
+# data: <PEAL_BASE>/configs/data/square.yaml
+lamb: [0.01, 0.1, 0.5, 1.0, 2.0, 5.0, 25.0, 100.0, 500.0, 2500.0]
+layer_position: [5, 6, 7, 8, 9, 10, 11, -2] # 0 for input, -1 for penultimate layer
+training:
+  train_batch_size: 32
+  val_batch_size: 32
+  test_batch_size: 32
+  learning_rate: 2.0e-04
+  optimizer: "sgd"
+  max_epochs: 10
+task:
+  y_selection: [ClassA, ClassB]
+  output_type: 'multiclass'
+  criterions:
+    l2: 1.0

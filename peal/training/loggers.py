@@ -56,7 +56,7 @@ class Logger:
         # temporary variables
         self.losses = []
         #
-        if self.config.data.output_type in ["singleclass", "multiclass"]:
+        if self.config.task.output_type in ["singleclass", "multiclass"]:
             self.predictions = []
             self.targets = []
             self.predicted_classes = []

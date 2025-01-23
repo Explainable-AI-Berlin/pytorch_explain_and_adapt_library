@@ -19,15 +19,15 @@ from torch.utils import data
 from torchvision import transforms
 from torchvision import datasets
 
-from core import dist_util
-from core.script_util import (
+from peal.dependencies.FastDiME_CelebA.core import dist_util
+from peal.dependencies.FastDiME_CelebA.core.script_util import (
     model_and_diffusion_defaults,
     create_model_and_diffusion,
     create_classifier,
     args_to_dict,
     add_dict_to_argparser,
 )
-from core.sample_utils import (
+from peal.dependencies.FastDiME_CelebA.core.sample_utils import (
     get_DiME_iterative_sampling,
     get_FastDiME_iterative_sampling,
     get_GMD_iterative_sampling,
@@ -44,10 +44,7 @@ from core.sample_utils import (
     ChunkedDataset,
     generate_mask,
 )
-#from core.image_datasets import CelebADataset, CelebAMiniVal, ShortcutCelebADataset
-from core.gaussian_diffusion import _extract_into_tensor
-from core.classifier.densenet import ClassificationModel
-from copy import deepcopy
+from peal.dependencies.FastDiME_CelebA.core.classifier.densenet import ClassificationModel
 import matplotlib
 
 matplotlib.use("Agg")  # to disable display

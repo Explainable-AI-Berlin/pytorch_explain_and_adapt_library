@@ -113,6 +113,7 @@ class PClArC(Adaptor):
         train_dataloader, val_dataloader, test_dataloader = create_dataloaders_from_datasource(self.adaptor_config)
         train_dataloader.dataset.return_dict = True
         train_dataloader.dataset.url_enabled = True
+        train_dataloader.dataset.disable_class_restriction()
         train_dataloader.dataset.enable_class_restriction(0)
 
         # models = []
@@ -127,11 +128,11 @@ class PClArC(Adaptor):
         test_data = [("original", test_dataloader)]
         if self.adaptor_config.unpoisoned_data is not None:
             test_data_unpoisoned = get_datasets(self.adaptor_config.unpoisoned_data)[2]
-            test_data_unpoisoned = get_dataloader(test_data_unpoisoned, mode="test", batch_size=self.adaptor_config.training.test_batch_size)
+            test_data_unpoisoned = get_dataloader(test_data_unpoisoned, mode="test", batch_size=self.adaptor_config.training.test_batch_size, task_config=self.adaptor_config.task)
             test_data.append(("unpoisoned", test_data_unpoisoned))
         if self.adaptor_config.poisoned_data is not None:
             test_data_poisoned = get_datasets(self.adaptor_config.poisoned_data)[2]
-            test_data_poisoned = get_dataloader(test_data_poisoned, mode="test", batch_size=self.adaptor_config.training.test_batch_size)
+            test_data_poisoned = get_dataloader(test_data_poisoned, mode="test", batch_size=self.adaptor_config.training.test_batch_size, task_config=self.adaptor_config.task)
             test_data.append(("fully_poisoned", test_data_poisoned))
 
         for description, dataloader in test_data:
@@ -159,7 +160,7 @@ class PClArC(Adaptor):
 
         feature_extractor, downstream_head = None, None
         if projection_location != 0:
-            feature_extractor, downstream_head = split_model_at_penultima(self.model, projection_location, self.device)
+            feature_extractor, downstream_head = split_model(self.model, projection_location, self.device)
 
         activations, annotations, targets = self.get_annotations_and_activations_simplified(dataloader, feature_extractor=feature_extractor)
         projection = get_projection_type(self.adaptor_config.projection_type)
@@ -196,7 +197,7 @@ class PClArC(Adaptor):
                 annotations.append(batch["y"][:, 1].detach())
             elif self.adaptor_config.data.dataset_class == "MnistDataset":
                 targets.append(batch["y"].detach())
-                annotations.append(self.get_perfect_annotations_mnist(x))
+                annotations.append(get_perfect_annotations_mnist(x))
 
             filenames.extend(batch["url"])
 
@@ -208,13 +209,6 @@ class PClArC(Adaptor):
         num_artifact_samples = torch.sum(annotations == 1).item()
         print(f"Number of artifact samples: {num_artifact_samples}; Number of non-artifact samples: {len(annotations) - num_artifact_samples}")
         return activations, annotations, targets
-
-    def get_perfect_annotations_mnist(self, x: torch.Tensor):
-        assert len(x.shape) == 4
-        assert x.shape[1] == 3
-        annotations = ~((x[:,0] == x[:,1]) * (x[:,0] == x[:,2])).all(dim=1).all(dim=1)
-        return annotations.int()
-
 
     def get_accuracies(self, dataloader: DataLoader, model: Module) -> dict:
         model.eval()
@@ -234,7 +228,7 @@ class PClArC(Adaptor):
                     annotations.append(batch["y"][:, 1].detach())
                 elif self.adaptor_config.data.dataset_class == "MnistDataset":
                     y = batch["y"].to(self.device)
-                    annotations.append(self.get_perfect_annotations_mnist(x))
+                    annotations.append(get_perfect_annotations_mnist(x))
                 else:
                     raise ValueError("Unknown dataset class")
 
@@ -264,7 +258,7 @@ class PClArC(Adaptor):
 
 
 
-def split_model_at_penultima(model: Module, split_at: int, device):
+def split_model(model: Module, split_at: int, device):
     '''
     Splits a model at the penultima layer
     '''
@@ -304,6 +298,7 @@ class PCAVProjection(torch.nn.Module):
         self.dtype = kwargs.get("dtype", torch.float32)
         self.correction_strength = kwargs.get("correction_strength", 1.0)
 
+        annotations[annotations == 0] = -1
         annotations = annotations.to(self.dtype)
         t_centered = annotations - annotations.mean()
         activations = activations.reshape(activations.shape[0], -1)
@@ -315,7 +310,7 @@ class PCAVProjection(torch.nn.Module):
         cav = self.correction_strength * w / torch.sqrt((w ** 2).sum())
         self.projection = cav @ cav.T
 
-        self.z = torch.mean(activations[annotations == 0], dim=0, keepdim=True).to(device=self.device, dtype=self.dtype)
+        self.z = torch.mean(activations[annotations == -1], dim=0, keepdim=True).to(device=self.device, dtype=self.dtype)
 
     def forward(self, x):
         x_flat = x.flatten(1)
@@ -380,3 +375,9 @@ projections = {
 }
 def get_projection_type(projection_type: str):
     return projections.get(projection_type, SimpleProjection)
+
+def get_perfect_annotations_mnist(x: torch.Tensor):
+    assert len(x.shape) == 4
+    assert x.shape[1] == 3
+    annotations = ~((x[:,0] == x[:,1]) * (x[:,0] == x[:,2])).all(dim=1).all(dim=1)
+    return annotations.int()

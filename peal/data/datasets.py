@@ -160,9 +160,8 @@ class DataConfig(BaseModel):
     seed: int = 0
 
     full_confounder_config: Union[type(None), list[float]] = None
-    color_target: list[int] = None
-    color_prob: float = None
-    raw_path: str = None
+    coloring: list[tuple[int, float]] = []
+    raw_path: Union[type(None), str] = None
 
 
 class SymbolicDataset(PealDataset):
@@ -1010,23 +1009,6 @@ class Image2ClassDataset(ImageDataset):
         self.string_description_enabled = self.string_description_enabled_buffer
         self.tokenizer = None
 
-    def enable_class_restriction(self, class_idx: Union[int, list[int]]):
-        self.backup_urls = copy.deepcopy(self.urls)
-        self.urls = []
-        for target_str, file in self.backup_urls:
-            try:
-                if int(target_str) in class_idx:
-                    self.urls.append((target_str, file))
-            except TypeError:
-                if int(target_str) == class_idx:
-                    self.urls.append((target_str, file))
-        print("enabled class restriction for target class:", str(class_idx))
-
-    def disable_class_restriction(self):
-        if hasattr(self, "backup_urls"):
-            self.urls = copy.deepcopy(self.backup_urls)
-        print("disabled class restriction")
-
     @property
     def output_size(self):
         return self.config.output_size
@@ -1066,19 +1048,27 @@ class Image2ClassDataset(ImageDataset):
 
         return len(self.urls)
 
-    def enable_class_restriction(self, class_idx):
+    def enable_class_restriction(self, class_idx: Union[int, list[int]]):
         self.backup_urls = copy.deepcopy(self.urls)
         self.urls = []
         self.class_restriction_enabled = True
+
+        if isinstance(class_idx, int):
+            allowed_classes = [self.idx_to_name[class_idx]]
+        else:
+            allowed_classes = [self.idx_to_name[idx] for idx in class_idx]
+
         for url in self.backup_urls:
-            if url[0] == self.idx_to_name[class_idx]:
+            if url[0] in allowed_classes:
                 self.urls.append(url)
+        print("enabled class restriction for target class(es):", str(class_idx))
 
     def disable_class_restriction(self):
         if hasattr(self, "backup_urls"):
             self.urls = copy.deepcopy(self.backup_urls)
 
         self.class_restriction_enabled = False
+        print("disabled class restriction")
 
 
     def __getitem__(self, idx):
@@ -1129,7 +1119,7 @@ class Image2ClassDataset(ImageDataset):
             return return_dict
 
         elif len(return_dict.values()):
-            return img, list(return_dict.values())[0]
+            return img, list(return_dict.values())[1]
 
         else:
             return tuple(return_dict.values())

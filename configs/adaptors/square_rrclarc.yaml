@@ -1,14 +1,19 @@
-adaptor_type: "RRClArC"
-model_path: $PEAL_RUNS/square2/colora_confounding_colorb/regularized0/classifier_unbalanced/model.cpl
-eval_acc_every_epoch: False
-img_size: 64
-classes: [0, 1]
-data: <PEAL_BASE>/configs/data/square_ClassA_confounding_ClassB_unbalanced.yaml
-# data: <PEAL_BASE>/configs/data/square.yaml
-training: <PEAL_BASE>/configs/training/rrclarc_collect_relevances.yaml
-base_dir: $PEAL_RUNS/square2/colora_confounding_colorb/regularized0/classifier_unbalanced/rrclarc
-lamb: 100.0
 category: "adaptor"
+adaptor_type: "RRClArC"
+base_dir: $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned098/rrclarc
+model_path: $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned098/model.cpl
+data: <PEAL_BASE>/configs/data/square_poisoned098.yaml
+unpoisoned_data: <PEAL_BASE>/configs/data/square_unpoisoned.yaml
+# data: <PEAL_BASE>/configs/data/square.yaml
+lamb: [0.01, 0.1, 0.5, 1.0, 2.0, 5.0, 25.0, 100.0, 500.0, 2500.0]
+layer_position: [5, 6, 7, 8, 9, 10, -2] # 0 for input, -1 for penultimate layer
+training:
+  train_batch_size: 32
+  val_batch_size: 32
+  test_batch_size: 32
+  learning_rate: 2.0e-04
+  optimizer: "sgd"
+  max_epochs: 10
 task:
   y_selection: [ClassA, ClassB]
   output_type: 'multiclass'

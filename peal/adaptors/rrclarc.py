@@ -1,13 +1,15 @@
 import copy
 import os
 import pathlib
-from collections.abc import Iterable
+from collections import defaultdict
 from typing import Union
 import numpy as np
+import pandas as pd
 import torchvision.models
 from PIL import Image
 
 import torch
+from torch.nn import Module
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 from zennit.attribution import Gradient
@@ -16,8 +18,10 @@ from zennit.image import imsave
 from zennit.torchvision import ResNetCanonizer
 
 from peal.adaptors.interfaces import Adaptor, AdaptorConfig
+from peal.adaptors.pclarc import get_perfect_annotations_mnist, split_model
 from peal.architectures.predictors import TaskConfig, TorchvisionModel
-from peal.data.dataloaders import create_dataloaders_from_datasource
+from peal.data.dataloaders import create_dataloaders_from_datasource, get_dataloader
+from peal.data.dataset_factory import get_datasets
 from peal.data.datasets import DataConfig
 from peal.explainers.lrp_explainer import LRPExplainer
 from peal.teachers.virelay_teacher import VirelayTeacher
@@ -44,19 +48,17 @@ class RRClArCConfig(AdaptorConfig):
 
     criterion: str = "allrand"
 
-    eval_acc_every_epoch: bool = False
+    lamb: list[float] = [1.0]
 
-    img_size: int = 224
-
-    lamb: float = 1.0
-
-    layer_name: str = "last_conv"
+    layer_position: list[int] = [-2]
 
     loss: str = "cross_entropy"
 
-    classes: Iterable[int] = [0]
-
     data: DataConfig
+
+    unpoisoned_data: DataConfig = None
+
+    poisoned_data: DataConfig = None
 
     training: TrainingConfig
 
@@ -70,13 +72,12 @@ class RRClArCConfig(AdaptorConfig):
                  model_path: str = None,
                  compute: str = None,
                  criterion: str = None,
-                 eval_acc_every_epoch: bool = None,
-                 img_size: int = None,
-                 lamb: float = None,
-                 layer_name: str = None,
+                 lamb: list[float] = None,
+                 layer_position: list[int] = None,
                  loss: str = None,
-                 classes: Iterable[int] = None,
                  data: Union[dict, DataConfig] = None,
+                 unpoisoned_data: Union[dict, DataConfig] = None,
+                 poisoned_data: Union[dict, DataConfig] = None,
                  training: Union[dict, TrainingConfig] = None,
                  task: Union[dict, TaskConfig] = None,
                  base_dir: str = None,
@@ -89,6 +90,16 @@ class RRClArCConfig(AdaptorConfig):
             self.data = data
         else:
             self.data = DataConfig(**data)
+
+        if isinstance(unpoisoned_data, DataConfig):
+            self.unpoisoned_data = unpoisoned_data
+        elif not unpoisoned_data is None:
+            self.unpoisoned_data = DataConfig(**unpoisoned_data)
+
+        if isinstance(poisoned_data, DataConfig):
+            self.poisoned_data = poisoned_data
+        elif not poisoned_data is None:
+            self.poisoned_data = DataConfig(**poisoned_data)
 
         if isinstance(training, TrainingConfig):
             self.training = training
@@ -104,18 +115,12 @@ class RRClArCConfig(AdaptorConfig):
             self.compute = compute
         if not criterion is None:
             self.criterion = criterion
-        if not eval_acc_every_epoch is None:
-            self.eval_acc_every_epoch = eval_acc_every_epoch
-        if not img_size is None:
-            self.img_size = img_size
         if not lamb is None:
             self.lamb = lamb
-        if not layer_name is None:
-            self.layer_name = layer_name
+        if not layer_position is None:
+            self.layer_position = layer_position
         if not loss is None:
             self.loss = loss
-        if not classes is None:
-            self.classes = classes
 
         self.kwargs = kwargs
 
@@ -124,11 +129,14 @@ class RRClArC(Adaptor):
     def __init__(self, adaptor_config: RRClArCConfig):
         self.adaptor_config = adaptor_config
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.orginal_model = torch.load(self.adaptor_config.model_path, map_location=self.device)
-        self.model = copy.deepcopy(self.orginal_model)
-        self.explainer = LRPExplainer(downstream_model=self.model, num_classes=2,
-                                      explainer_config_return_namespace=False)
-        self.teacher = VirelayTeacher(2)
+        print("running on device: ", self.device)
+        self.original_model = torch.load(self.adaptor_config.model_path, map_location=self.device)
+        if hasattr(self.original_model, 'model'):
+            self.original_model = self.original_model.model
+        self.model = copy.deepcopy(self.original_model)
+        # self.explainer = LRPExplainer(downstream_model=self.model, num_classes=2,
+        #                               explainer_config_return_namespace=False)
+        # self.teacher = VirelayTeacher(2)
 
         self.activation = torch.tensor([0])
         #self.hook_handle = self.register_feature_extractor()
@@ -300,6 +308,7 @@ class RRClArC(Adaptor):
     def calculate_cav(self, actvs, t):
         print("actvs: ", actvs.shape, actvs.mean(dim=0).shape)
         print("t: ", t.shape)
+        t = t.to(actvs.dtype)
         t_centered = t - t.mean()
         actvs_centered = actvs - actvs.mean(dim=0)[None]
         actvs_centered = actvs_centered.flatten(start_dim=1)
@@ -358,12 +367,44 @@ class RRClArC(Adaptor):
         self.model.eval()
 
         train_dataloader, val_dataloader, test_dataloader = create_dataloaders_from_datasource(self.adaptor_config)
-        train_dataloader.dataset.enable_idx()
         train_dataloader.dataset.return_dict = True
         train_dataloader.dataset.url_enabled = True
         train_dataloader.dataset.enable_class_restriction(0)
 
-        self._run(train_dataloader)
+        models = [(0, 0, self.adaptor_config.model_path)]
+        lambs, positions = np.meshgrid(self.adaptor_config.lamb, self.adaptor_config.layer_position)
+        for pos, lamb in zip(positions.flatten(), lambs.flatten()):
+            print(f"performing rr-clarc in layer {pos} with lamb={lamb}")
+            model_path = self._run(train_dataloader, layer_position=pos, lamb=lamb)
+            models.append((pos, lamb, model_path))
+            self.model = copy.deepcopy(self.original_model)
+
+        test_data = [("original", test_dataloader)]
+        if self.adaptor_config.unpoisoned_data is not None:
+            test_data_unpoisoned = get_datasets(self.adaptor_config.unpoisoned_data)[2]
+            test_data_unpoisoned = get_dataloader(test_data_unpoisoned, mode="test", batch_size=self.adaptor_config.training.test_batch_size, task_config=self.adaptor_config.task)
+            test_data.append(("unpoisoned", test_data_unpoisoned))
+        if self.adaptor_config.poisoned_data is not None:
+            test_data_poisoned = get_datasets(self.adaptor_config.poisoned_data)[2]
+            test_data_poisoned = get_dataloader(test_data_poisoned, mode="test", batch_size=self.adaptor_config.training.test_batch_size, task_config=self.adaptor_config.task)
+            test_data.append(("fully_poisoned", test_data_poisoned))
+
+        for description, dataloader in test_data:
+            results = defaultdict(list)
+            for pos, lamb, model_path in models:
+                print(f"loading model from file {model_path}")
+                model = torch.load(model_path, map_location=self.device)
+                model.eval()
+                results["layer_index"].append(pos)
+                results["lambda"].append(lamb)
+                for k, v in self.get_accuracies(dataloader, model).items():
+                    results[k].append(v)
+            filename = f"rrclarc_correction_{description}_dataset.csv"
+            results = pd.DataFrame(results)
+            results.fillna(0, inplace=True)
+            results.to_csv(os.path.join(self.adaptor_config.base_dir, filename), index=False)
+            print(f"\n\n### results on {description} dataset ###\n{results.to_string()}")
+
         exit()
 
         test_dataloader.dataset.enable_idx()
@@ -385,11 +426,8 @@ class RRClArC(Adaptor):
         print("saving corrected model to: " + corrected_model_path)
         torch.save(self.model.to("cpu"), corrected_model_path)
 
-    def _run(self, dataloader):
-        feature_extractor, downstream_head = split_model_at_penultima(self.model)
-        # print("original model: ", self.model)
-        print("\n~~~\nfeature extractor:", feature_extractor)
-        print("\n~~~\ndownstream head: ", downstream_head)
+    def _run(self, dataloader: DataLoader, layer_position: int = -2, lamb: float = 1.0) -> str:
+        feature_extractor, downstream_head = split_model(self.model, layer_position, self.device)
 
         activations = []
         targets = []
@@ -400,9 +438,17 @@ class RRClArC(Adaptor):
                 pbar.set_description(
                     f'calculating activations and annotations: {it * dataloader.batch_size}/{len(dataloader.dataset)}')
                 x = batch["x"].to(self.device)
+
+                if self.adaptor_config.data.dataset_class == "SquareDataset":
+                    targets.append(batch["y"][:, 0].detach())
+                    annotations.append(batch["y"][:, 1].detach())
+                elif self.adaptor_config.data.dataset_class == "MnistDataset":
+                    targets.append(batch["y"].detach())
+                    annotations.append(get_perfect_annotations_mnist(x))
+                else:
+                    raise ValueError("Unknown dataset class")
+
                 activations.append(feature_extractor(x).detach())
-                targets.append(batch["y"][:, 0].detach())
-                annotations.append(batch["y"][:, 1].detach())
                 # if it > 25:
                 #     break
 
@@ -418,10 +464,12 @@ class RRClArC(Adaptor):
         cav = self.calculate_cav(activations, annotations)
         print("cav shape: ", cav.shape)
 
-        dataloader = DataLoader(TensorDataset(activations, targets), batch_size=32, shuffle=True)
+        dataloader = DataLoader(TensorDataset(activations, targets),
+                                batch_size=self.adaptor_config.training.train_batch_size,
+                                shuffle=True)
         downstream_head.train()
-        optimizer = torch.optim.SGD(downstream_head.parameters(), lr=0.00001)
-        for epoch in range(50):
+        optimizer = torch.optim.SGD(downstream_head.parameters(), self.adaptor_config.training.learning_rate)
+        for epoch in range(self.adaptor_config.training.max_epochs):
             with tqdm(enumerate(dataloader)) as pbar:
                 for it, batch in pbar:
                     optimizer.zero_grad()
@@ -445,35 +493,60 @@ class RRClArC(Adaptor):
                     accuracy = torch.mean((prediction.argmax(1) == y).float()).item()
 
                     pbar.set_description(f'epoch {epoch}: accuracy={accuracy}, rr_loss={rr_loss}, ce_loss={ce_loss}')
-                    loss = self.adaptor_config.lamb * rr_loss + ce_loss
+                    loss = lamb * rr_loss + ce_loss
 
                     loss.backward()
                     optimizer.step()
 
         self.model = torch.nn.Sequential(*[feature_extractor, downstream_head])
-        corrected_model_path = os.path.join(self.adaptor_config.base_dir, "corrected_model-3.cpl")
+        filename = f"corrected_model_layer{layer_position}_lamb{lamb}.cpl"
+        corrected_model_path = os.path.join(self.adaptor_config.base_dir, filename)
         print("saving corrected model to: " + corrected_model_path)
         torch.save(self.model.to("cpu"), corrected_model_path)
+        return corrected_model_path
 
-def split_model_at_penultima(model):
-    '''
-    Splits a model at the penultima layer
-    '''
-    children_list = list(model.children()) # extract_all_children(model)
-    feature_extractor = torch.nn.Sequential(*children_list[:-3])
-    downstream_head = torch.nn.Sequential(*children_list[-3:])
-    return feature_extractor, downstream_head
+    def get_accuracies(self, dataloader: DataLoader, model: Module) -> dict:
+        model.eval()
+        dataloader.dataset.return_dict = True
 
-def extract_all_children(model):
-    '''
-    Extracts all children of a model
-    '''
-    children = []
-    for child in model.children():
-        if isinstance(child, torch.nn.Sequential):
-            children.extend(extract_all_children(child))
+        annotations = []
+        targets = []
+        acc = []
+        total_its = len(dataloader)
+        with tqdm(enumerate(dataloader)) as pbar:
+            for it, batch in pbar:
+                x = batch["x"].to(self.device)
+                prediction = model(x)
 
-        else:
-            children.append(child)
+                if self.adaptor_config.data.dataset_class == "SquareDataset":
+                    y = batch["y"][:, 0].to(self.device)
+                    annotations.append(batch["y"][:, 1].detach())
+                elif self.adaptor_config.data.dataset_class == "MnistDataset":
+                    y = batch["y"].to(self.device)
+                    annotations.append(get_perfect_annotations_mnist(x))
+                else:
+                    raise ValueError("Unknown dataset class")
 
-    return children
+                acc.append((prediction.argmax(dim=1) == y).to(torch.int))
+                targets.append(y)
+                pbar.set_description(f'it: {it}/{total_its}')
+
+        annotations = torch.cat(annotations, dim=0).to(self.device).int()
+        targets = torch.cat(targets, dim=0).to(self.device).int()
+        acc = torch.cat(acc, dim=0).to(self.device).float()
+
+        results = {"n": len(annotations),
+                   "artifact_freq": annotations.sum().item()/len(annotations),
+                   "accuracy": acc.mean().item(),
+                   "artifact_accuracy": acc[annotations == 1].mean().item(),
+                   "non-artifact_accuracy": acc[annotations == 0].mean().item()}
+
+        for y in torch.unique(targets):
+            idx = targets == y
+            results[f"c{y.item()}_n"] = len(annotations[idx])
+            results[f"c{y.item()}_artifact_freq"] = annotations[idx].sum().item()/len(annotations[idx])
+            results[f"c{y.item()}_accuracy"] = acc[idx].mean().item()
+            results[f"c{y.item()}_artifact_accuracy"] = acc[(annotations == 1) * idx].mean().item()
+            results[f"c{y.item()}_non-artifact_accuracy"] = acc[(annotations == 0) * idx].mean().item()
+
+        return results

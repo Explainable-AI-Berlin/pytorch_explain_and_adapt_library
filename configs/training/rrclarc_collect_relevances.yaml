@@ -1,6 +1,0 @@
-test_batch_size: 32
-train_batch_size: 32
-val_batch_size: 32
-learning_rate: 2.0e-05
-optimizer: "sgd"
-max_epochs: 1

@@ -30,6 +30,8 @@ class MnistDataset(Image2ClassDataset):
     def __init__(self, config: DataConfig, **kwargs):
 
         if not os.path.exists(config.dataset_path):
+            print(f"creating new dataset with coloring {config.coloring} at {config.dataset_path}")
+            coloring = {class_coloring[0] : class_coloring[1] for class_coloring in config.coloring}
             raw_path = config.dataset_path if config.raw_path is None else config.raw_path
 
             random.seed(0)
@@ -47,14 +49,11 @@ class MnistDataset(Image2ClassDataset):
                 if not os.path.exists(f"{img_dir}/{label}"):
                     os.makedirs(f"{img_dir}/{label}")
 
-                if (config.color_target is not None
-                    and config.color_prob is not None
-                    and label in config.color_target
-                    and random.random() < config.color_prob):
-                        img = np.asarray(img)
-                        zeros = np.zeros(img.shape, dtype=np.uint8)
-                        img = np.stack([img, zeros, zeros], axis=2)
-                        img = Image.fromarray(img)
+                if label in coloring and random.random() < coloring[label]:
+                    img = np.asarray(img)
+                    zeros = np.zeros(img.shape, dtype=np.uint8)
+                    img = np.stack([img, zeros, zeros], axis=2)
+                    img = Image.fromarray(img)
 
                 img.save(f"{img_dir}/{label}/{idxs[label]}.png")
                 idxs[label] += 1
@@ -68,10 +67,7 @@ class MnistDataset(Image2ClassDataset):
             for i in range(len(mnist_dataset_val)):
                 img, label = mnist_dataset_val[i]
 
-                if (config.color_target is not None
-                        and config.color_prob is not None
-                        and label in config.color_target
-                        and random.random() < config.color_prob):
+                if label in coloring and random.random() < coloring[label]:
                     img = np.asarray(img)
                     zeros = np.zeros(img.shape, dtype=np.uint8)
                     img = np.stack([img, zeros, zeros], axis=2)
