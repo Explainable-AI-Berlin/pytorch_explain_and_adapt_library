@@ -7,11 +7,10 @@ min_train_samples                    :  400
 finetune_iterations                  :  1
 max_validation_samples               :  100
 continuous_learning                  :  "finetune"
-replace_model                        :  True
-use_visualization                    :  True
+use_visualization                    :  False
 calculate_group_accuracies           :  True
-explainer                            :  <PEAL_BASE>/configs/explainers/pdc_default.yaml
-training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
+explainer                            :  <PEAL_BASE>/configs/explainers/pdc_default128x128.yaml
+training                             :  <PEAL_BASE>/configs/training/sensitive_distillation.yaml
 data                                 :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba500_poisoned090.yaml
 test_data                            :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba.yaml
 student                              :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisoned090/model.cpl
