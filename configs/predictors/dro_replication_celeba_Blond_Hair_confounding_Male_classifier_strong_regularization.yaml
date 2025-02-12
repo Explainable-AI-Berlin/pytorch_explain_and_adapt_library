@@ -4,7 +4,7 @@ training          : <PEAL_BASE>/configs/training/dro_replication_celeba_strong_r
 architecture      : torchvision_resnet50
 task:
   criterions:
-    mse     : 1.0
+    ce     : 1.0
     l2      : 0.1
   output_type             : singleclass
   output_channels         : 2

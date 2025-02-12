@@ -56,8 +56,6 @@ class LossComputer:
         confounder_vals = []
         max_vals = []
 
-        # import pdb; pdb.set_trace()
-
         for key in confounder_str:
             idx = dataset.attributes.index(key)
             attr_vals = np.array([dataset.data[pt][idx] for pt in dataset.data], dtype=int)
@@ -95,7 +93,7 @@ class LossComputer:
         if self.is_robust and not self.btl:
             actual_loss, weights = self.compute_robust_loss(group_loss, group_count)
         elif self.is_robust and self.btl:
-             actual_loss, weights = self.compute_robust_loss_btl(group_loss, group_count)
+            actual_loss, weights = self.compute_robust_loss_btl(group_loss, group_count)
         else:
             actual_loss = per_sample_losses.mean()
             weights = None
@@ -111,6 +109,9 @@ class LossComputer:
             adjusted_loss += self.adj/torch.sqrt(self.group_counts)
         if self.normalize_loss:
             adjusted_loss = adjusted_loss/(adjusted_loss.sum())
+
+        # import pdb; pdb.set_trace()
+        # TODO: GPT says the leak might be here
         self.adv_probs = self.adv_probs * torch.exp(self.step_size*adjusted_loss.data)
         self.adv_probs = self.adv_probs/(self.adv_probs.sum())
 
@@ -151,7 +152,9 @@ class LossComputer:
     def update_exp_avg_loss(self, group_loss, group_count):
         prev_weights = (1 - self.gamma*(group_count>0).float()) * (self.exp_avg_initialized>0).float()
         curr_weights = 1 - prev_weights
-        self.exp_avg_loss = self.exp_avg_loss * prev_weights + group_loss*curr_weights
+        # import pdb; pdb.set_trace()
+        # TODO: Maybe detach gorup_loss?
+        self.exp_avg_loss = self.exp_avg_loss * prev_weights + group_loss * curr_weights
         self.exp_avg_initialized = (self.exp_avg_initialized>0) + (group_count>0)
 
     def reset_stats(self):
