@@ -115,7 +115,7 @@ dro_criterions = {
 }
 
 
-class GroupDROConfig(AdaptorConfig):
+class LeakyGroupDROConfig(AdaptorConfig):
     """
     Config template for running the DRO adaptor.
     """
@@ -209,8 +209,16 @@ class GroupDROConfig(AdaptorConfig):
         self.kwargs = kwargs
 
 
-class GroupDRO(Adaptor):
-    """ GroupDRO Adaptor """
+
+class LeakyGroupDRO(Adaptor):
+    """
+    DRO Adaptor docstring.
+    """
+
+    # Instantiate the dataset with return_dict=True
+
+    # Pass an instantiated datasets to the model trainer as a list of datasets
+    # [train, val, test] under the datasource keyword
 
     def __init__(
         self,
@@ -230,12 +238,10 @@ class GroupDRO(Adaptor):
         gigabyte_vram=None,
         val_dataloader_weights=[1.0],
     ):
-        """ """
-        ### BEGIN: DRO Alterations
+
         self.adaptor_config = load_yaml_config(adaptor_config, AdaptorConfig)
         self.reset_weights = self.adaptor_config.reset_weights
         config = self.adaptor_config.predictor
-        ### END: DRO Alterations
         self.config = load_yaml_config(config)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.val_dataloader_weights = val_dataloader_weights
@@ -300,6 +306,7 @@ class GroupDRO(Adaptor):
         ) = create_dataloaders_from_datasource(
             config=self.config, datasource=datasource
         )
+
         if self.config.training.train_on_test:
             self.train_dataloader = test_dataloader
 
@@ -310,7 +317,6 @@ class GroupDRO(Adaptor):
             self.val_dataloaders = [self.val_dataloaders]
 
         ### BEGIN: DRO Alterations
-        # TOO: uncomment below to enable groups
         self.train_dataloader.dataset.enable_groups()
         for vd in self.val_dataloaders:
             vd.dataset.enable_groups()
@@ -365,12 +371,13 @@ class GroupDRO(Adaptor):
 
             print("trainable parameters: ", len(param_list))
             if self.config.training.optimizer == "sgd":
-                # Change this so that it matches the momentum and l2 norm as found in the config
                 self.optimizer = torch.optim.SGD(
                     param_list,
                     lr=self.config.training.learning_rate,
                     momentum=0.9,
-                    weight_decay=0.0001,
+                    ### Begin: DRO Alterations
+                    # weight_decay=0.0001,
+                    ### End: DRO Alterations
                 )
                 lambda1 = lambda epoch: 0.95**epoch
                 self.scheduler = torch.optim.lr_scheduler.LambdaLR(
@@ -404,7 +411,7 @@ class GroupDRO(Adaptor):
         if not model_path is None:
             self.config.model_path = model_path
 
-        # TODO: change criterion to group dro losses
+        """
         if criterions is None:
             criterions = get_criterions(config)
             self.criterions = {}
@@ -420,6 +427,42 @@ class GroupDRO(Adaptor):
 
         else:
             self.criterions = criterions
+        """
+
+        ### BEGIN: DRO Adaptations
+        # Repackage criterions
+        self.regularization_criterions = {}
+        self.train_criterions = {}
+        self.val_criterions = {}
+        if isinstance(self.val_dataloaders, list) or isinstance(self.val_dataloaders, tuple):
+            self.val_criterions = len(self.val_dataloaders) * [{}]
+
+        construct_loss_computer = lambda dro_cr, d_set: LossComputer(
+            dro_cr,
+            self.adaptor_config.is_robust,
+            d_set,
+            self.adaptor_config.alpha,
+            self.adaptor_config.gamma,
+            self.adaptor_config.adj,
+            self.adaptor_config.min_var_weight,
+            self.adaptor_config.step_size,
+            self.adaptor_config.normalize_loss,
+            self.adaptor_config.btl
+        )
+
+        for criterion_key in self.config.task.criterions.keys():
+            if criterion_key in ["l1", "l2", "orthogonality"]:
+                self.regularization_criterions[criterion_key] = available_criterions[criterion_key]
+            elif criterion_key in dro_criterions:
+                dro_criterion = dro_criterions[criterion_key]
+                self.train_criterions[criterion_key] = construct_loss_computer(
+                    dro_criterion, self.train_dataloader.dataset
+                )
+                for i, dataloader in enumerate(self.val_dataloaders):
+                    self.val_criterions[i][criterion_key] = construct_loss_computer(dro_criterion, dataloader.dataset)
+            else:
+                raise RuntimeError(f"Criterion {criterion_key} is not implemented for use in the GroupDRO adaptor")
+        ### END: DRO Adaptations
 
         if logger is None:
             self.logger = Logger(
@@ -427,7 +470,7 @@ class GroupDRO(Adaptor):
                 model=self.model,
                 optimizer=self.optimizer,
                 base_dir=self.model_path,
-                criterions=self.criterions,
+                criterions=self.val_criterions[0],
                 val_dataloader=self.val_dataloaders[0],
                 writer=None,
             )
@@ -447,6 +490,13 @@ class GroupDRO(Adaptor):
                 max_norm=self.config.training.attack_epsilon,
             )
 
+
+    def run(self, continue_training=False, is_initialized=False):
+        """
+        Runs GroupDRO method.
+        """
+        self.fit(continue_training=continue_training, is_initialized=is_initialized)
+
     def log_cpu_memory_usage(self):
         process = psutil.Process(os.getpid())
         print(f"Memory usage: {process.memory_info().rss / 1024 ** 2:.2f} MB")
@@ -459,10 +509,11 @@ class GroupDRO(Adaptor):
         else:
             print("CUDA is not available.")
 
-    def run_epoch(self, dataloader, mode="train", pbar=None):
+    @profile
+    def run_epoch(self, dataloader, loss_criterions, mode="train", pbar=None):
         """ """
         self.log_cpu_memory_usage()
-        self.log_gpu_memory_usage()
+        # self.log_gpu_memory_usage()
         sources = {}
         for batch_idx, sample in enumerate(dataloader):
             self.log_cpu_memory_usage()
@@ -491,11 +542,10 @@ class GroupDRO(Adaptor):
 
             X, y = sample
 
+            ### BEGIN: DRO Alterations
             # TODO this is a dirty fix!!!
             # if isinstance(y, list) or isinstance(y, tuple):
             #     y = y[0]
-
-            ### BEGIN: DRO Alterations
             y, has_confounder = y
             ### END: DRO Alterations
 
@@ -552,25 +602,46 @@ class GroupDRO(Adaptor):
             loss = torch.tensor(0.0).to(self.device)
             loss_logs = {}
 
+            # self.log_gpu_memory_usage()
+
             ### BEGIN: DRO Alterations
+            # import pdb; pdb.set_trace()
+            group_idx = y + dataloader.dataset.output_size * has_confounder
 
-            # TODO: Incorperate the DRO loss computer here
-
-
-            for criterion in self.config.task.criterions.keys():
+            for criterion in self.regularization_criterions.keys():
                 criterion_loss = self.config.task.criterions[
                     criterion
-                ] * self.criterions[criterion](self.model, pred, y.to(self.device))
-
-                if criterion in ["l1", "l2", "orthogonality"]:
-                    criterion_loss *= self.regularization_level
+                ] * self.regularization_criterions[criterion](self.model, pred, y.to(self.device))
 
                 loss_logs[criterion] = criterion_loss.detach().item()
                 loss += criterion_loss
 
+            for criterion in loss_criterions:
+                criterion_loss = self.config.task.criterions[
+                    criterion
+                ] * loss_criterions[criterion].loss(pred, y.to(self.device), group_idx.to(self.device))
+
+                loss_logs[criterion] = criterion_loss.detach().item()
+                loss += criterion_loss
+            """
+            for criterion in self.config.task.criterions.keys():
+
+                if criterion in ["l1", "l2", "orthogonality"]:
+                    criterion_loss = self.config.task.criterions[
+                        criterion
+                    ] * self.criterions[criterion](self.model, pred, y.to(self.device)) * self.regularization_level
+                else:
+                    criterion_loss = self.config.task.criterions[
+                        criterion
+                    ] * self.criterions[criterion].loss(pred, y.to(self.device), group_idx)
+
+                loss_logs[criterion] = criterion_loss.detach().item()      
+                loss += criterion_loss
+            """
             ### END: DRO Alterations
 
             loss_logs["loss"] = loss.detach().item()
+            # self.log_gpu_memory_usage()
 
             self.logger.log_step(mode, pred, y_original, loss_logs)
 
@@ -602,22 +673,21 @@ class GroupDRO(Adaptor):
             if mode == "train":
                 self.optimizer.step()
 
+            ### BEGIN: DRO Alterations
+            for criterion in loss_criterions:
+                if hasattr(loss_criterions[criterion], "reset_stats"):
+                    loss_criterions[criterion].reset_stats()
+            ### END: DRO Alterations
         #
         accuracy = self.logger.log_epoch(mode, pbar=pbar)
 
         return loss.detach().item(), accuracy
 
-    ### BEGIN: DRO Alterations
-    def run(self, continue_training=False, is_initialized=False):
-        """
-        Runs GroupDRO method.
-        """
-        self.fit(continue_training=continue_training, is_initialized=is_initialized)
-    ### END: DRO Alterations
-
     def fit(self, continue_training=False, is_initialized=False):
         """ """
         print("Training Config: " + str(self.config))
+
+
         ### BEGIN: DRO Alterations
         if (not continue_training) and self.reset_weights:
         ### END: DRO Alterations
@@ -689,7 +759,7 @@ class GroupDRO(Adaptor):
         for idx, val_dataloader in enumerate(self.val_dataloaders):
             if len(val_dataloader) >= 1:
                 val_loss, val_accuracy_current = self.run_epoch(
-                    val_dataloader, mode="validation_" + str(idx), pbar=pbar
+                    val_dataloader, self.val_criterions[idx], mode="validation_" + str(idx), pbar=pbar
                 )
                 val_accuracy += self.val_dataloader_weights[idx] * val_accuracy_current
 
@@ -706,7 +776,7 @@ class GroupDRO(Adaptor):
             #
             self.model.train()
             train_loss, train_accuracy = self.run_epoch(
-                self.train_dataloader, pbar=pbar
+                self.train_dataloader, self.train_criterions, pbar=pbar
             )
             if isinstance(self.model, Generator):
                 train_generator_performance = (
@@ -727,7 +797,7 @@ class GroupDRO(Adaptor):
             for idx, val_dataloader in enumerate(self.val_dataloaders):
                 if len(val_dataloader) >= 1:
                     val_loss, val_accuracy_current = self.run_epoch(
-                        val_dataloader, mode="validation_" + str(idx), pbar=pbar
+                        val_dataloader, self.val_criterions[idx], mode="validation_" + str(idx), pbar=pbar
                     )
                     val_accuracy += (
                         self.val_dataloader_weights[idx] * val_accuracy_current
@@ -791,7 +861,6 @@ class GroupDRO(Adaptor):
                 self.model.to(self.device)
 
             # increase regularization and reset checkpoint if overfitting occurs
-            # TODO: Maybe get rid of this overfitting thing?
             if (
                 train_accuracy >= train_accuracy_previous
                 and val_accuracy < val_accuracy_previous
@@ -821,4 +890,3 @@ class GroupDRO(Adaptor):
             save_yaml_config(self.config, os.path.join(self.model_path, "config.yaml"))
 
             self.config.training.epoch += 1
-
