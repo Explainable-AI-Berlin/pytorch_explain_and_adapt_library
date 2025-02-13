@@ -19,7 +19,7 @@ python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_pdc_unb
 # Reproduce results on CelebA copyrighttag dataset
 
 # train the generator
-
+python train_generator.py --config "<PEAL_BASE>/configs/generators/celeba_copyrighttag_ddpm.yaml"
 
 # Run CFKD for 90% poisoning
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba500x090_pdc_cfkd_mask.yaml"
@@ -47,3 +47,10 @@ python train_generator.py --config "<PEAL_BASE>/configs/generators/follicle_ddpm
 
 # train the predictor that shall be analyzed
 python train_predictor.py --config "<PEAL_BASE>/configs/predictors/follicle_cut_classifier.yaml"
+
+
+# Analysis of influence of sample number
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square250x100_perfect_false_counterfactuals_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square500x100_perfect_false_counterfactuals_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_perfect_false_counterfactuals_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square2000x100_perfect_false_counterfactuals_cfkd.yaml"

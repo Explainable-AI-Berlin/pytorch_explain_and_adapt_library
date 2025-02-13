@@ -538,12 +538,12 @@ def high_contrast_heatmap(x, counterfactual):
 
 
 @torch.no_grad()
-def generate_smooth_mask(x1, x2, dilation):
+def generate_smooth_mask(x1, x2, dilation, max_avg_combination=0.5):
     assert (dilation % 2) == 1, "dilation must be an odd number"
     mask = (x1 - x2).abs().sum(dim=1, keepdim=True)
     mask = mask / mask.view(mask.size(0), -1).max(dim=1)[0].view(-1, 1, 1, 1)
-    dil_mask = 0.5 * F.avg_pool2d(mask, dilation, stride=1, padding=(dilation - 1) // 2)
-    dil_mask += 0.5 * F.max_pool2d(
+    dil_mask = max_avg_combination * F.avg_pool2d(mask, dilation, stride=1, padding=(dilation - 1) // 2)
+    dil_mask += (1 - max_avg_combination) * F.max_pool2d(
         mask, dilation, stride=1, padding=(dilation - 1) // 2
     )
     # dil_mask = F.max_pool2d(mask, dilation, stride=1, padding=(dilation - 1) // 2)

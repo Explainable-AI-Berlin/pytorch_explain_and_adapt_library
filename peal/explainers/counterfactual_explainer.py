@@ -161,6 +161,7 @@ class PDCConfig(ExplainerConfig):
     """
     merge_clusters: str = "best"
     allow_overlap: bool = False
+    max_avg_combination: float = 0.5
 
 
 class ACEConfig(ExplainerConfig):
@@ -463,7 +464,7 @@ class CounterfactualExplainer(ExplainerInterface):
             inverse_datasets = get_datasets(inverse_config)
             self.inverse_datasets = {}
             self.inverse_datasets["Training"] = inverse_datasets[0]
-            self.inverse_datasets["Validation"] = inverse_datasets[1]
+            self.inverse_datasets["validation"] = inverse_datasets[1]
             if len(list(inverse_datasets)) == 3:
                 self.inverse_datasets["test"] = inverse_datasets[2]
 
@@ -471,6 +472,33 @@ class CounterfactualExplainer(ExplainerInterface):
                 inverse_test_config = copy.deepcopy(self.predictor_datasets[1].config)
                 inverse_test_config.dataset_path += "_inverse"
                 self.inverse_datasets["test"] = get_datasets(inverse_test_config)[-1]
+
+    def perfect_false_counterfactuals(self, x_in, target_classes, idx_list, mode):
+        """
+        This function generates a counterfactual for a given batch of inputs.
+
+        Args:
+            batch (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        x_counterfactual_list = []
+        z_difference_list = []
+        y_target_end_confidence_list = []
+        for i, idx in enumerate(idx_list):
+            x_counterfactual = self.inverse_datasets[mode][idx][0]
+            x_counterfactual_list.append(x_counterfactual)
+            preds = torch.nn.Softmax()(
+                self.predictor(x_counterfactual.unsqueeze(0).to(self.device))
+                .detach()
+                .cpu()
+            )
+            y_target_end_confidence_list.append(preds[0][target_classes[i]])
+            z_difference_list.append(x_in[i] - x_counterfactual)
+
+        return x_counterfactual_list, z_difference_list, y_target_end_confidence_list
+
 
     def predictor_distilled_counterfactual(
         self,
@@ -800,6 +828,7 @@ class CounterfactualExplainer(ExplainerInterface):
                         old_mask=torch.clone(boolmask),
                         mask_momentum=self.explainer_config.mask_momentum,
                         boolmask_in=boolmask_in,
+                        max_avg_combination=self.explainer_config.max_avg_combination,
                     )
                     for sample_idx in range(z[0].data.shape[0]):
                         if mask[sample_idx] == 1:
@@ -994,7 +1023,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 batch["y_target_end_confidence_list"],
             ) = self.perfect_false_counterfactuals(
                 x_in=batch["x_list"],
-                y_target=batch["y_target_list"],
+                target_classes=batch["y_target_list"],
                 idx_list=batch["idx_list"],
                 mode=mode,
             )
