@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
+    <style>
+        .swiper-container {
+            width: 500px;  /* Fixed size */
+            height: 300px;
+            overflow: hidden;
+        }
+        .swiper-slide img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+    </style>
+</head>
+<body>
+
+<div class="swiper-container">
+    <div class="swiper-wrapper">
+        {% for image in counterfactual_collages %}
+        <div class="swiper-slide">
+            <img src="{{ image }}" alt="Counterfactual Collage">
+        </div>
+        {% endfor %}
+    </div>
+    <!-- Navigation buttons -->
+    <div class="swiper-button-next"></div>
+    <div class="swiper-button-prev"></div>
+</div>
+
+<!-- Form -->
+<form method="post">
+    <input type="submit" name="submit_button" value="True Counterfactual">
+    <input type="submit" name="submit_button" value="False Counterfactual">
+    <input type="submit" name="submit_button" value="Out of Distribution">
+</form>
+
+<script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+<script>
+    var swiper = new Swiper('.swiper-container', {
+        navigation: {
+            nextEl: '.swiper-button-next',
+            prevEl: '.swiper-button-prev',
+        },
+    });
+</script>
+
+</body>
+</html>

@@ -499,7 +499,6 @@ class CounterfactualExplainer(ExplainerInterface):
 
         return x_counterfactual_list, z_difference_list, y_target_end_confidence_list
 
-
     def predictor_distilled_counterfactual(
         self,
         x_in,
@@ -982,6 +981,7 @@ class CounterfactualExplainer(ExplainerInterface):
         pbar=None,
         mode="",
         explainer_path=None,
+        batchwise_clustering=False,
     ) -> dict:
         """
         This function generates a counterfactual for a given batch of inputs.
@@ -1087,6 +1087,15 @@ class CounterfactualExplainer(ExplainerInterface):
                     else:
                         raise Exception
 
+        if self.explainer_config.num_attempts >= 2 and batchwise_clustering:
+            batch = self.cluster_explanations(
+                explanations_dict=batch,
+                batch_size=int(
+                    len(batch["x_list"]) / self.explainer_config.num_attempts
+                ),
+                n_clusters=self.explainer_config.num_attempts,
+            )
+
         batch_out = {}
         if remove_below_threshold:
             for key in batch.keys():
@@ -1174,28 +1183,30 @@ class CounterfactualExplainer(ExplainerInterface):
             return difference_list
 
         cluster_lists = [[] for i in range(n_clusters)]
+        collage_path_base = None
         if self.explainer_config.clustering_strategy == "activation_clusters":
             explanations_beginning = [e[0] for e in explanations_list_by_source]
             cluster_means = extract_feature_difference(explanations_beginning)
             cluster_lists[0] = [explanations_list_by_source[0][0]]
             cluster_lists[1] = [explanations_list_by_source[1][0]]
-            collage_path_ref = explanations_beginning[0]["collage_path_list"]
-            collage_path_elements = collage_path_ref.split(os.sep)[:-1]
-            collage_path_base = str(
-                os.path.join(*([os.path.abspath(os.sep)] + collage_path_elements))
-            )
-            for cluster_idx in range(len(cluster_means)):
-                collage_path = explanations_beginning[cluster_idx]["collage_path_list"]
-                Path(collage_path_base + "_" + str(cluster_idx)).mkdir(
-                    parents=True, exist_ok=True
+            if "collage_path_list" in explanations_beginning[0].keys():
+                collage_path_ref = explanations_beginning[0]["collage_path_list"]
+                collage_path_elements = collage_path_ref.split(os.sep)[:-1]
+                collage_path_base = str(
+                    os.path.join(*([os.path.abspath(os.sep)] + collage_path_elements))
                 )
-                collage_path_new = os.path.join(
-                    *[
-                        collage_path_base + "_" + str(cluster_idx),
-                        embed_numberstring(0, 7) + ".png",
-                    ]
-                )
-                shutil.copy(collage_path, collage_path_new)
+                for cluster_idx in range(len(cluster_means)):
+                    collage_path = explanations_beginning[cluster_idx]["collage_path_list"]
+                    Path(collage_path_base + "_" + str(cluster_idx)).mkdir(
+                        parents=True, exist_ok=True
+                    )
+                    collage_path_new = os.path.join(
+                        *[
+                            collage_path_base + "_" + str(cluster_idx),
+                            embed_numberstring(0, 7) + ".png",
+                        ]
+                    )
+                    shutil.copy(collage_path, collage_path_new)
 
         for idx in range(len(explanations_list_by_source[0])):
             if self.explainer_config.clustering_strategy == "highest_activation":
@@ -1209,7 +1220,9 @@ class CounterfactualExplainer(ExplainerInterface):
                         )
 
                     except Exception as exp:
-                        import pdb; pdb.set_trace()
+                        import pdb
+
+                        pdb.set_trace()
 
                 current_activations = torch.tensor(current_activations)
                 activations_order = torch.argsort(current_activations)
@@ -1235,7 +1248,10 @@ class CounterfactualExplainer(ExplainerInterface):
                 cosine_similarities_abs = torch.abs(cosine_similarities)
 
             for i in range(n_clusters):
-                if self.explainer_config.clustering_strategy == "representation_clusters":
+                if (
+                    self.explainer_config.clustering_strategy
+                    == "representation_clusters"
+                ):
                     idx_combined = int(torch.argmax(cosine_similarities_abs.flatten()))
                     idx_cluster = idx_combined // len(current_differences)
                     idx_current = idx_combined % len(current_differences)
@@ -1272,7 +1288,11 @@ class CounterfactualExplainer(ExplainerInterface):
                         idx_cluster
                     ]
 
-                if self.explainer_config.clustering_strategy == "highest_activation":
+                if (
+                    self.explainer_config.clustering_strategy == "highest_activation"
+                    and "collage_path_list"
+                    in explanations_list_by_source[idx_current][idx].keys()
+                ):
                     collage_path_ref = explanations_list_by_source[idx_current][idx][
                         "collage_path_list"
                     ]
@@ -1286,16 +1306,17 @@ class CounterfactualExplainer(ExplainerInterface):
                         parents=True, exist_ok=True
                     )
 
-                collage_path = explanations_list_by_source[idx_current][idx][
-                    "collage_path_list"
-                ]
-                collage_path_new = os.path.join(
-                    *[
-                        collage_path_base + "_" + str(int(idx_cluster)),
-                        embed_numberstring(idx, 7) + ".png",
+                if not collage_path_base is None:
+                    collage_path = explanations_list_by_source[idx_current][idx][
+                        "collage_path_list"
                     ]
-                )
-                shutil.copy(collage_path, collage_path_new)
+                    collage_path_new = os.path.join(
+                        *[
+                            collage_path_base + "_" + str(int(idx_cluster)),
+                            embed_numberstring(idx, 7) + ".png",
+                        ]
+                    )
+                    shutil.copy(collage_path, collage_path_new)
 
         cluster_dicts = []
         for cluster_idx in range(len(cluster_lists)):
@@ -1332,17 +1353,19 @@ class CounterfactualExplainer(ExplainerInterface):
         explanations_dict_out = cluster_dicts[sorted_cluster_idxs[0]]
 
         for i in range(len(sorted_cluster_idxs)):
-            explanations_dict_out["clusters" + str(int(i))] = copy.deepcopy(cluster_dicts[
-                sorted_cluster_idxs[i]
-            ]["x_counterfactual_list"])
-            explanations_dict_out["cluster_confidence" + str(int(i))] = copy.deepcopy(cluster_dicts[
-                sorted_cluster_idxs[i]
-            ]["y_target_end_confidence_list"])
+            explanations_dict_out["clusters" + str(int(i))] = copy.deepcopy(
+                cluster_dicts[sorted_cluster_idxs[i]]["x_counterfactual_list"]
+            )
+            explanations_dict_out["cluster_confidence" + str(int(i))] = copy.deepcopy(
+                cluster_dicts[sorted_cluster_idxs[i]]["y_target_end_confidence_list"]
+            )
 
         if self.explainer_config.merge_clusters == "concatenate":
             for key in cluster_dicts[0].keys():
                 for cluster_idx in range(1, len(cluster_dicts)):
-                    explanations_dict_out[key] += cluster_dicts[sorted_cluster_idxs[cluster_idx]][key]
+                    explanations_dict_out[key] += cluster_dicts[
+                        sorted_cluster_idxs[cluster_idx]
+                    ][key]
 
         return explanations_dict_out
 
@@ -1352,7 +1375,7 @@ class CounterfactualExplainer(ExplainerInterface):
             if hasattr(self.predictor_datasets[1], "sample_to_latent"):
                 latents_original = []
                 for i, e in enumerate(
-                    explanations_dict["x_list"][:len(explanations_dict["clusters0"])]
+                    explanations_dict["x_list"][: len(explanations_dict["clusters0"])]
                 ):
                     hint = (
                         explanations_dict["hint_list"][i]
@@ -1395,7 +1418,9 @@ class CounterfactualExplainer(ExplainerInterface):
                         )
 
                     except Exception as exp:
-                        import pdb; pdb.set_trace()
+                        import pdb
+
+                        pdb.set_trace()
 
             elif "hint_list" in explanations_dict.keys():
                 latent_differences = []

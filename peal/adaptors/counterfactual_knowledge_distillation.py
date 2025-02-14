@@ -795,7 +795,7 @@ class CFKD(Adaptor):
         visualization_path = os.path.join(self.base_dir, "visualization.png")
         if (
             self.output_size == 2
-            and self.adaptor_config.tracking_level >= 4
+            and self.adaptor_config.tracking_level >= 3
             and not os.path.exists(visualization_path)
         ):
             print("visualize progress!!!")
@@ -920,13 +920,7 @@ class CFKD(Adaptor):
         tracked_values = {key: [] for key in tracked_keys}
 
         continue_collecting = True
-        if hasattr(self.adaptor_config.explainer, "y_target_goal_confidence"):
-            acceptance_threshold = (
-                self.adaptor_config.explainer.y_target_goal_confidence
-            )
-
-        else:
-            acceptance_threshold = 0.51
+        acceptance_threshold = 0.51
 
         print("Start generating x counterfactual list!!!")
         pbar = tqdm(
@@ -942,11 +936,12 @@ class CFKD(Adaptor):
         )
         pbar.stored_values = {}
         pbar.stored_values["n_total"] = 0
+        remaining_sample_number = self.adaptor_config.min_train_samples
         while continue_collecting:
             num_batches_per_iteration = int(
                 1
                 + (
-                    self.adaptor_config.min_train_samples
+                    remaining_sample_number
                     - len(list(tracked_values.values())[0])
                 )
                 / self.adaptor_config.batch_size
@@ -997,6 +992,8 @@ class CFKD(Adaptor):
                     acceptance_threshold = float(
                         np.maximum(0.51, acceptance_threshold - 0.1)
                     )
+
+                remaining_sample_number = self.adaptor_config.min_train_samples - len(list(tracked_values.values())[0])
 
             else:
                 continue_collecting = False
@@ -1155,11 +1152,11 @@ class CFKD(Adaptor):
         }
         print("flip_rate: " + str(flip_rate))
 
-        if self.adaptor_config.tracking_level >= 3:
-
+        if self.adaptor_config.tracking_level >= 4:
+            # this is only for scientific experiments and could also be sourced out into another file!
             # distill into equivalent model
             predictor_distillation = load_yaml_config(
-                "<PEAL_BASE>/configs/predictors/simple_distillation.yaml",
+                "<PEAL_BASE>/configs/predictors/img_classifier_balanced.yaml",
                 PredictorConfig,
             )
             distillation_path = os.path.join(
@@ -2055,7 +2052,7 @@ class CFKD(Adaptor):
             )
             if (
                 self.output_size == 2
-                and self.adaptor_config.tracking_level >= 4
+                and self.adaptor_config.tracking_level >= 3
                 and not os.path.exists(visualization_path)
             ):
                 self.visualize_progress(

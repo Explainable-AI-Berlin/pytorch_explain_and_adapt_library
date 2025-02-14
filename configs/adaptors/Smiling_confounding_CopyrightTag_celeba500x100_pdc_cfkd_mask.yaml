@@ -13,10 +13,10 @@ explainer                            :  <PEAL_BASE>/configs/explainers/pdc_defau
 training                             :  <PEAL_BASE>/configs/training/sensitive_distillation.yaml
 data                                 :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba500_poisoned100.yaml
 test_data                            :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba.yaml
+base_dir                             :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned100/pdc_cfkd_mask
 student                              :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned100/model.cpl
 teacher                              :  SegmentationMask # $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisoned050/model.cpl
 generator                            :  $PEAL_RUNS/celeba_copyrighttag/ddpm/config.yaml
-base_dir                             :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned100/pdc_cfkd_mask
 task:
   criterions:
     ce     : 1.0

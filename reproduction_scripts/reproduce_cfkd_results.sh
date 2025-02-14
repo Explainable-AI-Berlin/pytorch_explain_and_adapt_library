@@ -54,3 +54,4 @@ python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square250x100_perfect_
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square500x100_perfect_false_counterfactuals_cfkd.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_perfect_false_counterfactuals_cfkd.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square2000x100_perfect_false_counterfactuals_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square4000x100_perfect_false_counterfactuals_cfkd.yaml"
