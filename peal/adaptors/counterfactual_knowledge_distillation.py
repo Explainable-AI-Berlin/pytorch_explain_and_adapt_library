@@ -848,6 +848,12 @@ class CFKD(Adaptor):
                 ):
                     idx = y_res[-1]
 
+            elif isinstance(
+                self.explainer.explainer_config, PerfectFalseCounterfactualConfig
+            ):
+                idx = y[-1]
+                y = y[0]
+
             logits = (
                 self.student(x.to(self.device).unsqueeze(0)).squeeze(0).detach().cpu()
             )
@@ -855,6 +861,7 @@ class CFKD(Adaptor):
                 logits / self.explainer.explainer_config.temperature
             )[y_target]
             prediction = self.logits_to_prediction(logits)
+            print([prediction, y, y_source])
             if (
                 not self.adaptor_config.counterfactual_type == "1sided"
                 or prediction == y == y_source
@@ -903,6 +910,7 @@ class CFKD(Adaptor):
         finetune_iteration,
         tracked_keys,
     ):
+        print('generate x counterfactual list!')
         self.datastack.reset()
 
         collage_base_path = os.path.join(
@@ -940,12 +948,10 @@ class CFKD(Adaptor):
         while continue_collecting:
             num_batches_per_iteration = int(
                 1
-                + (
-                    remaining_sample_number
-                    - len(list(tracked_values.values())[0])
-                )
+                + (remaining_sample_number - len(list(tracked_values.values())[0]))
                 / self.adaptor_config.batch_size
             )
+            print("continue from " + str(len(list(tracked_values.values()))))
             for i in range(num_batches_per_iteration):
                 batch = self.get_batch(error_matrix, i % 2)
                 values = self.explainer.explain_batch(
@@ -993,7 +999,9 @@ class CFKD(Adaptor):
                         np.maximum(0.51, acceptance_threshold - 0.1)
                     )
 
-                remaining_sample_number = self.adaptor_config.min_train_samples - len(list(tracked_values.values())[0])
+                remaining_sample_number = self.adaptor_config.min_train_samples - len(
+                    list(tracked_values.values())[0]
+                )
 
             else:
                 continue_collecting = False
@@ -1076,6 +1084,7 @@ class CFKD(Adaptor):
                 student=self.student,
                 **tracked_values,
             )
+            import pdb; pdb.set_trace()
 
             os.makedirs(
                 os.path.join(self.base_dir, str(finetune_iteration)), exist_ok=True
@@ -1117,7 +1126,9 @@ class CFKD(Adaptor):
             )
             / num_samples
         )
-        ood_rate = len(list(filter(lambda sample: sample == "ood", feedback))) / num_samples
+        ood_rate = (
+            len(list(filter(lambda sample: sample == "ood", feedback))) / num_samples
+        )
 
         num_true_1sided = len(
             list(
@@ -1256,12 +1267,14 @@ class CFKD(Adaptor):
         mode="",
         **kwargs,
     ):
-        assert (
+        if not (
             len(x_counterfactual_list)
             == len(feedback)
             == len(y_source_list)
             == len(y_target_list)
-        ), "missmatch in list lengths"
+        ):
+            print("missmatch in list lengths")
+            import pdb; pdb.set_trace()
 
         dataset_dir = os.path.join(
             self.base_dir, str(finetune_iteration), mode + "_dataset"
@@ -1819,7 +1832,9 @@ class CFKD(Adaptor):
             )
             if self.adaptor_config.tracking_level > 0:
                 validation_cluster_values_path = os.path.join(
-                    self.base_dir, str(finetune_iteration), "validation_tracked_cluster_values.npz"
+                    self.base_dir,
+                    str(finetune_iteration),
+                    "validation_tracked_cluster_values.npz",
                 )
                 with open(
                     validation_cluster_values_path,

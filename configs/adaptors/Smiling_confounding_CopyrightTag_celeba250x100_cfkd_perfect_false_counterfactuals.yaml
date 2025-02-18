@@ -4,6 +4,7 @@ category                             :  "adaptor"
 batch_size                           :  10
 finetune_iterations                  :  1
 tracking_level                       :  0
+max_test_batches                     :  1
 min_train_samples                    :  150
 max_validation_samples               :  100
 continuous_learning                  :  "finetune"
@@ -14,7 +15,7 @@ data                                 :  <PEAL_BASE>/configs/data/Smiling_confoun
 test_data                            :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba.yaml
 base_dir                             :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned100/pdc_cfkd_perfect_false_counterfactuals250
 student                              :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned100/model.cpl
-teacher                              :  SegmentationMask
+teacher                              :  Baseline:false
 task:
   criterions:
     ce     : 1.0
