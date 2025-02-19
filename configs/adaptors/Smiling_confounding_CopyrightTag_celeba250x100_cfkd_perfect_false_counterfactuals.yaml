@@ -1,4 +1,5 @@
-# python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba250x100_cfkd_perfect_false_counterfactuals.yaml"
+#
+#python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba250x100_cfkd_perfect_false_counterfactuals.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  10

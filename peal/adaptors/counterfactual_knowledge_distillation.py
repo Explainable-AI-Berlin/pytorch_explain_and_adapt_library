@@ -458,7 +458,8 @@ class CFKD(Adaptor):
             test_config=self.adaptor_config.test_data,
             enable_hints=bool(teacher == "SegmentationMask"),
         )
-        self.dataloaders_val = [self.val_dataloader, None]
+        self.dataloaders_val = [self.val_dataloader]
+        self.dataloader_val_weights = torch.tensor([1.0])
         self.adaptor_config.data = self.train_dataloader.dataset.config
 
         #
@@ -515,7 +516,7 @@ class CFKD(Adaptor):
             self.adaptor_config.training, self.train_dataloader
         )
         self.datastack = DataStack(
-            self.train_dataloader.dataset,
+            self.dataloader_mixer,
             self.output_size,
             transform=self.val_dataloader.dataset.transform,
         )
@@ -784,6 +785,12 @@ class CFKD(Adaptor):
                 )
                 print("counterfactual dataset " + str(i) + " added!!!")
 
+            self.datastack = DataStack(
+                self.dataloader_mixer,
+                self.output_size,
+                transform=self.val_dataloader.dataset.transform,
+            )
+
             if self.adaptor_config.current_iteration > 0:
                 print("load already updated student model!!!")
                 self.student = torch.load(
@@ -910,7 +917,7 @@ class CFKD(Adaptor):
         finetune_iteration,
         tracked_keys,
     ):
-        print('generate x counterfactual list!')
+        print("generate x counterfactual list!")
         self.datastack.reset()
 
         collage_base_path = os.path.join(
@@ -1023,6 +1030,13 @@ class CFKD(Adaptor):
                 tracked_keys=self.tracked_keys,
             )
 
+            if self.adaptor_config.explainer.use_clustering:
+                tracked_values = self.explainer.cluster_explanations(
+                    tracked_values,
+                    self.adaptor_config.batch_size,
+                    self.adaptor_config.explainer.num_attempts,
+                )
+
             if len(list(tracked_values.values())[0]) == 0:
                 return tracked_values
 
@@ -1082,9 +1096,9 @@ class CFKD(Adaptor):
                     self.base_dir, str(finetune_iteration), mode + "_teacher"
                 ),
                 student=self.student,
+                num_clusters=self.adaptor_config.explainer.num_attempts,
                 **tracked_values,
             )
-            import pdb; pdb.set_trace()
 
             os.makedirs(
                 os.path.join(self.base_dir, str(finetune_iteration)), exist_ok=True
@@ -1107,11 +1121,7 @@ class CFKD(Adaptor):
                 feedback = f.read().split("\n")
 
         # TODO this is not correct for calculating training stats.
-        if mode == "validation":
-            num_samples = len(tracked_values["y_list"])
-
-        else:
-            num_samples = -1
+        num_samples = len(tracked_values["y_list"])
 
         # TODO this seems like a bug!
         feedback = feedback[:num_samples]
@@ -1274,7 +1284,9 @@ class CFKD(Adaptor):
             == len(y_target_list)
         ):
             print("missmatch in list lengths")
-            import pdb; pdb.set_trace()
+            import pdb
+
+            pdb.set_trace()
 
         dataset_dir = os.path.join(
             self.base_dir, str(finetune_iteration), mode + "_dataset"
@@ -1356,7 +1368,12 @@ class CFKD(Adaptor):
             config=self.validation_data_config,
             datasource=val_dataset_path,
         )
-        self.dataloaders_val[1] = dataloader_val
+        self.dataloaders_val.append(dataloader_val)
+        self.dataloader_val_weights *= self.adaptor_config.mixing_ratio
+        self.dataloader_val_weights = torch.cat(
+            self.dataloader_val_weights,
+            torch.tensor([1 - self.adaptor_config.mixing_ratio]),
+        )
         log_images_to_writer(
             dataloader_val, writer, "validation_" + str(finetune_iteration)
         )
@@ -1375,6 +1392,11 @@ class CFKD(Adaptor):
             mixing_ratio=self.adaptor_config.mixing_ratio,
             writer=writer,
             finetune_iteration=finetune_iteration,
+        )
+        self.datastack = DataStack(
+            self.dataloader_mixer,
+            self.output_size,
+            transform=self.val_dataloader.dataset.transform,
         )
 
         y_list_dataset = [
@@ -1428,10 +1450,7 @@ class CFKD(Adaptor):
                 model_path=os.path.join(
                     self.base_dir, str(finetune_iteration), "finetuned_model"
                 ),
-                val_dataloader_weights=[
-                    1 - self.adaptor_config.mixing_ratio,
-                    self.adaptor_config.mixing_ratio,
-                ],
+                val_dataloader_weights=self.dataloader_val_weights,
                 only_last_layer=self.adaptor_config.continuous_learning
                 == "deep_feature_reweighting",
             )

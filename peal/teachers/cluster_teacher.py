@@ -75,7 +75,7 @@ class ClusterTeacher(TeacherInterface):
                     collage_path = self.data.collage_paths[self.data.i]
                     self.data.i += 1
                     return render_template(
-                        "feedback_loop.html",
+                        "clustered_feedback_loop.html",
                         form=request.form,
                         counterfactual_collage=collage_path,
                     )
@@ -91,11 +91,12 @@ class ClusterTeacher(TeacherInterface):
         self.thread.start()
         print("Feedback GUI is active on localhost:" + str(self.port))
 
-    def get_feedback(self, collage_path_list, base_dir, clusters, **kwargs):
+    def get_feedback(self, num_clusters, **kwargs):
         """ """
         print('start collecting feedback!!!')
         collage_path_clusters = []
-        for cluster in clusters:
+        for cluster_idx in range(num_clusters):
+            cluster = kwargs["cluster" + str(cluster_idx)]
             collage_path_clusters.append(cluster['collage_paths'])
 
         collage_clusters_static = []
@@ -130,4 +131,6 @@ class ClusterTeacher(TeacherInterface):
         self.data.collage_paths = []
         self.data.feedback = []
         self.data.i = 0
+        # TODO inlcude cluster ranking
+        import pdb; pdb.set_trace()
         return feedback

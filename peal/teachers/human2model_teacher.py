@@ -91,7 +91,7 @@ class Human2ModelTeacher(TeacherInterface):
         self.thread.start()
         print("Feedback GUI is active on localhost:" + str(self.port))
 
-    def get_feedback(self, collage_path_list, base_dir, **kwargs):
+    def get_feedback(self, collage_path_list, **kwargs):
         """ """
         print('start collecting feedback!!!')
         collage_paths_static = []
