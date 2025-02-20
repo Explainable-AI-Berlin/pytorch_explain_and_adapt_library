@@ -131,6 +131,10 @@ class ClusterTeacher(TeacherInterface):
         self.data.collage_paths = []
         self.data.feedback = []
         self.data.i = 0
-        # TODO inlcude cluster ranking
-        import pdb; pdb.set_trace()
-        return feedback
+        feedback_out = []
+        for cluster_idx in range(num_clusters):
+            cluster = kwargs["cluster" + str(cluster_idx)]
+            for collage_path in cluster['collage_paths']:
+                feedback_out.append(feedback[cluster_idx])
+
+        return feedback_out

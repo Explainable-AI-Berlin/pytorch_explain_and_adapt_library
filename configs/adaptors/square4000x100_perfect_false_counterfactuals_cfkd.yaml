@@ -18,7 +18,7 @@ teacher                              :  SegmentationMask
 base_dir                             :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned100/cfkd_perfect_counterfactuals4000
 task:
   criterions:
-    ce     : 1.0
+    ce     : 1.0Z
     l2     : 100.0
   output_type             : singleclass
   output_channels         : 2

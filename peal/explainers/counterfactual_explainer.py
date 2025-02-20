@@ -977,7 +977,7 @@ class CounterfactualExplainer(ExplainerInterface):
         base_path: str = "collages",
         start_idx: int = 0,
         y_target_goal_confidence_in: float = None,
-        remove_below_threshold: bool = True,
+        remove_below_threshold: bool = False,
         pbar=None,
         mode="",
         explainer_path=None,

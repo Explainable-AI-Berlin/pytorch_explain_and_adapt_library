@@ -595,7 +595,8 @@ class CFKD(Adaptor):
 
         boundary_path = os.path.join(self.base_dir, "0", "decision_boundary.png")
         if (
-            not os.path.exists(boundary_path)
+            self.adaptor_config.tracking_level >= 2
+            and not os.path.exists(boundary_path)
             and hasattr(self.dataloaders_val[0].dataset, "visualize_decision_boundary")
             and not os.path.exists(boundary_path)
         ):
@@ -954,19 +955,15 @@ class CFKD(Adaptor):
         remaining_sample_number = self.adaptor_config.min_train_samples
         while continue_collecting:
             num_batches_per_iteration = int(
-                1
-                + (remaining_sample_number - len(list(tracked_values.values())[0]))
-                / self.adaptor_config.batch_size
+                1 + remaining_sample_number / self.adaptor_config.batch_size
             )
-            print("continue from " + str(len(list(tracked_values.values()))))
+            print("continue from " + str(len(list(tracked_values.values())[0])))
             for i in range(num_batches_per_iteration):
                 batch = self.get_batch(error_matrix, i % 2)
                 values = self.explainer.explain_batch(
                     batch=batch,
                     base_path=collage_base_path,
                     start_idx=len(list(tracked_values.values())[0]),
-                    y_target_goal_confidence_in=acceptance_threshold,
-                    remove_below_threshold=True,
                     pbar=pbar,
                     mode="Training",
                     explainer_path=os.path.join(
@@ -1030,7 +1027,9 @@ class CFKD(Adaptor):
                 tracked_keys=self.tracked_keys,
             )
 
-            if self.adaptor_config.explainer.use_clustering:
+            if self.adaptor_config.explainer.use_clustering and not hasattr(
+                tracked_values, "cluster0"
+            ):
                 tracked_values = self.explainer.cluster_explanations(
                     tracked_values,
                     self.adaptor_config.batch_size,
@@ -1371,8 +1370,10 @@ class CFKD(Adaptor):
         self.dataloaders_val.append(dataloader_val)
         self.dataloader_val_weights *= self.adaptor_config.mixing_ratio
         self.dataloader_val_weights = torch.cat(
-            self.dataloader_val_weights,
-            torch.tensor([1 - self.adaptor_config.mixing_ratio]),
+            [
+                self.dataloader_val_weights,
+                torch.tensor([1 - self.adaptor_config.mixing_ratio]),
+            ],
         )
         log_images_to_writer(
             dataloader_val, writer, "validation_" + str(finetune_iteration)
@@ -2056,9 +2057,11 @@ class CFKD(Adaptor):
             decision_boundary_path = os.path.join(
                 self.base_dir, str(finetune_iteration), "decision_boundary.png"
             )
-            if hasattr(
-                self.dataloaders_val[0].dataset, "visualize_decision_boundary"
-            ) and not os.path.exists(decision_boundary_path):
+            if (
+                hasattr(self.dataloaders_val[0].dataset, "visualize_decision_boundary")
+                and not os.path.exists(decision_boundary_path)
+                and self.adaptor_config.tracking_level >= 2
+            ):
                 self.dataloaders_val[0].dataset.visualize_decision_boundary(
                     self.student,
                     self.adaptor_config.training.train_batch_size,

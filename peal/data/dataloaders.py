@@ -64,10 +64,14 @@ class DataStack:
 
             else:
                 X, y = next(iter(self.datasource))
+                if isinstance(y, int):
+                    X, y = X
+
                 if (
+                    isinstance(y, list) or
                     hasattr(self.dataset, "hints_enabled")
                     and self.dataset.hints_enabled
-                    or self.dataset.idx_enabled
+                    or hasattr(self.dataset, "idx_enabled") and self.dataset.idx_enabled
                 ):
                     for i in range(X.shape[0]):
                         y_out = tuple([y_elem[i] for y_elem in y])
