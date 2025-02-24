@@ -244,8 +244,8 @@ class ModelTrainer:
 
             new_val_dataloaders = []
             for i in range(self.config.task.output_channels):
-                val_dataloader_copy.dataset.enable_class_restriction(i)
                 val_dataloader_copy = copy.deepcopy(self.val_dataloaders[0])
+                val_dataloader_copy.dataset.enable_class_restriction(i)
                 new_val_dataloaders.append(val_dataloader_copy)
 
             self.val_dataloaders = new_val_dataloaders

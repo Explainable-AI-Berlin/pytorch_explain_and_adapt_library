@@ -271,7 +271,7 @@ class SquareDataset(Image2MixedDataset):
         )
 
     def visualize_decision_boundary(
-        self, predictor, batch_size, device, path, temperature=1.0
+        self, predictor, batch_size, device, path, temperature=1.0, train_dataloader=None, val_dataloader=None,
     ):
         print("visualize_decision_boundary")
 
@@ -317,24 +317,60 @@ class SquareDataset(Image2MixedDataset):
                 ].reshape(100, 100)
                 prediction_grids.append(prediction_grid)
 
-        """# Average the predictions across grids
-        prediction_grid = torch.mean(torch.stack(prediction_grids).to(torch.float32), dim=0).numpy()
-        
+        # Average the predictions across grids
+        prediction_grid = torch.mean(
+            torch.stack(prediction_grids).to(torch.float32), dim=0
+        ).numpy()
+
+        # Extract latents for training and validation samples
+        def extract_latents(dataloader):
+            latents = []
+            hints = []
+            for batch in dataloader:
+                x, hint = batch  # Assuming batch contains images and hints
+                for idx in range(len(x)):
+                    latents.append([
+                        self.check_foreground(x[idx], hint[idx]),
+                        self.check_background(x[idx], hint[idx]),
+                    ])
+                    hints.append(hint[idx])
+            return latents, hints
+
+        # TODO introduce new functionality into the dataloader mixer!
+        train_latents, _ = extract_latents(train_dataloader) if train_dataloader else ([], [])
+        val_latents, _ = extract_latents(val_dataloader) if val_dataloader else ([], [])
+
         # Create the plot
         plt.figure()
-        
+
         # Set a lighter color map: use "coolwarm" and make it lighter
         cmap = cm.get_cmap("bwr")
-        plt.contourf(xx, yy, prediction_grid, levels=100, cmap=cmap)
-        
+        # Create filled contour plot
+        contour_fill = plt.contourf(xx, yy, prediction_grid, levels=100, cmap=cmap)
+
+        # Add contour lines with black color and thicker lines
+        contour_lines = plt.contour(
+            xx, yy, prediction_grid, levels=10, colors="black", linewidths=1.5
+        )
+
+        # Plot training and validation samples
+        train_latents = np.array(train_latents)
+        val_latents = np.array(val_latents)
+        if len(train_latents) > 0:
+            plt.scatter(train_latents[:, 0], train_latents[:, 1], color='blue', label='Train Samples', alpha=0.7)
+        if len(val_latents) > 0:
+            plt.scatter(val_latents[:, 0], val_latents[:, 1], color='red', label='Val Samples', alpha=0.7)
+
+        plt.legend()
+
         # Set axis labels
         plt.xlabel("Foreground Intensity")
         plt.ylabel("Background Intensity")
-        
+
         # Set the ticks to increments of 0.5
         plt.xticks(np.arange(0, 1.1, 0.5))
         plt.yticks(np.arange(0, 1.1, 0.5))
-        
+
         # Add vertical dotted line for Foreground Intensity == 0.5
         plt.axvline(x=0.5, color="black", linestyle="--")
         plt.text(
@@ -344,17 +380,67 @@ class SquareDataset(Image2MixedDataset):
             rotation=270,
             verticalalignment="center",
         )
-        
+
         # Add horizontal dotted line for Background Intensity == 0.5
         plt.axhline(y=0.5, color="black", linestyle="--")
         plt.text(0.5, 1.05, "True feature only", horizontalalignment="center")
-        
+
         # Adjust plot limits to give space for text labels outside the plot
         plt.subplots_adjust(right=0.85, top=0.85)
-        
+
         # Save the plot to the specified path
         plt.savefig(path, bbox_inches="tight")
-        plt.clf()"""
+        plt.clf()
+        np.save(path[:-4] + ".npy", prediction_grid)
+
+        print("visualize_decision_boundary saved under " + path)
+
+    def visualize_decision_boundary_old(
+        self, predictor, batch_size, device, path, temperature=1.0, train_dataloader=None, val_dataloader=None,
+    ):
+        print("visualize_decision_boundary")
+
+        # Create the grid for plotting
+        x = torch.linspace(0, 1, 100)
+        y = torch.linspace(0, 1, 100)
+        xx, yy = torch.meshgrid(x, y)
+        grid = torch.stack([xx.flatten(), yy.flatten()], dim=1)
+
+        prediction_grids = []
+        positions = [0, 26, 52]
+
+        # Predict the grid values for decision boundary
+        for x_pos in positions:
+            for y_pos in positions:
+                current_batch = []
+                logits = []
+                first_batch = None
+
+                for i in range(len(grid)):
+                    current_batch.append(
+                        ToTensor()(
+                            latent_to_square_image(
+                                255 * float(grid[i][0]),
+                                255 * float(grid[i][1]),
+                                position_x=x_pos,
+                                position_y=y_pos,
+                            )[0],
+                        )
+                    )
+                    if len(current_batch) == batch_size:
+                        current_batch = torch.stack(current_batch)
+                        if first_batch is None:
+                            first_batch = current_batch
+
+                        logits.append(predictor(current_batch.to(device)).detach())
+                        current_batch = []
+
+                logits.append(predictor(torch.stack(current_batch).to(device)).detach())
+                logits = torch.cat(logits, dim=0).detach().cpu()
+                prediction_grid = torch.nn.Softmax(dim=1)(logits / temperature)[
+                    :, 0
+                ].reshape(100, 100)
+                prediction_grids.append(prediction_grid)
 
         # Average the predictions across grids
         prediction_grid = torch.mean(

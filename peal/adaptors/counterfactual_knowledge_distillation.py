@@ -581,7 +581,7 @@ class CFKD(Adaptor):
         self.validation_data_config.data.split = [0.0, 1.0]
 
     def initialize_run(self):
-        print("intialize run!!!")
+        print("initialize run!!!")
         if self.overwrite:
             # move from self.base_dir to self.base_dir + "_old_" + {date}_{timestamp}
             if os.path.exists(self.base_dir):
@@ -602,10 +602,12 @@ class CFKD(Adaptor):
         ):
             self.dataloaders_val[0].dataset.visualize_decision_boundary(
                 self.student,
-                self.adaptor_config.training.train_batch_size,
+                self.adaptor_config.training.test_batch_size,
                 self.device,
                 boundary_path,
                 temperature=self.adaptor_config.explainer.temperature,
+                train_dataloader=self.dataloader_mixer,
+                val_dataloader=self.dataloaders_val[0]
             )
 
         log_dir = os.path.join(self.base_dir, "logs")
@@ -1489,6 +1491,7 @@ class CFKD(Adaptor):
             map_location=self.device,
         )
         self.explainer.predictor = self.student
+        self.explainer.predictor_datasets = [self.dataloader_mixer, self.dataloaders_val]
 
     def visualize_progress(self, paths):
         task_config_buffer = copy.deepcopy(self.test_dataloader.dataset.task_config)
@@ -2064,7 +2067,7 @@ class CFKD(Adaptor):
             ):
                 self.dataloaders_val[0].dataset.visualize_decision_boundary(
                     self.student,
-                    self.adaptor_config.training.train_batch_size,
+                    self.adaptor_config.training.test_batch_size,
                     self.device,
                     decision_boundary_path,
                     temperature=self.adaptor_config.explainer.temperature,
