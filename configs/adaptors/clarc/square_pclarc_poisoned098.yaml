@@ -1,0 +1,21 @@
+category: "adaptor"
+adaptor_type: "PClArC"
+base_dir: $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned098/pclarc
+model_path: $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned098/model.cpl
+data: <PEAL_BASE>/configs/data/square_poisoned098.yaml
+unpoisoned_data: <PEAL_BASE>/configs/data/square_unpoisoned.yaml
+projection_type: 'pcav' # 'pcav', 'svm', 'simple'
+# cav_mode: "cavs_max" # 'cavs_max', 'cavs_mean'; only relevant when using projection_type 'pcav'
+layer_index: [12] # 0 for input, -1 for penultimate layer
+correction_strength: [1.5]
+attacked_class: 0
+save_model: True
+task:
+  y_selection: [ClassA, ClassB]
+  output_type: 'multiclass'
+  criterions:
+    l2: 1.0
+training:
+  test_batch_size: 128
+  train_batch_size: 128
+  val_batch_size: 128

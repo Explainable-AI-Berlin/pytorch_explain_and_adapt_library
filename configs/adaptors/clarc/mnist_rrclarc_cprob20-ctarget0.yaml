@@ -1,0 +1,24 @@
+category: "adaptor"
+adaptor_type: "RRClArC"
+base_dir: $PEAL_RUNS/mnist_colored/cprob20-ctarget0/rrclarc
+model_path: $PEAL_RUNS/mnist_colored/cprob20-ctarget0/model.cpl
+data: <PEAL_BASE>/configs/data/mnist_colored/mnist_colored-cprob20-ctarget0.yaml
+unpoisoned_data: <PEAL_BASE>/configs/data/mnist_colored/mnist_colored-cprob50-ctarget0123456789.yaml
+correction_strength: [0.1, 1, 10, 100, 1000, 3000, 5000, 10000]
+layer_index: [6, 7]
+projection_type: 'pcav' # 'pcav', 'svm', 'simple'
+# cav_mode: "cavs_max" # 'cavs_max', 'cavs_mean'; only relevant when using projection_type 'pcav'
+# mean_grad: True
+rrc_loss: "cosine" # 'l2', 'cosine'
+gradient_target: "all" # 'all', 'all_random', 'attacked_class', 'max'
+attacked_class: 0
+save_model: False
+training:
+  train_batch_size: 256
+  val_batch_size: 256
+  test_batch_size: 256
+  learning_rate: 5.0e-05
+  optimizer: "sgd"
+  max_epochs: 25
+task:
+  output_type: 'singleclass'

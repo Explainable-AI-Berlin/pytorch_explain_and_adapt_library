@@ -1,0 +1,11 @@
+'model_path'        : '$PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_unbalanced/03-03-04-00'
+'data'              : '<PEAL_BASE>/configs/data/square_unbalanced_03x03x04x00.yaml'
+'training'          : '<PEAL_BASE>/configs/training/img_classifier.yaml'
+'architecture'      : torchvision_resnet18
+'task':
+  'criterions':
+    'ce'     : 1.0
+    'l2'     : 1.0
+  'output_type'             : 'singleclass'
+  'output_channels'         : 2
+  'y_selection'             : ['ClassA']
