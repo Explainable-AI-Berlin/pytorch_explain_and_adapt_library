@@ -222,25 +222,36 @@ class ModelTrainer:
         if not isinstance(self.val_dataloaders, list):
             self.val_dataloaders = [self.val_dataloaders]
 
-        if self.config.training.class_balanced and not isinstance(self.train_dataloader, DataloaderMixer):
-            # TODO make batch balancing work for dataloader mixer!!!
-            new_train_dataloaders = []
-            for i in range(self.config.task.output_channels):
-                train_dataloader_copy = copy.deepcopy(self.train_dataloader)
-                train_dataloader_copy.dataset.enable_class_restriction(i)
-                new_train_dataloaders.append(train_dataloader_copy)
-
-            new_config = copy.deepcopy(self.config.training)
-            new_config.steps_per_epoch = 200
-            new_config.concatenate_batches = True
-            self.train_dataloader = DataloaderMixer(
-                new_config, new_train_dataloaders[0]
-            )
-            for i in range(1, len(new_train_dataloaders)):
-                # TODO this only works for two classes!
-                self.train_dataloader.append(
-                    new_train_dataloaders[i], weight_added_dataloader=0.5
+        if self.config.training.class_balanced:
+            if not isinstance(self.train_dataloader, DataloaderMixer):
+                new_config = copy.deepcopy(self.train_config.training)
+                new_config.steps_per_epoch = 200
+                new_config.concatenate_batches = True
+                self.train_dataloader = DataloaderMixer(
+                    new_config, self.train_dataloader
                 )
+                """# TODO make batch balancing work for dataloader mixer!!!
+                new_train_dataloaders = []
+                for i in range(self.config.task.output_channels):
+                    train_dataloader_copy = copy.deepcopy(self.train_dataloader)
+                    train_dataloader_copy.dataset.enable_class_restriction(i)
+                    new_train_dataloaders.append(train_dataloader_copy)
+
+                new_config = copy.deepcopy(self.config.training)
+                new_config.steps_per_epoch = 200
+                new_config.concatenate_batches = True
+                self.train_dataloader = DataloaderMixer(
+                    new_config, new_train_dataloaders[0]
+                )
+                for i in range(1, len(new_train_dataloaders)):
+                    # TODO this only works for two classes!
+                    self.train_dataloader.append(
+                        new_train_dataloaders[i], weight_added_dataloader=0.5
+                    )
+
+                self.train_dataloader.class_balancing_enabled = True"""
+
+            self.train_dataloader.enable_class_balancing()
 
             new_val_dataloaders = []
             for i in range(self.config.task.output_channels):

@@ -607,7 +607,8 @@ class CFKD(Adaptor):
                 boundary_path,
                 temperature=self.adaptor_config.explainer.temperature,
                 train_dataloader=self.dataloader_mixer,
-                val_dataloader=self.dataloaders_val[0]
+                val_dataloaders=self.dataloaders_val,
+                val_weights=self.dataloader_val_weights,
             )
 
         log_dir = os.path.join(self.base_dir, "logs")
@@ -2071,6 +2072,9 @@ class CFKD(Adaptor):
                     self.device,
                     decision_boundary_path,
                     temperature=self.adaptor_config.explainer.temperature,
+                    train_dataloader=self.dataloader_mixer,
+                    val_dataloaders=self.dataloaders_val,
+                    val_weights=self.dataloader_val_weights,
                 )
 
             validation_stats = self.retrieve_validation_stats(

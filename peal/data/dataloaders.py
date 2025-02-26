@@ -1,3 +1,5 @@
+import copy
+
 import torch
 import numpy as np
 
@@ -170,6 +172,8 @@ class DataloaderMixer(DataLoader):
         self.dataset = initial_dataloader.dataset  # TODO kind of hacky
         self.iterators = [iter(self.dataloaders[0])]
         self.return_src = return_src
+        self.hints_enabled = False
+        self.class_balancing_enabled = False
 
     def append(self, dataloader, priority=1, weight_added_dataloader=None):
         """
@@ -247,6 +251,63 @@ class DataloaderMixer(DataLoader):
             length += len(dataloader.dataset)
 
         return length
+
+    def enable_hints(self):
+        for dataloader in self.dataloaders:
+            if isinstance(dataloader, DataloaderMixer):
+                dataloader.enable_hints()
+
+            else:
+                dataloader.dataset.enable_hints()
+
+        self.hints_enabled = True
+
+    def disable_hints(self):
+        for dataloader in self.dataloaders:
+            if isinstance(dataloader, DataloaderMixer):
+                dataloader.disable_hints()
+
+            else:
+                dataloader.dataset.disable_hints()
+
+        self.hints_enabled = False
+
+    def enable_class_balancing(self):
+        if not self.class_balancing_enabled:
+            for idx, dataloader in enumerate(self.dataloaders):
+                if isinstance(dataloader, DataloaderMixer):
+                    dataloader.enable_class_balancing()
+
+                else:
+                    new_dataloaders = []
+                    for i in range(dataloader.dataset.output_size):
+                        dataloader_copy = copy.deepcopy(dataloader)
+                        dataloader_copy.dataset.enable_class_restriction(i)
+                        new_dataloaders.append(dataloader_copy)
+
+                    new_config = copy.deepcopy(self.config.training)
+                    new_config.steps_per_epoch = 200
+                    new_config.concatenate_batches = True
+                    self.dataloaders[idx] = DataloaderMixer(
+                        new_config, new_dataloaders[0]
+                    )
+                    for i in range(1, len(new_dataloaders)):
+                        self.dataloaders[idx].append(new_dataloaders[i])
+
+            self.class_balancing_enabled = True
+
+    def disable_class_balancing(self):
+        if self.class_balancing_enabled:
+            for idx, dataloader in enumerate(self.dataloaders):
+                if not isinstance(dataloader, DataloaderMixer):
+                    dataloader.dataset.disable_class_rectriction()
+                    self.dataloaders = [dataloader]
+                    self.priorities = None
+                    break
+
+                dataloader.disable_class_balancing()
+
+            self.class_balancing_enabled = False
 
 
 def get_dataloader(
