@@ -3,9 +3,6 @@ import torchvision
 
 from peal.global_utils import high_contrast_heatmap
 from typing import Optional
-
-import torch
-import torchvision
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 
