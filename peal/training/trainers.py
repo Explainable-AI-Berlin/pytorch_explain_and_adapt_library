@@ -224,7 +224,7 @@ class ModelTrainer:
 
         if self.config.training.class_balanced:
             if not isinstance(self.train_dataloader, DataloaderMixer):
-                new_config = copy.deepcopy(self.train_config.training)
+                new_config = copy.deepcopy(self.config.training)
                 new_config.steps_per_epoch = 200
                 new_config.concatenate_batches = True
                 self.train_dataloader = DataloaderMixer(

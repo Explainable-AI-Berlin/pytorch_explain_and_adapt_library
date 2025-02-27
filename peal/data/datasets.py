@@ -901,7 +901,12 @@ class Image2ClassDataset(ImageDataset):
         ):
             self.set_task_specific_urls()
 
-        target_str, file = self.urls[idx]
+        try:
+            target_str, file = self.urls[idx]
+
+        except Exception:
+            print("in singleclass data class")
+            import pdb; pdb.set_trace()
 
         img = Image.open(os.path.join(self.root_dir, target_str, file))
         state = torch.get_rng_state()
@@ -937,8 +942,10 @@ class Image2ClassDataset(ImageDataset):
         if self.return_dict:
             return img, return_dict
 
-        elif len(return_dict.values()):
-            return img, list(return_dict.values())[0]
-
         else:
             return img, tuple(return_dict.values())
+
+        """
+        elif len(return_dict.values()):
+            return img, list(return_dict.values())[0]
+        """

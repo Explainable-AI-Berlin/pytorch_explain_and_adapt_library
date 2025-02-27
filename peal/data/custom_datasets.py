@@ -342,7 +342,13 @@ class SquareDataset(Image2MixedDataset):
                 if batch_idx >= max_batches:
                     break
 
-                x, (y, hint) = batch  # Assuming batch contains images and hints
+                try:
+                    x, (y, hint) = batch  # Assuming batch contains images and hints
+
+                except Exception:
+                    print("in extract latents")
+                    import pdb; pdb.set_trace()
+
                 for idx in range(len(x)):
                     try:
                         latents.append(
