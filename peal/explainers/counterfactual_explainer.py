@@ -449,6 +449,10 @@ class CounterfactualExplainer(ExplainerInterface):
                 data_config, task_config=task_config
             )[:2]
 
+        if isinstance(self.predictor_datasets[1], list):
+            # TODO actually this should support multiple datasets!
+            self.predictor_datasets[1] = self.predictor_datasets[1][0]
+
         self.input_type = input_type
         if not tracking_level is None:
             self.tracking_level = tracking_level

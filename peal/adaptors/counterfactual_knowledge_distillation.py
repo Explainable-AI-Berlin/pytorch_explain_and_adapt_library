@@ -553,6 +553,7 @@ class CFKD(Adaptor):
             )
 
         if teacher == "SegmentationMask" or self.adaptor_config.tracking_level > 0:
+            self.hints_enabled = True
             self.tracked_keys.append("hint_list")
             self.train_dataloader.dataset.enable_hints()
             self.val_dataloader.dataset.enable_hints()
@@ -848,7 +849,7 @@ class CFKD(Adaptor):
             cm_idx = (cm_idx + 1) % (self.output_size**2)
             x, y = self.datastack.pop(int(y_source))
 
-            if self.train_dataloader.dataset.hints_enabled:
+            if self.hints_enabled:
                 y_res = y[1:]
                 y = y[0]
                 if isinstance(self.teacher, SegmentationMaskTeacher):
@@ -1349,7 +1350,7 @@ class CFKD(Adaptor):
     def add_dataset_to_dataloader_mixer(
         self, dataloader_old, dataset_path, mixing_ratio, writer, finetune_iteration
     ):
-        #
+        # TODO adapt batch size so that it matches!
         dataloader, _, _ = create_dataloaders_from_datasource(
             config=self.data_config,
             datasource=dataset_path,
@@ -1358,7 +1359,10 @@ class CFKD(Adaptor):
         dataloader = DataloaderMixer(self.adaptor_config.training, dataloader)
         # mixing ratio has to be flipped because in fact the old dataloader is the one appended
         dataloader.append(dataloader_old, weight_added_dataloader=1 - mixing_ratio)
-        dataloader.return_src = True
+        dataloader.return_src_internal = True
+        if self.hints_enabled:
+            dataloader.enable_hints()
+
         return dataloader
 
     def finetune_student(self, finetune_iteration, dataset_path, writer):
@@ -1403,7 +1407,7 @@ class CFKD(Adaptor):
             transform=self.val_dataloader.dataset.transform,
         )
 
-        y_list_dataset = [
+        """y_list_dataset = [
             self.dataloader_mixer.dataloaders[0].dataset[idx][1]
             for idx in range(len(self.dataloader_mixer.dataloaders[0].dataset))
         ]
@@ -1413,7 +1417,7 @@ class CFKD(Adaptor):
                 np.sum((torch.tensor(y_list_dataset) == c).numpy())
                 / len(y_list_dataset),
                 finetune_iteration,
-            )
+            )"""
 
         if self.overwrite or not os.path.exists(
             os.path.join(
@@ -1458,29 +1462,33 @@ class CFKD(Adaptor):
                 only_last_layer=self.adaptor_config.continuous_learning
                 == "deep_feature_reweighting",
             )
-            if isinstance(self.teacher, SegmentationMaskTeacher):
-                self.train_dataloader.dataset.disable_hints()
-                self.val_dataloader.dataset.disable_hints()
+            if self.hints_enabled:
+                self.dataloader_mixer.disable_hints()
+                for val_dataloader in self.dataloaders_val:
+                    val_dataloader.dataset.disable_hints()
 
             if isinstance(
                 self.explainer.explainer_config, PerfectFalseCounterfactualConfig
             ):
-                self.train_dataloader.dataset.disable_idx()
-                self.val_dataloader.dataset.disable_idx()
+                self.dataloader_mixer.disable_idx()
+                for val_dataloader in self.dataloaders_val:
+                    val_dataloader.dataset.disable_idx()
 
             finetune_trainer.fit(
                 continue_training=True
             )  # bool(self.adaptor_config.continuous_learning != "retrain"))
 
-            if isinstance(self.teacher, SegmentationMaskTeacher):
-                self.train_dataloader.dataset.enable_hints()
-                self.val_dataloader.dataset.enable_hints()
+            if self.hints_enabled:
+                self.dataloader_mixer.enable_hints()
+                for val_dataloader in self.dataloaders_val:
+                    val_dataloader.dataset.enable_hints()
 
             if isinstance(
                 self.explainer.explainer_config, PerfectFalseCounterfactualConfig
             ):
-                self.train_dataloader.dataset.enable_idx()
-                self.val_dataloader.dataset.enable_idx()
+                self.dataloader_mixer.enable_idx()
+                for val_dataloader in self.dataloaders_val:
+                    val_dataloader.dataset.enable_idx()
 
         self.student = torch.load(
             os.path.join(
@@ -1492,7 +1500,11 @@ class CFKD(Adaptor):
             map_location=self.device,
         )
         self.explainer.predictor = self.student
-        self.explainer.predictor_datasets = [self.dataloader_mixer, self.dataloaders_val]
+        # TODO support multiple validation datasets for the sake of distillation!!!
+        self.explainer.predictor_datasets = [
+            self.dataloader_mixer,
+            self.dataloaders_val[0].dataset,
+        ]
 
     def visualize_progress(self, paths):
         task_config_buffer = copy.deepcopy(self.test_dataloader.dataset.task_config)
