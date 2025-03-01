@@ -9,7 +9,7 @@ greedy: false
 iterationwise_encoding: true
 learning_rate: 200
 momentum: 0.999
-num_discretization_steps: 50
+num_discretization_steps: 20
 optimizer: SGD
 sampling_time_fraction: 0.3
 stochastic: fully

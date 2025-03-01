@@ -1,6 +1,6 @@
-train_batch_size        : 128
-val_batch_size          : 128
-test_batch_size         : 128
+train_batch_size        : 50 #128
+val_batch_size          : 5 #128
+test_batch_size         : 5 #128
 max_epochs              : 300
 learning_rate           : 0.01
 optimizer               : sgd

@@ -9,3 +9,4 @@ output_size             : [2]
 invariances             : [rotation, hflipping, vflipping, color_jitter, sharpness]
 confounding_factors     : [type, confounder]
 has_hints               : True
+x_selection             : imgs_cut

@@ -5,6 +5,7 @@ from torch import nn
 from typing import Union
 
 from peal.teachers.baseline_teacher import BaselineTeacher
+from peal.teachers.cluster_teacher import ClusterTeacher
 from peal.teachers.interfaces import TeacherInterface
 from peal.teachers.model2model_teacher import Model2ModelTeacher
 from peal.teachers.human2model_teacher import Human2ModelTeacher
@@ -45,6 +46,15 @@ def get_teacher(
             tracking_level=tracking_level,
             counterfactual_type=counterfactual_type,
         )
+
+    elif teacher[:5] == "cluster":
+        if len(teacher) == 10:
+            port = int(teacher[-4:])
+
+        else:
+            port = 8000
+
+        teacher = ClusterTeacher(port)
 
     elif teacher[:5] == "human":
         if len(teacher) == 10:

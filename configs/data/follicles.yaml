@@ -1,5 +1,5 @@
 dataset_name            : follicles
-dataset_path            : $PEAL_DATA/follicles2
+dataset_path            : $PEAL_DATA/follicles
 num_samples             : 1389
 split                   : []
 input_type              : image
@@ -9,3 +9,4 @@ output_size             : [2]
 invariances             : [rotation, hflipping, vflipping, color_jitter, sharpness]
 confounding_factors     : [type, confounder]
 has_hints               : False
+x_selection             : imgs_cut
