@@ -1,5 +1,8 @@
 dataset_path            : $PEAL_DATA/celeba
-split                   : [0.8034097, 0.9014704]
+# Removing split will use the default split
+# split                   : [0.8034097, 0.9014704]
+# TODO: Check that there is a default split
+split                   : []
 input_type              : image
 input_size              : [3, 128, 128]
 output_type             : multiclass
