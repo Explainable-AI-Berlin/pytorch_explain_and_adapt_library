@@ -485,6 +485,7 @@ class Image2MixedDataset(ImageDataset):
         self.string_description_enabled = False
         self.tokenizer = None
         self.return_dict = return_dict
+        self.class_restrictions_enabled = False
         # TODO
         # self.config.class_ratios = None
         if data_dir is None:
@@ -592,9 +593,13 @@ class Image2MixedDataset(ImageDataset):
             ):
                 self.keys.append(key)
 
+        self.class_restrictions_enabled = True
+
     def disable_class_restriction(self):
         if hasattr(self, "backup_keys"):
             self.keys = copy.deepcopy(self.backup_keys)
+
+        self.class_restrictions_enabled = True
 
     def set_task_specific_keys(self):
         self.task_specific_keys = []
@@ -998,10 +1003,8 @@ class Image2ClassDataset(ImageDataset):
         if self.return_dict:
             return img, return_dict
 
+        elif len(return_dict.values()) == 1:
+            return img, list(return_dict.values())[0]
+
         else:
             return img, tuple(return_dict.values())
-
-        """
-        elif len(return_dict.values()):
-            return img, list(return_dict.values())[0]
-        """

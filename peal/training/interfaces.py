@@ -116,6 +116,10 @@ class PredictorConfig:
     """
     base_path: str = None
     seed: int = 0
+    """
+    Where to distill from if used for distillation. Could either be done from the dataset or from the model.
+    """
+    distill_from: str = "dataset"
 
     def __init__(
         self,

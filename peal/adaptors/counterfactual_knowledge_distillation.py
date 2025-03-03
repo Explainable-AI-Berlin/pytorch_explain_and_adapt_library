@@ -27,7 +27,7 @@ from peal.training.loggers import log_images_to_writer
 from peal.data.dataloaders import (
     DataStack,
     DataloaderMixer,
-    create_dataloaders_from_datasource,
+    create_dataloaders_from_datasource, WeightedDataloaderList,
 )
 from peal.training.trainers import (
     ModelTrainer,
@@ -458,7 +458,7 @@ class CFKD(Adaptor):
             test_config=self.adaptor_config.test_data,
             enable_hints=bool(teacher == "SegmentationMask"),
         )
-        self.dataloaders_val = [self.val_dataloader]
+        self.dataloaders_val = WeightedDataloaderList([self.val_dataloader])
         self.dataloader_val_weights = torch.tensor([1.0])
         self.adaptor_config.data = self.train_dataloader.dataset.config
 
@@ -529,7 +529,7 @@ class CFKD(Adaptor):
             generator=self.generator,
             input_type=self.adaptor_config.data.input_type,
             explainer_config=self.adaptor_config.explainer,
-            datasets=[self.train_dataloader.dataset, self.val_dataloader.dataset],
+            datasource=[self.dataloader_mixer, self.dataloaders_val],
             tracking_level=self.adaptor_config.tracking_level,
         )
         self.logits_to_prediction = lambda logits: logits.argmax(-1)
@@ -598,10 +598,10 @@ class CFKD(Adaptor):
         if (
             self.adaptor_config.tracking_level >= 2
             and not os.path.exists(boundary_path)
-            and hasattr(self.dataloaders_val[0].dataset, "visualize_decision_boundary")
+            and hasattr(self.dataloaders_val.dataloaders[0].dataset, "visualize_decision_boundary")
             and not os.path.exists(boundary_path)
         ):
-            self.dataloaders_val[0].dataset.visualize_decision_boundary(
+            self.dataloaders_val.dataloaders[0].dataset.visualize_decision_boundary(
                 self.student,
                 self.adaptor_config.training.test_batch_size,
                 self.device,
@@ -1375,13 +1375,6 @@ class CFKD(Adaptor):
             datasource=val_dataset_path,
         )
         self.dataloaders_val.append(dataloader_val)
-        self.dataloader_val_weights *= self.adaptor_config.mixing_ratio
-        self.dataloader_val_weights = torch.cat(
-            [
-                self.dataloader_val_weights,
-                torch.tensor([1 - self.adaptor_config.mixing_ratio]),
-            ],
-        )
         log_images_to_writer(
             dataloader_val, writer, "validation_" + str(finetune_iteration)
         )
@@ -1464,14 +1457,14 @@ class CFKD(Adaptor):
             )
             if self.hints_enabled:
                 self.dataloader_mixer.disable_hints()
-                for val_dataloader in self.dataloaders_val:
+                for val_dataloader in self.dataloaders_val.dataloaders:
                     val_dataloader.dataset.disable_hints()
 
             if isinstance(
                 self.explainer.explainer_config, PerfectFalseCounterfactualConfig
             ):
                 self.dataloader_mixer.disable_idx()
-                for val_dataloader in self.dataloaders_val:
+                for val_dataloader in self.dataloaders_val.dataloaders:
                     val_dataloader.dataset.disable_idx()
 
             finetune_trainer.fit(
@@ -1480,14 +1473,14 @@ class CFKD(Adaptor):
 
             if self.hints_enabled:
                 self.dataloader_mixer.enable_hints()
-                for val_dataloader in self.dataloaders_val:
+                for val_dataloader in self.dataloaders_val.dataloaders:
                     val_dataloader.dataset.enable_hints()
 
             if isinstance(
                 self.explainer.explainer_config, PerfectFalseCounterfactualConfig
             ):
                 self.dataloader_mixer.enable_idx()
-                for val_dataloader in self.dataloaders_val:
+                for val_dataloader in self.dataloaders_val.dataloaders:
                     val_dataloader.dataset.enable_idx()
 
         self.student = torch.load(
@@ -1501,9 +1494,9 @@ class CFKD(Adaptor):
         )
         self.explainer.predictor = self.student
         # TODO support multiple validation datasets for the sake of distillation!!!
-        self.explainer.predictor_datasets = [
+        self.explainer.predictor_datasources = [
             self.dataloader_mixer,
-            self.dataloaders_val[0].dataset,
+            self.dataloaders_val,
         ]
 
     def visualize_progress(self, paths):
@@ -1701,7 +1694,7 @@ class CFKD(Adaptor):
                     validation_stats_current,
                 ) = calculate_validation_statistics(
                     model=self.student,
-                    dataloader=self.dataloaders_val[0],
+                    dataloader=self.dataloaders_val.dataloaders[0],
                     tracked_keys=self.tracked_keys,
                     base_path=validation_collages_base_path,
                     output_size=self.output_size,
@@ -1893,9 +1886,9 @@ class CFKD(Adaptor):
                     np.savez(f, **tracked_values_file)
 
         if self.adaptor_config.tracking_level > 0 and hasattr(
-            self.dataloaders_val[0].dataset, "global_counterfactual_visualization"
+            self.dataloaders_val.dataloaders[0].dataset, "global_counterfactual_visualization"
         ):
-            self.dataloaders_val[0].dataset.global_counterfactual_visualization(
+            self.dataloaders_val.dataloaders[0].dataset.global_counterfactual_visualization(
                 os.path.join(
                     self.base_dir,
                     str(finetune_iteration),
@@ -2074,11 +2067,11 @@ class CFKD(Adaptor):
                 self.base_dir, str(finetune_iteration), "decision_boundary.png"
             )
             if (
-                hasattr(self.dataloaders_val[0].dataset, "visualize_decision_boundary")
+                hasattr(self.dataloaders_val.dataloaders[0].dataset, "visualize_decision_boundary")
                 and not os.path.exists(decision_boundary_path)
                 and self.adaptor_config.tracking_level >= 2
             ):
-                self.dataloaders_val[0].dataset.visualize_decision_boundary(
+                self.dataloaders_val.dataloaders[0].dataset.visualize_decision_boundary(
                     self.student,
                     self.adaptor_config.training.test_batch_size,
                     self.device,
