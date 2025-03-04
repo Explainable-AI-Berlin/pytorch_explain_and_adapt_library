@@ -459,7 +459,6 @@ class CFKD(Adaptor):
             enable_hints=bool(teacher == "SegmentationMask"),
         )
         self.dataloaders_val = WeightedDataloaderList([self.val_dataloader])
-        self.dataloader_val_weights = torch.tensor([1.0])
         self.adaptor_config.data = self.train_dataloader.dataset.config
 
         #
@@ -609,7 +608,6 @@ class CFKD(Adaptor):
                 temperature=self.adaptor_config.explainer.temperature,
                 train_dataloader=self.dataloader_mixer,
                 val_dataloaders=self.dataloaders_val,
-                val_weights=self.dataloader_val_weights,
             )
 
         log_dir = os.path.join(self.base_dir, "logs")
@@ -1451,7 +1449,6 @@ class CFKD(Adaptor):
                 model_path=os.path.join(
                     self.base_dir, str(finetune_iteration), "finetuned_model"
                 ),
-                val_dataloader_weights=self.dataloader_val_weights,
                 only_last_layer=self.adaptor_config.continuous_learning
                 == "deep_feature_reweighting",
             )
@@ -2079,7 +2076,6 @@ class CFKD(Adaptor):
                     temperature=self.adaptor_config.explainer.temperature,
                     train_dataloader=self.dataloader_mixer,
                     val_dataloaders=self.dataloaders_val,
-                    val_weights=self.dataloader_val_weights,
                 )
 
             validation_stats = self.retrieve_validation_stats(
