@@ -95,9 +95,9 @@ class ClusterTeacher(TeacherInterface):
         """ """
         print('start collecting feedback!!!')
         collage_path_clusters = []
+        l = len(kwargs['collage_path_list']) // num_clusters
         for cluster_idx in range(num_clusters):
-            cluster = kwargs["cluster" + str(cluster_idx)]
-            collage_path_clusters.append(cluster['collage_paths'])
+            collage_path_clusters.append(kwargs['collage_path_list'][cluster_idx * l:(cluster_idx + 1) * l])
 
         collage_clusters_static = []
         for collage_path_list in collage_path_clusters:
@@ -133,8 +133,7 @@ class ClusterTeacher(TeacherInterface):
         self.data.i = 0
         feedback_out = []
         for cluster_idx in range(num_clusters):
-            cluster = kwargs["cluster" + str(cluster_idx)]
-            for collage_path in cluster['collage_paths']:
+            for _ in range(l):
                 feedback_out.append(feedback[cluster_idx])
 
         return feedback_out

@@ -47,8 +47,8 @@ def get_teacher(
             counterfactual_type=counterfactual_type,
         )
 
-    elif teacher[:5] == "cluster":
-        if len(teacher) == 10:
+    elif teacher[:7] == "cluster":
+        if len(teacher) == 12:
             port = int(teacher[-4:])
 
         else:
