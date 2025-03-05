@@ -1,3 +1,5 @@
+import copy
+
 import torch
 import numpy as np
 
@@ -64,13 +66,25 @@ class DataStack:
 
             else:
                 X, y = next(iter(self.datasource))
+                if isinstance(y, int):
+                    X, y = X
+
                 if (
-                    hasattr(self.dataset, "hints_enabled")
+                    isinstance(y, list)
+                    or hasattr(self.dataset, "hints_enabled")
                     and self.dataset.hints_enabled
-                    or self.dataset.idx_enabled
+                    or hasattr(self.dataset, "idx_enabled")
+                    and self.dataset.idx_enabled
                 ):
                     for i in range(X.shape[0]):
-                        y_out = tuple([y_elem[i] for y_elem in y])
+                        try:
+                            y_out = tuple([y_elem[i] for y_elem in y])
+
+                        except Exception:
+                            import pdb
+
+                            pdb.set_trace()
+
                         self.data[int(y[0][i])].append([X[i], y_out])
 
                 else:
@@ -165,7 +179,20 @@ class DataloaderMixer(DataLoader):
         self.priorities = None
         self.dataset = initial_dataloader.dataset  # TODO kind of hacky
         self.iterators = [iter(self.dataloaders[0])]
-        self.return_src = return_src
+        self.return_src_internal = return_src
+        self.hints_enabled = False
+        self.class_balancing_enabled = False
+
+    @property
+    def return_src(self):
+        if (
+            hasattr(self.train_config, "concatenate_batches")
+            and self.train_config.concatenate_batches
+        ):
+            return False
+
+        else:
+            return self.return_src_internal
 
     def append(self, dataloader, priority=1, weight_added_dataloader=None):
         """
@@ -186,13 +213,19 @@ class DataloaderMixer(DataLoader):
             self.priorities = self.priorities / self.priorities.sum()
 
         else:
-            self.priorities = np.array([1 - weight_added_dataloader, weight_added_dataloader])
+            self.priorities = np.array(
+                [1 - weight_added_dataloader, weight_added_dataloader]
+            )
 
     def __iter__(self):
         return DataIterator(self)
 
     def sample(self):
-        if not hasattr(self.train_config, "concatenate_batches") or not self.train_config.concatenate_batches:
+        if (
+            not hasattr(self.train_config, "concatenate_batches")
+            or not self.train_config.concatenate_batches
+            or len(self.dataloaders) == 1
+        ):
             if not self.priorities is None:
                 idx = int(np.random.multinomial(1, self.priorities).argmax())
 
@@ -208,22 +241,34 @@ class DataloaderMixer(DataLoader):
                 item = (item, idx)
 
         else:
-            items = []
+            subitems = []
             for idx in range(len(self.iterators)):
                 item = next(self.iterators[idx], "STOP")
                 if isinstance(item, str) and item == "STOP":
                     self.iterators[idx] = iter(self.dataloaders[idx])
                     item = next(self.iterators[idx])
 
-                items.append(item)
+                subitems.append(item)
 
-            item = items[0]
-            if isinstance(item[1], tuple) or isinstance(item[1], list):
-                item[1] = item[1][0]
+            item = subitems[0]
+            """if isinstance(item[1], tuple) or isinstance(item[1], list):
+                item[1] = item[1][0]"""
 
-            for it in items[1:]:
+            for subitem in subitems[1:]:
                 for i in range(len(item)):
-                    item[i] = torch.cat([item[i], it[i]], dim=0)
+                    if isinstance(item[i], list) or isinstance(item[i], tuple):
+                        for j in range(len(item[i])):
+                            try:
+                                item[i][j] = torch.cat([item[i][j], subitem[i][j]], dim=0)
+
+                            except Exception:
+                                import pdb; pdb.set_trace()
+
+                    else:
+                        try:
+                            item[i] = torch.cat([item[i], subitem[i]], dim=0)
+                        except Exception:
+                            import pdb; pdb.set_trace()
 
             if self.return_src:
                 item = (item, 0)
@@ -232,9 +277,14 @@ class DataloaderMixer(DataLoader):
 
     def reset(self):
         for i in range(len(self.dataloaders)):
-            self.dataloaders[i] = DataLoader(
-                self.dataloaders[i].dataset, batch_size=self.dataloaders[i].batch_size
-            )
+            if isinstance(self.dataloaders[i], DataloaderMixer):
+                self.dataloaders[i].reset()
+
+            else:
+                self.dataloaders[i] = DataLoader(
+                    self.dataloaders[i].dataset, batch_size=self.dataloaders[i].batch_size
+                )
+
             self.iterators[i] = iter(self.dataloaders[i])
 
     def __len__(self):
@@ -243,6 +293,105 @@ class DataloaderMixer(DataLoader):
             length += len(dataloader.dataset)
 
         return length
+
+    def enable_hints(self):
+        for dataloader in self.dataloaders:
+            if isinstance(dataloader, DataloaderMixer):
+                dataloader.enable_hints()
+
+            else:
+                dataloader.dataset.enable_hints()
+
+        self.reset()
+        self.hints_enabled = True
+
+    def disable_hints(self):
+        for dataloader in self.dataloaders:
+            if isinstance(dataloader, DataloaderMixer):
+                dataloader.disable_hints()
+
+            else:
+                dataloader.dataset.disable_hints()
+
+        self.reset()
+        self.hints_enabled = False
+
+    def enable_idx(self):
+        for dataloader in self.dataloaders:
+            if isinstance(dataloader, DataloaderMixer):
+                dataloader.enable_idx()
+
+            else:
+                dataloader.dataset.enable_idx()
+
+        self.reset()
+        self.idx_enabled = True
+
+    def disable_idx(self):
+        for dataloader in self.dataloaders:
+            if isinstance(dataloader, DataloaderMixer):
+                dataloader.disable_idx()
+
+            else:
+                dataloader.dataset.disable_idx()
+
+        self.reset()
+        self.idx_enabled = False
+
+    def enable_class_balancing(self):
+        if not self.class_balancing_enabled:
+            for idx, dataloader in enumerate(self.dataloaders):
+                if isinstance(dataloader, DataloaderMixer):
+                    dataloader.enable_class_balancing()
+
+                else:
+                    new_dataloaders = []
+                    for i in range(dataloader.dataset.output_size):
+                        dataloader_copy = copy.deepcopy(dataloader)
+                        dataloader_copy.dataset.enable_class_restriction(i)
+                        new_dataloaders.append(dataloader_copy)
+
+                    new_config = copy.deepcopy(self.train_config)
+                    new_config.steps_per_epoch = 200
+                    new_config.concatenate_batches = True
+                    self.dataloaders[idx] = DataloaderMixer(
+                        new_config, new_dataloaders[0]
+                    )
+                    for i in range(1, len(new_dataloaders)):
+                        self.dataloaders[idx].append(new_dataloaders[i])
+
+            self.reset()
+            self.class_balancing_enabled = True
+
+    def disable_class_balancing(self):
+        if self.class_balancing_enabled:
+            for idx, dataloader in enumerate(self.dataloaders):
+                if not isinstance(dataloader, DataloaderMixer):
+                    dataloader.dataset.disable_class_rectriction()
+                    self.dataloaders = [dataloader]
+                    self.priorities = None
+                    break
+
+                dataloader.disable_class_balancing()
+
+            self.reset()
+            self.class_balancing_enabled = False
+
+
+class WeightedDataloaderList:
+    def __init__(self, dataloaders, weights=None):
+        self.dataloaders = dataloaders
+        if not weights is None:
+            self.weights = weights
+
+        else:
+            self.weights = torch.ones([len(self.dataloaders)]) / len(self.dataloaders)
+
+    def append(self, dataloader):
+        self.dataloaders.append(dataloader)
+        self.weights *= 0.5
+        self.weights = torch.cat([self.weights, torch.tensor([0.5])])
+
 
 
 def get_dataloader(

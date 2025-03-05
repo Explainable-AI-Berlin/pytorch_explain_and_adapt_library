@@ -10,4 +10,4 @@ invariances             : [rotation, hflipping, vflipping, random_resize50]
 confounding_factors     : [type, confounder]
 normalization           : [0.5,0.5]
 has_hints               : True
-x_selection             : ["imgs_cut"]
+x_selection             : imgs_cut

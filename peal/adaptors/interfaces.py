@@ -30,6 +30,6 @@ class AdaptorConfig:
     seed: Union[int, type(None)] = None
     """
     How many intermediate results are cached an visualized.
-    Goes from 0 = None over 1 = caching only to 2 = essential visualizations to 3 = all.
+    Goes from 0 = None over 1 = caching only to 2 = essential visualizations to 3 = expensive visualizations, 4 = all.
     """
     tracking_level: int = 0

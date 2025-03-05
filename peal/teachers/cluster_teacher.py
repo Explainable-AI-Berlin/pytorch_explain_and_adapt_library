@@ -17,7 +17,7 @@ class DataStore:
     feedback = None
 
 
-class Human2ModelTeacher(TeacherInterface):
+class ClusterTeacher(TeacherInterface):
     """ """
 
     def __init__(self, port):
@@ -75,7 +75,7 @@ class Human2ModelTeacher(TeacherInterface):
                     collage_path = self.data.collage_paths[self.data.i]
                     self.data.i += 1
                     return render_template(
-                        "feedback_loop.html",
+                        "clustered_feedback_loop.html",
                         form=request.form,
                         counterfactual_collage=collage_path,
                     )
@@ -91,16 +91,25 @@ class Human2ModelTeacher(TeacherInterface):
         self.thread.start()
         print("Feedback GUI is active on localhost:" + str(self.port))
 
-    def get_feedback(self, collage_path_list, **kwargs):
+    def get_feedback(self, num_clusters, **kwargs):
         """ """
         print('start collecting feedback!!!')
-        collage_paths_static = []
-        for path in collage_path_list:
-            collage_path_static = os.path.join("static", path.split("/")[-1])
-            shutil.copy(path, collage_path_static)
-            collage_paths_static.append(collage_path_static)
+        collage_path_clusters = []
+        for cluster_idx in range(num_clusters):
+            cluster = kwargs["cluster" + str(cluster_idx)]
+            collage_path_clusters.append(cluster['collage_paths'])
 
-        self.data.collage_paths = collage_paths_static
+        collage_clusters_static = []
+        for collage_path_list in collage_path_clusters:
+            collage_paths_static = []
+            for path in collage_path_list:
+                collage_path_static = os.path.join("static", path.split("/")[-1])
+                shutil.copy(path, collage_path_static)
+                collage_paths_static.append(collage_path_static)
+
+            collage_clusters_static.append(collage_paths_static)
+
+        self.data.collage_paths = collage_clusters_static
 
         with tqdm(range(100000)) as pbar:
             for it in pbar:
@@ -118,10 +127,14 @@ class Human2ModelTeacher(TeacherInterface):
                     )
                     time.sleep(1.0)
 
-        # stop_threads = True
-        # thread.join()
         feedback = copy.deepcopy(self.data.feedback)
         self.data.collage_paths = []
         self.data.feedback = []
         self.data.i = 0
-        return feedback
+        feedback_out = []
+        for cluster_idx in range(num_clusters):
+            cluster = kwargs["cluster" + str(cluster_idx)]
+            for collage_path in cluster['collage_paths']:
+                feedback_out.append(feedback[cluster_idx])
+
+        return feedback_out

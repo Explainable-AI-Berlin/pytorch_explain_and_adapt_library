@@ -4,3 +4,4 @@ category : generator
 base_path : $PEAL_RUNS/celeba_copyrighttag/ddpm
 data: <PEAL_BASE>/configs/data/celeba_copyrighttag.yaml
 image_size: 128
+batch_size: 100

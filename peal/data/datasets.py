@@ -187,7 +187,9 @@ class ImageDataset(PealDataset):
             x = self.project_to_pytorch_default(x_list[i])
             counterfactual = self.project_to_pytorch_default(x_counterfactual_list[i])
 
-            heatmap_high_contrast, x_in, counterfactual_rgb = high_contrast_heatmap(x, counterfactual)
+            heatmap_high_contrast, x_in, counterfactual_rgb = high_contrast_heatmap(
+                x, counterfactual
+            )
 
             heatmap_list.append(heatmap_high_contrast)
 
@@ -217,9 +219,14 @@ class ImageDataset(PealDataset):
                     )
                     + " -> "
                 )
-                title_string += str(round(float(y_target_end_confidence_list[i]), 2)) + "\n"
+                title_string += (
+                    str(round(float(y_target_end_confidence_list[i]), 2)) + "\n"
+                )
                 if not hint_list is None and not idx_to_info is None:
-                    title_string += idx_to_info(x_list[i], x_counterfactual_list[i], hint_list[i]) + "\n"
+                    title_string += (
+                        idx_to_info(x_list[i], x_counterfactual_list[i], hint_list[i])
+                        + "\n"
+                    )
 
                 if not feedback_list is None:
                     title_string += (
@@ -246,7 +253,15 @@ class ImageDataset(PealDataset):
 
         return heatmap_list, collage_paths
 
-    def serialize_dataset(self, output_dir, x_list, y_list, hint_list=[], sample_names=None, classifier=None):
+    def serialize_dataset(
+        self,
+        output_dir,
+        x_list,
+        y_list,
+        hint_list=[],
+        sample_names=None,
+        classifier=None,
+    ):
         # TODO this does not seem very clean
         for class_name in range(max(2, self.output_size)):
             Path(os.path.join(output_dir, "imgs", str(class_name))).mkdir(
@@ -268,7 +283,10 @@ class ImageDataset(PealDataset):
             img.save(os.path.join(output_dir, "imgs", img_name))
             if not len(hint_list) == 0:
                 mask = Image.fromarray(
-                    np.array(255 * hint_list[idx].cpu().numpy().transpose(1, 2, 0), dtype=np.uint8)
+                    np.array(
+                        255 * hint_list[idx].cpu().numpy().transpose(1, 2, 0),
+                        dtype=np.uint8,
+                    )
                 )
                 mask.save(os.path.join(output_dir, "masks", img_name))
 
@@ -467,6 +485,7 @@ class Image2MixedDataset(ImageDataset):
         self.string_description_enabled = False
         self.tokenizer = None
         self.return_dict = return_dict
+        self.class_restrictions_enabled = False
         # TODO
         # self.config.class_ratios = None
         if data_dir is None:
@@ -485,7 +504,7 @@ class Image2MixedDataset(ImageDataset):
         self.attributes_positive = []
         self.attributes_negative = []
         for attribute in self.attributes:
-            attribute_values = attribute.split('_vs_')
+            attribute_values = attribute.split("_vs_")
             if len(attribute_values) == 2:
                 self.attributes_positive.append(attribute_values[0])
                 self.attributes_negative.append(attribute_values[1])
@@ -564,12 +583,23 @@ class Image2MixedDataset(ImageDataset):
         self.backup_keys = copy.deepcopy(self.keys)
         self.keys = []
         for key in self.backup_keys:
-            if int(self.data[key][self.attributes.index(self.task_config.y_selection[0])]) == class_idx:
+            if (
+                int(
+                    self.data[key][
+                        self.attributes.index(self.task_config.y_selection[0])
+                    ]
+                )
+                == class_idx
+            ):
                 self.keys.append(key)
+
+        self.class_restrictions_enabled = True
 
     def disable_class_restriction(self):
         if hasattr(self, "backup_keys"):
             self.keys = copy.deepcopy(self.backup_keys)
+
+        self.class_restrictions_enabled = True
 
     def set_task_specific_keys(self):
         self.task_specific_keys = []
@@ -661,7 +691,9 @@ class Image2MixedDataset(ImageDataset):
                 mask = Image.open(option4)
 
             else:
-                assert not self.config.has_hints, "Hints not found despite claim that they exist!"
+                assert (
+                    not self.config.has_hints
+                ), "Hints not found despite claim that they exist!"
                 mask = Image.new("RGB", img.size, (0, 0, 0))
 
             torch.set_rng_state(state)
@@ -696,23 +728,34 @@ class Image2MixedDataset(ImageDataset):
 
             for target_idx, attribute in enumerate(y_selection):
                 attribute_idx = self.attributes.index(attribute)
-                if len(y_selection) == 1 and target > 0.5 or len(y_selection) > 1 and target[target_idx] > 0.5:
-                    return_dict["description"] += self.attributes_positive[attribute_idx]
+                if (
+                    len(y_selection) == 1
+                    and target > 0.5
+                    or len(y_selection) > 1
+                    and target[target_idx] > 0.5
+                ):
+                    return_dict["description"] += self.attributes_positive[
+                        attribute_idx
+                    ]
 
                 else:
-                    return_dict["description"] += self.attributes_negative[attribute_idx]
+                    return_dict["description"] += self.attributes_negative[
+                        attribute_idx
+                    ]
 
                 if not target_idx == len(y_selection) - 1:
                     return_dict["description"] += ", "
 
             if self.tokenizer is not None:
-                return_dict["tokens"] = torch.tensor(self.tokenizer(
-                    return_dict["description"],
-                    max_length=self.tokenizer.model_max_length,
-                    padding="max_length",
-                    truncation=True,
-                    return_tensors="pt",
-                ).input_ids)
+                return_dict["tokens"] = torch.tensor(
+                    self.tokenizer(
+                        return_dict["description"],
+                        max_length=self.tokenizer.model_max_length,
+                        padding="max_length",
+                        truncation=True,
+                        return_tensors="pt",
+                    ).input_ids
+                )
 
         if self.return_dict:
             return return_dict
@@ -755,13 +798,12 @@ class Image2ClassDataset(ImageDataset):
         """
         self.config = config
         if root_dir is None:
-            self.root_dir = os.path.join(config.dataset_path, self.config.x_selection)
+            root_dir = config.dataset_path
 
-        else:
-            self.root_dir = os.path.join(root_dir, self.config.x_selection)
+        self.root_dir = os.path.join(root_dir, self.config.x_selection)
 
         if self.config.has_hints:
-            self.mask_dir = os.path.join(self.root_dir, "masks")
+            self.mask_dir = os.path.join(root_dir, "masks")
             self.all_urls = []
             self.urls_with_hints = []
 
@@ -799,8 +841,15 @@ class Image2ClassDataset(ImageDataset):
         if self.config.has_hints:
             self.all_urls = copy.deepcopy(self.urls)
             for target_str, file in self.all_urls:
-                if os.path.exists(os.path.join(self.mask_dir, file)):
+                if os.path.exists(os.path.join(self.mask_dir, file)) or os.path.exists(
+                    os.path.join(self.mask_dir, target_str, file)
+                ):
                     self.urls_with_hints.append((target_str, file))
+
+                else:
+                    import pdb
+
+                    pdb.set_trace()
 
         self.task_specific_urls = None
         if (
@@ -892,7 +941,6 @@ class Image2ClassDataset(ImageDataset):
 
         self.class_restriction_enabled = False
 
-
     def __getitem__(self, idx):
         if (
             not self.task_config is None
@@ -901,7 +949,14 @@ class Image2ClassDataset(ImageDataset):
         ):
             self.set_task_specific_urls()
 
-        target_str, file = self.urls[idx]
+        try:
+            target_str, file = self.urls[idx]
+
+        except Exception:
+            print("in singleclass data class")
+            import pdb
+
+            pdb.set_trace()
 
         img = Image.open(os.path.join(self.root_dir, target_str, file))
         state = torch.get_rng_state()
@@ -917,7 +972,16 @@ class Image2ClassDataset(ImageDataset):
         return_dict["target"] = target
 
         if self.hints_enabled:
-            mask = Image.open(os.path.join(self.mask_dir, file))
+            if os.path.exists(os.path.join(self.mask_dir, file)):
+                mask_path = os.path.join(self.mask_dir, file)
+
+            elif os.path.exists(os.path.join(self.mask_dir, target_str, file)):
+                mask_path = os.path.join(self.mask_dir, target_str, file)
+
+            else:
+                raise Exception(os.path.join(self.mask_dir, target_str, file) + " not found!")
+
+            mask = Image.open(mask_path)
             torch.set_rng_state(state)
             mask = self.transform(mask)
             return_dict["mask"] = mask
@@ -926,18 +990,20 @@ class Image2ClassDataset(ImageDataset):
             return_dict["description"] = target_str
 
             if self.tokenizer is not None:
-                return_dict["tokens"] = torch.tensor(self.tokenizer(
-                    return_dict["description"],
-                    max_length=self.tokenizer.model_max_length,
-                    padding="max_length",
-                    truncation=True,
-                    return_tensors="pt",
-                ).input_ids)
+                return_dict["tokens"] = torch.tensor(
+                    self.tokenizer(
+                        return_dict["description"],
+                        max_length=self.tokenizer.model_max_length,
+                        padding="max_length",
+                        truncation=True,
+                        return_tensors="pt",
+                    ).input_ids
+                )
 
         if self.return_dict:
             return img, return_dict
 
-        elif len(return_dict.values()):
+        elif len(return_dict.values()) == 1:
             return img, list(return_dict.values())[0]
 
         else:

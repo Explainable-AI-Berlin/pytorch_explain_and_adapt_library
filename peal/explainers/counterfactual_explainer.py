@@ -161,6 +161,7 @@ class PDCConfig(ExplainerConfig):
     """
     merge_clusters: str = "best"
     allow_overlap: bool = False
+    max_avg_combination: float = 0.5
 
 
 class ACEConfig(ExplainerConfig):
@@ -380,7 +381,7 @@ class CounterfactualExplainer(ExplainerInterface):
         predictor: nn.Module = None,
         generator: Union[InvertibleGenerator, EditCapableGenerator] = None,
         input_type: str = None,
-        datasets: list = None,
+        datasource: list = None,
         tracking_level: int = None,
         test_data_config: str = None,
     ):
@@ -424,10 +425,12 @@ class CounterfactualExplainer(ExplainerInterface):
                 ),
             )
 
-        if not datasets is None:
-            self.predictor_datasets = datasets
+        if not datasource is None:
+            self.predictor_datasources = datasource
+            self.val_dataset = self.predictor_datasources[1].dataloaders[0].dataset
 
         else:
+            raise Exception("Currently not implemented correctly!")
             if not self.explainer_config.data_config is None:
                 data_config = self.explainer_config.data_config
 
@@ -444,7 +447,7 @@ class CounterfactualExplainer(ExplainerInterface):
             else:
                 task_config = None
 
-            self.predictor_datasets = get_datasets(
+            self.predictor_datasources = get_datasets(
                 data_config, task_config=task_config
             )[:2]
 
@@ -458,19 +461,45 @@ class CounterfactualExplainer(ExplainerInterface):
         self.loss = torch.nn.CrossEntropyLoss()
 
         if isinstance(self.explainer_config, PerfectFalseCounterfactualConfig):
-            inverse_config = copy.deepcopy(self.predictor_datasets[1].config)
+            inverse_config = copy.deepcopy(self.val_dataset.config)
             inverse_config.dataset_path += "_inverse"
             inverse_datasets = get_datasets(inverse_config)
             self.inverse_datasets = {}
             self.inverse_datasets["Training"] = inverse_datasets[0]
-            self.inverse_datasets["Validation"] = inverse_datasets[1]
+            self.inverse_datasets["validation"] = inverse_datasets[1]
             if len(list(inverse_datasets)) == 3:
                 self.inverse_datasets["test"] = inverse_datasets[2]
 
             if not test_data_config is None:
-                inverse_test_config = copy.deepcopy(self.predictor_datasets[1].config)
+                inverse_test_config = copy.deepcopy(self.val_dataset.config)
                 inverse_test_config.dataset_path += "_inverse"
                 self.inverse_datasets["test"] = get_datasets(inverse_test_config)[-1]
+
+    def perfect_false_counterfactuals(self, x_in, target_classes, idx_list, mode):
+        """
+        This function generates a counterfactual for a given batch of inputs.
+
+        Args:
+            batch (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        x_counterfactual_list = []
+        z_difference_list = []
+        y_target_end_confidence_list = []
+        for i, idx in enumerate(idx_list):
+            x_counterfactual = self.inverse_datasets[mode][idx][0]
+            x_counterfactual_list.append(x_counterfactual)
+            preds = torch.nn.Softmax()(
+                self.predictor(x_counterfactual.unsqueeze(0).to(self.device))
+                .detach()
+                .cpu()
+            )
+            y_target_end_confidence_list.append(preds[0][target_classes[i]])
+            z_difference_list.append(x_in[i] - x_counterfactual)
+
+        return x_counterfactual_list, z_difference_list, y_target_end_confidence_list
 
     def predictor_distilled_counterfactual(
         self,
@@ -528,7 +557,7 @@ class CounterfactualExplainer(ExplainerInterface):
                     self.explainer_config.distilled_predictor,
                     os.path.join(base_path, "explainer"),
                     self.predictor,
-                    self.predictor_datasets,
+                    self.predictor_datasources,
                     replace_with_activation=self.explainer_config.replace_with_activation,
                 )
 
@@ -544,9 +573,9 @@ class CounterfactualExplainer(ExplainerInterface):
                 "decision_boundary.png",
             )
             if hasattr(
-                self.predictor_datasets[1], "visualize_decision_boundary"
+                self.val_dataset, "visualize_decision_boundary"
             ) and not os.path.exists(decision_boundary_path_distilled):
-                self.predictor_datasets[1].visualize_decision_boundary(
+                self.val_dataset.visualize_decision_boundary(
                     gradient_predictor,
                     32,
                     self.device,
@@ -558,7 +587,7 @@ class CounterfactualExplainer(ExplainerInterface):
             gradient_predictor = self.predictor
 
         x_predictor = torch.clone(x_in)
-        x = self.predictor_datasets[1].project_to_pytorch_default(x_predictor)
+        x = self.val_dataset.project_to_pytorch_default(x_predictor)
         x = self.generator.dataset.project_from_pytorch_default(x)
         x = torchvision.transforms.Resize(self.generator.config.data.input_size[1:])(x)
         if not self.explainer_config.iterationwise_encoding:
@@ -641,7 +670,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 z_default = self.generator.dataset.project_to_pytorch_default(z[0])
                 clean_img_old = torch.clone(z_default).detach().cpu()
                 z_predictor_original = (
-                    self.predictor_datasets[1]
+                    self.val_dataset
                     .project_from_pytorch_default(z_default)
                     .to(self.device)
                 )
@@ -658,13 +687,13 @@ class CounterfactualExplainer(ExplainerInterface):
                 z_encoded, t=self.explainer_config.sampling_time_fraction
             )
             img_default = self.generator.dataset.project_to_pytorch_default(img_decoded)
-            if self.predictor_datasets[1].config.normalization is None:
+            if self.val_dataset.config.normalization is None:
                 img_default = torch.clamp(img_default, 0, 1)
 
             img_predictor = torchvision.transforms.Resize(
-                self.predictor_datasets[1].config.input_size[1:]
+                self.val_dataset.config.input_size[1:]
             )(img_default)
-            img_predictor = self.predictor_datasets[1].project_from_pytorch_default(
+            img_predictor = self.val_dataset.project_from_pytorch_default(
                 img_predictor
             )
 
@@ -800,6 +829,7 @@ class CounterfactualExplainer(ExplainerInterface):
                         old_mask=torch.clone(boolmask),
                         mask_momentum=self.explainer_config.mask_momentum,
                         boolmask_in=boolmask_in,
+                        max_avg_combination=self.explainer_config.max_avg_combination,
                     )
                     for sample_idx in range(z[0].data.shape[0]):
                         if mask[sample_idx] == 1:
@@ -807,7 +837,7 @@ class CounterfactualExplainer(ExplainerInterface):
 
                 z_default = self.generator.dataset.project_to_pytorch_default(z[0])
                 z_predictor = (
-                    self.predictor_datasets[1]
+                    self.val_dataset
                     .project_from_pytorch_default(z_default)
                     .to(self.device)
                 )
@@ -852,9 +882,7 @@ class CounterfactualExplainer(ExplainerInterface):
                         gradients_path, embed_numberstring(i, 4) + ".png"
                     ),
                     boolmask_in=boolmask_in,
-                    project_to_pytorch_default=self.predictor_datasets[
-                        1
-                    ].project_to_pytorch_default,
+                    project_to_pytorch_default=self.val_dataset.project_to_pytorch_default,
                 )
 
         if not self.explainer_config.iterationwise_encoding:
@@ -868,9 +896,9 @@ class CounterfactualExplainer(ExplainerInterface):
             counterfactual
         )
         counterfactual = torchvision.transforms.Resize(
-            self.predictor_datasets[1].config.input_size[1:]
+            self.val_dataset.config.input_size[1:]
         )(counterfactual)
-        counterfactual = self.predictor_datasets[1].project_from_pytorch_default(
+        counterfactual = self.val_dataset.project_from_pytorch_default(
             counterfactual
         )
         logits = self.predictor(counterfactual.to(self.device))
@@ -949,10 +977,11 @@ class CounterfactualExplainer(ExplainerInterface):
         base_path: str = "collages",
         start_idx: int = 0,
         y_target_goal_confidence_in: float = None,
-        remove_below_threshold: bool = True,
+        remove_below_threshold: bool = False,
         pbar=None,
         mode="",
         explainer_path=None,
+        batchwise_clustering=False,
     ) -> dict:
         """
         This function generates a counterfactual for a given batch of inputs.
@@ -994,7 +1023,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 batch["y_target_end_confidence_list"],
             ) = self.perfect_false_counterfactuals(
                 x_in=batch["x_list"],
-                y_target=batch["y_target_list"],
+                target_classes=batch["y_target_list"],
                 idx_list=batch["idx_list"],
                 mode=mode,
             )
@@ -1040,7 +1069,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 explainer_config=self.explainer_config,
                 pbar=pbar,
                 mode=mode,
-                predictor_datasets=self.predictor_datasets,
+                predictor_datasets=self.predictor_datasources,
                 base_path=explainer_path,
             )
 
@@ -1058,6 +1087,15 @@ class CounterfactualExplainer(ExplainerInterface):
                     else:
                         raise Exception
 
+        if self.explainer_config.num_attempts >= 2 and batchwise_clustering:
+            batch = self.cluster_explanations(
+                explanations_dict=batch,
+                batch_size=int(
+                    len(batch["x_list"]) / self.explainer_config.num_attempts
+                ),
+                n_clusters=self.explainer_config.num_attempts,
+            )
+
         batch_out = {}
         if remove_below_threshold:
             for key in batch.keys():
@@ -1074,7 +1112,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 (
                     batch_out["x_attribution_list"],
                     batch_out["collage_path_list"],
-                ) = self.predictor_datasets[1].generate_contrastive_collage(
+                ) = self.val_dataset.generate_contrastive_collage(
                     target_confidence_goal=target_confidence_goal,
                     base_path=base_path,
                     predictor=self.predictor,
@@ -1145,28 +1183,30 @@ class CounterfactualExplainer(ExplainerInterface):
             return difference_list
 
         cluster_lists = [[] for i in range(n_clusters)]
+        collage_path_base = None
         if self.explainer_config.clustering_strategy == "activation_clusters":
             explanations_beginning = [e[0] for e in explanations_list_by_source]
             cluster_means = extract_feature_difference(explanations_beginning)
             cluster_lists[0] = [explanations_list_by_source[0][0]]
             cluster_lists[1] = [explanations_list_by_source[1][0]]
-            collage_path_ref = explanations_beginning[0]["collage_path_list"]
-            collage_path_elements = collage_path_ref.split(os.sep)[:-1]
-            collage_path_base = str(
-                os.path.join(*([os.path.abspath(os.sep)] + collage_path_elements))
-            )
-            for cluster_idx in range(len(cluster_means)):
-                collage_path = explanations_beginning[cluster_idx]["collage_path_list"]
-                Path(collage_path_base + "_" + str(cluster_idx)).mkdir(
-                    parents=True, exist_ok=True
+            if "collage_path_list" in explanations_beginning[0].keys():
+                collage_path_ref = explanations_beginning[0]["collage_path_list"]
+                collage_path_elements = collage_path_ref.split(os.sep)[:-1]
+                collage_path_base = str(
+                    os.path.join(*([os.path.abspath(os.sep)] + collage_path_elements))
                 )
-                collage_path_new = os.path.join(
-                    *[
-                        collage_path_base + "_" + str(cluster_idx),
-                        embed_numberstring(0, 7) + ".png",
-                    ]
-                )
-                shutil.copy(collage_path, collage_path_new)
+                for cluster_idx in range(len(cluster_means)):
+                    collage_path = explanations_beginning[cluster_idx]["collage_path_list"]
+                    Path(collage_path_base + "_" + str(cluster_idx)).mkdir(
+                        parents=True, exist_ok=True
+                    )
+                    collage_path_new = os.path.join(
+                        *[
+                            collage_path_base + "_" + str(cluster_idx),
+                            embed_numberstring(0, 7) + ".png",
+                        ]
+                    )
+                    shutil.copy(collage_path, collage_path_new)
 
         for idx in range(len(explanations_list_by_source[0])):
             if self.explainer_config.clustering_strategy == "highest_activation":
@@ -1180,7 +1220,9 @@ class CounterfactualExplainer(ExplainerInterface):
                         )
 
                     except Exception as exp:
-                        import pdb; pdb.set_trace()
+                        import pdb
+
+                        pdb.set_trace()
 
                 current_activations = torch.tensor(current_activations)
                 activations_order = torch.argsort(current_activations)
@@ -1206,7 +1248,10 @@ class CounterfactualExplainer(ExplainerInterface):
                 cosine_similarities_abs = torch.abs(cosine_similarities)
 
             for i in range(n_clusters):
-                if self.explainer_config.clustering_strategy == "representation_clusters":
+                if (
+                    self.explainer_config.clustering_strategy
+                    == "representation_clusters"
+                ):
                     idx_combined = int(torch.argmax(cosine_similarities_abs.flatten()))
                     idx_cluster = idx_combined // len(current_differences)
                     idx_current = idx_combined % len(current_differences)
@@ -1243,7 +1288,11 @@ class CounterfactualExplainer(ExplainerInterface):
                         idx_cluster
                     ]
 
-                if self.explainer_config.clustering_strategy == "highest_activation":
+                if (
+                    self.explainer_config.clustering_strategy == "highest_activation"
+                    and "collage_path_list"
+                    in explanations_list_by_source[idx_current][idx].keys()
+                ):
                     collage_path_ref = explanations_list_by_source[idx_current][idx][
                         "collage_path_list"
                     ]
@@ -1257,16 +1306,17 @@ class CounterfactualExplainer(ExplainerInterface):
                         parents=True, exist_ok=True
                     )
 
-                collage_path = explanations_list_by_source[idx_current][idx][
-                    "collage_path_list"
-                ]
-                collage_path_new = os.path.join(
-                    *[
-                        collage_path_base + "_" + str(int(idx_cluster)),
-                        embed_numberstring(idx, 7) + ".png",
+                if not collage_path_base is None:
+                    collage_path = explanations_list_by_source[idx_current][idx][
+                        "collage_path_list"
                     ]
-                )
-                shutil.copy(collage_path, collage_path_new)
+                    collage_path_new = os.path.join(
+                        *[
+                            collage_path_base + "_" + str(int(idx_cluster)),
+                            embed_numberstring(idx, 7) + ".png",
+                        ]
+                    )
+                    shutil.copy(collage_path, collage_path_new)
 
         cluster_dicts = []
         for cluster_idx in range(len(cluster_lists)):
@@ -1303,27 +1353,29 @@ class CounterfactualExplainer(ExplainerInterface):
         explanations_dict_out = cluster_dicts[sorted_cluster_idxs[0]]
 
         for i in range(len(sorted_cluster_idxs)):
-            explanations_dict_out["clusters" + str(int(i))] = copy.deepcopy(cluster_dicts[
-                sorted_cluster_idxs[i]
-            ]["x_counterfactual_list"])
-            explanations_dict_out["cluster_confidence" + str(int(i))] = copy.deepcopy(cluster_dicts[
-                sorted_cluster_idxs[i]
-            ]["y_target_end_confidence_list"])
+            explanations_dict_out["clusters" + str(int(i))] = copy.deepcopy(
+                cluster_dicts[sorted_cluster_idxs[i]]["x_counterfactual_list"]
+            )
+            explanations_dict_out["cluster_confidence" + str(int(i))] = copy.deepcopy(
+                cluster_dicts[sorted_cluster_idxs[i]]["y_target_end_confidence_list"]
+            )
 
         if self.explainer_config.merge_clusters == "concatenate":
             for key in cluster_dicts[0].keys():
                 for cluster_idx in range(1, len(cluster_dicts)):
-                    explanations_dict_out[key] += cluster_dicts[sorted_cluster_idxs[cluster_idx]][key]
+                    explanations_dict_out[key] += cluster_dicts[
+                        sorted_cluster_idxs[cluster_idx]
+                    ][key]
 
         return explanations_dict_out
 
     def calculate_latent_difference_stats(self, explanations_dict):
         if self.explainer_config.tracking_level >= 3:
             latent_differences = None
-            if hasattr(self.predictor_datasets[1], "sample_to_latent"):
+            if hasattr(self.val_dataset, "sample_to_latent"):
                 latents_original = []
                 for i, e in enumerate(
-                    explanations_dict["x_list"][:len(explanations_dict["clusters0"])]
+                    explanations_dict["x_list"][: len(explanations_dict["clusters0"])]
                 ):
                     hint = (
                         explanations_dict["hint_list"][i]
@@ -1331,7 +1383,7 @@ class CounterfactualExplainer(ExplainerInterface):
                         else None
                     )
                     latents_original.append(
-                        self.predictor_datasets[1]
+                        self.val_dataset
                         .sample_to_latent(e.to(self.device), hint)
                         .cpu()
                     )
@@ -1341,7 +1393,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 for c in range(self.explainer_config.num_attempts):
                     latents_counterfactual.append(
                         [
-                            self.predictor_datasets[1]
+                            self.val_dataset
                             .sample_to_latent(
                                 e.to(self.device),
                                 (
@@ -1366,7 +1418,9 @@ class CounterfactualExplainer(ExplainerInterface):
                         )
 
                     except Exception as exp:
-                        import pdb; pdb.set_trace()
+                        import pdb
+
+                        pdb.set_trace()
 
             elif "hint_list" in explanations_dict.keys():
                 latent_differences = []
@@ -1477,13 +1531,13 @@ class CounterfactualExplainer(ExplainerInterface):
         batches_out = []
         batch = None
         collage_idx = 0
-        if self.predictor_datasets[1].config.has_hints:
-            self.predictor_datasets[1].enable_hints()
+        if self.val_dataset.config.has_hints:
+            self.val_dataset.enable_hints()
 
         n = (
             self.explainer_config.max_samples
             if not self.explainer_config.max_samples is None
-            else len(self.predictor_datasets[1])
+            else len(self.val_dataset)
         )
         pbar = tqdm(
             total=n
@@ -1495,15 +1549,15 @@ class CounterfactualExplainer(ExplainerInterface):
         )
         pbar.stored_values = {}
         pbar.stored_values["n_total"] = 0
-        for idx in range(len(self.predictor_datasets[1])):
+        for idx in range(len(self.val_dataset)):
             if (
                 not self.explainer_config.max_samples is None
                 and collage_idx >= self.explainer_config.max_samples
             ):
                 break
 
-            x, y = self.predictor_datasets[1][idx]
-            if self.predictor_datasets[1].hints_enabled:
+            x, y = self.val_dataset[idx]
+            if self.val_dataset.hints_enabled:
                 y, hint = y
 
             else:
@@ -1515,7 +1569,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 y_logits / self.explainer_config.temperature
             )
             for y_target in range(
-                self.predictor_datasets[1].task_config.output_channels
+                self.val_dataset.task_config.output_channels
             ):
                 if y_target == y_pred:
                     continue
@@ -1704,9 +1758,9 @@ class CounterfactualExplainer(ExplainerInterface):
             self.explainer_config.explanations_dir, "interpretations"
         )
         Path(interpretations_dir).mkdir(parents=True, exist_ok=True)
-        for source_class in range(self.predictor_datasets[1].output_size):
+        for source_class in range(self.val_dataset.output_size):
             for target_class in range(
-                source_class + 1, self.predictor_datasets[1].output_size
+                source_class + 1, self.val_dataset.output_size
             ):
                 interpretation = {}
                 for idx, elem in enumerate(zip(feedback, y_source_list, y_target_list)):

@@ -1,34 +1,57 @@
-MODEL_FLAGS="--attention_resolutions 32,16,8 --class_cond False --diffusion_steps 500 --learn_sigma True
---noise_schedule linear --num_channels 128 --num_heads 4 --num_res_blocks 2 --resblock_updown True
---use_fp16 True --use_scale_shift_norm True"
-SAMPLE_FLAGS="--batch_size 3"
+# This script is meant to be able to reproduce the results of the PDC paper (ARXIV_LINK).
+# The results were reproduced with the following software versions: (GIT_HASH)
+# the batch sizes are optimized for a GPU with 80gb VRAM, but can be decreased for smaller GPUs
+# this script was executed at commit TODO
 
-Q=31  # 39 for age
-T=-1
 
-GPU=0
-DATAPATH=datasets/celeba_dime
-MODELPATH=peal_runs/ace_test/model.pt
-CLASSIFIERPATH=peal_runs/ace_test/classifier.pth
-OUTPUT_PATH=peal_runs/ace_test/outputs
-EXPNAME=experiment1
+# Reproduce the results on the square dataset
 
-python run_ace.py $MODEL_FLAGS $SAMPLE_FLAGS --gpu $GPU \
-    --num_samples 1000 \
-    --model_path $MODELPATH \
-    --classifier_path $CLASSIFIERPATH \
-    --output_path $OUTPUT_PATH \
-    --exp_name $EXPNAME \
-    --attack_method PGD \
-    --attack_iterations 50 \
-    --attack_joint True \
-    --dist_l1 0.001 \
-    --timestep_respacing 50 \
-    --sampling_time_fraction 0.1 \
-    --sampling_stochastic True \
-    --sampling_inpaint 0.15 \
-    --label_query $Q \
-    --label_target $T \
-    --image_size 128 \
-    --data_dir $DATAPATH \
-    --dataset 'CelebAMV'
+# train the generator that is used for the counterfactual explainer (the dataset will be generated automatically)
+python train_generator.py --config "<PEAL_BASE>/configs/generators/square_ddpm.yaml"
+
+# train the predictor that shall be analyzed
+python train_predictor.py --config "<PEAL_BASE>/configs/predictors/square3_classifier_poisoned100.yaml"
+
+#
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_pdc_unbiased_cfkd.yaml"
+
+
+# Reproduce results on CelebA copyrighttag dataset
+
+# train the generator
+python train_generator.py --config "<PEAL_BASE>/configs/generators/celeba_copyrighttag_ddpm.yaml"
+
+# Run CFKD for 90% poisoning
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba500x090_pdc_cfkd_mask.yaml"
+
+# Run CFKD for 100% poisoning
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba500x100_pdc_cfkd_mask.yaml"
+
+
+# Reproduce the results on the square dataset
+
+# train the generator
+python train_generator.py --config "<PEAL_BASE>/configs/generators/square_ddpm.yaml"
+
+
+# Reproduce results on Waterbirds dataset
+
+# train the generator that is used for the counterfactual explainer
+python train_generator.py --config "<PEAL_BASE>/configs/generators/waterbirds_ddpm.yaml"
+
+
+# Reproduce results on follicle dataset
+
+# train the generator that is used for the counterfactual explainer (the dataset will be generated automatically)
+python train_generator.py --config "<PEAL_BASE>/configs/generators/follicle_ddpm.yaml"
+
+# train the predictor that shall be analyzed
+python train_predictor.py --config "<PEAL_BASE>/configs/predictors/follicle_cut_classifier.yaml"
+
+
+# Analysis of influence of sample number
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square250x100_perfect_false_counterfactuals_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square500x100_perfect_false_counterfactuals_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_perfect_false_counterfactuals_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square2000x100_perfect_false_counterfactuals_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square4000x100_perfect_false_counterfactuals_cfkd.yaml"

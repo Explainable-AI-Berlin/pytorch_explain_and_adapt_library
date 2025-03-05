@@ -484,6 +484,15 @@ if __name__ == "__main__":
                             ]
                         )
 
+    for method_idx, method_name in enumerate(method_names):
+        plot_images_with_custom_padding(
+            imgs[method_idx:method_idx+1],
+            target_confidences,
+            task_names,
+            [method_names[method_idx]],
+            method_name + ".png",
+        )
+
     imgs_reshaped = imgs.reshape([-1] + list(imgs.shape)[2:])
     plot_images_with_custom_padding(
         imgs,

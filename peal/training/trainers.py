@@ -33,7 +33,7 @@ from peal.training.interfaces import PredictorConfig
 from peal.training.loggers import log_images_to_writer
 from peal.training.loggers import Logger
 from peal.training.criterions import get_criterions
-from peal.data.dataloaders import create_dataloaders_from_datasource, DataloaderMixer
+from peal.data.dataloaders import create_dataloaders_from_datasource, DataloaderMixer, WeightedDataloaderList
 from peal.generators.interfaces import Generator
 from peal.architectures.predictors import (
     SequentialModel,
@@ -216,39 +216,39 @@ class ModelTrainer:
         if self.config.training.train_on_test:
             self.train_dataloader = test_dataloader
 
-        if isinstance(self.val_dataloaders, tuple):
+        if isinstance(self.val_dataloaders, WeightedDataloaderList):
+            self.val_dataloader_weights = list(self.val_dataloaders.weights)
+            self.val_dataloaders = self.val_dataloaders.dataloaders
+
+        elif isinstance(self.val_dataloaders, tuple):
             self.val_dataloaders = list(self.val_dataloaders)
 
         if not isinstance(self.val_dataloaders, list):
             self.val_dataloaders = [self.val_dataloaders]
 
         if self.config.training.class_balanced:
-            new_train_dataloaders = []
-            new_val_dataloaders = []
-            for i in range(self.config.task.output_channels):
-                train_dataloader_copy = copy.deepcopy(self.train_dataloader)
-                val_dataloader_copy = copy.deepcopy(self.val_dataloaders[0])
-                train_dataloader_copy.dataset.enable_class_restriction(i)
-                val_dataloader_copy.dataset.enable_class_restriction(i)
-                new_train_dataloaders.append(train_dataloader_copy)
-                new_val_dataloaders.append(val_dataloader_copy)
-
-            new_config = copy.deepcopy(self.config.training)
-            new_config.steps_per_epoch = 200
-            new_config.concatenate_batches = True
-            self.train_dataloader = DataloaderMixer(
-                new_config, new_train_dataloaders[0]
-            )
-            for i in range(1, len(new_train_dataloaders)):
-                # TODO this only works for two classes!
-                self.train_dataloader.append(
-                    new_train_dataloaders[i], weight_added_dataloader=0.5
+            if not isinstance(self.train_dataloader, DataloaderMixer):
+                new_config = copy.deepcopy(self.config.training)
+                new_config.steps_per_epoch = 200
+                new_config.concatenate_batches = True
+                self.train_dataloader = DataloaderMixer(
+                    new_config, self.train_dataloader
                 )
 
+            self.train_dataloader.enable_class_balancing()
+
+            new_val_dataloaders = []
+            new_val_dataloader_weights = []
+            for j in range(len(self.val_dataloaders)):
+                for i in range(self.config.task.output_channels):
+                    val_dataloader_copy = copy.deepcopy(self.val_dataloaders[j])
+                    val_dataloader_copy.dataset.enable_class_restriction(i)
+                    new_val_dataloaders.append(val_dataloader_copy)
+                    new_val_dataloader_weights.append(0.5 * self.val_dataloader_weights[j])
+                    new_val_dataloader_weights.append(0.5 * self.val_dataloader_weights[j])
+
             self.val_dataloaders = new_val_dataloaders
-            self.val_dataloader_weights = [1.0 / len(self.val_dataloaders)] * len(
-                self.val_dataloaders
-            )
+            self.val_dataloader_weights = new_val_dataloader_weights
 
         #
         if optimizer is None:
@@ -691,7 +691,7 @@ class ModelTrainer:
 def distill_binary_dataset(
     predictor_distillation, base_path, predictor, predictor_datasets
 ):
-    distillation_datasets = []
+    distillation_datasource = []
     for i in range(2):
         class_predictions_path = os.path.join(base_path, str(i) + "predictions.csv")
         Path(base_path).mkdir(exist_ok=True, parents=True)
@@ -713,7 +713,7 @@ def distill_binary_dataset(
         distilled_dataset_config.confounding_factors = None
         distilled_dataset_config.confounder_probability = None
         distilled_dataset_config.dataset_class = None
-        distillation_datasets.append(
+        distillation_datasource.append(
             get_datasets(
                 config=distilled_dataset_config, data_dir=class_predictions_path
             )[i]
@@ -723,18 +723,18 @@ def distill_binary_dataset(
         )
         distilled_predictor_config.data = distilled_dataset_config
         predictor_distillation = distilled_predictor_config
-        distillation_datasets[i].task_config = predictor_distillation.task
-        distillation_datasets[i].task_config.x_selection = predictor_datasets[
+        distillation_datasource[i].task_config = predictor_distillation.task
+        distillation_datasource[i].task_config.x_selection = predictor_datasets[
             i
         ].task_config.x_selection
 
-    return distillation_datasets
+    return distillation_datasource
 
 
 def distill_1ofn_dataset(
     predictor_distillation, base_path, predictor, predictor_datasets
 ):
-    distillation_datasets = []
+    distillation_datasource = []
     for i in range(2):
         class_predictions_path = os.path.join(base_path, "dataset_" + str(i))
         if not os.path.exists(class_predictions_path):
@@ -758,7 +758,7 @@ def distill_1ofn_dataset(
         distilled_dataset_config.confounding_factors = None
         distilled_dataset_config.confounder_probability = None
         distilled_dataset_config.dataset_class = None
-        distillation_datasets.append(
+        distillation_datasource.append(
             get_datasets(
                 config=distilled_dataset_config, data_dir=class_predictions_path
             )[i]
@@ -768,35 +768,38 @@ def distill_1ofn_dataset(
         )
         distilled_predictor_config.data = distilled_dataset_config
         predictor_distillation = distilled_predictor_config
-        distillation_datasets[i].task_config = predictor_datasets[i].task_config
+        distillation_datasource[i].task_config = predictor_datasets[i].task_config
 
-    return distillation_datasets
+    return distillation_datasource
 
 
 def distill_predictor(
     predictor_distillation,
     base_path,
     predictor,
-    predictor_datasets,
+    predictor_datasource,
     replace_with_activation=None,
 ):
     predictor_distillation = load_yaml_config(
         predictor_distillation,
         PredictorConfig,
     )
-    if isinstance(predictor_datasets[0], Image2MixedDataset):
-        distillation_datasets = distill_binary_dataset(
-            predictor_distillation, base_path, predictor, predictor_datasets
+    if predictor_distillation.distill_from == "dataset":
+        distillation_datasource = predictor_datasource
+
+    elif isinstance(predictor_datasource[0].dataset, Image2MixedDataset):
+        distillation_datasource = distill_binary_dataset(
+            predictor_distillation, base_path, predictor, predictor_datasource
         )
 
-    elif isinstance(predictor_datasets[0], Image2ClassDataset):
-        distillation_datasets = distill_1ofn_dataset(
-            predictor_distillation, base_path, predictor, predictor_datasets
+    elif isinstance(predictor_datasource[0].dataset, Image2ClassDataset):
+        distillation_datasource = distill_1ofn_dataset(
+            predictor_distillation, base_path, predictor, predictor_datasource
         )
-        predictor_distillation.task = predictor_datasets[0].task_config
+        predictor_distillation.task = predictor_datasource[0].task_config
 
     else:
-        raise Exception("Dataset type not available!")
+        raise Exception("Either distill from dataset or use available dataset type for relabeling")
 
     predictor_distilled = copy.deepcopy(predictor)
     if replace_with_activation == "leakysoftplus":
@@ -808,7 +811,7 @@ def distill_predictor(
     distillation_trainer = ModelTrainer(
         config=predictor_distillation,
         model=predictor_distilled,
-        datasource=distillation_datasets,
+        datasource=distillation_datasource,
         model_path=os.path.join(base_path, "distilled_predictor"),
     )
     distillation_trainer.fit()

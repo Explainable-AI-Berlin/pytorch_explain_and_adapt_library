@@ -58,7 +58,7 @@ class TrainingConfig(BaseModel):
     dataset_size / batch_size
     """
     steps_per_epoch: Union[type(None), PositiveInt] = None
-    concatenate_batches: bool = False
+    concatenate_batches: bool = True
     adv_training: bool = False
     input_noise_std: float = 0.1
     num_noise_vec: int = 1
@@ -116,6 +116,10 @@ class PredictorConfig:
     """
     base_path: str = None
     seed: int = 0
+    """
+    Where to distill from if used for distillation. Could either be done from the dataset or from the model.
+    """
+    distill_from: str = "dataset"
 
     def __init__(
         self,

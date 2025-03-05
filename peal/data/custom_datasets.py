@@ -12,7 +12,7 @@ import requests
 from torchvision.transforms import ToTensor
 from wilds import get_dataset
 
-
+from peal.data.dataloaders import DataloaderMixer, WeightedDataloaderList
 from peal.data.dataset_generators import SquareDatasetGenerator
 from peal.data.datasets import (
     Image2ClassDataset,
@@ -271,95 +271,138 @@ class SquareDataset(Image2MixedDataset):
         )
 
     def visualize_decision_boundary(
-        self, predictor, batch_size, device, path, temperature=1.0
+        self,
+        predictor,
+        batch_size,
+        device,
+        path,
+        temperature=1.0,
+        train_dataloader=None,
+        val_dataloaders=[],
+        val_weights=[],
     ):
         print("visualize_decision_boundary")
-
+        grid_path = path[:-4] + ".npy"
         # Create the grid for plotting
         x = torch.linspace(0, 1, 100)
         y = torch.linspace(0, 1, 100)
         xx, yy = torch.meshgrid(x, y)
         grid = torch.stack([xx.flatten(), yy.flatten()], dim=1)
+        if not os.path.exists(grid_path):
+            prediction_grids = []
+            positions = [0, 26, 52]
 
-        prediction_grids = []
-        positions = [0, 26, 52]
+            # Predict the grid values for decision boundary
+            for x_pos in positions:
+                for y_pos in positions:
+                    current_batch = []
+                    logits = []
+                    first_batch = None
 
-        # Predict the grid values for decision boundary
-        for x_pos in positions:
-            for y_pos in positions:
-                current_batch = []
-                logits = []
-                first_batch = None
-
-                for i in range(len(grid)):
-                    current_batch.append(
-                        ToTensor()(
-                            latent_to_square_image(
-                                255 * float(grid[i][0]),
-                                255 * float(grid[i][1]),
-                                position_x=x_pos,
-                                position_y=y_pos,
-                            )[0],
+                    for i in range(len(grid)):
+                        current_batch.append(
+                            ToTensor()(
+                                latent_to_square_image(
+                                    255 * float(grid[i][0]),
+                                    255 * float(grid[i][1]),
+                                    position_x=x_pos,
+                                    position_y=y_pos,
+                                )[0],
+                            )
                         )
-                    )
-                    if len(current_batch) == batch_size:
-                        current_batch = torch.stack(current_batch)
-                        if first_batch is None:
-                            first_batch = current_batch
+                        if len(current_batch) == batch_size:
+                            current_batch = torch.stack(current_batch)
+                            if first_batch is None:
+                                first_batch = current_batch
 
-                        logits.append(predictor(current_batch.to(device)).detach())
-                        current_batch = []
+                            logits.append(predictor(current_batch.to(device)).detach())
+                            current_batch = []
 
-                logits.append(predictor(torch.stack(current_batch).to(device)).detach())
-                logits = torch.cat(logits, dim=0).detach().cpu()
-                prediction_grid = torch.nn.Softmax(dim=1)(logits / temperature)[
-                    :, 0
-                ].reshape(100, 100)
-                prediction_grids.append(prediction_grid)
+                    logits.append(predictor(torch.stack(current_batch).to(device)).detach())
+                    logits = torch.cat(logits, dim=0).detach().cpu()
+                    prediction_grid = torch.nn.Softmax(dim=1)(logits / temperature)[
+                        :, 0
+                    ].reshape(100, 100)
+                    prediction_grids.append(prediction_grid)
 
-        """# Average the predictions across grids
-        prediction_grid = torch.mean(torch.stack(prediction_grids).to(torch.float32), dim=0).numpy()
-        
-        # Create the plot
-        plt.figure()
-        
-        # Set a lighter color map: use "coolwarm" and make it lighter
-        cmap = cm.get_cmap("bwr")
-        plt.contourf(xx, yy, prediction_grid, levels=100, cmap=cmap)
-        
-        # Set axis labels
-        plt.xlabel("Foreground Intensity")
-        plt.ylabel("Background Intensity")
-        
-        # Set the ticks to increments of 0.5
-        plt.xticks(np.arange(0, 1.1, 0.5))
-        plt.yticks(np.arange(0, 1.1, 0.5))
-        
-        # Add vertical dotted line for Foreground Intensity == 0.5
-        plt.axvline(x=0.5, color="black", linestyle="--")
-        plt.text(
-            1.05,
-            0.5,
-            "Confounding feature only",
-            rotation=270,
-            verticalalignment="center",
+            # Average the predictions across grids
+            prediction_grid = torch.mean(
+                torch.stack(prediction_grids).to(torch.float32), dim=0
+            ).numpy()
+            np.save(grid_path, prediction_grid)
+
+        else:
+            prediction_grid = np.load(grid_path)
+
+        # Extract latents for training and validation samples
+        def extract_latents(dataloader, max_batches=8):
+            latents = []
+            y_list = []
+            for batch_idx, batch in enumerate(dataloader):
+                if batch_idx >= max_batches:
+                    break
+
+                try:
+                    x, (y, hint) = batch  # Assuming batch contains images and hints
+
+                except Exception:
+                    print("in extract latents")
+                    import pdb; pdb.set_trace()
+
+                for idx in range(len(x)):
+                    try:
+                        latents.append(
+                            [
+                                self.check_foreground(x[idx], hint[idx]),
+                                self.check_background(x[idx], hint[idx]),
+                            ]
+                        )
+
+                    except Exception:
+                        import pdb
+
+                        pdb.set_trace()
+
+                    y_list.append(y[idx])
+
+            return latents, y_list
+
+        # TODO introduce new functionality into the dataloader mixer!
+        if isinstance(train_dataloader, DataloaderMixer):
+            train_hints_buffer = train_dataloader.hints_enabled
+            train_dataloader.enable_hints()
+
+        elif train_dataloader:
+            train_hints_buffer = train_dataloader.dataset.hints_enabled
+            train_dataloader.dataset.enable_hints()
+
+        train_latents, train_y_list = (
+            extract_latents(train_dataloader) if train_dataloader else ([], [])
         )
-        
-        # Add horizontal dotted line for Background Intensity == 0.5
-        plt.axhline(y=0.5, color="black", linestyle="--")
-        plt.text(0.5, 1.05, "True feature only", horizontalalignment="center")
-        
-        # Adjust plot limits to give space for text labels outside the plot
-        plt.subplots_adjust(right=0.85, top=0.85)
-        
-        # Save the plot to the specified path
-        plt.savefig(path, bbox_inches="tight")
-        plt.clf()"""
 
-        # Average the predictions across grids
-        prediction_grid = torch.mean(
-            torch.stack(prediction_grids).to(torch.float32), dim=0
-        ).numpy()
+        if train_dataloader and not train_hints_buffer:
+            if isinstance(train_dataloader, DataloaderMixer):
+                train_dataloader.enable_hints()
+
+            else:
+                train_dataloader.dataset.enable_hints()
+
+        val_latents, val_y_list = ([], [])
+        if isinstance(val_dataloaders, WeightedDataloaderList):
+            val_weights = val_dataloaders.weights
+            val_dataloaders = val_dataloaders.dataloaders
+
+        for val_idx, val_dataloader in enumerate(val_dataloaders):
+            val_hints_buffer = val_dataloader.dataset.hints_enabled
+            val_dataloader.dataset.enable_hints()
+            max_batches = max(1, 8 // val_weights[val_idx])
+            val_latents_current, val_y_list_current = extract_latents(
+                val_dataloader, max_batches=max_batches
+            )
+            val_latents.extend(val_latents_current)
+            val_y_list.extend(val_y_list_current)
+            if not val_hints_buffer:
+                val_dataloader.dataset.disable_hints()
 
         # Create the plot
         plt.figure()
@@ -373,6 +416,35 @@ class SquareDataset(Image2MixedDataset):
         contour_lines = plt.contour(
             xx, yy, prediction_grid, levels=10, colors="black", linewidths=1.5
         )
+
+        # Plot training and validation samples
+        train_latents = np.array(train_latents)
+        val_latents = np.array(val_latents)
+        if len(train_latents) > 0:
+            train_y_concat = np.array(train_y_list)
+            plt.scatter(
+                train_latents[:, 0],
+                train_latents[:, 1],
+                c=np.where(train_y_concat == 1, "blue", "red"),
+                marker="^",
+                edgecolors="black",
+                label="Train Samples",
+                alpha=0.7,
+            )
+
+        if len(val_latents) > 0:
+            val_y_concat = np.array(val_y_list)
+            plt.scatter(
+                val_latents[:, 0],
+                val_latents[:, 1],
+                c=np.where(val_y_concat == 1, "blue", "red"),
+                marker="s",
+                edgecolors="black",
+                label="Val Samples",
+                alpha=0.7,
+            )
+
+        plt.legend()
 
         # Set axis labels
         plt.xlabel("Foreground Intensity")
@@ -402,7 +474,6 @@ class SquareDataset(Image2MixedDataset):
         # Save the plot to the specified path
         plt.savefig(path, bbox_inches="tight")
         plt.clf()
-        np.save(path[:-4] + ".npy", prediction_grid)
 
         print("visualize_decision_boundary saved under " + path)
 
@@ -418,7 +489,10 @@ class SquareDataset(Image2MixedDataset):
 
     def sample_to_latent(self, x, hint):
         return torch.tensor(
-            [self.check_foreground(x.to(hint), hint), self.check_background(x.to(hint), hint)]
+            [
+                self.check_foreground(x.to(hint), hint),
+                self.check_background(x.to(hint), hint),
+            ]
         )
 
     def generate_contrastive_collage(

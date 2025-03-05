@@ -278,12 +278,13 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         old_mask=None,
         mask_momentum=0.5,
         boolmask_in=None,
+        max_avg_combination=0.5,
     ):
         respaced_steps = int(t * int(self.config.timestep_respacing))
         indices = list(range(respaced_steps))[::-1]
         x_normalized = self.dataset.project_to_pytorch_default(x)
         pe_normalized = self.dataset.project_to_pytorch_default(pe)
-        mask, dil_mask = generate_smooth_mask(x_normalized, pe_normalized, dilation)
+        mask, dil_mask = generate_smooth_mask(x_normalized, pe_normalized, dilation, max_avg_combination)
         if old_mask is not None:
             dil_mask = dil_mask - inpaint * old_mask.to(dil_mask) * mask_momentum
 
