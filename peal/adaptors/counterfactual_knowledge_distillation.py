@@ -986,10 +986,15 @@ class CFKD(Adaptor):
                     len(list(tracked_values.values())[0])
                     / pbar.stored_values["n_total"]
                 )
+                remaining_sample_number = self.adaptor_config.min_train_samples - len(
+                    list(tracked_values.values())[0]
+                )
+                print("remaining_sample_number: " + str(remaining_sample_number))
+                if remaining_sample_number <= 0:
+                    break
 
             if (
-                len(list(tracked_values.values())[0])
-                < self.adaptor_config.min_train_samples
+                remaining_sample_number
             ):
                 if (
                     acceptance_threshold == 0.51
@@ -997,17 +1002,13 @@ class CFKD(Adaptor):
                 ):
                     continue_collecting = False
 
-                elif (
+                """elif (
                     len(list(values.values())[0])
                     < self.adaptor_config.min_train_samples / 2
                 ):
                     acceptance_threshold = float(
                         np.maximum(0.51, acceptance_threshold - 0.1)
-                    )
-
-                remaining_sample_number = self.adaptor_config.min_train_samples - len(
-                    list(tracked_values.values())[0]
-                )
+                    )"""
 
             else:
                 continue_collecting = False

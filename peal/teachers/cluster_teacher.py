@@ -20,10 +20,12 @@ class DataStore:
 class ClusterTeacher(TeacherInterface):
     """ """
 
-    def __init__(self, port):
+    def __init__(self, port, dataset, tracking_level=0):
         """ """
         # TODO fix bug with reloading
         shutil.rmtree("static", ignore_errors=True)
+        self.dataset = dataset
+        self.tracking_level = tracking_level
         os.makedirs("static")
         self.port = port
         while is_port_in_use(self.port):
@@ -77,7 +79,7 @@ class ClusterTeacher(TeacherInterface):
                     return render_template(
                         "clustered_feedback_loop.html",
                         form=request.form,
-                        counterfactual_collage=collage_path,
+                        counterfactual_collages=collage_path,
                     )
 
                 else:
@@ -135,5 +137,19 @@ class ClusterTeacher(TeacherInterface):
         for cluster_idx in range(num_clusters):
             for _ in range(l):
                 feedback_out.append(feedback[cluster_idx])
+
+        if self.tracking_level > 1:
+            self.dataset.generate_contrastive_collage(
+                y_counterfactual_teacher_list=kwargs['teacher_counterfactual'],
+                y_original_teacher_list=kwargs['teacher_original'],
+                feedback_list=feedback_out,
+                x_counterfactual_list=kwargs['x_counterfactual_list'],
+                y_source_list=kwargs['y_source_list'],
+                y_target_list=kwargs['y_target_list'],
+                x_list=kwargs['x_list'],
+                y_list=kwargs['y_list'],
+                y_target_end_confidence_list=kwargs['y_target_end_confidence_list'],
+                base_path=kwargs['base_dir'],
+            )
 
         return feedback_out
