@@ -12,6 +12,7 @@ from torchvision.models import ResNet
 from tqdm import tqdm
 
 from peal.adaptors.interfaces import AdaptorConfig, Adaptor
+import peal.adaptors.spray as spray
 from peal.architectures.interfaces import TaskConfig
 from peal.data.dataloaders import create_dataloaders_from_datasource, get_dataloader
 from peal.data.dataset_factory import get_datasets
@@ -93,7 +94,6 @@ class PClArCConfig(ClArCConfig):
                  model_path: str = None,
                  data: Union[dict, DataConfig] = None,
                  unpoisoned_data:Union[dict, DataConfig] = None,
-                 poisoned_data: Union[dict, DataConfig] = None,
                  training: Union[dict, TrainingConfig] = None,
                  task: Union[dict, TaskConfig] = None,
                  base_dir: str = None,
@@ -176,12 +176,14 @@ class ClArC(Adaptor):
         if hasattr(self.original_model, 'model'):
             self.original_model = self.original_model.model
         self.model = copy.deepcopy(self.original_model)
+        self.attacked_class = adaptor_config.attacked_class
 
         pathlib.Path(self.adaptor_config.base_dir).mkdir(exist_ok=True)
 
     def run(self):
         train_dataloader, val_dataloader, test_dataloader = create_dataloaders_from_datasource(self.adaptor_config)
         train_dataloader.dataset.return_dict = True
+        train_dataloader.dataset.url_enabled = True
         train_dataloader.dataset.disable_class_restriction()
         if self.adaptor_config.attacked_class is not None:
             train_dataloader.dataset.enable_class_restriction(self.adaptor_config.attacked_class)
@@ -198,11 +200,11 @@ class ClArC(Adaptor):
             evaluation["unpoisoned"] = defaultdict(list)
 
         self.model.eval()
-        for description, dataloader in test_data:
-            evaluation[description]["projection_location"].append("---")
-            evaluation[description]["correction_strength"].append("---")
-            for k, v in get_accuracies(dataloader, self.model, self.adaptor_config.data.dataset_class, self.device).items():
-                evaluation[description][k].append(v)
+        # for description, dataloader in test_data:
+        #     evaluation[description]["projection_location"].append("---")
+        #     evaluation[description]["correction_strength"].append("---")
+        #     for k, v in get_accuracies(dataloader, self.model, self.adaptor_config.data.dataset_class, self.device).items():
+        #         evaluation[description][k].append(v)
 
         layers, correction_strength = np.meshgrid(self.adaptor_config.layer_index, self.adaptor_config.correction_strength)
         for layer, cs in zip(layers.flatten(), correction_strength.flatten()):
@@ -228,6 +230,41 @@ class ClArC(Adaptor):
 
     def get_evaluation_filename(self, dataset_name: str) -> str:
         pass
+
+    def get_annotations_and_activations(self, dataloader: DataLoader, record_layer: str) -> tuple[torch.Tensor, torch.Tensor]:
+        analysis_dir = os.path.join(self.adaptor_config.base_dir, f"layer-{record_layer}_class-{self.attacked_class}_analysis")
+        pathlib.Path(analysis_dir).mkdir(exist_ok=True)
+        input_db_path, attribution_db_path, heatmaps_db_path, concept_importance_db_path \
+            = spray.compute_attributions(self.model, dataloader, record_layer, self.attacked_class, analysis_dir, self.device)
+        analysis_db_path = os.path.join(analysis_dir, f"analysis.h5")
+
+        dataset_class = self.adaptor_config.data.dataset_class
+
+        spray.spectral_clustering(attribution_db_path, analysis_db_path, dataset_class, self.attacked_class)
+        label_map_file_path = spray.create_label_map_file(analysis_dir, self.adaptor_config.task.output_channels, dataset_class)
+        virelay_project_path = spray.make_project(analysis_dir, input_db_path, heatmaps_db_path, analysis_db_path, label_map_file_path, dataset_class, dataloader.dataset[0]["x"].shape)
+        feedback = spray.run_virelay(analysis_dir, virelay_project_path)
+
+        true_annotations = []
+        for batch in dataloader:
+            x = batch["x"].to(self.device).requires_grad_()
+            if dataset_class == "SquareDataset":
+                true_annotations.append(batch["y"][:, 1].detach())
+            elif dataset_class == "MnistDataset":
+                true_annotations.append(get_perfect_annotations_mnist(x))
+        # activations = torch.cat(activations, 0)
+        true_annotations = torch.cat(true_annotations, dim=0).to(self.device)
+
+        annotations = torch.zeros(len(true_annotations))
+        annotations[feedback] = 1
+        print("matching artifact annotations:", (annotations[true_annotations == 1] == true_annotations[true_annotations == 1]).float().mean().item())
+        print("matching non-artifact annotations:", (annotations[true_annotations == 0] == true_annotations[true_annotations == 0]).float().mean().item())
+
+        exit()
+
+        num_artifact_samples = torch.sum(true_annotations == 1).item()
+        print(f"Number of artifact samples: {num_artifact_samples}; Number of non-artifact samples: {len(true_annotations) - num_artifact_samples}")
+        return activations, true_annotations
 
     def get_annotations_and_activations_simplified(self, dataloader: DataLoader, feature_extractor: Module = None) -> tuple[torch.Tensor, torch.Tensor]:
         annotations = []
@@ -281,13 +318,13 @@ class PClArC(ClArC):
         # train_dataloader.dataset.visualize_decision_boundary(self.model, 32, self.device, os.path.join(self.adaptor_config.base_dir, "decision_boundary_corrected_pcav.png"))
         # exit()
 
-        feature_extractor, downstream_head = None, None
+        feature_extractor, downstream_head, layer_name = None, None, None
         if layer_index != 0:
-            feature_extractor, downstream_head = split_model(self.model, layer_index, self.device)
-            # feature_extractor.eval()
-            # downstream_head.eval()
+            feature_extractor, downstream_head, layer_name = split_model(self.model, layer_index, self.device)
 
-        activations, annotations = self.get_annotations_and_activations_simplified(dataloader, feature_extractor=feature_extractor)
+        # activations, annotations = self.get_annotations_and_activations_simplified(dataloader, feature_extractor=feature_extractor)
+        activations, annotations = self.get_annotations_and_activations(dataloader, layer_name)
+
         projection = SimpleProjection if self.adaptor_config.projection_type == "simple" else CavProjection
         projection = projection(activations, annotations, projection_type=self.adaptor_config.projection_type, cav_mode=self.adaptor_config.cav_mode, device=self.device, correction_strength=correction_strength)
 
@@ -333,7 +370,7 @@ class RRClArC(ClArC):
         model_name = f"corrected_model_layer-{layer_index}_mode-{self.adaptor_config.cav_mode}_lamb{correction_strength}_{self.adaptor_config.rrc_loss}-loss{mean_grad}{attacked_class}"
 
         assert layer_index != 0, "rr-clarc not implemented for input layer"
-        feature_extractor, downstream_head = split_model(self.model, layer_index, self.device)
+        feature_extractor, downstream_head, layer_name = split_model(self.model, layer_index, self.device)
         feature_extractor.eval()
 
         activations, annotations = self.get_annotations_and_activations_simplified(dataloader, feature_extractor=feature_extractor)
@@ -465,11 +502,11 @@ class RRClArC(ClArC):
         return torch.cat(acc, dim=0).float().mean().item()
 
 
-def split_model(model: Module, split_at: int, device):
+def split_model(model: Module, split_at: int, device) -> (Module, Module, str):
     '''
     Splits a model at the penultima layer
     '''
-    children_list = extract_all_children(model)
+    children_list, children_names = extract_all_children(model)
     feature_extractor = torch.nn.Sequential(*children_list[:split_at])
     if isinstance(model, ResNet):
         downstream_head = torch.nn.Sequential(*children_list[split_at:-1], torch.nn.Flatten(start_dim=1), children_list[-1])
@@ -479,21 +516,27 @@ def split_model(model: Module, split_at: int, device):
     # print("\n\n\nfeature extractor:\n", feature_extractor)
     # print("\n\n\ndownstream head:\n", downstream_head)
     # exit()
-    return feature_extractor.to(device), downstream_head.to(device)
+    return feature_extractor.to(device), downstream_head.to(device), children_names[split_at-1]
 
-def extract_all_children(model):
+def extract_all_children(model: Module, prefix: str = "") -> (list[Module], list[str]):
     '''
     Extracts all children of a model
     '''
     children = []
-    for child in model.children():
+    children_names = []
+    for name, child in model.named_children():
+        if prefix:
+            name = prefix + "." + name
         if isinstance(child, torch.nn.Sequential):
-            children.extend(extract_all_children(child))
+            grandchildren, grandchildren_names = extract_all_children(child, prefix=name)
+            children.extend(grandchildren)
+            children_names.extend(grandchildren_names)
 
         else:
             children.append(child)
+            children_names.append(name)
 
-    return children
+    return children, children_names
 
 
 def get_perfect_annotations_mnist(x: torch.Tensor) -> torch.Tensor:

@@ -6,10 +6,10 @@ data: <PEAL_BASE>/configs/data/square_poisoned098.yaml
 unpoisoned_data: <PEAL_BASE>/configs/data/square_unpoisoned.yaml
 projection_type: 'pcav' # 'pcav', 'svm', 'simple'
 # cav_mode: "cavs_max" # 'cavs_max', 'cavs_mean'; only relevant when using projection_type 'pcav'
-layer_index: [12] # 0 for input, -1 for penultimate layer
-correction_strength: [1.5]
-attacked_class: 0
-save_model: True
+layer_index: [6] # 0 for input, -1 for penultimate layer
+correction_strength: [1]
+attacked_class: 1
+save_model: False
 task:
   y_selection: [ClassA, ClassB]
   output_type: 'multiclass'

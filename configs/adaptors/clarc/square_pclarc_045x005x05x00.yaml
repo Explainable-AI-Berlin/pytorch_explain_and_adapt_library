@@ -9,10 +9,11 @@ projection_type: 'pcav' # 'pcav', 'svm', 'simple'
 layer_index: [3] # 0 for input, -1 for penultimate layer
 correction_strength: [1.3]
 attacked_class: 0
-save_model: True
+save_model: False
 task:
   y_selection: [ClassA, ClassB]
   output_type: 'multiclass'
+  output_channels: 2
   criterions:
     l2: 1.0
 training:
