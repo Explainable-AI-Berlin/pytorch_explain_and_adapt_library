@@ -256,9 +256,13 @@ class DataloaderMixer(DataLoader):
 
             for subitem in subitems[1:]:
                 for i in range(len(item)):
-                    if isinstance(item[i], list) or isinstance(item[i], list):
+                    if isinstance(item[i], list) or isinstance(item[i], tuple):
                         for j in range(len(item[i])):
-                            item[i][j] = torch.cat([item[i][j], subitem[i][j]], dim=0)
+                            try:
+                                item[i][j] = torch.cat([item[i][j], subitem[i][j]], dim=0)
+
+                            except Exception:
+                                import pdb; pdb.set_trace()
 
                     else:
                         try:
@@ -273,9 +277,14 @@ class DataloaderMixer(DataLoader):
 
     def reset(self):
         for i in range(len(self.dataloaders)):
-            self.dataloaders[i] = DataLoader(
-                self.dataloaders[i].dataset, batch_size=self.dataloaders[i].batch_size
-            )
+            if isinstance(self.dataloaders[i], DataloaderMixer):
+                self.dataloaders[i].reset()
+
+            else:
+                self.dataloaders[i] = DataLoader(
+                    self.dataloaders[i].dataset, batch_size=self.dataloaders[i].batch_size
+                )
+
             self.iterators[i] = iter(self.dataloaders[i])
 
     def __len__(self):
@@ -293,6 +302,7 @@ class DataloaderMixer(DataLoader):
             else:
                 dataloader.dataset.enable_hints()
 
+        self.reset()
         self.hints_enabled = True
 
     def disable_hints(self):
@@ -303,6 +313,7 @@ class DataloaderMixer(DataLoader):
             else:
                 dataloader.dataset.disable_hints()
 
+        self.reset()
         self.hints_enabled = False
 
     def enable_idx(self):
@@ -313,6 +324,7 @@ class DataloaderMixer(DataLoader):
             else:
                 dataloader.dataset.enable_idx()
 
+        self.reset()
         self.idx_enabled = True
 
     def disable_idx(self):
@@ -323,6 +335,7 @@ class DataloaderMixer(DataLoader):
             else:
                 dataloader.dataset.disable_idx()
 
+        self.reset()
         self.idx_enabled = False
 
     def enable_class_balancing(self):
@@ -338,7 +351,7 @@ class DataloaderMixer(DataLoader):
                         dataloader_copy.dataset.enable_class_restriction(i)
                         new_dataloaders.append(dataloader_copy)
 
-                    new_config = copy.deepcopy(self.config.training)
+                    new_config = copy.deepcopy(self.train_config)
                     new_config.steps_per_epoch = 200
                     new_config.concatenate_batches = True
                     self.dataloaders[idx] = DataloaderMixer(
@@ -347,6 +360,7 @@ class DataloaderMixer(DataLoader):
                     for i in range(1, len(new_dataloaders)):
                         self.dataloaders[idx].append(new_dataloaders[i])
 
+            self.reset()
             self.class_balancing_enabled = True
 
     def disable_class_balancing(self):
@@ -360,7 +374,24 @@ class DataloaderMixer(DataLoader):
 
                 dataloader.disable_class_balancing()
 
+            self.reset()
             self.class_balancing_enabled = False
+
+
+class WeightedDataloaderList:
+    def __init__(self, dataloaders, weights=None):
+        self.dataloaders = dataloaders
+        if not weights is None:
+            self.weights = weights
+
+        else:
+            self.weights = torch.ones([len(self.dataloaders)]) / len(self.dataloaders)
+
+    def append(self, dataloader):
+        self.dataloaders.append(dataloader)
+        self.weights *= 0.5
+        self.weights = torch.cat([self.weights, torch.tensor([0.5])])
+
 
 
 def get_dataloader(
