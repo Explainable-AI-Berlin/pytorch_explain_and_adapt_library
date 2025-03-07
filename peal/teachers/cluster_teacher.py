@@ -64,9 +64,9 @@ class ClusterTeacher(TeacherInterface):
                     collage_path = self.data.collage_paths[self.data.i]
                     self.data.i += 1
                     return render_template(
-                        "feedback_loop.html",
+                        "clustered_feedback_loop.html",
                         form=request.form,
-                        counterfactual_collage=collage_path,
+                        counterfactual_collages=collage_path,
                     )
 
                 else:
@@ -140,8 +140,8 @@ class ClusterTeacher(TeacherInterface):
 
         if self.tracking_level > 1:
             self.dataset.generate_contrastive_collage(
-                y_counterfactual_teacher_list=kwargs['teacher_counterfactual'],
-                y_original_teacher_list=kwargs['teacher_original'],
+                y_counterfactual_teacher_list=[-1] * len(feedback_out),
+                y_original_teacher_list=[-1] * len(feedback_out),
                 feedback_list=feedback_out,
                 x_counterfactual_list=kwargs['x_counterfactual_list'],
                 y_source_list=kwargs['y_source_list'],
@@ -149,6 +149,7 @@ class ClusterTeacher(TeacherInterface):
                 x_list=kwargs['x_list'],
                 y_list=kwargs['y_list'],
                 y_target_end_confidence_list=kwargs['y_target_end_confidence_list'],
+                y_target_start_confidence_list=kwargs['y_target_start_confidence_list'],
                 base_path=kwargs['base_dir'],
             )
 

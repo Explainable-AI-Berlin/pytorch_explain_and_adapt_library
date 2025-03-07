@@ -1959,7 +1959,7 @@ class CFKD(Adaptor):
             tracked_values = self.retrieve_counterfactual_list(
                 validation_stats=validation_stats, finetune_iteration=finetune_iteration
             )
-            if (
+            """if (
                 len(list(tracked_values.values())[0])
                 < self.adaptor_config.min_train_samples
             ):
@@ -1969,7 +1969,7 @@ class CFKD(Adaptor):
                     + str(finetune_iteration)
                     + "!"
                 )
-                return self.student
+                return self.student"""
 
             feedback, feedback_stats = self.retrieve_feedback(
                 tracked_values=tracked_values,
