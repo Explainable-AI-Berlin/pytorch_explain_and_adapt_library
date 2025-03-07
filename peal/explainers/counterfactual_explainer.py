@@ -37,6 +37,7 @@ from peal.generators.interfaces import (
 from peal.data.interfaces import PealDataset, DataConfig
 from peal.explainers.interfaces import ExplainerInterface, ExplainerConfig
 from peal.teachers.human2model_teacher import DataStore
+from peal.training.interfaces import PredictorConfig
 from peal.training.trainers import distill_predictor
 from peal.visualization.visualize_counterfactual_gradients import visualize_step
 
@@ -430,8 +431,7 @@ class CounterfactualExplainer(ExplainerInterface):
             self.val_dataset = self.predictor_datasources[1].dataloaders[0].dataset
 
         else:
-            raise Exception("Currently not implemented correctly!")
-            if not self.explainer_config.data_config is None:
+            """if not self.explainer_config.data_config is None:
                 data_config = self.explainer_config.data_config
 
             elif not self.predictor_config is None:
@@ -449,7 +449,8 @@ class CounterfactualExplainer(ExplainerInterface):
 
             self.predictor_datasources = get_datasets(
                 data_config, task_config=task_config
-            )[:2]
+            )[:2]"""
+            raise Exception("Currently not implemented correctly!")
 
         self.input_type = input_type
         if not tracking_level is None:
@@ -553,6 +554,12 @@ class CounterfactualExplainer(ExplainerInterface):
                 "model.cpl",
             )
             if not os.path.exists(distilled_path):
+                if isinstance(self.explainer_config.distilled_predictor, dict):
+                    self.explainer_config.distilled_predictor['data'] = self.val_dataset.config
+
+                elif isinstance(self.explainer_config.distilled_predictor, PredictorConfig):
+                    self.explainer_config.distilled_predictor.data = self.val_dataset.config
+
                 gradient_predictor = distill_predictor(
                     self.explainer_config.distilled_predictor,
                     os.path.join(base_path, "explainer"),

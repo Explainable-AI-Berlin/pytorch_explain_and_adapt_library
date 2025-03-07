@@ -217,6 +217,12 @@ class DataloaderMixer(DataLoader):
                 [1 - weight_added_dataloader, weight_added_dataloader]
             )
 
+        if (
+            hasattr(self.train_config, "concatenate_batches")
+            and self.train_config.concatenate_batches
+        ):
+            self.reset(batch_size=self.batch_size // 2)
+
     def __iter__(self):
         return DataIterator(self)
 
@@ -275,14 +281,15 @@ class DataloaderMixer(DataLoader):
 
         return item
 
-    def reset(self):
+    def reset(self, batch_size=None):
         for i in range(len(self.dataloaders)):
             if isinstance(self.dataloaders[i], DataloaderMixer):
-                self.dataloaders[i].reset()
+                self.dataloaders[i].reset(batch_size)
 
             else:
+                new_batch_size = batch_size if batch_size else self.dataloaders[i].batch_size
                 self.dataloaders[i] = DataLoader(
-                    self.dataloaders[i].dataset, batch_size=self.dataloaders[i].batch_size
+                    self.dataloaders[i].dataset, batch_size=new_batch_size
                 )
 
             self.iterators[i] = iter(self.dataloaders[i])

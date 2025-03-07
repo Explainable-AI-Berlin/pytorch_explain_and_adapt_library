@@ -47,14 +47,18 @@ def get_teacher(
             counterfactual_type=counterfactual_type,
         )
 
-    elif teacher[:5] == "cluster":
-        if len(teacher) == 10:
+    elif teacher[:7] == "cluster":
+        if len(teacher) == 12:
             port = int(teacher[-4:])
 
         else:
             port = 8000
 
-        teacher = ClusterTeacher(port)
+        teacher = ClusterTeacher(
+            port,
+            dataset=dataset,
+            tracking_level=tracking_level,
+        )
 
     elif teacher[:5] == "human":
         if len(teacher) == 10:
@@ -73,7 +77,7 @@ def get_teacher(
             counterfactual_type=counterfactual_type,
         )
 
-    elif teacher[:len("Baseline")] == 'Baseline':
+    elif teacher[: len("Baseline")] == "Baseline":
         teacher = BaselineTeacher(
             strategy=teacher.split(":")[1],
             dataset=dataset,

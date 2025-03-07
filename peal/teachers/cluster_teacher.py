@@ -20,10 +20,12 @@ class DataStore:
 class ClusterTeacher(TeacherInterface):
     """ """
 
-    def __init__(self, port):
+    def __init__(self, port, dataset, tracking_level=0):
         """ """
         # TODO fix bug with reloading
         shutil.rmtree("static", ignore_errors=True)
+        self.dataset = dataset
+        self.tracking_level = tracking_level
         os.makedirs("static")
         self.port = port
         while is_port_in_use(self.port):
@@ -62,9 +64,9 @@ class ClusterTeacher(TeacherInterface):
                     collage_path = self.data.collage_paths[self.data.i]
                     self.data.i += 1
                     return render_template(
-                        "feedback_loop.html",
+                        "clustered_feedback_loop.html",
                         form=request.form,
-                        counterfactual_collage=collage_path,
+                        counterfactual_collages=collage_path,
                     )
 
                 else:
@@ -77,7 +79,7 @@ class ClusterTeacher(TeacherInterface):
                     return render_template(
                         "clustered_feedback_loop.html",
                         form=request.form,
-                        counterfactual_collage=collage_path,
+                        counterfactual_collages=collage_path,
                     )
 
                 else:
@@ -95,9 +97,9 @@ class ClusterTeacher(TeacherInterface):
         """ """
         print('start collecting feedback!!!')
         collage_path_clusters = []
+        l = len(kwargs['collage_path_list']) // num_clusters
         for cluster_idx in range(num_clusters):
-            cluster = kwargs["cluster" + str(cluster_idx)]
-            collage_path_clusters.append(cluster['collage_paths'])
+            collage_path_clusters.append(kwargs['collage_path_list'][cluster_idx * l:(cluster_idx + 1) * l])
 
         collage_clusters_static = []
         for collage_path_list in collage_path_clusters:
@@ -133,8 +135,22 @@ class ClusterTeacher(TeacherInterface):
         self.data.i = 0
         feedback_out = []
         for cluster_idx in range(num_clusters):
-            cluster = kwargs["cluster" + str(cluster_idx)]
-            for collage_path in cluster['collage_paths']:
+            for _ in range(l):
                 feedback_out.append(feedback[cluster_idx])
+
+        if self.tracking_level > 1:
+            self.dataset.generate_contrastive_collage(
+                y_counterfactual_teacher_list=[-1] * len(feedback_out),
+                y_original_teacher_list=[-1] * len(feedback_out),
+                feedback_list=feedback_out,
+                x_counterfactual_list=kwargs['x_counterfactual_list'],
+                y_source_list=kwargs['y_source_list'],
+                y_target_list=kwargs['y_target_list'],
+                x_list=kwargs['x_list'],
+                y_list=kwargs['y_list'],
+                y_target_end_confidence_list=kwargs['y_target_end_confidence_list'],
+                y_target_start_confidence_list=kwargs['y_target_start_confidence_list'],
+                base_path=kwargs['base_dir'],
+            )
 
         return feedback_out
