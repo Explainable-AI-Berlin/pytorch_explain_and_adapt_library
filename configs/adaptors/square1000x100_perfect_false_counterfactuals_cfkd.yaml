@@ -6,7 +6,7 @@ tracking_level                       :  0
 min_train_samples                    :  900
 finetune_iterations                  :  1
 max_validation_samples               :  100
-continuous_learning                  :  "retrain"
+continuous_learning                  :  "finetune"
 use_visualization                    :  False
 calculate_group_accuracies           :  True
 explainer                            :  <PEAL_BASE>/configs/explainers/perfect_false_counterfactuals.yaml

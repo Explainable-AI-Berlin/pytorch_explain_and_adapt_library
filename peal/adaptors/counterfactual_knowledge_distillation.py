@@ -201,6 +201,11 @@ class CFKDConfig(AdaptorConfig):
     2sided also allows that we start from samples with wrong orignal prediction.
     """
     counterfactual_type: str = "1sided"
+    """
+    Whether to always give feedback directly after creating validation counterfactuals or whether to wait until
+    the next train feedback shall be given as well (which means less interruptions!)
+    """
+    lazy_feedback: bool = False
 
     def __init__(
         self,
@@ -556,6 +561,9 @@ class CFKD(Adaptor):
             self.tracked_keys.append("hint_list")
             self.train_dataloader.dataset.enable_hints()
             self.val_dataloader.dataset.enable_hints()
+
+        else:
+            self.hints_enabled = False
 
         if isinstance(
             self.explainer.explainer_config, PerfectFalseCounterfactualConfig

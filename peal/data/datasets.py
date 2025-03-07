@@ -808,6 +808,7 @@ class Image2ClassDataset(ImageDataset):
             self.urls_with_hints = []
 
         self.hints_enabled = False
+        self.idx_enabled = False
         self.task_config = task_config
         self.transform = transform
         self.return_dict = return_dict
@@ -887,6 +888,12 @@ class Image2ClassDataset(ImageDataset):
     def disable_tokens(self):
         self.string_description_enabled = self.string_description_enabled_buffer
         self.tokenizer = None
+
+    def enable_idx(self):
+        self.idx_enabled = True
+
+    def disable_idx(self):
+        self.idx_enabled = False
 
     @property
     def output_size(self):
@@ -985,6 +992,9 @@ class Image2ClassDataset(ImageDataset):
             torch.set_rng_state(state)
             mask = self.transform(mask)
             return_dict["mask"] = mask
+
+        if self.idx_enabled:
+            return_dict["idx"] = idx
 
         if self.string_description_enabled:
             return_dict["description"] = target_str
