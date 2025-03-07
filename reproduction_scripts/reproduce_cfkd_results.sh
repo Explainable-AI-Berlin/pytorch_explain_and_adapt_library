@@ -55,3 +55,8 @@ python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square500x100_perfect_
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_perfect_false_counterfactuals_cfkd.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square2000x100_perfect_false_counterfactuals_cfkd.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square4000x100_perfect_false_counterfactuals_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba250x100_cfkd_perfect_false_counterfactuals.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba500x100_cfkd_perfect_false_counterfactuals.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_cfkd_perfect_false_counterfactuals.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba2000x100_cfkd_perfect_false_counterfactuals.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba4000x100_cfkd_perfect_false_counterfactuals.yaml"

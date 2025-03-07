@@ -889,7 +889,6 @@ class CounterfactualExplainer(ExplainerInterface):
                         gradients_path, embed_numberstring(i, 4) + ".png"
                     ),
                     boolmask_in=boolmask_in,
-                    project_to_pytorch_default=self.val_dataset.project_to_pytorch_default,
                 )
 
         if not self.explainer_config.iterationwise_encoding:

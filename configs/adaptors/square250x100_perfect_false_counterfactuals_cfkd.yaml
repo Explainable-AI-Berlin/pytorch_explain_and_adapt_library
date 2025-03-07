@@ -3,10 +3,10 @@ adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  6
 tracking_level                       :  0
-min_train_samples                    :  224
+min_train_samples                    :  150
 finetune_iterations                  :  1
-max_validation_samples               :  26
-continuous_learning                  :  "retrain"
+max_validation_samples               :  100
+continuous_learning                  :  "finetune"
 use_visualization                    :  False
 calculate_group_accuracies           :  True
 explainer                            :  <PEAL_BASE>/configs/explainers/perfect_false_counterfactuals.yaml
