@@ -1,6 +1,4 @@
 """
-This is an attempt to more directly implement DRO directly from the GitHub repository
-rather than adapting the PEAL train_predictor to integrate DRO.
 """
 
 import copy
@@ -25,8 +23,7 @@ from pydantic import BaseModel, PositiveInt
 from typing import Union
 
 from peal.data.dataset_factory import get_datasets
-from peal.data.interfaces import DataConfig
-from peal.data.datasets import Image2MixedDataset, Image2ClassDataset
+from peal.data.datasets import DataConfig, Image2MixedDataset, Image2ClassDataset
 from peal.dependencies.attacks.attacks import PGD_L2
 from peal.global_utils import (
     orthogonal_initialization,
@@ -59,7 +56,15 @@ from peal.dependencies.group_dro.loss import LossComputer
 from memory_profiler import profile
 
 
-class PealGroupDROConfig(AdaptorConfig):
+dro_criterions = {
+    "ce": nn.CrossEntropyLoss(reduction='none'),
+    "bce": nn.BCEWithLogitsLoss(reduction='none'),
+    "mse": nn.MSELoss(reduction='none'),
+    "mae": nn.MSELoss(reduction='none'),
+}
+
+
+class GroupDROConfig(AdaptorConfig):
     """
     Config template for running the DRO adaptor.
     """
@@ -67,7 +72,8 @@ class PealGroupDROConfig(AdaptorConfig):
     """
     The config template for an adaptor
     """
-    adaptor_type: str = "PealGroupDRO"
+
+    adaptor_type: str = "GroupDRO"
     """
     The config of the predictor to be adapted.
     """
@@ -102,7 +108,8 @@ class PealGroupDROConfig(AdaptorConfig):
     """
     The name of the class.
     """
-    __name__: str = "peal.PealGroupDROConfig"
+    __name__: str = "peal.GroupDROConfig"
+
 
     def __init__(
         self,
@@ -154,14 +161,7 @@ class PealGroupDROConfig(AdaptorConfig):
 
 
 class GroupDRO(Adaptor):
-    """
-    DRO Adaptor docstring.
-    """
-
-    # Instantiate the dataset with return_dict=True
-
-    # Pass an instantiated datasets to the model trainer as a list of datasets
-    # [train, val, test] under the datasource keyword
+    """ GroupDRO Adaptor """
 
     def __init__(
         self,
@@ -181,6 +181,7 @@ class GroupDRO(Adaptor):
         gigabyte_vram=None,
         val_dataloader_weights=[1.0],
     ):
+
 
 
         pass
