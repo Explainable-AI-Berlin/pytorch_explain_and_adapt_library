@@ -73,7 +73,8 @@ from pydantic import BaseModel, PositiveInt
 from typing import Union
 
 from peal.data.dataset_factory import get_datasets
-from peal.data.datasets import DataConfig, Image2MixedDataset, Image2ClassDataset
+from peal.data.interfaces import DataConfig
+from peal.data.datasets import Image2MixedDataset, Image2ClassDataset
 from peal.dependencies.attacks.attacks import PGD_L2
 from peal.global_utils import (
     orthogonal_initialization,
@@ -92,10 +93,9 @@ from peal.training.criterions import get_criterions, available_criterions
 from peal.training.trainers import PredictorConfig
 from peal.data.dataloaders import create_dataloaders_from_datasource, DataloaderMixer
 from peal.generators.interfaces import Generator
+from peal.architectures.interfaces import ArchitectureConfig, TaskConfig
 from peal.architectures.predictors import (
     SequentialModel,
-    ArchitectureConfig,
-    TaskConfig,
     TorchvisionModel,
 )
 from peal.adaptors.interfaces import Adaptor, AdaptorConfig
@@ -115,7 +115,7 @@ dro_criterions = {
 }
 
 
-class LeakyGroupDROConfig(AdaptorConfig):
+class PealGroupDROConfig(AdaptorConfig):
     """
     Config template for running the DRO adaptor.
     """
@@ -123,7 +123,7 @@ class LeakyGroupDROConfig(AdaptorConfig):
     """
     The config template for an adaptor
     """
-    adaptor_type: str = "GroupDRO"
+    adaptor_type: str = "PealGroupDRO"
     """
     The config of the predictor to be adapted.
     """
@@ -158,7 +158,7 @@ class LeakyGroupDROConfig(AdaptorConfig):
     """
     The name of the class.
     """
-    __name__: str = "peal.GroupDROConfig"
+    __name__: str = "peal.PealGroupDROConfig"
 
     def __init__(
         self,
@@ -210,7 +210,7 @@ class LeakyGroupDROConfig(AdaptorConfig):
 
 
 
-class LeakyGroupDRO(Adaptor):
+class PealGroupDRO(Adaptor):
     """
     DRO Adaptor docstring.
     """
@@ -509,15 +509,15 @@ class LeakyGroupDRO(Adaptor):
         else:
             print("CUDA is not available.")
 
-    @profile
+    # @profile
     def run_epoch(self, dataloader, loss_criterions, mode="train", pbar=None):
         """ """
-        self.log_cpu_memory_usage()
+        # self.log_cpu_memory_usage()
         # self.log_gpu_memory_usage()
         sources = {}
         for batch_idx, sample in enumerate(dataloader):
-            self.log_cpu_memory_usage()
-            self.log_gpu_memory_usage()
+            # self.log_cpu_memory_usage()
+            # self.log_gpu_memory_usage()
             if hasattr(dataloader, "return_src") and dataloader.return_src:
                 sample, source = sample
                 source = str(source)
@@ -861,6 +861,7 @@ class LeakyGroupDRO(Adaptor):
                 self.model.to(self.device)
 
             # increase regularization and reset checkpoint if overfitting occurs
+            """
             if (
                 train_accuracy >= train_accuracy_previous
                 and val_accuracy < val_accuracy_previous
@@ -886,6 +887,7 @@ class LeakyGroupDRO(Adaptor):
                 val_accuracy_previous = val_accuracy
                 if hasattr(self, "scheduler"):
                     self.scheduler.step()
+            """
 
             save_yaml_config(self.config, os.path.join(self.model_path, "config.yaml"))
 
