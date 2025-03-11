@@ -186,7 +186,6 @@ dependencies:
       - wget==3.2
       - wilds
       - wrapt==1.15.0
-      - xformers
       - zennit==0.5.0
       - zipp==3.16.2
 prefix: /opt/conda/envs/peal

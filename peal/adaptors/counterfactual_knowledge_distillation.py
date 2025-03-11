@@ -27,7 +27,8 @@ from peal.training.loggers import log_images_to_writer
 from peal.data.dataloaders import (
     DataStack,
     DataloaderMixer,
-    create_dataloaders_from_datasource, WeightedDataloaderList,
+    create_dataloaders_from_datasource,
+    WeightedDataloaderList,
 )
 from peal.training.trainers import (
     ModelTrainer,
@@ -196,6 +197,10 @@ class CFKDConfig(AdaptorConfig):
     How aggressively to change the model based on the counterfactual samples. 0 -> No change, 1 -> Full change
     """
     mixing_ratio: float = 0.5
+    """"
+    A list of the feedback accuracies.
+    """
+    feedback_accuracies: list = []
     """
     What type of counterfactuals are valid. 1sided means that we can only start from samples with correct prediction,
     2sided also allows that we start from samples with wrong orignal prediction.
@@ -207,7 +212,7 @@ class CFKDConfig(AdaptorConfig):
     """
     lazy_feedback: bool = False
 
-    def __init__(
+    '''def __init__(
         self,
         training: Union[dict, TrainingConfig] = None,
         task: Union[dict, TaskConfig] = None,
@@ -383,7 +388,7 @@ class CFKDConfig(AdaptorConfig):
             if not counterfactual_type is None
             else self.counterfactual_type
         )
-        self.kwargs = kwargs
+        self.kwargs = kwargs'''
 
 
 class CFKD(Adaptor):
@@ -605,7 +610,10 @@ class CFKD(Adaptor):
         if (
             self.adaptor_config.tracking_level >= 2
             and not os.path.exists(boundary_path)
-            and hasattr(self.dataloaders_val.dataloaders[0].dataset, "visualize_decision_boundary")
+            and hasattr(
+                self.dataloaders_val.dataloaders[0].dataset,
+                "visualize_decision_boundary",
+            )
             and not os.path.exists(boundary_path)
         ):
             self.dataloaders_val.dataloaders[0].dataset.visualize_decision_boundary(
@@ -749,7 +757,9 @@ class CFKD(Adaptor):
                 f.write(platform.node())
 
             print("start generating validation stats!!!")
-            validation_stats = self.retrieve_validation_stats(finetune_iteration=0)
+            validation_tracked_values, validation_stats = (
+                self.retrieve_validation_prestats(finetune_iteration=0)
+            )
             for key in validation_stats.keys():
                 if isinstance(validation_stats[key], float):
                     writer.add_scalar(
@@ -766,10 +776,21 @@ class CFKD(Adaptor):
 
             print("start loading validation stats!!!")
             validation_stats_existed = os.path.exists(
-                os.path.join(self.base_dir, "0", "validation_stats.npz")
+                os.path.join(
+                    self.base_dir,
+                    self.adaptor_config.current_iteration - 1,
+                    "validation_stats.npz",
+                )
+            )
+            validation_tracked_values, validation_prestats = (
+                self.retrieve_validation_prestats(
+                    finetune_iteration=self.adaptor_config.current_iteration - 1
+                )
             )
             validation_stats = self.retrieve_validation_stats(
-                finetune_iteration=self.adaptor_config.current_iteration
+                finetune_iteration=self.adaptor_config.current_iteration,
+                validation_tracked_values=validation_tracked_values,
+                validation_prestats=validation_prestats,
             )
             if not validation_stats_existed:
                 for key in validation_stats.keys():
@@ -821,7 +842,7 @@ class CFKD(Adaptor):
             print("Visualization done!!!")
 
         print("intialization done!!!")
-        return validation_stats, writer
+        return validation_stats, validation_tracked_values, writer
 
     def get_batch(
         self,
@@ -1001,9 +1022,7 @@ class CFKD(Adaptor):
                 if remaining_sample_number <= 0:
                     break
 
-            if (
-                remaining_sample_number
-            ):
+            if remaining_sample_number:
                 if (
                     acceptance_threshold == 0.51
                     and len(list(tracked_values.values())[0]) == 0
@@ -1636,25 +1655,7 @@ class CFKD(Adaptor):
         self.test_dataloader.dataset.task_config = task_config_buffer
         return img
 
-    def retrieve_validation_stats(self, finetune_iteration):
-        if not self.overwrite and os.path.exists(
-            os.path.join(self.base_dir, str(finetune_iteration), "validation_stats.npz")
-        ):
-            print("load already completed validation stats!!!")
-            with open(
-                os.path.join(
-                    self.base_dir, str(finetune_iteration), "validation_stats.npz"
-                ),
-                "rb",
-            ) as f:
-                validation_stats = {}
-                validation_tracked_file = np.load(f, allow_pickle=True)
-                for key in validation_tracked_file.keys():
-                    validation_stats[key] = torch.tensor(validation_tracked_file[key])
-
-            print("validation stats loaded!!!")
-            return validation_stats
-
+    def retrieve_validation_prestats(self, finetune_iteration):
         validation_values_path = os.path.join(
             self.base_dir, str(finetune_iteration), "validation_tracked_values.npz"
         )
@@ -1860,17 +1861,17 @@ class CFKD(Adaptor):
             )
 
         if self.adaptor_config.explainer.use_clustering:
+            validation_cluster_values_path = os.path.join(
+                self.base_dir,
+                str(finetune_iteration),
+                "validation_tracked_cluster_values.npz",
+            )
             validation_tracked_values = self.explainer.cluster_explanations(
                 validation_tracked_values,
                 self.adaptor_config.batch_size,
                 self.adaptor_config.explainer.num_attempts,
             )
             if self.adaptor_config.tracking_level > 0:
-                validation_cluster_values_path = os.path.join(
-                    self.base_dir,
-                    str(finetune_iteration),
-                    "validation_tracked_cluster_values.npz",
-                )
                 with open(
                     validation_cluster_values_path,
                     "wb",
@@ -1892,9 +1893,12 @@ class CFKD(Adaptor):
                     np.savez(f, **tracked_values_file)
 
         if self.adaptor_config.tracking_level > 0 and hasattr(
-            self.dataloaders_val.dataloaders[0].dataset, "global_counterfactual_visualization"
+            self.dataloaders_val.dataloaders[0].dataset,
+            "global_counterfactual_visualization",
         ):
-            self.dataloaders_val.dataloaders[0].dataset.global_counterfactual_visualization(
+            self.dataloaders_val.dataloaders[
+                0
+            ].dataset.global_counterfactual_visualization(
                 os.path.join(
                     self.base_dir,
                     str(finetune_iteration),
@@ -1908,6 +1912,31 @@ class CFKD(Adaptor):
                 validation_tracked_values["hint_list"],
             )
             print("global counterfactual visualization saved!!!")
+
+        return validation_tracked_values, validation_stats
+
+    def retrieve_validation_stats(
+        self, finetune_iteration, validation_tracked_values, validation_prestats
+    ):
+        if not self.overwrite and os.path.exists(
+            os.path.join(self.base_dir, str(finetune_iteration), "validation_stats.npz")
+        ):
+            print("load already completed validation stats!!!")
+            with open(
+                os.path.join(
+                    self.base_dir, str(finetune_iteration), "validation_stats.npz"
+                ),
+                "rb",
+            ) as f:
+                validation_stats = {}
+                validation_tracked_file = np.load(f, allow_pickle=True)
+                for key in validation_tracked_file.keys():
+                    validation_stats[key] = torch.tensor(validation_tracked_file[key])
+
+            print("validation stats loaded!!!")
+            return validation_stats
+
+        validation_stats = validation_prestats
 
         validation_feedback, validation_feedback_stats = self.retrieve_feedback(
             tracked_values=validation_tracked_values,
@@ -1952,8 +1981,7 @@ class CFKD(Adaptor):
         Run the counterfactual knowledge distillation
         """
         print("Adaptor Config: " + str(self.adaptor_config))
-        validation_stats, writer = self.initialize_run()
-        self.feedback_accuracy = validation_stats["feedback_accuracy"]
+        validation_prestats, validation_tracked_values, writer = self.initialize_run()
 
         # iterate over the finetune iterations
         for finetune_iteration in range(
@@ -1965,7 +1993,8 @@ class CFKD(Adaptor):
                 + str(finetune_iteration)
             )
             tracked_values = self.retrieve_counterfactual_list(
-                validation_stats=validation_stats, finetune_iteration=finetune_iteration
+                validation_stats=validation_prestats,
+                finetune_iteration=finetune_iteration,
             )
             """if (
                 len(list(tracked_values.values())[0])
@@ -1984,13 +2013,20 @@ class CFKD(Adaptor):
                 finetune_iteration=finetune_iteration,
                 mode="train",
             )
+            validation_stats = self.retrieve_validation_stats(
+                finetune_iteration=finetune_iteration - 1,
+                validation_prestats=validation_prestats,
+                validation_tracked_values=validation_tracked_values,
+            )
             for key in validation_stats.keys():
                 if isinstance(validation_stats[key], float):
                     writer.add_scalar(
-                        "train_" + key,
+                        "validation_" + key,
                         validation_stats[key],
                         finetune_iteration,
                     )
+
+            self.adaptor_config.feedback_accuracies.append(validation_stats["feedback_accuracy"])
 
             dataset_path = self.create_dataset(
                 feedback=feedback,
@@ -2073,7 +2109,10 @@ class CFKD(Adaptor):
                 self.base_dir, str(finetune_iteration), "decision_boundary.png"
             )
             if (
-                hasattr(self.dataloaders_val.dataloaders[0].dataset, "visualize_decision_boundary")
+                hasattr(
+                    self.dataloaders_val.dataloaders[0].dataset,
+                    "visualize_decision_boundary",
+                )
                 and not os.path.exists(decision_boundary_path)
                 and self.adaptor_config.tracking_level >= 2
             ):
@@ -2087,19 +2126,9 @@ class CFKD(Adaptor):
                     val_dataloaders=self.dataloaders_val,
                 )
 
-            validation_stats = self.retrieve_validation_stats(
-                finetune_iteration=finetune_iteration
+            validation_tracked_values, validation_prestats = (
+                self.retrieve_validation_prestats(finetune_iteration=finetune_iteration)
             )
-
-            for key in validation_stats.keys():
-                if isinstance(validation_stats[key], float):
-                    writer.add_scalar(
-                        "validation_" + key,
-                        validation_stats[key],
-                        finetune_iteration,
-                    )
-
-            self.feedback_accuracy = validation_stats["feedback_accuracy"]
 
             visualization_path = os.path.join(
                 self.base_dir, str(finetune_iteration), "visualization.png"
@@ -2124,5 +2153,20 @@ class CFKD(Adaptor):
             save_yaml_config(
                 self.adaptor_config, os.path.join(self.base_dir, "config.yaml")
             )
+
+        validation_stats = self.retrieve_validation_stats(
+            finetune_iteration=self.adaptor_config.current_iteration - 1,
+            validation_prestats=validation_prestats,
+            validation_tracked_values=validation_tracked_values,
+        )
+        for key in validation_stats.keys():
+            if isinstance(validation_stats[key], float):
+                writer.add_scalar(
+                    "validation_" + key,
+                    validation_stats[key],
+                    finetune_iteration,
+                )
+
+        self.adaptor_config.feedback_accuracies.append(validation_stats["feedback_accuracy"])
 
         return self.student
