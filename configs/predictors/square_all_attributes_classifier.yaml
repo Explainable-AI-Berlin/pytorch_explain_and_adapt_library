@@ -2,7 +2,7 @@
 model_path        : $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_all_attributes
 data              : <PEAL_BASE>/configs/data/square_unpoisoned.yaml
 training          : <PEAL_BASE>/configs/training/img_classifier.yaml
-architecture      : torchvision_vit_b_16
+architecture      : torchvision_resnet18
 task:
   criterions:
     bce    : 1.0

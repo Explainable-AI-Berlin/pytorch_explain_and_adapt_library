@@ -555,10 +555,16 @@ class CounterfactualExplainer(ExplainerInterface):
             )
             if not os.path.exists(distilled_path):
                 if isinstance(self.explainer_config.distilled_predictor, dict):
-                    self.explainer_config.distilled_predictor['data'] = self.val_dataset.config
+                    self.explainer_config.distilled_predictor[
+                        "data"
+                    ] = self.val_dataset.config
 
-                elif isinstance(self.explainer_config.distilled_predictor, PredictorConfig):
-                    self.explainer_config.distilled_predictor.data = self.val_dataset.config
+                elif isinstance(
+                    self.explainer_config.distilled_predictor, PredictorConfig
+                ):
+                    self.explainer_config.distilled_predictor.data = (
+                        self.val_dataset.config
+                    )
 
                 gradient_predictor = distill_predictor(
                     self.explainer_config.distilled_predictor,
@@ -676,11 +682,9 @@ class CounterfactualExplainer(ExplainerInterface):
                 )
                 z_default = self.generator.dataset.project_to_pytorch_default(z[0])
                 clean_img_old = torch.clone(z_default).detach().cpu()
-                z_predictor_original = (
-                    self.val_dataset
-                    .project_from_pytorch_default(z_default)
-                    .to(self.device)
-                )
+                z_predictor_original = self.val_dataset.project_from_pytorch_default(
+                    z_default
+                ).to(self.device)
                 pred_original = torch.nn.functional.softmax(
                     self.predictor(z_predictor_original)
                     / self.explainer_config.temperature
@@ -700,9 +704,7 @@ class CounterfactualExplainer(ExplainerInterface):
             img_predictor = torchvision.transforms.Resize(
                 self.val_dataset.config.input_size[1:]
             )(img_default)
-            img_predictor = self.val_dataset.project_from_pytorch_default(
-                img_predictor
-            )
+            img_predictor = self.val_dataset.project_from_pytorch_default(img_predictor)
 
             if not self.explainer_config.iterationwise_encoding:
                 pred_original = torch.nn.functional.softmax(
@@ -737,20 +739,14 @@ class CounterfactualExplainer(ExplainerInterface):
             loss = self.loss(logits_gradient, y_target.to(self.device))
             l1_losses = []
             for z_idx in range(len(z_original)):
-                try:
-                    l1_losses.append(
-                        torch.mean(
-                            torch.abs(
-                                z[z_idx].to(self.device)
-                                - torch.clone(z_original[z_idx]).detach()
-                            )
+                l1_losses.append(
+                    torch.mean(
+                        torch.abs(
+                            z[z_idx].to(self.device)
+                            - torch.clone(z_original[z_idx]).detach()
                         )
                     )
-
-                except Exception:
-                    import pdb
-
-                    pdb.set_trace()
+                )
 
             if num_attempts == 1 or self.explainer_config.allow_overlap:
                 dist_l1 = self.explainer_config.dist_l1
@@ -843,11 +839,9 @@ class CounterfactualExplainer(ExplainerInterface):
                             z[0].data[sample_idx] = z_updated[sample_idx]
 
                 z_default = self.generator.dataset.project_to_pytorch_default(z[0])
-                z_predictor = (
-                    self.val_dataset
-                    .project_from_pytorch_default(z_default)
-                    .to(self.device)
-                )
+                z_predictor = self.val_dataset.project_from_pytorch_default(
+                    z_default
+                ).to(self.device)
                 pred_new = torch.nn.functional.softmax(
                     gradient_predictor(z_predictor) / self.explainer_config.temperature
                 )
@@ -904,9 +898,7 @@ class CounterfactualExplainer(ExplainerInterface):
         counterfactual = torchvision.transforms.Resize(
             self.val_dataset.config.input_size[1:]
         )(counterfactual)
-        counterfactual = self.val_dataset.project_from_pytorch_default(
-            counterfactual
-        )
+        counterfactual = self.val_dataset.project_from_pytorch_default(counterfactual)
         logits = self.predictor(counterfactual.to(self.device))
         logit_confidences = (
             torch.nn.Softmax(dim=-1)(logits / self.explainer_config.temperature)
@@ -1008,9 +1000,15 @@ class CounterfactualExplainer(ExplainerInterface):
             dict: The batch with the counterfactuals added.
         """
         if explainer_path is None:
-            explainer_path = os.path.join(
-                *([os.path.abspath(os.sep)] + base_path.split(os.sep)[:-1])
-            )
+            os_sep = os.path.abspath(os.sep)
+            if base_path[: len(os_sep)] == os_sep:
+                path_splitted = [os_sep]
+
+            else:
+                path_splitted = []
+
+            path_splitted += base_path.split(os.sep)[:-1]
+            explainer_path = os.path.join(*path_splitted)
 
         if y_target_goal_confidence_in is None:
             if hasattr(self.explainer_config, "y_target_goal_confidence"):
@@ -1202,7 +1200,9 @@ class CounterfactualExplainer(ExplainerInterface):
                     os.path.join(*([os.path.abspath(os.sep)] + collage_path_elements))
                 )
                 for cluster_idx in range(len(cluster_means)):
-                    collage_path = explanations_beginning[cluster_idx]["collage_path_list"]
+                    collage_path = explanations_beginning[cluster_idx][
+                        "collage_path_list"
+                    ]
                     Path(collage_path_base + "_" + str(cluster_idx)).mkdir(
                         parents=True, exist_ok=True
                     )
@@ -1389,9 +1389,7 @@ class CounterfactualExplainer(ExplainerInterface):
                         else None
                     )
                     latents_original.append(
-                        self.val_dataset
-                        .sample_to_latent(e.to(self.device), hint)
-                        .cpu()
+                        self.val_dataset.sample_to_latent(e.to(self.device), hint).cpu()
                     )
 
                 latents_counterfactual = []
@@ -1399,16 +1397,14 @@ class CounterfactualExplainer(ExplainerInterface):
                 for c in range(self.explainer_config.num_attempts):
                     latents_counterfactual.append(
                         [
-                            self.val_dataset
-                            .sample_to_latent(
+                            self.val_dataset.sample_to_latent(
                                 e.to(self.device),
                                 (
                                     explanations_dict["hint_list"][i]
                                     if "hint_list" in explanations_dict.keys()
                                     else None
                                 ),
-                            )
-                            .cpu()
+                            ).cpu()
                             for i, e in enumerate(
                                 explanations_dict["clusters" + str(c)]
                             )
@@ -1574,9 +1570,7 @@ class CounterfactualExplainer(ExplainerInterface):
             y_confidence = torch.nn.Softmax(dim=-1)(
                 y_logits / self.explainer_config.temperature
             )
-            for y_target in range(
-                self.val_dataset.task_config.output_channels
-            ):
+            for y_target in range(self.val_dataset.task_config.output_channels):
                 if y_target == y_pred:
                     continue
 
@@ -1765,9 +1759,7 @@ class CounterfactualExplainer(ExplainerInterface):
         )
         Path(interpretations_dir).mkdir(parents=True, exist_ok=True)
         for source_class in range(self.val_dataset.output_size):
-            for target_class in range(
-                source_class + 1, self.val_dataset.output_size
-            ):
+            for target_class in range(source_class + 1, self.val_dataset.output_size):
                 interpretation = {}
                 for idx, elem in enumerate(zip(feedback, y_source_list, y_target_list)):
                     feedback_elem, source_class_elem, target_class_elem = elem
