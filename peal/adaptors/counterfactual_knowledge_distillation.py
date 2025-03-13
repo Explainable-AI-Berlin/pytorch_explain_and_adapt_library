@@ -141,7 +141,7 @@ class CFKDConfig(AdaptorConfig):
     """
     Logging of the current finetune iteration
     """
-    current_iteration: PositiveInt = 0
+    current_iteration: int = 0
     """
     Whether to continue training from the current student model or start training from scratch
     again. Can e.g. be "retrain", which retrains model on original data and counterfactuals from scratch,
@@ -608,7 +608,7 @@ class CFKD(Adaptor):
             validation_stats_existed = os.path.exists(
                 os.path.join(
                     self.base_dir,
-                    self.adaptor_config.current_iteration - 1,
+                    str(self.adaptor_config.current_iteration - 1),
                     "validation_stats.npz",
                 )
             )

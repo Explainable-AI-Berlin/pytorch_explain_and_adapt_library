@@ -1,4 +1,4 @@
-# python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_pdc_cfkd_unit_test.yaml"
+# python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square_pdc_cfkd_unit_test.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  1
@@ -14,10 +14,10 @@ explainer                            :  <PEAL_BASE>/configs/explainers/pdc_unit_
 training                             :  <PEAL_BASE>/configs/training/unit_test.yaml
 data                                 :  <PEAL_BASE>/configs/data/square40_poisoned100.yaml
 test_data                            :  <PEAL_BASE>/configs/data/square40_unpoisoned.yaml
-student                              :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned100/model.cpl
+student                              :  $PEAL_RUNS/square40/classifier_unit_test/model.cpl
 teacher                              :  SegmentationMask
-generator                            :  $PEAL_RUNS/square/ddpm/config.yaml
-base_dir                             :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_cfkd_unit_test
+generator                            :  $PEAL_RUNS/square40/ddpm_unit_test/config.yaml
+base_dir                             :  $PEAL_RUNS/square40/classifier_unit_test/pdc_cfkd_unit_test
 task:
   criterions:
     ce     : 1.0
