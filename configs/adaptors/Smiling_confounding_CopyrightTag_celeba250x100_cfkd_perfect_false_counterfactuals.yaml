@@ -14,7 +14,7 @@ explainer                            :  <PEAL_BASE>/configs/explainers/perfect_f
 training                             :  <PEAL_BASE>/configs/training/sensitive_distillation.yaml
 data                                 :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba_poisoned100.yaml
 test_data                            :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba.yaml
-base_dir                             :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned100/perfect_false_counterfactuals250_cfkd
+base_dir                             :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned100/cfkd_perfect_false_counterfactuals250
 student                              :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned100/model.cpl
 teacher                              :  SegmentationMask
 task:
