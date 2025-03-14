@@ -20,7 +20,7 @@ If you search for logs, visualizations or want to use the run for another run yo
 Hence, there is no need and also no option to set it yourself.
 
 Then, one should create a conda environment based on the environment.yml file like:
-```conda env create -f environment.yml``` and activate it with ```conda activate peal```.
+```conda env create -f environment.yaml``` and activate it with ```conda activate peal```.
 
 An alternative to conda is to work with apptainer by running ```apptainer build python_container.sif python_container.def``` and then run everything inside ```apptainer run --nv python_container.sif```.
 
