@@ -279,6 +279,7 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         mask_momentum=0.5,
         boolmask_in=None,
         max_avg_combination=0.5,
+        exceptions=None,
     ):
         respaced_steps = int(t * int(self.config.timestep_respacing))
         indices = list(range(respaced_steps))[::-1]
@@ -293,6 +294,12 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
             boolmask = torch.minimum(
                 torch.ones_like(boolmask), boolmask + 1 - boolmask_in.to(boolmask)
             )
+
+        if not exceptions is None:
+            for i in range(exceptions.shape[0]):
+                # No repainting!
+                if exceptions[i] == 1:
+                    boolmask[i] = 0
 
         noise_fn = torch.randn_like if stochastic else torch.zeros_like
 

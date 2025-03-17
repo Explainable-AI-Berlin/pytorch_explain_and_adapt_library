@@ -7,6 +7,8 @@ import types
 import pandas as pd
 import torch
 import os
+
+import torchvision
 import yaml
 import socket
 import typing
@@ -21,10 +23,6 @@ from pkg_resources import resource_filename
 from pydantic import BaseModel
 from tqdm import tqdm
 from pathlib import Path
-
-from peal.architectures.interfaces import TaskConfig, ArchitectureConfig
-from peal.data.interfaces import DataConfig
-from peal.training.interfaces import TrainingConfig
 
 
 def dict_to_bar_chart(input_dict, name):
@@ -542,10 +540,20 @@ def generate_smooth_mask(x1, x2, dilation, max_avg_combination=0.5):
     assert (dilation % 2) == 1, "dilation must be an odd number"
     mask = (x1 - x2).abs().sum(dim=1, keepdim=True)
     mask = mask / mask.view(mask.size(0), -1).max(dim=1)[0].view(-1, 1, 1, 1)
-    dil_mask = max_avg_combination * F.avg_pool2d(mask, dilation, stride=1, padding=(dilation - 1) // 2)
+    dil_mask = mask
+    blurring = torchvision.transforms.GaussianBlur(dilation, sigma=2.0)
+    try:
+        dil_mask = blurring(mask)
+
+    except Exception:
+        import pdb; pdb.set_trace()
+
+    dil_mask = torch.clamp(dil_mask, 0, 1)
+
+    '''dil_mask = max_avg_combination * F.avg_pool2d(mask, dilation, stride=1, padding=(dilation - 1) // 2)
     dil_mask += (1 - max_avg_combination) * F.max_pool2d(
         mask, dilation, stride=1, padding=(dilation - 1) // 2
-    )
+    )'''
     # dil_mask = F.max_pool2d(mask, dilation, stride=1, padding=(dilation - 1) // 2)
     return mask, dil_mask
 

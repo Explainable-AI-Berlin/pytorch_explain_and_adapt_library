@@ -556,9 +556,9 @@ class CounterfactualExplainer(ExplainerInterface):
             )
             if not os.path.exists(distilled_path):
                 if isinstance(self.explainer_config.distilled_predictor, dict):
-                    self.explainer_config.distilled_predictor[
-                        "data"
-                    ] = self.val_dataset.config
+                    self.explainer_config.distilled_predictor["data"] = (
+                        self.val_dataset.config
+                    )
 
                 elif isinstance(
                     self.explainer_config.distilled_predictor, PredictorConfig
@@ -807,13 +807,24 @@ class CounterfactualExplainer(ExplainerInterface):
                 stochastic=self.explainer_config.stochastic,
             )
             z_default = self.generator.dataset.project_to_pytorch_default(z[0])
-            clean_img_old = torch.clone(z_default).detach().cpu()
             z_predictor_original = self.val_dataset.project_from_pytorch_default(
                 z_default
             ).to(self.device)
             pred_original = torch.nn.functional.softmax(
                 self.predictor(z_predictor_original) / self.explainer_config.temperature
             )
+            target_confidences = torch.zeros_like(
+                target_confidence_goal_current
+            )
+            for j in range(len(target_confidences)):
+                target_confidences[j] = pred_original[j, int(y_target[j])]
+
+            print("target_confidences_current_upper: " + str(target_confidences))
+
+            clean_img_old = torch.clone(z_default).detach().cpu()
+            """target_confidences = [
+                float(pred_original[i][y_target[i]]) for i in range(len(y_target))
+            ]"""
 
         else:
             z_encoded = [z_elem.to(self.device) for z_elem in z]
@@ -837,24 +848,35 @@ class CounterfactualExplainer(ExplainerInterface):
                 / self.explainer_config.temperature,
                 -1,
             )
-
-        target_confidences = [
-            float(pred_original[i][y_target[i]]) for i in range(len(y_target))
-        ]
+            target_confidences = [
+                float(pred_original[i][y_target[i]]) for i in range(len(y_target))
+            ]
 
         for j in range(img_predictor.shape[0]):
-            if pred_original[j, int(y_target[j])] > best_score[j]:
+            if target_confidences[j] > best_score[j]:
                 best_z[j] = torch.clone(z[0][j])
-                best_score[j] = pred_original[j, int(y_target[j])]
+                best_score[j] = target_confidences[j]
                 if not boolmask is None:
                     best_mask[j] = boolmask[j]
 
-            if pred_original[j, int(y_target[j])] > target_confidence_goal_current[j]:
+            if mask[j] == 0:
+                pass
+
+            elif target_confidences[j] > target_confidence_goal_current[j]:
                 mask[j] = 0
+                print(
+                    str(target_confidences[j])
+                    + "/"
+                    + str(target_confidence_goal_current[j])
+                )
                 print(mask)
 
             else:
-                print(str(pred_original[j, int(y_target[j])]) + "/" + str(target_confidence_goal_current[j]))
+                print(
+                    str(target_confidences[j])
+                    + "/"
+                    + str(target_confidence_goal_current[j])
+                )
 
         if mask.sum() == 0:
             return (
@@ -952,9 +974,25 @@ class CounterfactualExplainer(ExplainerInterface):
         optimizer.step()
         boolmask = torch.zeros_like(z[0].data)
         if self.explainer_config.iterationwise_encoding:
+            #z[0].data = torch.clamp(z[0].data, -1, 1)
             pe = self.generator.dataset.project_to_pytorch_default(
                 torch.clone(z[0]).detach().cpu()
             )
+            z_default = self.generator.dataset.project_to_pytorch_default(z[0])
+            z_predictor = self.val_dataset.project_from_pytorch_default(z_default).to(
+                self.device
+            )
+            pred_current = torch.nn.functional.softmax(
+                self.predictor(z_predictor) / self.explainer_config.temperature
+            )
+            target_confidences_current = torch.zeros_like(
+                target_confidence_goal_current
+            )
+            for j in range(len(target_confidences_current)):
+                target_confidences_current[j] = pred_current[j, int(y_target[j])]
+
+            print("target_confidences_current: " + str(target_confidences_current))
+
             if (
                 self.explainer_config.inpaint > 0.0
                 and abs(i - self.explainer_config.repaint_frequency + 1)
@@ -972,12 +1010,13 @@ class CounterfactualExplainer(ExplainerInterface):
                     mask_momentum=self.explainer_config.mask_momentum,
                     boolmask_in=boolmask_in,
                     max_avg_combination=self.explainer_config.max_avg_combination,
+                    exceptions=target_confidences_current < 0.5,
                 )
                 for sample_idx in range(z[0].data.shape[0]):
                     if mask[sample_idx] == 1:
                         z[0].data[sample_idx] = z_updated[sample_idx]
 
-            z_default = self.generator.dataset.project_to_pytorch_default(z[0])
+            """z_default = self.generator.dataset.project_to_pytorch_default(z[0])
             z_predictor = self.val_dataset.project_from_pytorch_default(z_default).to(
                 self.device
             )
@@ -992,7 +1031,7 @@ class CounterfactualExplainer(ExplainerInterface):
                             print("Update " + str(j))
 
                         else:
-                            z[0].data[j] = z_old[j]
+                            z[0].data[j] = z_old[j]"""
 
         if self.explainer_config.visualize_gradients:
             gradients_path = str(
