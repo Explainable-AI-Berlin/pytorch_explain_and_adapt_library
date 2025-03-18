@@ -54,6 +54,8 @@ def visualize_step(
     boolmask_in: Optional[torch.Tensor] = None,
     latent_decoder=None,
     latent_encoder=None,
+    best_z=None,
+    best_mask=None,
 ):
     transform = torchvision.transforms.Resize(x.size()[2])
     original_vs_counterfactual = []
@@ -84,22 +86,37 @@ def visualize_step(
             grad_heatmap = transform(grad_heatmap)
 
             gradient_z.append(grad_heatmap)
+
+    best_img = 0.5 * best_z.data.detach().cpu() + 0.5
+
     if clean_img_old.size() != x.size():
         clean_img_old = transform(clean_img_old)
+
     if boolmask is not None:
         if boolmask.size()[2] != x.size()[2]:
             if latent_decoder:
                 with torch.no_grad():
                     boolmask = latent_decoder(boolmask)
+
             boolmask = transform(boolmask)
 
         if boolmask.shape[1] == 1:
             boolmask = torch.cat(3 * [boolmask.detach().cpu()], dim=1)
+
+    if best_mask.size()[2] != x.size()[2]:
+        if latent_decoder:
+            with torch.no_grad():
+                best_mask = latent_decoder(best_mask)
+
+        best_mask = transform(best_mask)
+
+    if best_mask.shape[1] == 1:
+        best_mask = torch.cat(3 * [best_mask.detach().cpu()], dim=1)
+
     if boolmask_in.size()[2] != x.size()[2]:
         boolmask_in = transform(boolmask_in)
 
     if z is None and boolmask is None:
-
         components = [
             (x, "Input (x)"),
             (z_encoded.detach().cpu(), "Encoded Z"),
@@ -108,24 +125,23 @@ def visualize_step(
             (pe, "PE"),
             (torch.stack(original_vs_counterfactual), "Original vs CF"),
         ]
-    else:
 
-        try:
-            components = [
-                (x, "Input (x)"),
-                (clean_img_old, "Clean Old"),
-                (z_encoded.detach().cpu(), "Encoded Z"),
-                (img_predictor.cpu().detach(), "Predictor Img"),
-                (torch.stack(gradient_img), "Img Gradients"),
-                (torch.stack(gradient_z), "Z Gradients"),
-                (pe, "PE"),
-                (torch.stack(original_vs_counterfactual), "Original vs CF"),
-                (boolmask_in, "Input Mask"),
-                (boolmask, "Boolmask"),
-                (clean_img_new, "Clean New"),
-            ]
-        except:
-            breakpoint()
+    else:
+        components = [
+            (x, "Input (x)"),
+            (clean_img_old, "Clean Old"),
+            (z_encoded.detach().cpu(), "Encoded Z"),
+            (img_predictor.cpu().detach(), "Predictor Img"),
+            (torch.stack(gradient_img), "Img Gradients"),
+            (torch.stack(gradient_z), "Z Gradients"),
+            (pe, "PE"),
+            (torch.stack(original_vs_counterfactual), "Original vs CF"),
+            (boolmask_in, "Input Mask"),
+            (boolmask, "Boolmask"),
+            (clean_img_new, "Clean New"),
+            (best_mask, "Best Mask"),
+            (best_img, "Best Image"),
+        ]
 
     rows = []
     for tensor, name in components:

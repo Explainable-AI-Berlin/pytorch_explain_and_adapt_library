@@ -89,7 +89,7 @@ class CFKDConfig(AdaptorConfig):
     The number of finetune iterations when executing the adaptor.
     If set to 0 only the explanation and no adaption is done.
     """
-    finetune_iterations: PositiveInt = 1
+    finetune_iterations: int = 1
     """
     The config of the task the student model shall solve.
     """

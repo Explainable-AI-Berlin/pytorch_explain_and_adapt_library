@@ -269,6 +269,7 @@ class SquareDataset(Image2MixedDataset):
             y_end_confidence,
             decision_boundary,
         )
+        import pdb; pdb.set_trace()
 
     def visualize_decision_boundary(
         self,

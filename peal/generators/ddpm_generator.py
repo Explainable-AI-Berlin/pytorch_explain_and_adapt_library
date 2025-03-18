@@ -286,20 +286,23 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         x_normalized = self.dataset.project_to_pytorch_default(x)
         pe_normalized = self.dataset.project_to_pytorch_default(pe)
         mask, dil_mask = generate_smooth_mask(x_normalized, pe_normalized, dilation, max_avg_combination)
-        if old_mask is not None:
-            dil_mask = dil_mask - inpaint * old_mask.to(dil_mask) * mask_momentum
+        """if old_mask is not None:
+            dil_mask = dil_mask - inpaint * old_mask.to(dil_mask) * mask_momentum"""
 
         boolmask = (dil_mask < inpaint).float()
         if boolmask_in is not None:
-            boolmask = torch.minimum(
-                torch.ones_like(boolmask), boolmask + 1 - boolmask_in.to(boolmask)
-            )
+            added_term = torch.ones_like(boolmask) - boolmask_in[:,0:1].to(boolmask)
+            new_candidate = boolmask + added_term
+            boolmask = torch.minimum(torch.ones_like(boolmask), new_candidate)
 
         if not exceptions is None:
             for i in range(exceptions.shape[0]):
                 # No repainting!
                 if exceptions[i] == 1:
                     boolmask[i] = 0
+
+                else:
+                    import pdb; pdb.set_trace()
 
         noise_fn = torch.randn_like if stochastic else torch.zeros_like
 
