@@ -391,7 +391,8 @@ class CFKD(Adaptor):
                 ]
             )
 
-        if teacher == "SegmentationMask" or self.adaptor_config.tracking_level > 0:
+        #teacher == "SegmentationMask" or self.adaptor_config.tracking_level > 0:
+        if self.adaptor_config.data.has_hints:
             self.hints_enabled = True
             self.tracked_keys.append("hint_list")
             self.train_dataloader.dataset.enable_hints()
@@ -608,13 +609,13 @@ class CFKD(Adaptor):
             validation_stats_existed = os.path.exists(
                 os.path.join(
                     self.base_dir,
-                    str(self.adaptor_config.current_iteration - 1),
+                    str(max(0, self.adaptor_config.current_iteration - 1)),
                     "validation_stats.npz",
                 )
             )
             validation_tracked_values, validation_prestats = (
                 self.retrieve_validation_prestats(
-                    finetune_iteration=self.adaptor_config.current_iteration - 1
+                    finetune_iteration=max(0, self.adaptor_config.current_iteration - 1)
                 )
             )
             validation_stats = self.retrieve_validation_stats(
@@ -818,6 +819,9 @@ class CFKD(Adaptor):
             num_batches_per_iteration = int(
                 1 + remaining_sample_number / self.adaptor_config.batch_size
             )
+            if len(list(tracked_values.values())[0]) >= self.adaptor_config.min_train_samples:
+                break
+
             print("continue from " + str(len(list(tracked_values.values())[0])))
             for i in range(num_batches_per_iteration):
                 batch = self.get_batch(error_matrix, i % 2)
@@ -851,21 +855,6 @@ class CFKD(Adaptor):
                 print("remaining_sample_number: " + str(remaining_sample_number))
                 if remaining_sample_number <= 0:
                     break
-
-            if remaining_sample_number:
-                if (
-                    acceptance_threshold == 0.51
-                    and len(list(tracked_values.values())[0]) == 0
-                ):
-                    continue_collecting = False
-
-                """elif (
-                    len(list(values.values())[0])
-                    < self.adaptor_config.min_train_samples / 2
-                ):
-                    acceptance_threshold = float(
-                        np.maximum(0.51, acceptance_threshold - 0.1)
-                    )"""
 
             else:
                 continue_collecting = False

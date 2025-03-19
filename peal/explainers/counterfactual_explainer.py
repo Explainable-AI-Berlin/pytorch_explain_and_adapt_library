@@ -1001,7 +1001,7 @@ class CounterfactualExplainer(ExplainerInterface):
             target_confidences[j] = pred_original[j, int(y_target[j])]
 
         for j in range(img_predictor.shape[0]):
-            if exceptions[j] == 1:
+            if exceptions[j] or mask[j] == 0:
                 continue
 
             if (
@@ -1014,10 +1014,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 if not boolmask is None:
                     best_mask[j] = boolmask[j]
 
-            if mask[j] == 0:
-                pass
-
-            elif target_confidences[j] >= target_confidence_goal_current[j]:
+            if target_confidences[j] >= target_confidence_goal_current[j]:
                 mask[j] = 0
 
         if self.explainer_config.visualize_gradients:

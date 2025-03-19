@@ -540,9 +540,9 @@ def generate_smooth_mask(x1, x2, dilation, max_avg_combination=0.5):
     assert (dilation % 2) == 1, "dilation must be an odd number"
     mask = (x1 - x2).abs().sum(dim=1, keepdim=True)
     #mask = mask / mask.view(mask.size(0), -1).max(dim=1)[0].view(-1, 1, 1, 1)
-    #blurring = torchvision.transforms.GaussianBlur(dilation, sigma=2.0)
-    #dil_mask = blurring(mask)
-    dil_mask = mask
+    #dil_mask = mask
+    blurring = torchvision.transforms.GaussianBlur(dilation, sigma=2.0)
+    dil_mask = blurring(mask)
 
     dil_mask = torch.clamp(dil_mask, 0, 1)
     dil_mask = dil_mask / mask.view(dil_mask.size(0), -1).max(dim=1)[0].view(-1, 1, 1, 1)
