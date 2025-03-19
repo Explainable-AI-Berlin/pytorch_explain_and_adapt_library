@@ -157,14 +157,19 @@ class TorchvisionModel(torch.nn.Module):
         super(TorchvisionModel, self).__init__()
         if model == 'resnet18':
             self.model = torchvision.models.resnet18(pretrained=True)
+            self.model.fc = torch.nn.Linear(self.model.fc.in_features, num_classes)
 
         elif model == "resnet50":
             self.model = torchvision.models.resnet50(pretrained=True)
+            self.model.fc = torch.nn.Linear(self.model.fc.in_features, num_classes)
+
+        elif model == "vit_b_16":
+            self.model = torchvision.models.vit_b_16()
+            self.model.heads.head = torch.nn.Linear(self.model.heads.head.in_features, num_classes)
 
         else:
             raise ValueError("Unknown model: {}".format(model))
 
-        self.model.fc = torch.nn.Linear(self.model.fc.in_features, num_classes)
 
     def forward(self, x):
         return self.model(x)

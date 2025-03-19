@@ -207,7 +207,7 @@ class DataConfig(BaseModel):
     The seed the dataset was generated with.
     Only relevant for generated datasets!
     """
-    seed: Union[type(None), int] = None
+    seed: Union[type(None), int] = 0
     """
     The label noise of a generated dataset.
     Necessary to mimic real dataset behauviour and avoid trivial non-robust solutions.

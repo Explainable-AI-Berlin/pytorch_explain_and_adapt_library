@@ -10,7 +10,7 @@ class Adaptor:
         """
         raise NotImplementedError
 
-class AdaptorConfig:
+class AdaptorConfig(BaseModel):
     """
     The config template for an adaptor.
     """

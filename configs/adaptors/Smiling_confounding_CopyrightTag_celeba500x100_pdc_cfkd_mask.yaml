@@ -15,7 +15,7 @@ data                                 :  <PEAL_BASE>/configs/data/Smiling_confoun
 test_data                            :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba.yaml
 base_dir                             :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned100/pdc_cfkd_mask
 student                              :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned100/model.cpl
-teacher                              :  SegmentationMask # $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisoned050/model.cpl
+teacher                              :  SegmentationMask
 generator                            :  $PEAL_RUNS/celeba_copyrighttag/ddpm/config.yaml
 task:
   criterions:
