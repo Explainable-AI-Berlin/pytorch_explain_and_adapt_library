@@ -1,12 +1,12 @@
 # python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_pdc_cfkd.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
-batch_size                           :  2
+batch_size                           :  6
 tracking_level                       :  3
 min_train_samples                    :  900
-finetune_iterations                  :  1
+finetune_iterations                  :  2
 max_validation_samples               :  100
-continuous_learning                  :  "retrain"
+continuous_learning                  :  "finetune"
 use_visualization                    :  True
 calculate_group_accuracies           :  True
 explainer                            :  <PEAL_BASE>/configs/explainers/pdc_default64x64.yaml

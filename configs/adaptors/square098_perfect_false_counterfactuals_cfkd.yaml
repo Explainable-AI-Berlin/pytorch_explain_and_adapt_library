@@ -1,0 +1,26 @@
+# python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square098_perfect_false_counterfactuals_cfkd.yaml"
+adaptor_type                         :  "CFKD"
+category                             :  "adaptor"
+batch_size                           :  6
+tracking_level                       :  3
+min_train_samples                    :  6400
+finetune_iterations                  :  1
+max_validation_samples               :  800
+continuous_learning                  :  "finetune"
+use_visualization                    :  False
+calculate_group_accuracies           :  True
+explainer                            :  <PEAL_BASE>/configs/explainers/perfect_false_counterfactuals.yaml
+#training                             :  <PEAL_BASE>/configs/training/sensitive_distillation.yaml
+training                             :  <PEAL_BASE>/configs/training/img_classifier.yaml
+data                                 :  <PEAL_BASE>/configs/data/square_poisoned098.yaml
+test_data                            :  <PEAL_BASE>/configs/data/square_unpoisoned.yaml
+student                              :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned098/model.cpl
+teacher                              :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_unpoisoned/model.cpl
+base_dir                             :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned098/cfkd_perfect_counterfactuals_img_classifier
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [ClassA]

@@ -207,7 +207,11 @@ class TrainLoop:
             or self.step + self.resume_step < self.lr_anneal_steps
         ):
             pbar.step = self.step
-            batch, cond = next(self.data)
+            current = next(self.data, None)
+            if current is None:
+                break
+
+            batch, cond = current
             if isinstance(cond, torch.Tensor):
                 #cond = {"y": cond}
                 cond = {}

@@ -27,7 +27,8 @@ from peal.training.loggers import log_images_to_writer
 from peal.data.dataloaders import (
     DataStack,
     DataloaderMixer,
-    create_dataloaders_from_datasource, WeightedDataloaderList,
+    create_dataloaders_from_datasource,
+    WeightedDataloaderList,
 )
 from peal.training.trainers import (
     ModelTrainer,
@@ -88,7 +89,7 @@ class CFKDConfig(AdaptorConfig):
     The number of finetune iterations when executing the adaptor.
     If set to 0 only the explanation and no adaption is done.
     """
-    finetune_iterations: PositiveInt = 1
+    finetune_iterations: int = 1
     """
     The config of the task the student model shall solve.
     """
@@ -140,7 +141,7 @@ class CFKDConfig(AdaptorConfig):
     """
     Logging of the current finetune iteration
     """
-    current_iteration: PositiveInt = 0
+    current_iteration: int = 0
     """
     Whether to continue training from the current student model or start training from scratch
     again. Can e.g. be "retrain", which retrains model on original data and counterfactuals from scratch,
@@ -196,6 +197,10 @@ class CFKDConfig(AdaptorConfig):
     How aggressively to change the model based on the counterfactual samples. 0 -> No change, 1 -> Full change
     """
     mixing_ratio: float = 0.5
+    """"
+    A list of the feedback accuracies.
+    """
+    feedback_accuracies: list = []
     """
     What type of counterfactuals are valid. 1sided means that we can only start from samples with correct prediction,
     2sided also allows that we start from samples with wrong orignal prediction.
@@ -206,184 +211,14 @@ class CFKDConfig(AdaptorConfig):
     the next train feedback shall be given as well (which means less interruptions!)
     """
     lazy_feedback: bool = False
-
-    def __init__(
-        self,
-        training: Union[dict, TrainingConfig] = None,
-        task: Union[dict, TaskConfig] = None,
-        explainer: Union[dict, ExplainerConfig] = None,
-        data: Union[dict, DataConfig] = None,
-        test_data: Union[dict, DataConfig] = None,
-        generator: Union[dict, GeneratorConfig] = None,
-        student: str = None,
-        teacher: str = None,
-        base_dir: str = None,
-        batch_size: PositiveInt = None,
-        validation_runs: PositiveInt = None,
-        calculate_group_accuracies: bool = None,
-        gigabyte_vram: float = None,
-        assumed_input_size: list[PositiveInt] = None,
-        replace_model: bool = None,
-        continuous_learning: bool = None,
-        attribution_threshold: float = None,
-        min_start_target_percentile: float = None,
-        use_confusion_matrix: bool = None,
-        replacement_strategy: str = None,
-        min_train_samples: PositiveInt = None,
-        max_validation_samples: PositiveInt = None,
-        finetune_iterations: PositiveInt = None,
-        current_iteration: PositiveInt = None,
-        overwrite: bool = None,
-        use_visualization: bool = None,
-        tracking_level: int = None,
-        counterfactual_type: str = None,
-        max_test_batches: Union[type(None), PositiveInt] = None,
-        mixing_ratio: float = None,
-        **kwargs,
-    ):
-        """
-        The config template for an adaptor.
-        Args:
-            training: The config of the trainer used for finetuning the student model.
-            task: The config of the task the student model shall solve.
-            explainer: The config of the counterfactual explainer that is used.
-            data: The config of the data used to create the counterfactuals from.
-            testdata: The config of the test data used evaluate the real progress on.
-            student: The type of student used.
-            teacher: The type of teacher used.
-            generator: The type of generator used.
-            base_dir: The base directory where the run of CFKD is stored.
-            batch_size: What batch_size is used for creating the counterfactuals?
-            validation_runs:    The number of batches per iteration used for training.
-            calculate_group_accuracies: The reference batch size when automatically adapting the batch_size to the vram
-            gigabyte_vram: The reference vram of the gpu when using adaptive batch_size.
-            assumed_input_size: The reference input size when using adaptive batch_size.
-            replace_model: Whether to replace the model every iteration or not.
-            continuous_learning: Whether to continue training from the current student model or start training from scratch
-            attribution_threshold: Defines whether the created counterfactuals are oversampled in relation to their number
-            min_start_target_percentile: Whether to select sample for counterfactual creation the model is not that confident about.
-            use_confusion_matrix: Whether to draw samples for counterfactual creation according to the error matrix or not.
-            replacement_strategy: Whether to directly replace the model or wait one iteration.
-            min_train_samples: The minimum number of samples used for finetuning in every iteration.
-            max_validation_samples: The maximum number of validation samples that are used for tracking stats every iteration.
-            finetune_iterations: The number of finetune iterations when executing the adaptor.
-            current_iteration: Logging of the current finetune iteration
-            overwrite: Whether to overwrite the logs and intermediate results.
-            use_visualization: Whether to visualize the results.
-            **kwargs: A dict containing all variables that could not be given with the current config structure
-        """
-        if not training is None:
-            self.training = (
-                training
-                if isinstance(training, TrainingConfig)
-                else TrainingConfig(**training)
-            )
-
-        if not task is None:
-            self.task = task if isinstance(task, TaskConfig) else TaskConfig(**task)
-
-        if not data is None:
-            if isinstance(data, DataConfig):
-                self.data = data
-
-            else:
-                self.data = DataConfig(**data)
-
-        if not test_data is None:
-            if isinstance(test_data, DataConfig):
-                self.test_data = test_data
-
-            else:
-                self.test_data = DataConfig(**test_data)
-
-        if isinstance(explainer, ExplainerConfig):
-            self.explainer = explainer
-
-        elif isinstance(explainer, dict):
-            explainer_config_model = get_config_model(explainer)
-            self.explainer = explainer_config_model(**explainer)
-
-        if isinstance(generator, GeneratorConfig):
-            self.generator = generator
-
-        elif isinstance(generator, dict):
-            generator_config_model = get_config_model(generator)
-            self.generator = generator_config_model(**generator)
-            self.generator.full_args = generator
-
-        self.student = student if not student is None else self.student
-        self.teacher = teacher if not teacher is None else self.teacher
-        self.base_dir = base_dir if not base_dir is None else self.base_dir
-        self.batch_size = batch_size if not batch_size is None else self.batch_size
-        self.validation_runs = (
-            validation_runs if not validation_runs is None else self.validation_runs
-        )
-        self.calculate_group_accuracies = (
-            calculate_group_accuracies
-            if not calculate_group_accuracies is None
-            else self.calculate_group_accuracies
-        )
-        self.continuous_learning = (
-            continuous_learning
-            if not continuous_learning is None
-            else self.continuous_learning
-        )
-        self.attribution_threshold = (
-            attribution_threshold
-            if not attribution_threshold is None
-            else self.attribution_threshold
-        )
-        self.min_start_target_percentile = (
-            min_start_target_percentile
-            if not min_start_target_percentile is None
-            else self.min_start_target_percentile
-        )
-        self.use_confusion_matrix = (
-            use_confusion_matrix
-            if not use_confusion_matrix is None
-            else self.use_confusion_matrix
-        )
-        self.min_train_samples = (
-            min_train_samples
-            if not min_train_samples is None
-            else self.min_train_samples
-        )
-        self.max_validation_samples = (
-            max_validation_samples
-            if not max_validation_samples is None
-            else self.max_validation_samples
-        )
-        self.finetune_iterations = (
-            finetune_iterations
-            if not finetune_iterations is None
-            else self.finetune_iterations
-        )
-        self.current_iteration = (
-            current_iteration
-            if not current_iteration is None
-            else self.current_iteration
-        )
-        self.overwrite = overwrite if not overwrite is None else self.overwrite
-        self.use_visualization = (
-            use_visualization
-            if not use_visualization is None
-            else self.use_visualization
-        )
-        self.max_test_batches = (
-            max_test_batches if not max_test_batches is None else self.max_test_batches
-        )
-        self.tracking_level = (
-            tracking_level if not tracking_level is None else self.tracking_level
-        )
-        self.mixing_ratio = (
-            mixing_ratio if not mixing_ratio is None else self.mixing_ratio
-        )
-        self.counterfactual_type = (
-            counterfactual_type
-            if not counterfactual_type is None
-            else self.counterfactual_type
-        )
-        self.kwargs = kwargs
+    """
+    The path of the last finetuned model
+    """
+    model_path: str = ""
+    """
+    Dummy field to be able to use it as a model config!
+    """
+    is_loaded: bool = False
 
 
 class CFKD(Adaptor):
@@ -556,7 +391,8 @@ class CFKD(Adaptor):
                 ]
             )
 
-        if teacher == "SegmentationMask" or self.adaptor_config.tracking_level > 0:
+        #teacher == "SegmentationMask" or self.adaptor_config.tracking_level > 0:
+        if self.adaptor_config.data.has_hints:
             self.hints_enabled = True
             self.tracked_keys.append("hint_list")
             self.train_dataloader.dataset.enable_hints()
@@ -605,7 +441,10 @@ class CFKD(Adaptor):
         if (
             self.adaptor_config.tracking_level >= 2
             and not os.path.exists(boundary_path)
-            and hasattr(self.dataloaders_val.dataloaders[0].dataset, "visualize_decision_boundary")
+            and hasattr(
+                self.dataloaders_val.dataloaders[0].dataset,
+                "visualize_decision_boundary",
+            )
             and not os.path.exists(boundary_path)
         ):
             self.dataloaders_val.dataloaders[0].dataset.visualize_decision_boundary(
@@ -749,7 +588,9 @@ class CFKD(Adaptor):
                 f.write(platform.node())
 
             print("start generating validation stats!!!")
-            validation_stats = self.retrieve_validation_stats(finetune_iteration=0)
+            validation_tracked_values, validation_stats = (
+                self.retrieve_validation_prestats(finetune_iteration=0)
+            )
             for key in validation_stats.keys():
                 if isinstance(validation_stats[key], float):
                     writer.add_scalar(
@@ -766,10 +607,21 @@ class CFKD(Adaptor):
 
             print("start loading validation stats!!!")
             validation_stats_existed = os.path.exists(
-                os.path.join(self.base_dir, "0", "validation_stats.npz")
+                os.path.join(
+                    self.base_dir,
+                    str(max(0, self.adaptor_config.current_iteration - 1)),
+                    "validation_stats.npz",
+                )
+            )
+            validation_tracked_values, validation_prestats = (
+                self.retrieve_validation_prestats(
+                    finetune_iteration=max(0, self.adaptor_config.current_iteration - 1)
+                )
             )
             validation_stats = self.retrieve_validation_stats(
-                finetune_iteration=self.adaptor_config.current_iteration
+                finetune_iteration=self.adaptor_config.current_iteration,
+                validation_tracked_values=validation_tracked_values,
+                validation_prestats=validation_prestats,
             )
             if not validation_stats_existed:
                 for key in validation_stats.keys():
@@ -813,7 +665,7 @@ class CFKD(Adaptor):
         visualization_path = os.path.join(self.base_dir, "visualization.png")
         if (
             self.output_size == 2
-            and self.adaptor_config.tracking_level >= 3
+            and self.adaptor_config.tracking_level >= 4
             and not os.path.exists(visualization_path)
         ):
             print("visualize progress!!!")
@@ -821,7 +673,7 @@ class CFKD(Adaptor):
             print("Visualization done!!!")
 
         print("intialization done!!!")
-        return validation_stats, writer
+        return validation_stats, validation_tracked_values, writer
 
     def get_batch(
         self,
@@ -967,6 +819,9 @@ class CFKD(Adaptor):
             num_batches_per_iteration = int(
                 1 + remaining_sample_number / self.adaptor_config.batch_size
             )
+            if len(list(tracked_values.values())[0]) >= self.adaptor_config.min_train_samples:
+                break
+
             print("continue from " + str(len(list(tracked_values.values())[0])))
             for i in range(num_batches_per_iteration):
                 batch = self.get_batch(error_matrix, i % 2)
@@ -1000,23 +855,6 @@ class CFKD(Adaptor):
                 print("remaining_sample_number: " + str(remaining_sample_number))
                 if remaining_sample_number <= 0:
                     break
-
-            if (
-                remaining_sample_number
-            ):
-                if (
-                    acceptance_threshold == 0.51
-                    and len(list(tracked_values.values())[0]) == 0
-                ):
-                    continue_collecting = False
-
-                """elif (
-                    len(list(values.values())[0])
-                    < self.adaptor_config.min_train_samples / 2
-                ):
-                    acceptance_threshold = float(
-                        np.maximum(0.51, acceptance_threshold - 0.1)
-                    )"""
 
             else:
                 continue_collecting = False
@@ -1636,25 +1474,7 @@ class CFKD(Adaptor):
         self.test_dataloader.dataset.task_config = task_config_buffer
         return img
 
-    def retrieve_validation_stats(self, finetune_iteration):
-        if not self.overwrite and os.path.exists(
-            os.path.join(self.base_dir, str(finetune_iteration), "validation_stats.npz")
-        ):
-            print("load already completed validation stats!!!")
-            with open(
-                os.path.join(
-                    self.base_dir, str(finetune_iteration), "validation_stats.npz"
-                ),
-                "rb",
-            ) as f:
-                validation_stats = {}
-                validation_tracked_file = np.load(f, allow_pickle=True)
-                for key in validation_tracked_file.keys():
-                    validation_stats[key] = torch.tensor(validation_tracked_file[key])
-
-            print("validation stats loaded!!!")
-            return validation_stats
-
+    def retrieve_validation_prestats(self, finetune_iteration):
         validation_values_path = os.path.join(
             self.base_dir, str(finetune_iteration), "validation_tracked_values.npz"
         )
@@ -1860,17 +1680,17 @@ class CFKD(Adaptor):
             )
 
         if self.adaptor_config.explainer.use_clustering:
+            validation_cluster_values_path = os.path.join(
+                self.base_dir,
+                str(finetune_iteration),
+                "validation_tracked_cluster_values.npz",
+            )
             validation_tracked_values = self.explainer.cluster_explanations(
                 validation_tracked_values,
                 self.adaptor_config.batch_size,
                 self.adaptor_config.explainer.num_attempts,
             )
             if self.adaptor_config.tracking_level > 0:
-                validation_cluster_values_path = os.path.join(
-                    self.base_dir,
-                    str(finetune_iteration),
-                    "validation_tracked_cluster_values.npz",
-                )
                 with open(
                     validation_cluster_values_path,
                     "wb",
@@ -1892,9 +1712,12 @@ class CFKD(Adaptor):
                     np.savez(f, **tracked_values_file)
 
         if self.adaptor_config.tracking_level > 0 and hasattr(
-            self.dataloaders_val.dataloaders[0].dataset, "global_counterfactual_visualization"
+            self.dataloaders_val.dataloaders[0].dataset,
+            "global_counterfactual_visualization",
         ):
-            self.dataloaders_val.dataloaders[0].dataset.global_counterfactual_visualization(
+            self.dataloaders_val.dataloaders[
+                0
+            ].dataset.global_counterfactual_visualization(
                 os.path.join(
                     self.base_dir,
                     str(finetune_iteration),
@@ -1908,6 +1731,31 @@ class CFKD(Adaptor):
                 validation_tracked_values["hint_list"],
             )
             print("global counterfactual visualization saved!!!")
+
+        return validation_tracked_values, validation_stats
+
+    def retrieve_validation_stats(
+        self, finetune_iteration, validation_tracked_values, validation_prestats
+    ):
+        if not self.overwrite and os.path.exists(
+            os.path.join(self.base_dir, str(finetune_iteration), "validation_stats.npz")
+        ):
+            print("load already completed validation stats!!!")
+            with open(
+                os.path.join(
+                    self.base_dir, str(finetune_iteration), "validation_stats.npz"
+                ),
+                "rb",
+            ) as f:
+                validation_stats = {}
+                validation_tracked_file = np.load(f, allow_pickle=True)
+                for key in validation_tracked_file.keys():
+                    validation_stats[key] = torch.tensor(validation_tracked_file[key])
+
+            print("validation stats loaded!!!")
+            return validation_stats
+
+        validation_stats = validation_prestats
 
         validation_feedback, validation_feedback_stats = self.retrieve_feedback(
             tracked_values=validation_tracked_values,
@@ -1952,8 +1800,7 @@ class CFKD(Adaptor):
         Run the counterfactual knowledge distillation
         """
         print("Adaptor Config: " + str(self.adaptor_config))
-        validation_stats, writer = self.initialize_run()
-        self.feedback_accuracy = validation_stats["feedback_accuracy"]
+        validation_prestats, validation_tracked_values, writer = self.initialize_run()
 
         # iterate over the finetune iterations
         for finetune_iteration in range(
@@ -1965,7 +1812,8 @@ class CFKD(Adaptor):
                 + str(finetune_iteration)
             )
             tracked_values = self.retrieve_counterfactual_list(
-                validation_stats=validation_stats, finetune_iteration=finetune_iteration
+                validation_stats=validation_prestats,
+                finetune_iteration=finetune_iteration,
             )
             """if (
                 len(list(tracked_values.values())[0])
@@ -1984,13 +1832,20 @@ class CFKD(Adaptor):
                 finetune_iteration=finetune_iteration,
                 mode="train",
             )
+            validation_stats = self.retrieve_validation_stats(
+                finetune_iteration=finetune_iteration - 1,
+                validation_prestats=validation_prestats,
+                validation_tracked_values=validation_tracked_values,
+            )
             for key in validation_stats.keys():
                 if isinstance(validation_stats[key], float):
                     writer.add_scalar(
-                        "train_" + key,
+                        "validation_" + key,
                         validation_stats[key],
                         finetune_iteration,
                     )
+
+            self.adaptor_config.feedback_accuracies.append(validation_stats["feedback_accuracy"])
 
             dataset_path = self.create_dataset(
                 feedback=feedback,
@@ -2073,7 +1928,10 @@ class CFKD(Adaptor):
                 self.base_dir, str(finetune_iteration), "decision_boundary.png"
             )
             if (
-                hasattr(self.dataloaders_val.dataloaders[0].dataset, "visualize_decision_boundary")
+                hasattr(
+                    self.dataloaders_val.dataloaders[0].dataset,
+                    "visualize_decision_boundary",
+                )
                 and not os.path.exists(decision_boundary_path)
                 and self.adaptor_config.tracking_level >= 2
             ):
@@ -2087,26 +1945,16 @@ class CFKD(Adaptor):
                     val_dataloaders=self.dataloaders_val,
                 )
 
-            validation_stats = self.retrieve_validation_stats(
-                finetune_iteration=finetune_iteration
+            validation_tracked_values, validation_prestats = (
+                self.retrieve_validation_prestats(finetune_iteration=finetune_iteration)
             )
-
-            for key in validation_stats.keys():
-                if isinstance(validation_stats[key], float):
-                    writer.add_scalar(
-                        "validation_" + key,
-                        validation_stats[key],
-                        finetune_iteration,
-                    )
-
-            self.feedback_accuracy = validation_stats["feedback_accuracy"]
 
             visualization_path = os.path.join(
                 self.base_dir, str(finetune_iteration), "visualization.png"
             )
             if (
                 self.output_size == 2
-                and self.adaptor_config.tracking_level >= 3
+                and self.adaptor_config.tracking_level >= 4
                 and not os.path.exists(visualization_path)
             ):
                 self.visualize_progress(
@@ -2124,5 +1972,20 @@ class CFKD(Adaptor):
             save_yaml_config(
                 self.adaptor_config, os.path.join(self.base_dir, "config.yaml")
             )
+
+        validation_stats = self.retrieve_validation_stats(
+            finetune_iteration=self.adaptor_config.current_iteration - 1,
+            validation_prestats=validation_prestats,
+            validation_tracked_values=validation_tracked_values,
+        )
+        for key in validation_stats.keys():
+            if isinstance(validation_stats[key], float):
+                writer.add_scalar(
+                    "validation_" + key,
+                    validation_stats[key],
+                    finetune_iteration,
+                )
+
+        self.adaptor_config.feedback_accuracies.append(validation_stats["feedback_accuracy"])
 
         return self.student

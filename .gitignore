@@ -10,7 +10,8 @@ notebooks/static
 notebooks/templates
 notebooks
 datasets
-peal_runs
+peal_runs*
+peal_data*
 static
 outputs
 *.fuse_hidden*

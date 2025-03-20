@@ -849,9 +849,9 @@ class Image2ClassDataset(ImageDataset):
                     self.urls_with_hints.append((target_str, file))
 
                 else:
-                    import pdb
-
-                    pdb.set_trace()
+                    print(os.path.join(self.mask_dir, file))
+                    print(os.path.join(self.mask_dir, target_str, file))
+                    raise Exception("No hints available!")
 
         self.task_specific_urls = None
         if (

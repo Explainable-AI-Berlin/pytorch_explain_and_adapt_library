@@ -72,7 +72,7 @@ class TrainingConfig(BaseModel):
     label_smoothing: float = 0.0
 
 
-class PredictorConfig:
+class PredictorConfig(BaseModel):
     """
     The config template for a model.
     """
@@ -88,13 +88,11 @@ class PredictorConfig:
     """
     The config of the architecture of the model.
     """
-    architecture: Union[ArchitectureConfig, types.SimpleNamespace, str, type(None)] = (
-        None
-    )
+    architecture: Union[ArchitectureConfig, str, type(None)] = None
     """
     The config of the data used for training the model.
     """
-    data: DataConfig = None
+    data: Union[DataConfig, type(None)] = None
     """
     The name of the model.
     """
@@ -114,14 +112,17 @@ class PredictorConfig:
     """
     The name of the class.
     """
-    base_path: str = None
+    base_path: Union[str, type(None)] = None
+    """
+    The seed that is used to ensure reproducability of results.
+    """
     seed: int = 0
     """
     Where to distill from if used for distillation. Could either be done from the dataset or from the model.
     """
     distill_from: str = "dataset"
 
-    def __init__(
+    '''def __init__(
         self,
         training: Union[dict, TrainingConfig],
         task: Union[dict, TaskConfig],
@@ -162,4 +163,4 @@ class PredictorConfig:
         if not seed is None:
             self.seed = seed
 
-        self.kwargs = kwargs
+        self.kwargs = kwargs'''

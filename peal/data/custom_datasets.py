@@ -364,7 +364,8 @@ class SquareDataset(Image2MixedDataset):
                     break
 
                 try:
-                    x, (y, hint) = batch  # Assuming batch contains images and hints
+                    x, y = batch  # Assuming batch contains images and hints
+                    y, hint = y[:2]
 
                 except Exception:
                     print("in extract latents")

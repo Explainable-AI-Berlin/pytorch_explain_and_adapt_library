@@ -21,7 +21,7 @@ mask_momentum: 0.2
 max_samples: null
 momentum: 0.999
 num_attempts: 2
-num_discretization_steps: 50
+num_discretization_steps: 20
 optimizer: SGD
 port: 8000
 predictor: null

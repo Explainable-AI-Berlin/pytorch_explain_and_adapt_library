@@ -13,9 +13,9 @@ explainer                            :  <PEAL_BASE>/configs/explainers/perfect_f
 training                             :  <PEAL_BASE>/configs/training/sensitive_distillation.yaml
 data                                 :  <PEAL_BASE>/configs/data/square_poisoned100.yaml
 test_data                            :  <PEAL_BASE>/configs/data/square_unpoisoned.yaml
+base_dir                             :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned100/cfkd_perfect_counterfactuals500
 student                              :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned100/model.cpl
 teacher                              :  SegmentationMask
-base_dir                             :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned100/cfkd_perfect_counterfactuals500
 task:
   criterions:
     ce     : 1.0
