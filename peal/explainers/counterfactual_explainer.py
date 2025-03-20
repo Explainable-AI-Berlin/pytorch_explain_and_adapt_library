@@ -1202,7 +1202,7 @@ class CounterfactualExplainer(ExplainerInterface):
         else:
             batch_out = batch
 
-        if self.tracking_level > 0:
+        if self.tracking_level >= 2:
             try:
                 (
                     batch_out["x_attribution_list"],

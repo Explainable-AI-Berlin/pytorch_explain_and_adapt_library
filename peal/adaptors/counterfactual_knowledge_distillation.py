@@ -361,7 +361,7 @@ class CFKD(Adaptor):
         )
 
         if teacher[:5] == "human":
-            assert self.adaptor_config.tracking_level > 0, "Tracking level too low!"
+            assert self.adaptor_config.tracking_level >= 2, "Tracking level too low!"
 
         self.explainer = CounterfactualExplainer(
             predictor=self.student,
@@ -380,12 +380,12 @@ class CFKD(Adaptor):
             "x_list",
             "y_list",
             "x_attribution_list",
+            "y_target_start_confidence_list",
         ]
 
-        if self.adaptor_config.tracking_level > 0:
+        if self.adaptor_config.tracking_level >= 2:
             self.tracked_keys.extend(
                 [
-                    "y_target_start_confidence_list",
                     "z_difference_list",
                     "collage_path_list",
                 ]
@@ -419,6 +419,7 @@ class CFKD(Adaptor):
         self.data_config.data.num_samples = self.adaptor_config.min_train_samples
         self.data_config.data.dataset_class = None
         self.validation_data_config = copy.deepcopy(self.data_config)
+        self.validation_data_config.x_selection = "imgs"
         self.validation_data_config.data.num_samples = (
             self.adaptor_config.max_validation_samples
         )
@@ -439,7 +440,7 @@ class CFKD(Adaptor):
 
         boundary_path = os.path.join(self.base_dir, "0", "decision_boundary.png")
         if (
-            self.adaptor_config.tracking_level >= 2
+            self.adaptor_config.tracking_level >= 1
             and not os.path.exists(boundary_path)
             and hasattr(
                 self.dataloaders_val.dataloaders[0].dataset,
@@ -1651,33 +1652,34 @@ class CFKD(Adaptor):
                             validation_tracked_file[key]
                         )
 
-            print("recreate validation collage path!")
-            get_collage_path = lambda x: os.path.join(
-                self.base_dir, str(finetune_iteration), "validation_collages" + str(x)
-            )
-            idx = 0
-            collage_path_list = []
-            while os.path.exists(get_collage_path(idx)):
-                collage_paths = os.listdir(get_collage_path(idx))
-                collage_paths.sort()
-                collage_paths = list(filter(lambda x: x[-4:] == ".png", collage_paths))
-                collage_path_list.extend(collage_paths)
-                idx += 1
-                # TODO this is a bug, but currently not used
-                if idx == 1:
-                    break
-
-            validation_tracked_values["collage_path_list"] = list(
-                map(
-                    lambda x: os.path.join(
-                        self.base_dir,
-                        str(finetune_iteration),
-                        "validation_collages0",
-                        x,
-                    ),
-                    collage_path_list,
+            if "collage_path_list" in self.tracked_keys:
+                print("recreate validation collage path!")
+                get_collage_path = lambda x: os.path.join(
+                    self.base_dir, str(finetune_iteration), "validation_collages" + str(x)
                 )
-            )
+                idx = 0
+                collage_path_list = []
+                while os.path.exists(get_collage_path(idx)):
+                    collage_paths = os.listdir(get_collage_path(idx))
+                    collage_paths.sort()
+                    collage_paths = list(filter(lambda x: x[-4:] == ".png", collage_paths))
+                    collage_path_list.extend(collage_paths)
+                    idx += 1
+                    # TODO this is a bug, but currently not used
+                    if idx == 1:
+                        break
+
+                validation_tracked_values["collage_path_list"] = list(
+                    map(
+                        lambda x: os.path.join(
+                            self.base_dir,
+                            str(finetune_iteration),
+                            "validation_collages0",
+                            x,
+                        ),
+                        collage_path_list,
+                    )
+                )
 
         if self.adaptor_config.explainer.use_clustering:
             validation_cluster_values_path = os.path.join(
@@ -1933,7 +1935,7 @@ class CFKD(Adaptor):
                     "visualize_decision_boundary",
                 )
                 and not os.path.exists(decision_boundary_path)
-                and self.adaptor_config.tracking_level >= 2
+                and self.adaptor_config.tracking_level >= 1
             ):
                 self.dataloaders_val.dataloaders[0].dataset.visualize_decision_boundary(
                     self.student,
