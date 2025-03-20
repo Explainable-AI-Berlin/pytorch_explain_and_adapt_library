@@ -665,7 +665,7 @@ class CFKD(Adaptor):
         visualization_path = os.path.join(self.base_dir, "visualization.png")
         if (
             self.output_size == 2
-            and self.adaptor_config.tracking_level >= 3
+            and self.adaptor_config.tracking_level >= 4
             and not os.path.exists(visualization_path)
         ):
             print("visualize progress!!!")
@@ -1954,7 +1954,7 @@ class CFKD(Adaptor):
             )
             if (
                 self.output_size == 2
-                and self.adaptor_config.tracking_level >= 3
+                and self.adaptor_config.tracking_level >= 4
                 and not os.path.exists(visualization_path)
             ):
                 self.visualize_progress(
