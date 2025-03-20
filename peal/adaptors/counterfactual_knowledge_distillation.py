@@ -419,7 +419,7 @@ class CFKD(Adaptor):
         self.data_config.data.num_samples = self.adaptor_config.min_train_samples
         self.data_config.data.dataset_class = None
         self.validation_data_config = copy.deepcopy(self.data_config)
-        self.validation_data_config.x_selection = "imgs"
+        self.validation_data_config.data.x_selection = "imgs"
         self.validation_data_config.data.num_samples = (
             self.adaptor_config.max_validation_samples
         )
