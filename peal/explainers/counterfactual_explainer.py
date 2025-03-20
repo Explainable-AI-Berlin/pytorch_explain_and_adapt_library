@@ -1177,6 +1177,10 @@ class CounterfactualExplainer(ExplainerInterface):
                         raise Exception
 
         if self.explainer_config.num_attempts >= 2 and batchwise_clustering:
+            clustering_strategy_buffer = self.explainer_config.clustering_strategy
+            merge_clusters_buffer = self.explainer_config.merge_clusters
+            self.explainer_config.clustering_strategy = "highest_activation"
+            self.explainer_config.merge_clusters = "select_best"
             batch = self.cluster_explanations(
                 explanations_dict=batch,
                 batch_size=int(
@@ -1184,6 +1188,8 @@ class CounterfactualExplainer(ExplainerInterface):
                 ),
                 n_clusters=self.explainer_config.num_attempts,
             )
+            self.explainer_config.clustering_strategy = clustering_strategy_buffer
+            self.explainer_config.merge_clusters = merge_clusters_buffer
 
         batch_out = {}
         if remove_below_threshold:
@@ -1318,7 +1324,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 current_activations = torch.tensor(current_activations)
                 activations_order = torch.argsort(current_activations)
 
-            elif self.explainer_config.clustering_strategy == "representation_clusters":
+            elif self.explainer_config.clustering_strategy == "activation_clusters":
                 if idx == 0:
                     continue
 
@@ -1341,7 +1347,7 @@ class CounterfactualExplainer(ExplainerInterface):
             for i in range(n_clusters):
                 if (
                     self.explainer_config.clustering_strategy
-                    == "representation_clusters"
+                    == "activation_clusters"
                 ):
                     idx_combined = int(torch.argmax(cosine_similarities_abs.flatten()))
                     idx_cluster = idx_combined // len(current_differences)
