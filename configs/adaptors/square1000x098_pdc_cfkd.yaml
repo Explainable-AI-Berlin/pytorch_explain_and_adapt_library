@@ -14,7 +14,7 @@ training                             :  <PEAL_BASE>/configs/training/img_finetun
 data                                 :  <PEAL_BASE>/configs/data/square_poisoned098.yaml
 test_data                            :  <PEAL_BASE>/configs/data/square_unpoisoned.yaml
 student                              :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned098/model.cpl
-teacher                              :  SegmentationMask
+teacher                              :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_unpoisoned/model.cpl
 generator                            :  $PEAL_RUNS/square/ddpm/config.yaml
 base_dir                             :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned098/pdc_cfkd
 task:
