@@ -416,6 +416,7 @@ class CFKD(Adaptor):
         self.data_config.data.output_type = "singleclass"
         self.data_config.data.output_size = self.train_dataloader.dataset.output_size
         self.data_config.data.delimiter = ","
+        self.data_config.data.x_selection = "imgs"
         self.data_config.data.num_samples = self.adaptor_config.min_train_samples
         self.data_config.data.dataset_class = None
         self.validation_data_config = copy.deepcopy(self.data_config)
@@ -1148,7 +1149,7 @@ class CFKD(Adaptor):
         y_counterfactual_list = []
         sample_names = []
         for sample_idx in range(len(feedback)):
-            if feedback[sample_idx] == "true":
+            '''if feedback[sample_idx] == "true":
                 sample_name = (
                     "true_"
                     + str(int(y_source_list[sample_idx]))
@@ -1163,9 +1164,9 @@ class CFKD(Adaptor):
 
                 y_counterfactual_list.append(int(y_target_list[sample_idx]))
                 sample_names.append(sample_name)
-                sample_idx += 1
+                sample_idx += 1'''
 
-            elif feedback[sample_idx] == "false":
+            if feedback[sample_idx] == "false":
                 sample_name = (
                     "false_"
                     + str(int(y_source_list[sample_idx]))
