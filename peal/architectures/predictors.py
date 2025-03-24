@@ -5,17 +5,24 @@ import torchvision
 from pydantic import PositiveInt
 
 from peal.architectures.basic_modules import Mean
-from peal.architectures.interfaces import ArchitectureConfig, FCConfig, VGGConfig, ResnetConfig, TransformerConfig
+from peal.architectures.interfaces import (
+    ArchitectureConfig,
+    FCConfig,
+    VGGConfig,
+    ResnetConfig,
+    TransformerConfig,
+)
 from peal.architectures.module_blocks import (
     FCBlock,
     ResnetBlock,
     TransformerBlock,
     VGGBlock,
-    create_cnn_layer, )
+    create_cnn_layer,
+)
 from peal.global_utils import load_yaml_config
 
 
-def get_predictor(predictor, device="cpu"):
+def get_predictor(predictor, device="cuda"):
     if isinstance(predictor, torch.nn.Module):
         return predictor, None
 
@@ -31,7 +38,15 @@ def get_predictor(predictor, device="cpu"):
 
     else:
         predictor_config = load_yaml_config(predictor)
-        if predictor_config.architecture == "torchvision_resnet18_imagenet":
+        if not predictor_config.weights_path is None:
+            # TODO this is not very clean yet!!!
+            predictor_out = TorchvisionModel(
+                model=predictor_config.architecture,
+                num_classes=predictor_config.task.output_channels,
+            )
+            predictor_out.load_state_dict(predictor_config.weights_path)
+
+        elif predictor_config.architecture == "torchvision_resnet18_imagenet":
             predictor_out = torchvision.models.resnet18(pretrained=True)
 
         else:
@@ -143,8 +158,12 @@ class SequentialModel(torch.nn.Sequential):
             layers.append(torch.nn.Dropout(dropout))
 
         if not output_channels is None:
-            last_layer_config = FCConfig(num_neurons=output_channels, tensor_dim=tensor_dim)
-            layers.append(FCBlock(last_layer_config, num_neurons_previous))#, activation))
+            last_layer_config = FCConfig(
+                num_neurons=output_channels, tensor_dim=tensor_dim
+            )
+            layers.append(
+                FCBlock(last_layer_config, num_neurons_previous)
+            )  # , activation))
             num_neurons_previous = output_channels
 
         self.output_channels = num_neurons_previous
@@ -155,7 +174,7 @@ class SequentialModel(torch.nn.Sequential):
 class TorchvisionModel(torch.nn.Module):
     def __init__(self, model, num_classes):
         super(TorchvisionModel, self).__init__()
-        if model == 'resnet18':
+        if model == "resnet18":
             self.model = torchvision.models.resnet18(pretrained=True)
             self.model.fc = torch.nn.Linear(self.model.fc.in_features, num_classes)
 
@@ -165,11 +184,12 @@ class TorchvisionModel(torch.nn.Module):
 
         elif model == "vit_b_16":
             self.model = torchvision.models.vit_b_16()
-            self.model.heads.head = torch.nn.Linear(self.model.heads.head.in_features, num_classes)
+            self.model.heads.head = torch.nn.Linear(
+                self.model.heads.head.in_features, num_classes
+            )
 
         else:
             raise ValueError("Unknown model: {}".format(model))
-
 
     def forward(self, x):
         return self.model(x)

@@ -1,7 +1,8 @@
-train_batch_size        : 50 #128
-val_batch_size          : 5 #128
-test_batch_size         : 5 #128
-max_epochs              : 300
-learning_rate           : 0.01
-optimizer               : sgd
-class_balanced          : True
+train_batch_size          : 128
+val_batch_size            : 16 #128
+test_batch_size           : 16 #128
+max_epochs                : 300
+learning_rate             : 0.01
+optimizer                 : sgd
+class_balanced            : True
+early_stopping_goal       : worst_group_accuracy

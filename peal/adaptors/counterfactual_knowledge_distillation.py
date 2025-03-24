@@ -17,7 +17,7 @@ from types import SimpleNamespace
 from pydantic import PositiveInt
 from typing import Union
 
-from peal.architectures.predictors import TorchvisionModel
+from peal.architectures.predictors import TorchvisionModel, get_predictor
 from peal.global_utils import (
     load_yaml_config,
     save_yaml_config,
@@ -273,7 +273,8 @@ class CFKD(Adaptor):
         #
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         if student is None:
-            student = torch.load(self.adaptor_config.student, map_location=self.device)
+            #student = torch.load(self.adaptor_config.student, map_location=self.device)
+            student, student_config = get_predictor(self.adaptor_config.student, device=self.device)
 
         self.original_student = student
         self.original_student.eval()

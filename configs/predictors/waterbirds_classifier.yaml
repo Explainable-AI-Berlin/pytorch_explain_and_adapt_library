@@ -1,9 +1,9 @@
 # python train_predictor.py --config "<PEAL_BASE>/configs/predictors/waterbirds_classifier.yaml"
-model_path        : $PEAL_RUNS/waterbirds/classifier_natural
+model_path        : $PEAL_RUNS/waterbirds/classifier_natural_new
 training          : <PEAL_BASE>/configs/training/img_classifier_balanced.yaml
 architecture      : torchvision_resnet18
-#architecture      : <PEAL_BASE>/configs/architectures/resnet18.yaml
 data              : <PEAL_BASE>/configs/data/waterbirds.yaml
+continue_training : True
 task:
   criterions:
     ce     : 1.0

@@ -550,14 +550,24 @@ class ModelTrainer:
         val_accuracy_previous = 0.0
         train_accuracy_previous = 0.0
         self.model.eval()
-        val_accuracy = 0.0
+        val_accuracy = None
         self.config.training.epoch = -1
         for idx, val_dataloader in enumerate(self.val_dataloaders):
             if len(val_dataloader) >= 1:
                 val_loss, val_accuracy_current = self.run_epoch(
                     val_dataloader, mode="validation_" + str(idx), pbar=pbar
                 )
-                val_accuracy += self.val_dataloader_weights[idx] * val_accuracy_current
+                if self.config.training.early_stopping_goal == "average_accuracy":
+                    if val_accuracy is None:
+                        val_accuracy = 0.0
+
+                    val_accuracy += self.val_dataloader_weights[idx] * val_accuracy_current
+
+                elif self.config.training.early_stopping_goal == "worst_group_accuracy":
+                    if val_accuracy is None:
+                        val_accuracy = val_accuracy_current
+
+                    val_accuracy = min(val_accuracy, val_accuracy_current)
 
         self.logger.writer.add_scalar("epoch_validation_accuracy", val_accuracy, -1)
 
@@ -589,15 +599,23 @@ class ModelTrainer:
                     )
             #
             self.model.eval()
-            val_accuracy = 0.0
+            val_accuracy = None
             for idx, val_dataloader in enumerate(self.val_dataloaders):
                 if len(val_dataloader) >= 1:
                     val_loss, val_accuracy_current = self.run_epoch(
                         val_dataloader, mode="validation_" + str(idx), pbar=pbar
                     )
-                    val_accuracy += (
-                        self.val_dataloader_weights[idx] * val_accuracy_current
-                    )
+                    if self.config.training.early_stopping_goal == "average_accuracy":
+                        if val_accuracy is None:
+                            val_accuracy = 0.0
+
+                        val_accuracy += self.val_dataloader_weights[idx] * val_accuracy_current
+
+                    elif self.config.training.early_stopping_goal == "worst_group_accuracy":
+                        if val_accuracy is None:
+                            val_accuracy = val_accuracy_current
+
+                        val_accuracy = min(val_accuracy, val_accuracy_current)
 
             self.logger.writer.add_scalar(
                 "epoch_validation_accuracy", val_accuracy, self.config.training.epoch

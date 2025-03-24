@@ -24,7 +24,7 @@ def main():
 
     model_trainer = ModelTrainer(config)
     model_trainer.fit(
-        continue_training=config.is_loaded, is_initialized=config.is_loaded
+        continue_training=config.continue_training, is_initialized=config.is_loaded
     )
 
 if __name__ == '__main__':
