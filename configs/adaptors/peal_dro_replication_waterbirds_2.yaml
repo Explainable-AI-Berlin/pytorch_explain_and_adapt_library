@@ -1,9 +1,9 @@
 adaptor_type  : "PealGroupDRO"
 category      : "adaptor"
 predictor     : <PEAL_BASE>/configs/predictors/dro_replication_waterbirds_classifier.yaml
-model_path    : $PEAL_RUNS/waterbirds/peal_dro_classifier_natural
+model_path    : $PEAL_RUNS/waterbirds/peal_dro_classifier_natural_2
 is_robust     : True
 alpha         : 0.01
 gamma         : 0.1
 reset_weights : False
-seed          : 0
+seed          : 2

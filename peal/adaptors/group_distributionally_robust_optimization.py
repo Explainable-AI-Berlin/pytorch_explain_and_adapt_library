@@ -23,7 +23,8 @@ from pydantic import BaseModel, PositiveInt
 from typing import Union
 
 from peal.data.dataset_factory import get_datasets
-from peal.data.datasets import DataConfig, Image2MixedDataset, Image2ClassDataset
+from peal.data.interfaces import DataConfig
+from peal.data.datasets import Image2MixedDataset, Image2ClassDataset
 from peal.dependencies.attacks.attacks import PGD_L2
 from peal.global_utils import (
     orthogonal_initialization,
@@ -181,7 +182,34 @@ class GroupDRO(Adaptor):
         gigabyte_vram=None,
         val_dataloader_weights=[1.0],
     ):
+        # TODO: Set parameters and settings for the adaptor
+
+        # Transfer required parameters to the class
+
+        # Get logs dir
+        # Instantiate logs dir if it doesn't exist
+
+        # Set the global seed
+
+        # Load datasets
+
+        # Load the model
+
+        #
+
+        pass
 
 
+    def fit(self):
+
+        # TODO: Create setup for the run. Roughly should be the contents of run_expt.py
+
+        pass
+
+
+
+    def run_epoch(self):
+
+        # TODO: Should roughly be the contents of the train_epoch function in run_expt.py
 
         pass

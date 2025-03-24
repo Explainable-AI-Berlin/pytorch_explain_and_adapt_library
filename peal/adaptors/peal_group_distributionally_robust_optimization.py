@@ -512,12 +512,12 @@ class PealGroupDRO(Adaptor):
     # @profile
     def run_epoch(self, dataloader, loss_criterions, mode="train", pbar=None):
         """ """
-        # self.log_cpu_memory_usage()
-        # self.log_gpu_memory_usage()
+        self.log_cpu_memory_usage()
+        self.log_gpu_memory_usage()
         sources = {}
         for batch_idx, sample in enumerate(dataloader):
-            # self.log_cpu_memory_usage()
-            # self.log_gpu_memory_usage()
+            self.log_cpu_memory_usage()
+            self.log_gpu_memory_usage()
             if hasattr(dataloader, "return_src") and dataloader.return_src:
                 sample, source = sample
                 source = str(source)
