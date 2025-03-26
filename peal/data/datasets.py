@@ -1025,8 +1025,8 @@ class Image2ClassDataset(ImageDataset):
         if self.return_dict:
             return return_dict
 
-        elif len(return_dict.values()) == 1:
-            return img, list(return_dict.values())[0]
+        elif len(return_dict.values()) == 2:
+            return img, list(return_dict.values())[1]
 
         else:
-            return img, tuple(return_dict.values())
+            return img, tuple(return_dict.values())[1:]

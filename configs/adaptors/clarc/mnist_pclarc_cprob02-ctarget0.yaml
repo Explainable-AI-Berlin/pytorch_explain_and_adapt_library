@@ -1,17 +1,17 @@
 category: "adaptor"
 adaptor_type: "PClArC"
-base_dir: $PEAL_RUNS/mnist_colored/cprob10-ctarget0/pclarc
-model_path: $PEAL_RUNS/mnist_colored/cprob10-ctarget0/model.cpl
-data: <PEAL_BASE>/configs/data/mnist_colored/mnist_colored-cprob10-ctarget0.yaml
+base_dir: $PEAL_RUNS/mnist_colored/cprob02-ctarget0/pclarc
+model_path: $PEAL_RUNS/mnist_colored/cprob02-ctarget0/model.cpl
+data: <PEAL_BASE>/configs/data/mnist_colored/mnist_colored-cprob02-ctarget0.yaml
 unpoisoned_data: <PEAL_BASE>/configs/data/mnist_colored/mnist_colored-cprob50-ctarget0123456789.yaml
 virelay_config: <PEAL_BASE>/configs/teachers/spray_square_poisoned099_5.yaml
 projection_type: 'pcav' # 'pcav', 'svm', 'simple'
 # cav_mode: "cavs_max" # None, 'cavs_max', 'cavs_mean'
-layer_index: [7] # 0 for input, -1 for penultimate layer
-correction_strength: [1, 1.1, 1.2, 1.3]
+layer_index: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13] # 0 for input, -1 for penultimate layer
+correction_strength: [1]
 attacked_class: 0
 save_model: False
-use_perfect_annotations: False
+use_perfect_annotations: True
 task:
   output_type: 'singleclass'
   output_channels: 10

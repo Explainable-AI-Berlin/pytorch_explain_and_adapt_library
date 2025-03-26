@@ -4,6 +4,7 @@ base_dir: $PEAL_RUNS/mnist_colored/cprob20-ctarget0/pclarc
 model_path: $PEAL_RUNS/mnist_colored/cprob20-ctarget0/model.cpl
 data: <PEAL_BASE>/configs/data/mnist_colored/mnist_colored-cprob20-ctarget0.yaml
 unpoisoned_data: <PEAL_BASE>/configs/data/mnist_colored/mnist_colored-cprob50-ctarget0123456789.yaml
+virelay_config: <PEAL_BASE>/configs/teachers/spray_square_poisoned099_5.yaml
 projection_type: 'pcav' # 'pcav', 'svm', 'simple'
 # cav_mode: "cavs_max" # None, 'cavs_max', 'cavs_mean'
 layer_index: [0, 12] # 0 for input, -1 for penultimate layer

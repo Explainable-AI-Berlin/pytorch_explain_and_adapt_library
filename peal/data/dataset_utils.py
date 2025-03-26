@@ -239,10 +239,10 @@ def process_confounder_data_controlled(
             config.num_samples * config.confounder_probability * 0.5
         )
         max_attribute_confounding[1][0] = int(
-            config.num_samples * round(1 - config.confounder_probability, 2) * 0.5
+            config.num_samples * round(1 - config.confounder_probability, 3) * 0.5
         )
         max_attribute_confounding[0][1] = int(
-            config.num_samples * round(1 - config.confounder_probability, 2) * 0.5
+            config.num_samples * round(1 - config.confounder_probability, 3) * 0.5
         )
         max_attribute_confounding[1][1] = int(
             config.num_samples * config.confounder_probability * 0.5

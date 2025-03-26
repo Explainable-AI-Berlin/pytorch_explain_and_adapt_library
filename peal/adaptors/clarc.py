@@ -1,8 +1,8 @@
 import copy
+import json
 import os
 import pathlib
 from collections import defaultdict
-from typing import Union
 
 from sklearn.svm import LinearSVC
 from torch.nn import Module
@@ -12,7 +12,6 @@ from torchvision.models import ResNet
 from tqdm import tqdm
 
 from peal.adaptors.interfaces import AdaptorConfig, Adaptor
-import peal.adaptors.spray as spray
 from peal.architectures.interfaces import TaskConfig
 from peal.data.dataloaders import create_dataloaders_from_datasource, get_dataloader
 from peal.data.dataset_factory import get_datasets
@@ -26,149 +25,41 @@ import pandas as pd
 
 class ClArCConfig(AdaptorConfig):
 
+    __name__: str = "peal.AdaptorConfig"
     category: str = "adaptor"
     seed: int = 0
     model_path: str
     base_dir: str
     data: DataConfig
     unpoisoned_data: DataConfig = None
+    group_labels: str = None
     training: TrainingConfig
-    task: TaskConfig = None
-    projection_type: str
-    layer_index: list[int]
-    correction_strength: list[float]
-    attacked_class: Union[int, list[int]] = 0
+    task: TaskConfig
+    projection_type: str = "pcav"
+    layer_index: list[int] = [-1]
+    correction_strength: list[float] = [1]
+    attacked_class: int = 0
     cav_mode: str = None
     save_model: bool = True
+    use_perfect_annotations: bool = False
 
-    __name__: str = "peal.AdaptorConfig"
-
-    def __init__(self,
-                 model_path: str = None,
-                 data: Union[dict, DataConfig] = None,
-                 unpoisoned_data: Union[dict, DataConfig] = None,
-                 training: Union[dict, TrainingConfig] = None,
-                 task: Union[dict, TaskConfig] = None,
-                 base_dir: str = None,
-                 layer_index: list[int] = None,
-                 projection_type: str = "svm",
-                 correction_strength: list[float] = None,
-                 attacked_class: Union[int, list[int]] = None,
-                 cav_mode: str = None,
-                 save_model: bool = True):
-
-        self.model_path = model_path
-        self.base_dir = base_dir
-        self.layer_index = layer_index if layer_index is not None else [-1]
-        self.projection_type = projection_type
-        self.correction_strength = correction_strength if correction_strength is not None else [1.0]
-        self.attacked_class = attacked_class
-        self.cav_mode = cav_mode
-        self.save_model = save_model
-
-        if isinstance(data, DataConfig):
-            self.data = data
-        else:
-            self.data = DataConfig(**data)
-
-        if isinstance(unpoisoned_data, DataConfig):
-            self.unpoisoned_data = unpoisoned_data
-        elif not unpoisoned_data is None:
-            self.unpoisoned_data = DataConfig(**unpoisoned_data)
-
-        if isinstance(training, TrainingConfig):
-            self.training = training
-        else:
-            self.training = TrainingConfig(**training)
-
-        if isinstance(task, TaskConfig):
-            self.task = task
-        elif not task is None:
-            self.task = TaskConfig(**task)
 
 class PClArCConfig(ClArCConfig):
-
     adaptor_type: str = "PClArC"
 
-    def __init__(self,
-                 model_path: str = None,
-                 data: Union[dict, DataConfig] = None,
-                 unpoisoned_data:Union[dict, DataConfig] = None,
-                 training: Union[dict, TrainingConfig] = None,
-                 task: Union[dict, TaskConfig] = None,
-                 base_dir: str = None,
-                 layer_index: list[int] = None,
-                 projection_type: str = "svm",
-                 correction_strength: list[float] = None,
-                 attacked_class: Union[int, list[int]] = None,
-                 cav_mode: str = None,
-                 save_model: bool = True,
-                 **kwargs):
-
-        super().__init__(model_path=model_path,
-                         data=data,
-                         unpoisoned_data=unpoisoned_data,
-                         training=training,
-                         task=task,
-                         base_dir=base_dir,
-                         layer_index=layer_index,
-                         projection_type=projection_type,
-                         correction_strength=correction_strength,
-                         attacked_class=attacked_class,
-                         cav_mode=cav_mode,
-                         save_model=save_model)
-
-        self.kwargs = kwargs
 
 class RRClArCConfig(ClArCConfig):
-
     adaptor_type: str = "RRClArC"
-    gradient_target: str = "allrand"
+    gradient_target: str = "all"
     mean_grad: bool = False
     rrc_loss: str = "l2"
-
-    def __init__(self,
-                 model_path: str = None,
-                 gradient_target: str = None,
-                 correction_strength: list[float] = None,
-                 layer_index: list[int] = None,
-                 projection_type: str = "svm",
-                 cav_mode: str = None,
-                 attacked_class: Union[int, list[int], None] = None,
-                 mean_grad: bool = False,
-                 rrc_loss: str = "l2",
-                 data: Union[dict, DataConfig] = None,
-                 unpoisoned_data: Union[dict, DataConfig] = None,
-                 training: Union[dict, TrainingConfig] = None,
-                 task: Union[dict, TaskConfig] = None,
-                 base_dir: str = None,
-                 save_model: bool = True,
-                 **kwargs):
-
-        super().__init__(model_path=model_path,
-                         data=data,
-                         unpoisoned_data=unpoisoned_data,
-                         training=training,
-                         task=task,
-                         base_dir=base_dir,
-                         layer_index=layer_index,
-                         projection_type=projection_type,
-                         correction_strength=correction_strength,
-                         attacked_class=attacked_class,
-                         cav_mode=cav_mode,
-                         save_model=save_model)
-
-        self.rrc_loss = rrc_loss
-        self.mean_grad = mean_grad
-        if not gradient_target is None:
-            self.gradient_target = gradient_target
-
-        self.kwargs = kwargs
 
 
 class ClArC(Adaptor):
 
     def __init__(self, adaptor_config: ClArCConfig):
+        pathlib.Path(adaptor_config.base_dir).mkdir(exist_ok=True)
+
         self.adaptor_config = adaptor_config
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         print("running on device: ", self.device)
@@ -178,7 +69,6 @@ class ClArC(Adaptor):
         self.model = copy.deepcopy(self.original_model)
         self.attacked_class = adaptor_config.attacked_class
 
-        pathlib.Path(self.adaptor_config.base_dir).mkdir(exist_ok=True)
 
     def run(self):
         train_dataloader, val_dataloader, test_dataloader = create_dataloaders_from_datasource(self.adaptor_config)
@@ -200,11 +90,11 @@ class ClArC(Adaptor):
             evaluation["unpoisoned"] = defaultdict(list)
 
         self.model.eval()
-        # for description, dataloader in test_data:
-        #     evaluation[description]["projection_location"].append("---")
-        #     evaluation[description]["correction_strength"].append("---")
-        #     for k, v in get_accuracies(dataloader, self.model, self.adaptor_config.data.dataset_class, self.device).items():
-        #         evaluation[description][k].append(v)
+        for description, dataloader in test_data:
+            evaluation[description]["projection_location"].append("uncorrected")
+            evaluation[description]["correction_strength"].append("uncorrected")
+            for k, v in get_accuracies(dataloader, self.model, self.adaptor_config.data.dataset_class, self.device).items():
+                evaluation[description][k].append(v)
 
         layers, correction_strength = np.meshgrid(self.adaptor_config.layer_index, self.adaptor_config.correction_strength)
         for layer, cs in zip(layers.flatten(), correction_strength.flatten()):
@@ -231,59 +121,31 @@ class ClArC(Adaptor):
     def get_evaluation_filename(self, dataset_name: str) -> str:
         pass
 
-    def get_annotations_and_activations(self, dataloader: DataLoader, record_layer: str) -> tuple[torch.Tensor, torch.Tensor]:
-        analysis_dir = os.path.join(self.adaptor_config.base_dir, f"layer-{record_layer}_class-{self.attacked_class}_analysis")
-        pathlib.Path(analysis_dir).mkdir(exist_ok=True)
-        input_db_path, attribution_db_path, heatmaps_db_path, concept_importance_db_path \
-            = spray.compute_attributions(self.model, dataloader, record_layer, self.attacked_class, analysis_dir, self.device)
-        analysis_db_path = os.path.join(analysis_dir, f"analysis.h5")
+    def get_annotations_and_activations(self, dataloader: DataLoader, feature_extractor: Module = None) -> tuple[torch.Tensor, torch.Tensor]:
 
-        dataset_class = self.adaptor_config.data.dataset_class
+        if self.adaptor_config.use_perfect_annotations:
+            activations, annotations = self._get_perfect_annotations_and_activations(dataloader, feature_extractor)
+        else:
+            group_label_map = json.load(open(self.adaptor_config.group_labels, 'r'))
+            confounder_filenames = np.asarray(group_label_map["confounders"])
+            confounder_filenames = np.random.choice(confounder_filenames, size=min(len(confounder_filenames), 10000), replace=False)
+            non_confounder_filenames = np.asarray(group_label_map["non_confounders"])
+            non_confounder_filenames = np.random.choice(non_confounder_filenames, size=min(len(non_confounder_filenames), 10000), replace=False)
 
-        spray.spectral_clustering(attribution_db_path, analysis_db_path, dataset_class, self.attacked_class)
-        label_map_file_path = spray.create_label_map_file(analysis_dir, self.adaptor_config.task.output_channels, dataset_class)
-        virelay_project_path = spray.make_project(analysis_dir, input_db_path, heatmaps_db_path, analysis_db_path, label_map_file_path, dataset_class, dataloader.dataset[0]["x"].shape)
-        feedback = spray.run_virelay(analysis_dir, virelay_project_path)
+            confounders = []
+            non_confounders = []
+            for it, batch in enumerate(dataloader):
+                x = batch["x"].to(self.device)
+                activation = x if feature_extractor is None else feature_extractor(x).detach()
 
-        true_annotations = []
-        for batch in dataloader:
-            x = batch["x"].to(self.device).requires_grad_()
-            if dataset_class == "SquareDataset":
-                true_annotations.append(batch["y"][:, 1].detach())
-            elif dataset_class == "MnistDataset":
-                true_annotations.append(get_perfect_annotations_mnist(x))
-        # activations = torch.cat(activations, 0)
-        true_annotations = torch.cat(true_annotations, dim=0).to(self.device)
+                filenames = np.asarray(batch["url"])
+                confounders.append(activation[np.isin(filenames, confounder_filenames)])
+                non_confounders.append(activation[np.isin(filenames, non_confounder_filenames)])
 
-        annotations = torch.zeros(len(true_annotations))
-        annotations[feedback] = 1
-        print("matching artifact annotations:", (annotations[true_annotations == 1] == true_annotations[true_annotations == 1]).float().mean().item())
-        print("matching non-artifact annotations:", (annotations[true_annotations == 0] == true_annotations[true_annotations == 0]).float().mean().item())
-
-        exit()
-
-        num_artifact_samples = torch.sum(true_annotations == 1).item()
-        print(f"Number of artifact samples: {num_artifact_samples}; Number of non-artifact samples: {len(true_annotations) - num_artifact_samples}")
-        return activations, true_annotations
-
-    def get_annotations_and_activations_simplified(self, dataloader: DataLoader, feature_extractor: Module = None) -> tuple[torch.Tensor, torch.Tensor]:
-        annotations = []
-        activations = []
-
-        for it, batch in enumerate(dataloader):
-            x = batch["x"].to(self.device)
-            if feature_extractor is None:
-                activations.append(x)
-            else:
-                activations.append(feature_extractor(x).detach())
-
-            if self.adaptor_config.data.dataset_class == "SquareDataset":
-                annotations.append(batch["y"][:, 1].detach())
-            elif self.adaptor_config.data.dataset_class == "MnistDataset":
-                annotations.append(get_perfect_annotations_mnist(x))
-
-        activations = torch.cat(activations, 0)
-        annotations = torch.cat(annotations, dim=0).to(self.device)
+            confounders = torch.cat(confounders, dim=0)
+            non_confounders = torch.cat(non_confounders, dim=0)
+            activations = torch.cat([confounders, non_confounders], dim=0)
+            annotations = torch.cat([torch.ones(len(confounders)), torch.zeros(len(non_confounders))], dim=0).to(self.device)
 
         if self.adaptor_config.cav_mode == "cavs_max":
             activations = activations.flatten(start_dim=2).max(2).values
@@ -294,6 +156,22 @@ class ClArC(Adaptor):
 
         num_artifact_samples = torch.sum(annotations == 1).item()
         print(f"Number of artifact samples: {num_artifact_samples}; Number of non-artifact samples: {len(annotations) - num_artifact_samples}")
+        return activations, annotations
+
+    def _get_perfect_annotations_and_activations(self, dataloader: DataLoader, feature_extractor: Module = None):
+        annotations = []
+        activations = []
+        for batch in dataloader:
+            x = batch["x"].to(self.device)
+            activations.append(x if feature_extractor is None else feature_extractor(x).detach())
+
+            if self.adaptor_config.data.dataset_class == "SquareDataset":
+                annotations.append(batch["y"][:, 1].detach())
+            elif self.adaptor_config.data.dataset_class == "MnistDataset":
+                annotations.append(get_perfect_annotations_mnist(x))
+
+        annotations = torch.cat(annotations, dim=0).to(self.device)
+        activations = torch.cat(activations, 0)
         return activations, annotations
 
 
@@ -318,12 +196,11 @@ class PClArC(ClArC):
         # train_dataloader.dataset.visualize_decision_boundary(self.model, 32, self.device, os.path.join(self.adaptor_config.base_dir, "decision_boundary_corrected_pcav.png"))
         # exit()
 
-        feature_extractor, downstream_head, layer_name = None, None, None
+        feature_extractor, downstream_head = None, None
         if layer_index != 0:
-            feature_extractor, downstream_head, layer_name = split_model(self.model, layer_index, self.device)
+            feature_extractor, downstream_head = split_model(self.model, layer_index, self.device)
 
-        # activations, annotations = self.get_annotations_and_activations_simplified(dataloader, feature_extractor=feature_extractor)
-        activations, annotations = self.get_annotations_and_activations(dataloader, layer_name)
+        activations, annotations = self.get_annotations_and_activations(dataloader, feature_extractor=feature_extractor)
 
         projection = SimpleProjection if self.adaptor_config.projection_type == "simple" else CavProjection
         projection = projection(activations, annotations, projection_type=self.adaptor_config.projection_type, cav_mode=self.adaptor_config.cav_mode, device=self.device, correction_strength=correction_strength)
@@ -370,10 +247,10 @@ class RRClArC(ClArC):
         model_name = f"corrected_model_layer-{layer_index}_mode-{self.adaptor_config.cav_mode}_lamb{correction_strength}_{self.adaptor_config.rrc_loss}-loss{mean_grad}{attacked_class}"
 
         assert layer_index != 0, "rr-clarc not implemented for input layer"
-        feature_extractor, downstream_head, layer_name = split_model(self.model, layer_index, self.device)
+        feature_extractor, downstream_head = split_model(self.model, layer_index, self.device)
         feature_extractor.eval()
 
-        activations, annotations = self.get_annotations_and_activations_simplified(dataloader, feature_extractor=feature_extractor)
+        activations, annotations = self.get_annotations_and_activations(dataloader, feature_extractor=feature_extractor)
         cav = calculate_cav(activations, annotations, self.adaptor_config.projection_type)
         cav = cav.to(self.device, activations.dtype)
         self.finetune(dataloader, cav, feature_extractor, downstream_head, correction_strength, model_name=model_name, data_val_unpoisoned=data_val_unpoisoned)
@@ -502,11 +379,8 @@ class RRClArC(ClArC):
         return torch.cat(acc, dim=0).float().mean().item()
 
 
-def split_model(model: Module, split_at: int, device) -> (Module, Module, str):
-    '''
-    Splits a model at the penultima layer
-    '''
-    children_list, children_names = extract_all_children(model)
+def split_model(model: Module, split_at: int, device) -> (Module, Module):
+    children_list = extract_all_children(model)[0]
     feature_extractor = torch.nn.Sequential(*children_list[:split_at])
     if isinstance(model, ResNet):
         downstream_head = torch.nn.Sequential(*children_list[split_at:-1], torch.nn.Flatten(start_dim=1), children_list[-1])
@@ -516,12 +390,9 @@ def split_model(model: Module, split_at: int, device) -> (Module, Module, str):
     # print("\n\n\nfeature extractor:\n", feature_extractor)
     # print("\n\n\ndownstream head:\n", downstream_head)
     # exit()
-    return feature_extractor.to(device), downstream_head.to(device), children_names[split_at-1]
+    return feature_extractor.to(device), downstream_head.to(device)
 
 def extract_all_children(model: Module, prefix: str = "") -> (list[Module], list[str]):
-    '''
-    Extracts all children of a model
-    '''
     children = []
     children_names = []
     for name, child in model.named_children():
@@ -538,13 +409,8 @@ def extract_all_children(model: Module, prefix: str = "") -> (list[Module], list
 
     return children, children_names
 
-
-def get_perfect_annotations_mnist(x: torch.Tensor) -> torch.Tensor:
-    assert len(x.shape) == 4
-    assert x.shape[1] == 3
-    annotations = ~((x[:,0] == x[:,1]) * (x[:,0] == x[:,2])).all(dim=1).all(dim=1)
-    return annotations.int()
-
+def get_layer_name(model: Module, layer_index: int) -> str:
+    return extract_all_children(model)[1][layer_index-1]
 
 def calculate_cav(activations: torch.Tensor, annotations: torch.Tensor, projection_type: str) -> torch.Tensor:
     if projection_type == "pcav":
@@ -688,3 +554,9 @@ class SimpleProjection(torch.nn.Module):
         out = x_flat - self.difference
         out = torch.nn.functional.relu(out)
         return out.reshape(x.shape)
+
+def get_perfect_annotations_mnist(x: torch.Tensor) -> torch.Tensor:
+    assert len(x.shape) == 4
+    assert x.shape[1] == 3
+    annotations = ~((x[:,0] == x[:,1]) * (x[:,0] == x[:,2])).all(dim=1).all(dim=1)
+    return annotations.int()
