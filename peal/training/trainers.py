@@ -194,7 +194,7 @@ class ModelTrainer:
                 and self.config.architecture[:12] == "torchvision_"
             ):
                 self.model = TorchvisionModel(
-                    self.config.architecture[12:], output_channels
+                    self.config.architecture[12:], output_channels, self.config.data.input_size[-1]
                 )
 
             else:
