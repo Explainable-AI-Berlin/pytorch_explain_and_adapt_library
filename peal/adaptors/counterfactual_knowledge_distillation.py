@@ -219,6 +219,10 @@ class CFKDConfig(AdaptorConfig):
     Dummy field to be able to use it as a model config!
     """
     is_loaded: bool = False
+    """
+    The performance of the generative model measured e.g. in FID score.
+    """
+    generator_performance: dict = {}
 
 
 class CFKD(Adaptor):
@@ -1028,7 +1032,7 @@ class CFKD(Adaptor):
             # this is only for scientific experiments and could also be sourced out into another file!
             # distill into equivalent model
             predictor_distillation = load_yaml_config(
-                "<PEAL_BASE>/configs/predictors/img_classifier_balanced.yaml",
+                "<PEAL_BASE>/configs/predictors/simple_distillation.yaml",
                 PredictorConfig,
             )
             distillation_path = os.path.join(

@@ -236,7 +236,7 @@ class TorchvisionModel(torch.nn.Module):
         return x
 
     def forward(self, x: torch.Tensor):
-        if self.model_type[:len("resnet")] == "resnet":
+        if not hasattr(self, "model_type") or self.model_type[:len("resnet")] == "resnet":
             return self.model(x)
 
         else:
