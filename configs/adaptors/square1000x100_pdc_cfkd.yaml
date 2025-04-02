@@ -16,7 +16,7 @@ test_data                            :  <PEAL_BASE>/configs/data/square_unpoison
 student                              :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned100/model.cpl
 teacher                              :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_unpoisoned/model.cpl
 generator                            :  $PEAL_RUNS/square/ddpm/config.yaml
-base_dir                             :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_cfkd_distilled_from_predictor
+base_dir                             :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_cfkd_distilled_from_predictor2
 task:
   criterions:
     ce     : 1.0

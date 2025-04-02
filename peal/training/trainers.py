@@ -728,6 +728,9 @@ def distill_binary_dataset(
 ):
     distillation_datasource = []
     for i in range(len(predictor_datasets)):
+        if isinstance(predictor_datasets[i], torch.utils.data.DataLoader):
+            predictor_datasets[i] = predictor_datasets[i].dataset
+
         class_predictions_path = os.path.join(base_path, str(i) + "predictions.csv")
         Path(base_path).mkdir(exist_ok=True, parents=True)
         if not os.path.exists(class_predictions_path):
@@ -811,6 +814,8 @@ def distill_1ofn_dataset(
 def distill_dataloader_mixer(
     predictor_distillation, base_path, predictor, predictor_datasource
 ):
+    print("distill_dataloader_mixer")
+    print(base_path)
     distillation_datasource = copy.deepcopy(predictor_datasource)
     for i in range(len(distillation_datasource.dataloaders)):
         if isinstance(distillation_datasource.dataloaders[i], DataloaderMixer):
@@ -862,6 +867,7 @@ def distill_predictor(
                 predictor_datasource[0],
             )
         )
+        print('distill validation dataset!')
         distillation_datasource.append(copy.deepcopy(predictor_datasource[1]))
         validation_datasets = distill_binary_dataset(
             predictor_distillation,

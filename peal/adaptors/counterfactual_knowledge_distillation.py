@@ -23,6 +23,7 @@ from peal.global_utils import (
     save_yaml_config,
     reset_weights,
 )
+from peal.teachers.model2model_teacher import Model2ModelTeacher
 from peal.training.loggers import log_images_to_writer
 from peal.data.dataloaders import (
     DataStack,
@@ -277,8 +278,10 @@ class CFKD(Adaptor):
         #
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         if student is None:
-            #student = torch.load(self.adaptor_config.student, map_location=self.device)
-            student, student_config = get_predictor(self.adaptor_config.student, device=self.device)
+            # student = torch.load(self.adaptor_config.student, map_location=self.device)
+            student, student_config = get_predictor(
+                self.adaptor_config.student, device=self.device
+            )
 
         self.original_student = student
         self.original_student.eval()
@@ -396,7 +399,7 @@ class CFKD(Adaptor):
                 ]
             )
 
-        #teacher == "SegmentationMask" or self.adaptor_config.tracking_level > 0:
+        # teacher == "SegmentationMask" or self.adaptor_config.tracking_level > 0:
         if self.adaptor_config.data.has_hints:
             self.hints_enabled = True
             self.tracked_keys.append("hint_list")
@@ -595,9 +598,10 @@ class CFKD(Adaptor):
                 f.write(platform.node())
 
             print("start generating validation stats!!!")
-            validation_tracked_values, validation_stats = (
-                self.retrieve_validation_prestats(finetune_iteration=0)
-            )
+            (
+                validation_tracked_values,
+                validation_stats,
+            ) = self.retrieve_validation_prestats(finetune_iteration=0)
             for key in validation_stats.keys():
                 if isinstance(validation_stats[key], float):
                     writer.add_scalar(
@@ -620,10 +624,11 @@ class CFKD(Adaptor):
                     "validation_stats.npz",
                 )
             )
-            validation_tracked_values, validation_prestats = (
-                self.retrieve_validation_prestats(
-                    finetune_iteration=max(0, self.adaptor_config.current_iteration - 1)
-                )
+            (
+                validation_tracked_values,
+                validation_prestats,
+            ) = self.retrieve_validation_prestats(
+                finetune_iteration=max(0, self.adaptor_config.current_iteration - 1)
             )
             validation_stats = self.retrieve_validation_stats(
                 finetune_iteration=self.adaptor_config.current_iteration,
@@ -826,7 +831,10 @@ class CFKD(Adaptor):
             num_batches_per_iteration = int(
                 1 + remaining_sample_number / self.adaptor_config.batch_size
             )
-            if len(list(tracked_values.values())[0]) >= self.adaptor_config.min_train_samples:
+            if (
+                len(list(tracked_values.values())[0])
+                >= self.adaptor_config.min_train_samples
+            ):
                 break
 
             print("continue from " + str(len(list(tracked_values.values())[0])))
@@ -1154,22 +1162,22 @@ class CFKD(Adaptor):
         y_counterfactual_list = []
         sample_names = []
         for sample_idx in range(len(feedback)):
-            '''if feedback[sample_idx] == "true":
-                sample_name = (
-                    "true_"
-                    + str(int(y_source_list[sample_idx]))
-                    + "_to_"
-                    + str(int(y_target_list[sample_idx]))
-                    + "_"
-                    + str(sample_idx)
-                )
-                x_list.append(x_counterfactual_list[sample_idx])
-                if not hint_list is None:
-                    hint_list_dataset.append(hint_list[sample_idx])
+            """if feedback[sample_idx] == "true":
+            sample_name = (
+                "true_"
+                + str(int(y_source_list[sample_idx]))
+                + "_to_"
+                + str(int(y_target_list[sample_idx]))
+                + "_"
+                + str(sample_idx)
+            )
+            x_list.append(x_counterfactual_list[sample_idx])
+            if not hint_list is None:
+                hint_list_dataset.append(hint_list[sample_idx])
 
-                y_counterfactual_list.append(int(y_target_list[sample_idx]))
-                sample_names.append(sample_name)
-                sample_idx += 1'''
+            y_counterfactual_list.append(int(y_target_list[sample_idx]))
+            sample_names.append(sample_name)
+            sample_idx += 1"""
 
             if feedback[sample_idx] == "false":
                 sample_name = (
@@ -1661,14 +1669,18 @@ class CFKD(Adaptor):
             if "collage_path_list" in self.tracked_keys:
                 print("recreate validation collage path!")
                 get_collage_path = lambda x: os.path.join(
-                    self.base_dir, str(finetune_iteration), "validation_collages" + str(x)
+                    self.base_dir,
+                    str(finetune_iteration),
+                    "validation_collages" + str(x),
                 )
                 idx = 0
                 collage_path_list = []
                 while os.path.exists(get_collage_path(idx)):
                     collage_paths = os.listdir(get_collage_path(idx))
                     collage_paths.sort()
-                    collage_paths = list(filter(lambda x: x[-4:] == ".png", collage_paths))
+                    collage_paths = list(
+                        filter(lambda x: x[-4:] == ".png", collage_paths)
+                    )
                     collage_path_list.extend(collage_paths)
                     idx += 1
                     # TODO this is a bug, but currently not used
@@ -1853,7 +1865,9 @@ class CFKD(Adaptor):
                         finetune_iteration,
                     )
 
-            self.adaptor_config.feedback_accuracies.append(validation_stats["feedback_accuracy"])
+            self.adaptor_config.feedback_accuracies.append(
+                validation_stats["feedback_accuracy"]
+            )
 
             dataset_path = self.create_dataset(
                 feedback=feedback,
@@ -1953,9 +1967,10 @@ class CFKD(Adaptor):
                     val_dataloaders=self.dataloaders_val,
                 )
 
-            validation_tracked_values, validation_prestats = (
-                self.retrieve_validation_prestats(finetune_iteration=finetune_iteration)
-            )
+            (
+                validation_tracked_values,
+                validation_prestats,
+            ) = self.retrieve_validation_prestats(finetune_iteration=finetune_iteration)
 
             visualization_path = os.path.join(
                 self.base_dir, str(finetune_iteration), "visualization.png"
@@ -1994,6 +2009,8 @@ class CFKD(Adaptor):
                     finetune_iteration,
                 )
 
-        self.adaptor_config.feedback_accuracies.append(validation_stats["feedback_accuracy"])
+        self.adaptor_config.feedback_accuracies.append(
+            validation_stats["feedback_accuracy"]
+        )
 
         return self.student

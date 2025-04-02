@@ -209,9 +209,10 @@ class TorchvisionModel(torch.nn.Module):
                 # reinitialize the positional embedding to random values.
                 torch.nn.init.trunc_normal_(self.model.encoder.pos_embedding, std=0.02)
 
-            self.model.heads.head = torch.nn.Linear(
-                self.model.heads.head.in_features, num_classes
-            )
+            if num_classes != 1000:
+                self.model.heads.head = torch.nn.Linear(
+                    self.model.heads.head.in_features, num_classes
+                )
 
         else:
             raise ValueError("Unknown model: {}".format(model))
