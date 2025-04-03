@@ -203,11 +203,16 @@ class TorchvisionModel(torch.nn.Module):
                 num_patches = (
                     input_size // kernel_size
                 ) ** 2 + 1  # 64 patches + class token
-                self.model.encoder.pos_embedding = torch.nn.Parameter(
-                    torch.zeros(1, num_patches, self.model.encoder.pos_embedding.shape[2])
-                )
-                # reinitialize the positional embedding to random values.
-                torch.nn.init.trunc_normal_(self.model.encoder.pos_embedding, std=0.02)
+                if num_patches < self.model.encoder.pos_embedding.shape[1]:
+                    self.model.encoder.pos_embedding = torch.nn.Parameter(
+                        self.model.encoder.pos_embedding[:,:num_patches]
+                    )
+                else:
+                    self.model.encoder.pos_embedding = torch.nn.Parameter(
+                        torch.zeros(1, num_patches, self.model.encoder.pos_embedding.shape[2])
+                    )
+                    # reinitialize the positional embedding to random values.
+                    torch.nn.init.trunc_normal_(self.model.encoder.pos_embedding, std=0.02)
 
             if num_classes != 1000:
                 self.model.heads.head = torch.nn.Linear(

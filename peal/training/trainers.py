@@ -876,9 +876,9 @@ def distill_predictor(
             predictor_datasource[1].dataloaders,
         )
         for i in range(len(validation_datasets)):
-            distillation_datasource.dataloaders[i] = torch.utils.data.DataLoader(
+            distillation_datasource[1].dataloaders[i] = torch.utils.data.DataLoader(
                 validation_datasets[i],
-                batch_size=distillation_datasource.dataloaders[i].batch_size,
+                batch_size=distillation_datasource[1].dataloaders[i].batch_size,
             )
 
     elif isinstance(predictor_datasource[0].dataset, Image2MixedDataset):

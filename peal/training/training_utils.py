@@ -64,6 +64,7 @@ def calculate_validation_statistics(
 
     print("start iteration over validation dataset!")
     for it, (x, y) in enumerate(dataloader):
+        print(it)
         pred_confidences = (
             torch.nn.Softmax(dim=-1)(
                 model(x.to(device)) / explainer.explainer_config.temperature
@@ -89,6 +90,8 @@ def calculate_validation_statistics(
             confusion_matrix[int(y[i])][int(y_pred[i])] += 1
             num_samples += 1
 
+        print('A')
+
         pbar.stored_values["acc"] = correct / num_samples
 
         batch_targets = (y_pred + 1) % output_size
@@ -113,6 +116,7 @@ def calculate_validation_statistics(
         batch["y_target_start_confidence_list"] = torch.stack(
             batch_target_start_confidences, 0
         )
+        print('explain batch!')
         results = explainer.explain_batch(
             batch=batch,
             base_path=base_path,

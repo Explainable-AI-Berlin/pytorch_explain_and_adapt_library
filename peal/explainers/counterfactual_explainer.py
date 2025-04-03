@@ -1085,6 +1085,7 @@ class CounterfactualExplainer(ExplainerInterface):
         Returns:
             dict: The batch with the counterfactuals added.
         """
+        print('in explain batch!')
         if explainer_path is None:
             os_sep = os.path.abspath(os.sep)
             if base_path[: len(os_sep)] == os_sep:
