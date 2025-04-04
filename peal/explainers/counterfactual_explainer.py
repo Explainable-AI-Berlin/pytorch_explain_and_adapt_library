@@ -924,7 +924,10 @@ class CounterfactualExplainer(ExplainerInterface):
             if current_inpaint > 0.0:
                 z[0].grad = boolmask_in * z[0].grad
 
-        optimizer.step()
+        abs_grads = torch.abs(z[0].grad)
+        z[0].grad[abs_grads < (abs_grads.max() / 10)] = 0
+        z[0].data = z[0].data - 100.0 * z[0].grad
+        #optimizer.step()
         boolmask = torch.zeros_like(z[0].data)
         if self.explainer_config.iterationwise_encoding:
             z[0].data = torch.clamp(z[0].data, -1, 1)
