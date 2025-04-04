@@ -9,7 +9,7 @@ max_validation_samples               :  100
 continuous_learning                  :  "finetune"
 use_visualization                    :  True
 calculate_group_accuracies           :  True
-explainer                            :  <PEAL_BASE>/configs/explainers/pdc_default128x128_2.yaml
+explainer                            :  <PEAL_BASE>/configs/explainers/pdc_default128x128.yaml
 training                             :  <PEAL_BASE>/configs/training/sensitive_distillation.yaml
 data                                 :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba_poisoned100.yaml
 test_data                            :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba.yaml

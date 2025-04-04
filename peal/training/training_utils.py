@@ -11,7 +11,7 @@ from peal.explainers.interfaces import ExplainerInterface
 
 def calculate_validation_statistics(
     model: nn.Module,
-    dataloader: torch.utils.data.DataLoader,
+    dataloaders: torch.utils.data.DataLoader,
     tracked_keys: list,
     base_path: str,
     output_size: int,
@@ -42,134 +42,135 @@ def calculate_validation_statistics(
         _type_: _description_
     """
     tracked_values = {key: [] for key in tracked_keys}
-    confusion_matrix = np.zeros([output_size, output_size])
-    correct = 0
-    num_samples = 0
-    confidence_scores = []
-    for i in range(output_size):
-        confidence_scores.append([])
+    for dataloader in dataloaders:
+        confusion_matrix = np.zeros([output_size, output_size])
+        correct = 0
+        num_samples = 0
+        confidence_scores = []
+        for i in range(output_size):
+            confidence_scores.append([])
 
-    pbar = tqdm(
-        total=int(
-            min(max_validation_samples, len(dataloader.dataset)) / dataloader.batch_size
-            + 0.9999
-        )
-        * (
-            explainer.explainer_config.gradient_steps
-            if hasattr(explainer.explainer_config, "gradient_steps")
-            else 1
-        ),
-    )
-    pbar.stored_values = {}
-
-    print("start iteration over validation dataset!")
-    for it, (x, y) in enumerate(dataloader):
-        print(it)
-        pred_confidences = (
-            torch.nn.Softmax(dim=-1)(
-                model(x.to(device)) / explainer.explainer_config.temperature
+        pbar = tqdm(
+            total=int(
+                min(max_validation_samples, len(dataloader.dataset)) / dataloader.batch_size
+                + 0.9999
             )
-            .detach()
-            .cpu()
+            * (
+                explainer.explainer_config.gradient_steps
+                if hasattr(explainer.explainer_config, "gradient_steps")
+                else 1
+            ),
         )
-        y_pred = logits_to_prediction(pred_confidences)
-        if "hint_list" in tracked_keys or "idx_list" in tracked_keys:
-            y_res = y[1:]
-            y = y[0]
+        pbar.stored_values = {}
+
+        print("start iteration over validation dataset!")
+        for it, (x, y) in enumerate(dataloader):
+            print(it)
+            pred_confidences = (
+                torch.nn.Softmax(dim=-1)(
+                    model(x.to(device)) / explainer.explainer_config.temperature
+                )
+                .detach()
+                .cpu()
+            )
+            y_pred = logits_to_prediction(pred_confidences)
+            if "hint_list" in tracked_keys or "idx_list" in tracked_keys:
+                y_res = y[1:]
+                y = y[0]
+                if "hint_list" in tracked_keys:
+                    hints = y_res[0]
+
+                if "idx_list" in tracked_keys:
+                    idxs = y_res[-1]
+
+            for i in range(y.shape[0]):
+                if y_pred[i] == y[i]:
+                    correct += 1
+                    confidence_scores[int(y[i])].append(pred_confidences[i])
+
+                confusion_matrix[int(y[i])][int(y_pred[i])] += 1
+                num_samples += 1
+
+            print('A')
+
+            pbar.stored_values["acc"] = correct / num_samples
+
+            batch_targets = (y_pred + 1) % output_size
+            batch_target_start_confidences = []
+            for sample_idx in range(pred_confidences.shape[0]):
+                batch_target_start_confidences.append(
+                    pred_confidences[sample_idx][batch_targets[sample_idx]]
+                )
+
+            batch = {}
+            batch["x_list"] = x
+            batch["y_list"] = y
             if "hint_list" in tracked_keys:
-                hints = y_res[0]
+                batch["hint_list"] = hints
 
             if "idx_list" in tracked_keys:
-                idxs = y_res[-1]
+                print(idxs)
+                batch["idx_list"] = idxs
 
-        for i in range(y.shape[0]):
-            if y_pred[i] == y[i]:
-                correct += 1
-                confidence_scores[int(y[i])].append(pred_confidences[i])
-
-            confusion_matrix[int(y[i])][int(y_pred[i])] += 1
-            num_samples += 1
-
-        print('A')
-
-        pbar.stored_values["acc"] = correct / num_samples
-
-        batch_targets = (y_pred + 1) % output_size
-        batch_target_start_confidences = []
-        for sample_idx in range(pred_confidences.shape[0]):
-            batch_target_start_confidences.append(
-                pred_confidences[sample_idx][batch_targets[sample_idx]]
+            batch["y_source_list"] = y_pred
+            batch["y_target_list"] = batch_targets
+            batch["y_target_start_confidence_list"] = torch.stack(
+                batch_target_start_confidences, 0
             )
+            print('explain batch!')
+            results = explainer.explain_batch(
+                batch=batch,
+                base_path=base_path,
+                remove_below_threshold=False,
+                pbar=pbar,
+                mode="validation",
+                start_idx=it * dataloader.batch_size,
+                # dataloader=dataloader,
+            )
+            # except TypeError:
+            #    import pdb; pdb.set_trace()
+            for key in set(results.keys()).intersection(set(tracked_values.keys())):
+                tracked_values[key].extend(results[key])
 
-        batch = {}
-        batch["x_list"] = x
-        batch["y_list"] = y
-        if "hint_list" in tracked_keys:
-            batch["hint_list"] = hints
+            if num_samples >= max_validation_samples:
+                break
 
-        if "idx_list" in tracked_keys:
-            print(idxs)
-            batch["idx_list"] = idxs
+        pbar.close()
 
-        batch["y_source_list"] = y_pred
-        batch["y_target_list"] = batch_targets
-        batch["y_target_start_confidence_list"] = torch.stack(
-            batch_target_start_confidences, 0
-        )
-        print('explain batch!')
-        results = explainer.explain_batch(
-            batch=batch,
-            base_path=base_path,
-            remove_below_threshold=False,
-            pbar=pbar,
-            mode="validation",
-            start_idx=it * dataloader.batch_size,
-            # dataloader=dataloader,
-        )
-        # except TypeError:
-        #    import pdb; pdb.set_trace()
-        for key in set(results.keys()).intersection(set(tracked_values.keys())):
-            tracked_values[key].extend(results[key])
-
-        if num_samples >= max_validation_samples:
-            break
-
-    pbar.close()
-
-    confidence_score_stats = []
-    for i in range(output_size):
-        if len(confidence_scores[i]) >= 1:
-            confidence_score_stats.append(
-                torch.quantile(
-                    torch.stack(confidence_scores[i], dim=1),
-                    min_start_target_percentile,
-                    dim=1,
+        confidence_score_stats = []
+        for i in range(output_size):
+            if len(confidence_scores[i]) >= 1:
+                confidence_score_stats.append(
+                    torch.quantile(
+                        torch.stack(confidence_scores[i], dim=1),
+                        min_start_target_percentile,
+                        dim=1,
+                    )
                 )
-            )
+
+            else:
+                confidence_score_stats.append(torch.zeros([output_size]))
+
+        confidence_score_stats = torch.stack(confidence_score_stats)
+        accuracy = correct / num_samples
+
+        if use_confusion_matrix and not accuracy == 1.0:
+            error_matrix = np.copy(confusion_matrix)
+            for i in range(error_matrix.shape[0]):
+                error_matrix[i][i] = 0.0
+
+            error_matrix = error_matrix.flatten()
+            error_matrix = error_matrix / error_matrix.sum()
+            error_matrix = torch.tensor(error_matrix)
 
         else:
-            confidence_score_stats.append(torch.zeros([output_size]))
+            error_matrix = torch.ones([output_size, output_size]) - torch.eye(output_size)
+            error_matrix = error_matrix.flatten() / error_matrix.sum()
 
-    confidence_score_stats = torch.stack(confidence_score_stats)
-    accuracy = correct / num_samples
-
-    if use_confusion_matrix and not accuracy == 1.0:
-        error_matrix = np.copy(confusion_matrix)
-        for i in range(error_matrix.shape[0]):
-            error_matrix[i][i] = 0.0
-
-        error_matrix = error_matrix.flatten()
-        error_matrix = error_matrix / error_matrix.sum()
-        error_matrix = torch.tensor(error_matrix)
-
-    else:
-        error_matrix = torch.ones([output_size, output_size]) - torch.eye(output_size)
-        error_matrix = error_matrix.flatten() / error_matrix.sum()
-
-    validation_stats = {
-        "accuracy": accuracy,
-        "confidence_score_stats": confidence_score_stats,
-        "error_matrix": error_matrix,
-    }
+        validation_stats = {
+            "accuracy": accuracy,
+            "confidence_score_stats": confidence_score_stats,
+            "error_matrix": error_matrix,
+        }
 
     return tracked_values, validation_stats

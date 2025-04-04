@@ -1,4 +1,4 @@
-# python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_natural_pdc_cfkd.yaml"
+# python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_resnet50_pdc_cfkd.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  1
@@ -13,10 +13,10 @@ explainer                            :  <PEAL_BASE>/configs/explainers/pdc_defau
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/celeba.yaml
 test_data                            :  <PEAL_BASE>/configs/data/celeba.yaml
-student                              :  $PEAL_RUNS/celeba/Blond_Hair/classifier_natural/model.cpl
-teacher                              :  $PEAL_RUNS/celeba/Blond_Hair/classifier_natural/model.cpl
+student                              :  $PEAL_RUNS/celeba/Blond_Hair/resnet50_natural/model.cpl
+teacher                              :  $PEAL_RUNS/celeba/Blond_Hair/resnet50_natural/model.cpl
 generator                            :  $PEAL_RUNS/celeba/ddpm/config.yaml
-base_dir                             :  $PEAL_RUNS/celeba/Blond_Hair/classifier_natural/pdc_cfkd
+base_dir                             :  $PEAL_RUNS/celeba/Blond_Hair/resnet50_natural/pdc_cfkd
 task:
   criterions:
     ce     : 1.0

@@ -156,3 +156,36 @@ python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/waterbirds_natural_pdc
 # you can see the collages in $PEAL_BASE/waterbirds/classifier_natural/pdc_cfkd/0/validation_collages0
 # metrics: tensorboard --logdir $PEAL_BASE/waterbirds/classifier_natural/pdc_cfkd/logs
 
+
+# Reproduction of results on Resnet50
+#
+python train_predictor.py --config "<PEAL_BASE>/configs/predictors/celeba_Blond_Hair_resnet50.yaml"
+
+#
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_resnet50_ace_cfkd.yaml"
+
+#
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_resnet50_dime_cfkd.yaml"
+
+#
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_resnet50_fastdime_cfkd.yaml"
+
+#
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_resnet50_pdc_cfkd.yaml"
+
+
+# Reproduction of results on VitB16
+#
+python train_predictor.py --config "<PEAL_BASE>/configs/predictors/celeba_Blond_Hair_vit_b_16.yaml"
+
+#
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_vit_b_16_ace_cfkd.yaml"
+
+#
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_vit_b_16_dime_cfkd.yaml"
+
+#
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_vit_b_16_fastdime_cfkd.yaml"
+
+#
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_vit_b_16_pdc_cfkd.yaml"

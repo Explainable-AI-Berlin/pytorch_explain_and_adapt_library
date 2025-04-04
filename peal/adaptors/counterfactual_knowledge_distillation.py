@@ -306,7 +306,7 @@ class CFKD(Adaptor):
             test_config=self.adaptor_config.test_data,
             enable_hints=bool(teacher == "SegmentationMask"),
         )
-        self.dataloaders_val = WeightedDataloaderList([self.val_dataloader])
+        self.joint_validation_dataloader = WeightedDataloaderList([self.val_dataloader])
         self.adaptor_config.data = self.train_dataloader.dataset.config
 
         #
@@ -376,7 +376,7 @@ class CFKD(Adaptor):
             generator=self.generator,
             input_type=self.adaptor_config.data.input_type,
             explainer_config=self.adaptor_config.explainer,
-            datasource=[self.dataloader_mixer, self.dataloaders_val],
+            datasource=[self.dataloader_mixer, self.joint_validation_dataloader],
             tracking_level=self.adaptor_config.tracking_level,
         )
         self.logits_to_prediction = lambda logits: logits.argmax(-1)
@@ -452,19 +452,19 @@ class CFKD(Adaptor):
             self.adaptor_config.tracking_level >= 1
             and not os.path.exists(boundary_path)
             and hasattr(
-                self.dataloaders_val.dataloaders[0].dataset,
+                self.joint_validation_dataloader.dataloaders[0].dataset,
                 "visualize_decision_boundary",
             )
             and not os.path.exists(boundary_path)
         ):
-            self.dataloaders_val.dataloaders[0].dataset.visualize_decision_boundary(
+            self.joint_validation_dataloader.dataloaders[0].dataset.visualize_decision_boundary(
                 self.student,
                 self.adaptor_config.training.test_batch_size,
                 self.device,
                 boundary_path,
                 temperature=self.adaptor_config.explainer.temperature,
                 train_dataloader=self.dataloader_mixer,
-                val_dataloaders=self.dataloaders_val,
+                val_dataloaders=self.joint_validation_dataloader,
             )
 
         log_dir = os.path.join(self.base_dir, "logs")
@@ -1234,7 +1234,7 @@ class CFKD(Adaptor):
             config=self.validation_data_config,
             datasource=val_dataset_path,
         )
-        self.dataloaders_val.append(dataloader_val)
+        self.joint_validation_dataloader.append(dataloader_val)
         log_images_to_writer(
             dataloader_val, writer, "validation_" + str(finetune_iteration)
         )
@@ -1307,7 +1307,7 @@ class CFKD(Adaptor):
             finetune_trainer = ModelTrainer(
                 config=copy.deepcopy(self.adaptor_config),
                 model=self.student,
-                datasource=(self.dataloader_mixer, self.dataloaders_val),
+                datasource=(self.dataloader_mixer, self.joint_validation_dataloader),
                 model_path=os.path.join(
                     self.base_dir, str(finetune_iteration), "finetuned_model"
                 ),
@@ -1316,14 +1316,14 @@ class CFKD(Adaptor):
             )
             if self.hints_enabled:
                 self.dataloader_mixer.disable_hints()
-                for val_dataloader in self.dataloaders_val.dataloaders:
+                for val_dataloader in self.joint_validation_dataloader.dataloaders:
                     val_dataloader.dataset.disable_hints()
 
             if isinstance(
                 self.explainer.explainer_config, PerfectFalseCounterfactualConfig
             ):
                 self.dataloader_mixer.disable_idx()
-                for val_dataloader in self.dataloaders_val.dataloaders:
+                for val_dataloader in self.joint_validation_dataloader.dataloaders:
                     val_dataloader.dataset.disable_idx()
 
             finetune_trainer.fit(
@@ -1332,14 +1332,14 @@ class CFKD(Adaptor):
 
             if self.hints_enabled:
                 self.dataloader_mixer.enable_hints()
-                for val_dataloader in self.dataloaders_val.dataloaders:
+                for val_dataloader in self.joint_validation_dataloader.dataloaders:
                     val_dataloader.dataset.enable_hints()
 
             if isinstance(
                 self.explainer.explainer_config, PerfectFalseCounterfactualConfig
             ):
                 self.dataloader_mixer.enable_idx()
-                for val_dataloader in self.dataloaders_val.dataloaders:
+                for val_dataloader in self.joint_validation_dataloader.dataloaders:
                     val_dataloader.dataset.enable_idx()
 
         self.student = torch.load(
@@ -1355,7 +1355,7 @@ class CFKD(Adaptor):
         # TODO support multiple validation datasets for the sake of distillation!!!
         self.explainer.predictor_datasources = [
             self.dataloader_mixer,
-            self.dataloaders_val,
+            self.joint_validation_dataloader,
         ]
 
     def visualize_progress(self, paths):
@@ -1535,7 +1535,7 @@ class CFKD(Adaptor):
                     validation_stats_current,
                 ) = calculate_validation_statistics(
                     model=self.student,
-                    dataloader=self.dataloaders_val.dataloaders[0],
+                    dataloaders=self.joint_validation_dataloader.dataloaders,
                     tracked_keys=self.tracked_keys,
                     base_path=validation_collages_base_path,
                     output_size=self.output_size,
@@ -1732,10 +1732,10 @@ class CFKD(Adaptor):
                     np.savez(f, **tracked_values_file)
 
         if self.adaptor_config.tracking_level > 0 and hasattr(
-            self.dataloaders_val.dataloaders[0].dataset,
+            self.joint_validation_dataloader.dataloaders[0].dataset,
             "global_counterfactual_visualization",
         ):
-            self.dataloaders_val.dataloaders[
+            self.joint_validation_dataloader.dataloaders[
                 0
             ].dataset.global_counterfactual_visualization(
                 os.path.join(
@@ -1951,20 +1951,20 @@ class CFKD(Adaptor):
             )
             if (
                 hasattr(
-                    self.dataloaders_val.dataloaders[0].dataset,
+                    self.joint_validation_dataloader.dataloaders[0].dataset,
                     "visualize_decision_boundary",
                 )
                 and not os.path.exists(decision_boundary_path)
                 and self.adaptor_config.tracking_level >= 1
             ):
-                self.dataloaders_val.dataloaders[0].dataset.visualize_decision_boundary(
+                self.joint_validation_dataloader.dataloaders[0].dataset.visualize_decision_boundary(
                     self.student,
                     self.adaptor_config.training.test_batch_size,
                     self.device,
                     decision_boundary_path,
                     temperature=self.adaptor_config.explainer.temperature,
                     train_dataloader=self.dataloader_mixer,
-                    val_dataloaders=self.dataloaders_val,
+                    val_dataloaders=self.joint_validation_dataloader,
                 )
 
             (
