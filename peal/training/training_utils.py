@@ -73,6 +73,7 @@ def calculate_validation_statistics(
                 .detach()
                 .cpu()
             )
+            print('A')
             y_pred = logits_to_prediction(pred_confidences)
             if "hint_list" in tracked_keys or "idx_list" in tracked_keys:
                 y_res = y[1:]
@@ -91,7 +92,6 @@ def calculate_validation_statistics(
                 confusion_matrix[int(y[i])][int(y_pred[i])] += 1
                 num_samples += 1
 
-            print('A')
 
             pbar.stored_values["acc"] = correct / num_samples
 

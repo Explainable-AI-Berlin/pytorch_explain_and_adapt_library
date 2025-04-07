@@ -556,9 +556,9 @@ class CounterfactualExplainer(ExplainerInterface):
             )
             if not os.path.exists(distilled_path):
                 if isinstance(self.explainer_config.distilled_predictor, dict):
-                    self.explainer_config.distilled_predictor[
-                        "data"
-                    ] = self.val_dataset.config
+                    self.explainer_config.distilled_predictor["data"] = (
+                        self.val_dataset.config
+                    )
 
                 elif isinstance(
                     self.explainer_config.distilled_predictor, PredictorConfig
@@ -646,7 +646,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 self.explainer_config.optimizer + " is not a valid optimizer!"
             )
 
-        mask = torch.ones(x.shape[0]).to(x)
+        not_finished_mask = torch.ones(x.shape[0]).to(x)
         pred_original = (
             torch.nn.functional.softmax(
                 self.predictor(x_predictor.to(self.device))
@@ -670,14 +670,13 @@ class CounterfactualExplainer(ExplainerInterface):
         best_z = torch.clone(z[0])
         best_score = 0.5 * torch.ones_like(target_confidence_goal_current)
         best_mask = torch.ones_like(best_z)
-        boolmask = None
 
         for i in range(self.explainer_config.gradient_steps):
             (
                 best_score,
                 best_z,
                 best_mask,
-                mask,
+                not_finished_mask,
                 z,
                 target_confidence_goal_current,
                 gradient_confidences_old,
@@ -701,7 +700,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 z=z,
                 best_mask=best_mask,
                 target_confidence_goal_current=target_confidence_goal_current,
-                mask=mask,
+                not_finished_mask=not_finished_mask,
                 gradient_confidences_old=gradient_confidences_old,
             )
 
@@ -793,7 +792,7 @@ class CounterfactualExplainer(ExplainerInterface):
         z,
         best_mask,
         target_confidence_goal_current,
-        mask,
+        not_finished_mask,
         gradient_confidences_old,
     ):
         if self.explainer_config.iterationwise_encoding:
@@ -864,8 +863,8 @@ class CounterfactualExplainer(ExplainerInterface):
             current_inpaint = self.explainer_config.inpaint
 
         else:
-            dist_l1 = 0.0
-            current_inpaint = 0.00001
+            dist_l1 = self.explainer_config.dist_l1 * (0.5 ** (num_attempts -1))
+            current_inpaint = self.explainer_config.inpaint * (0.5 ** (num_attempts -1))
 
         loss += dist_l1 * torch.mean(torch.stack(l1_losses))
         if not pbar is None:
@@ -897,9 +896,6 @@ class CounterfactualExplainer(ExplainerInterface):
                 z[0].grad[sample_idx].norm(p=float("inf"))
                 * self.explainer_config.learning_rate
             )
-            """clip_value = self.explainer_config.gradient_clipping * float(
-                torch.prod(torch.tensor(list(z[0][sample_idx].shape)))
-            )"""
             if norm > self.explainer_config.gradient_clipping:
                 rescale_factor = (
                     self.explainer_config.gradient_clipping
@@ -910,7 +906,7 @@ class CounterfactualExplainer(ExplainerInterface):
 
         if self.explainer_config.use_masking:
             for sample_idx in range(len(target_confidences)):
-                if mask[sample_idx] == 0:
+                if not_finished_mask[sample_idx] == 0:
                     for variable_idx, v_elem in enumerate(z):
                         if self.explainer_config.optimizer == "Adam":
                             optimizer = torch.optim.Adam(
@@ -924,10 +920,11 @@ class CounterfactualExplainer(ExplainerInterface):
             if current_inpaint > 0.0:
                 z[0].grad = boolmask_in * z[0].grad
 
-        abs_grads = torch.abs(z[0].grad)
-        z[0].grad[abs_grads < (abs_grads.max() / 10)] = 0
-        z[0].data = z[0].data - 100.0 * z[0].grad
-        #optimizer.step()
+        #abs_grads = torch.abs(z[0].grad)
+        # z[0].grad[abs_grads < (abs_grads.max() / 10)] = 0
+        # z[0].grad = torch.zeros_like(z[0].grad)
+        #z[0].data = z[0].data - 100.0 * z[0].grad
+        optimizer.step()
         boolmask = torch.zeros_like(z[0].data)
         if self.explainer_config.iterationwise_encoding:
             z[0].data = torch.clamp(z[0].data, -1, 1)
@@ -947,19 +944,17 @@ class CounterfactualExplainer(ExplainerInterface):
             for j in range(len(target_confidences_current)):
                 target_confidences_current[j] = pred_current[j, int(y_target[j])]
 
-            exceptions = target_confidences_current < 0.5
+            no_repaint_exceptions = target_confidences_current < 0.5
             if i == self.explainer_config.gradient_steps - 1:
-                exceptions = torch.zeros_like(exceptions)
+                no_repaint_exceptions = torch.zeros_like(no_repaint_exceptions)
 
-            if self.explainer_config.inpaint > 0.0 and (
-                abs(i - self.explainer_config.repaint_frequency + 1)
-                % self.explainer_config.repaint_frequency
-                == 0
-                or i == self.explainer_config.gradient_steps - 1
+            if (
+                self.explainer_config.inpaint > 0.0
+                and not no_repaint_exceptions.sum() == no_repaint_exceptions.shape[0]
             ):
                 z_updated, boolmask = self.generator.repaint(
                     x=x.to(self.device),  # TODO seems to be in generator normalization
-                    pe=z[0].to(self.device),
+                    pe=torch.clone(z[0].data).to(self.device),
                     inpaint=current_inpaint,
                     dilation=self.explainer_config.dilation,
                     t=self.explainer_config.sampling_time_fraction,
@@ -968,10 +963,13 @@ class CounterfactualExplainer(ExplainerInterface):
                     mask_momentum=self.explainer_config.mask_momentum,
                     boolmask_in=boolmask_in,
                     max_avg_combination=self.explainer_config.max_avg_combination,
-                    exceptions=exceptions,
+                    exceptions=no_repaint_exceptions,
                 )
                 for sample_idx in range(z[0].data.shape[0]):
-                    if mask[sample_idx] == 1:
+                    if (
+                        not_finished_mask[sample_idx] == 1
+                        and no_repaint_exceptions[sample_idx] == 0
+                    ):
                         z[0].data[sample_idx] = z_updated[sample_idx]
 
             """z_default = self.generator.dataset.project_to_pytorch_default(z[0])
@@ -1004,7 +1002,7 @@ class CounterfactualExplainer(ExplainerInterface):
             target_confidences[j] = pred_original[j, int(y_target[j])]
 
         for j in range(img_predictor.shape[0]):
-            if exceptions[j] or mask[j] == 0:
+            if no_repaint_exceptions[j] or not_finished_mask[j] == 0:
                 continue
 
             if (
@@ -1018,7 +1016,7 @@ class CounterfactualExplainer(ExplainerInterface):
                     best_mask[j] = boolmask[j]
 
             if target_confidences[j] >= target_confidence_goal_current[j]:
-                mask[j] = 0
+                not_finished_mask[j] = 0
 
         if self.explainer_config.visualize_gradients:
             gradients_path = str(
@@ -1051,11 +1049,11 @@ class CounterfactualExplainer(ExplainerInterface):
             best_score,
             best_z,
             best_mask,
-            mask,
+            not_finished_mask,
             z,
             target_confidence_goal_current,
             gradient_confidences_old,
-            mask.sum() == 0,
+            not_finished_mask.sum() == 0,
         )
 
     def explain_batch(
@@ -1088,7 +1086,7 @@ class CounterfactualExplainer(ExplainerInterface):
         Returns:
             dict: The batch with the counterfactuals added.
         """
-        print('in explain batch!')
+        print("in explain batch!")
         if explainer_path is None:
             os_sep = os.path.abspath(os.sep)
             if base_path[: len(os_sep)] == os_sep:
@@ -1349,10 +1347,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 cosine_similarities_abs = torch.abs(cosine_similarities)
 
             for i in range(n_clusters):
-                if (
-                    self.explainer_config.clustering_strategy
-                    == "activation_clusters"
-                ):
+                if self.explainer_config.clustering_strategy == "activation_clusters":
                     idx_combined = int(torch.argmax(cosine_similarities_abs.flatten()))
                     idx_cluster = idx_combined // len(current_differences)
                     idx_current = idx_combined % len(current_differences)

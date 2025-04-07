@@ -867,7 +867,7 @@ def distill_predictor(
                 predictor_datasource[0],
             )
         )
-        print('distill validation dataset!')
+        print("distill validation dataset!")
         distillation_datasource.append(copy.deepcopy(predictor_datasource[1]))
         validation_datasets = distill_binary_dataset(
             predictor_distillation,
@@ -881,7 +881,9 @@ def distill_predictor(
                 batch_size=distillation_datasource[1].dataloaders[i].batch_size,
             )
 
-    elif isinstance(predictor_datasource[0].dataset, Image2MixedDataset):
+    elif isinstance(predictor_datasource[0], Image2MixedDataset) or isinstance(
+        predictor_datasource[0].dataset, Image2MixedDataset
+    ):
         distillation_datasource = distill_binary_dataset(
             predictor_distillation, base_path, predictor, predictor_datasource
         )
