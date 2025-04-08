@@ -104,7 +104,10 @@ from torch import nn
 
 from peal.dependencies.group_dro.loss import LossComputer
 
-from memory_profiler import profile
+# from memory_profiler import profile
+
+from torch.utils.data import DataLoader
+from torch.utils.data.sampler import WeightedRandomSampler
 
 
 dro_criterions = {
@@ -140,6 +143,10 @@ class PealGroupDROConfig(AdaptorConfig):
     normalize_loss: bool = False
     btl: bool = False
     """
+    Reweights groups of set if true.
+    """
+    reweight_groups: bool = False
+    """
     Resets weights if true.
     """
     reset_weights: bool = True
@@ -160,6 +167,7 @@ class PealGroupDROConfig(AdaptorConfig):
     """
     __name__: str = "peal.PealGroupDROConfig"
 
+    """
     def __init__(
         self,
         predictor: Union[dict, PredictorConfig] = None,
@@ -171,19 +179,20 @@ class PealGroupDROConfig(AdaptorConfig):
         step_size: float = 0.01,
         normalize_loss: bool = False,
         btl: bool = False,
+        reweight_groups: bool = False,
         reset_weights: bool = True,
         model_path: str = None,
         seed: int = 0,
         **kwargs,
     ):
-        """
+        
         The config template for the DRO adaptor.
         Sets the values of the config that are listed above.
 
         TODO: Run checks to assure all values are filled, including with defaults, if necessary
         Args:
             so weiter und so fort
-        """
+        
 
         # TODO: We are using pydantic to create the config file. Be sure to check that it's written in this style
 
@@ -203,11 +212,12 @@ class PealGroupDROConfig(AdaptorConfig):
         self.normalize_loss = normalize_loss
         self.btl = btl
 
+        self.reweight_groups = reweight_groups
         self.reset_weights = reset_weights
         self.model_path = model_path
         self.seed = seed
         self.kwargs = kwargs
-
+    """
 
 
 class PealGroupDRO(Adaptor):
@@ -298,6 +308,8 @@ class PealGroupDRO(Adaptor):
 
         self.model.to(self.device)
 
+        ### BEGIN: DRO Alterations
+        """
         # either the dataloaders have to be given or the path to the dataset
         (
             self.train_dataloader,
@@ -306,6 +318,101 @@ class PealGroupDRO(Adaptor):
         ) = create_dataloaders_from_datasource(
             config=self.config, datasource=datasource
         )
+        """
+        datasource = self.config.data.dataset_path
+
+        if isinstance(datasource, str):
+            dataset_train, dataset_val, dataset_test = get_datasets(
+                config=self.config.data,
+                base_dir=datasource
+            )
+
+        elif isinstance(datasource[0], torch.utils.data.Dataset):
+            if len(datasource) == 2:
+                dataset_train, dataset_val = datasource
+                dataset_test = dataset_val
+
+            else:
+                dataset_train, dataset_val, dataset_test = datasource
+
+        dataset_train.enable_groups()
+        dataset_val.enable_groups()
+
+        dataset_train.task_config = self.config.task
+        dataset_val.task_config = self.config.task
+        dataset_test.task_config = self.config.task
+
+        shuffle = True
+        sampler = None
+
+        if self.adaptor_config.reweight_groups:
+
+            """ 
+            group_array = torch.zeros(len(dataset_train), dtype=torch.int)
+            confounding_factors = dataset_train.config.confounding_factors
+            confounding_factors_idx = torch.zeros(len(confounding_factors), dtype=torch.int)
+            encoding_array = 2 ** torch.arange(len(confounding_factors))
+
+            for idx, cf in enumerate(confounding_factors):
+                confounding_factors_idx[idx] = dataset_train.attributes.index(cf)
+
+            for idx, key in enumerate(dataset_train.keys):
+                attr = dataset_train.data[key]
+                # NOTE: Assumes that attributes are binary and encoded as 0 and 1
+                group_array[idx] = torch.sum(attr[confounding_factors_idx] * encoding_array, dtype=torch.float)
+
+            group_counts = torch.zeros(2 ** len(confounding_factors))
+
+            for idx in range(len(group_array)):
+                group_counts[group_array[idx]] += 1
+
+            group_weights = len(dataset_train) / group_counts
+            weights = group_weights[group_array]
+            """
+
+            group_array = []
+            # TODO: This n_groups calculation seems dubious
+            n_groups = 2 ** dataset_train.output_size
+
+            for x, y in dataset_train:
+                y, confounder = y
+                group_idx = y + dataset_train.output_size * confounder
+                group_array.append(group_idx)
+
+            _group_array = torch.LongTensor([g.item() for g in group_array])
+            _group_counts = (torch.arange(n_groups).unsqueeze(1) == _group_array).sum(1).float()
+
+            group_weights = len(dataset_train) / _group_counts
+            weights = group_weights[_group_array]
+
+            shuffle = False
+            sampler = WeightedRandomSampler(weights, len(dataset_train), replacement=True)
+
+        self.train_dataloader = DataLoader(
+            dataset_train,
+            shuffle=shuffle,
+            sampler=sampler,
+            batch_size=self.config.training.train_batch_size,
+            num_workers=0
+        )
+
+        self.val_dataloaders = DataLoader(
+            dataset_val,
+            shuffle=False,
+            batch_size=self.config.training.val_batch_size,
+            num_workers=0
+        )
+
+        self.test_dataloader = DataLoader(
+            dataset_test,
+            shuffle=False,
+            batch_size=self.config.training.test_batch_size,
+            num_workers=0
+        )
+        ### END: DRO Alterations
+
+
+
 
         if self.config.training.train_on_test:
             self.train_dataloader = test_dataloader
@@ -315,12 +422,6 @@ class PealGroupDRO(Adaptor):
 
         if not isinstance(self.val_dataloaders, list):
             self.val_dataloaders = [self.val_dataloaders]
-
-        ### BEGIN: DRO Alterations
-        self.train_dataloader.dataset.enable_groups()
-        for vd in self.val_dataloaders:
-            vd.dataset.enable_groups()
-        ### END: DRO Alterations
 
         if self.config.training.class_balanced:
             new_train_dataloaders = []
@@ -497,6 +598,7 @@ class PealGroupDRO(Adaptor):
         """
         self.fit(continue_training=continue_training, is_initialized=is_initialized)
 
+    """ 
     def log_cpu_memory_usage(self):
         process = psutil.Process(os.getpid())
         print(f"Memory usage: {process.memory_info().rss / 1024 ** 2:.2f} MB")
@@ -508,16 +610,16 @@ class PealGroupDRO(Adaptor):
             print(f"GPU Memory - Allocated: {allocated_memory:.2f} MB, Reserved: {reserved_memory:.2f} MB")
         else:
             print("CUDA is not available.")
-
+    """
     # @profile
     def run_epoch(self, dataloader, loss_criterions, mode="train", pbar=None):
         """ """
-        self.log_cpu_memory_usage()
-        self.log_gpu_memory_usage()
+        #self.log_cpu_memory_usage()
+        #self.log_gpu_memory_usage()
         sources = {}
         for batch_idx, sample in enumerate(dataloader):
-            self.log_cpu_memory_usage()
-            self.log_gpu_memory_usage()
+            #self.log_cpu_memory_usage()
+            #self.log_gpu_memory_usage()
             if hasattr(dataloader, "return_src") and dataloader.return_src:
                 sample, source = sample
                 source = str(source)
