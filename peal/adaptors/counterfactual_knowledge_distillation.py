@@ -610,7 +610,7 @@ class CFKD(Adaptor):
                         self.adaptor_config.current_iteration,
                     )
 
-            print("validation stats generatated!!!")
+            print("validation stats generated!!!")
 
         else:
             with open(os.path.join(self.base_dir, "platform.txt"), "w") as f:
@@ -677,7 +677,7 @@ class CFKD(Adaptor):
         visualization_path = os.path.join(self.base_dir, "visualization.png")
         if (
             self.output_size == 2
-            and self.adaptor_config.tracking_level >= 4
+            and self.adaptor_config.tracking_level >= 6
             and not os.path.exists(visualization_path)
         ):
             print("visualize progress!!!")
@@ -1977,7 +1977,7 @@ class CFKD(Adaptor):
             )
             if (
                 self.output_size == 2
-                and self.adaptor_config.tracking_level >= 4
+                and self.adaptor_config.tracking_level >= 6
                 and not os.path.exists(visualization_path)
             ):
                 self.visualize_progress(
@@ -1997,7 +1997,7 @@ class CFKD(Adaptor):
             )
 
         validation_stats = self.retrieve_validation_stats(
-            finetune_iteration=self.adaptor_config.current_iteration - 1,
+            finetune_iteration=self.adaptor_config.current_iteration,
             validation_prestats=validation_prestats,
             validation_tracked_values=validation_tracked_values,
         )
@@ -2006,7 +2006,7 @@ class CFKD(Adaptor):
                 writer.add_scalar(
                     "validation_" + key,
                     validation_stats[key],
-                    finetune_iteration,
+                    self.adaptor_config.current_iteration,
                 )
 
         self.adaptor_config.feedback_accuracies.append(
