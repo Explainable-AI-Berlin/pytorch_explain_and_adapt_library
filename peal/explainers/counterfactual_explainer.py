@@ -1466,6 +1466,7 @@ class CounterfactualExplainer(ExplainerInterface):
         return explanations_dict_out
 
     def calculate_latent_difference_stats(self, explanations_dict):
+        tracked_stats = {}
         if self.explainer_config.tracking_level >= 3:
             latent_differences = None
             if hasattr(self.val_dataset, "sample_to_latent"):
@@ -1606,11 +1607,11 @@ class CounterfactualExplainer(ExplainerInterface):
                     else:
                         latent_diversity = 0.0
 
-        tracked_stats = {}
-        tracked_stats["latent_sparsity"] = latent_sparsity
-        print("latent_sparsity: " + str(latent_sparsity))
-        tracked_stats["latent_diversity"] = latent_diversity
-        print("latent_diversity: " + str(latent_diversity))
+                tracked_stats["latent_sparsity"] = latent_sparsity
+                print("latent_sparsity: " + str(latent_sparsity))
+                tracked_stats["latent_diversity"] = latent_diversity
+                print("latent_diversity: " + str(latent_diversity))
+
         return tracked_stats
 
     def run(self, oracle_path=None, confounder_oracle_path=None):

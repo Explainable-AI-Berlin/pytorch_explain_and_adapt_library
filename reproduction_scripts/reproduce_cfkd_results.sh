@@ -10,7 +10,7 @@
 python train_generator.py --config "<PEAL_BASE>/configs/generators/square_ddpm.yaml"
 
 # train the predictor that shall be analyzed
-python train_predictor.py --config "<PEAL_BASE>/configs/predictors/square3_classifier_poisoned100.yaml"
+python train_predictor.py --config "<PEAL_BASE>/configs/predictors/square_classifier_poisoned100.yaml"
 
 #
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_pdc_unbiased_cfkd.yaml"

@@ -306,6 +306,9 @@ class CFKD(Adaptor):
             test_config=self.adaptor_config.test_data,
             enable_hints=bool(teacher == "SegmentationMask"),
         )
+        if not isinstance(self.val_dataloader, torch.utils.data.DataLoader):
+            import pdb; pdb.set_trace()
+
         self.joint_validation_dataloader = WeightedDataloaderList([self.val_dataloader])
         self.adaptor_config.data = self.train_dataloader.dataset.config
 
@@ -1234,6 +1237,9 @@ class CFKD(Adaptor):
             config=self.validation_data_config,
             datasource=val_dataset_path,
         )
+        if not isinstance(dataloader_val, torch.utils.data.DataLoader):
+            import pdb; pdb.set_trace()
+
         self.joint_validation_dataloader.append(dataloader_val)
         log_images_to_writer(
             dataloader_val, writer, "validation_" + str(finetune_iteration)
