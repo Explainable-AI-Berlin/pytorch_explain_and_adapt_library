@@ -33,7 +33,11 @@ from peal.training.interfaces import PredictorConfig
 from peal.training.loggers import log_images_to_writer
 from peal.training.loggers import Logger
 from peal.training.criterions import get_criterions
-from peal.data.dataloaders import create_dataloaders_from_datasource, DataloaderMixer, WeightedDataloaderList
+from peal.data.dataloaders import (
+    create_dataloaders_from_datasource,
+    DataloaderMixer,
+    WeightedDataloaderList,
+)
 from peal.generators.interfaces import Generator
 from peal.architectures.predictors import (
     SequentialModel,
@@ -194,7 +198,9 @@ class ModelTrainer:
                 and self.config.architecture[:12] == "torchvision_"
             ):
                 self.model = TorchvisionModel(
-                    self.config.architecture[12:], output_channels
+                    self.config.architecture[12:],
+                    output_channels,
+                    self.config.data.input_size[-1],
                 )
 
             else:
@@ -244,8 +250,12 @@ class ModelTrainer:
                     val_dataloader_copy = copy.deepcopy(self.val_dataloaders[j])
                     val_dataloader_copy.dataset.enable_class_restriction(i)
                     new_val_dataloaders.append(val_dataloader_copy)
-                    new_val_dataloader_weights.append(0.5 * self.val_dataloader_weights[j])
-                    new_val_dataloader_weights.append(0.5 * self.val_dataloader_weights[j])
+                    new_val_dataloader_weights.append(
+                        0.5 * self.val_dataloader_weights[j]
+                    )
+                    new_val_dataloader_weights.append(
+                        0.5 * self.val_dataloader_weights[j]
+                    )
 
             self.val_dataloaders = new_val_dataloaders
             self.val_dataloader_weights = new_val_dataloader_weights
@@ -550,14 +560,26 @@ class ModelTrainer:
         val_accuracy_previous = 0.0
         train_accuracy_previous = 0.0
         self.model.eval()
-        val_accuracy = 0.0
+        val_accuracy = None
         self.config.training.epoch = -1
         for idx, val_dataloader in enumerate(self.val_dataloaders):
             if len(val_dataloader) >= 1:
                 val_loss, val_accuracy_current = self.run_epoch(
                     val_dataloader, mode="validation_" + str(idx), pbar=pbar
                 )
-                val_accuracy += self.val_dataloader_weights[idx] * val_accuracy_current
+                if self.config.training.early_stopping_goal == "average_accuracy":
+                    if val_accuracy is None:
+                        val_accuracy = 0.0
+
+                    val_accuracy += (
+                        self.val_dataloader_weights[idx] * val_accuracy_current
+                    )
+
+                elif self.config.training.early_stopping_goal == "worst_group_accuracy":
+                    if val_accuracy is None:
+                        val_accuracy = val_accuracy_current
+
+                    val_accuracy = min(val_accuracy, val_accuracy_current)
 
         self.logger.writer.add_scalar("epoch_validation_accuracy", val_accuracy, -1)
 
@@ -589,15 +611,28 @@ class ModelTrainer:
                     )
             #
             self.model.eval()
-            val_accuracy = 0.0
+            val_accuracy = None
             for idx, val_dataloader in enumerate(self.val_dataloaders):
                 if len(val_dataloader) >= 1:
                     val_loss, val_accuracy_current = self.run_epoch(
                         val_dataloader, mode="validation_" + str(idx), pbar=pbar
                     )
-                    val_accuracy += (
-                        self.val_dataloader_weights[idx] * val_accuracy_current
-                    )
+                    if self.config.training.early_stopping_goal == "average_accuracy":
+                        if val_accuracy is None:
+                            val_accuracy = 0.0
+
+                        val_accuracy += (
+                            self.val_dataloader_weights[idx] * val_accuracy_current
+                        )
+
+                    elif (
+                        self.config.training.early_stopping_goal
+                        == "worst_group_accuracy"
+                    ):
+                        if val_accuracy is None:
+                            val_accuracy = val_accuracy_current
+
+                        val_accuracy = min(val_accuracy, val_accuracy_current)
 
             self.logger.writer.add_scalar(
                 "epoch_validation_accuracy", val_accuracy, self.config.training.epoch
@@ -692,7 +727,10 @@ def distill_binary_dataset(
     predictor_distillation, base_path, predictor, predictor_datasets
 ):
     distillation_datasource = []
-    for i in range(2):
+    for i in range(len(predictor_datasets)):
+        if isinstance(predictor_datasets[i], torch.utils.data.DataLoader):
+            predictor_datasets[i] = predictor_datasets[i].dataset
+
         class_predictions_path = os.path.join(base_path, str(i) + "predictions.csv")
         Path(base_path).mkdir(exist_ok=True, parents=True)
         if not os.path.exists(class_predictions_path):
@@ -713,6 +751,7 @@ def distill_binary_dataset(
         distilled_dataset_config.confounding_factors = None
         distilled_dataset_config.confounder_probability = None
         distilled_dataset_config.dataset_class = None
+        distilled_dataset_config.output_type = "multiclass"
         distillation_datasource.append(
             get_datasets(
                 config=distilled_dataset_config, data_dir=class_predictions_path
@@ -773,6 +812,36 @@ def distill_1ofn_dataset(
     return distillation_datasource
 
 
+def distill_dataloader_mixer(
+    predictor_distillation, base_path, predictor, predictor_datasource
+):
+    print("distill_dataloader_mixer")
+    print(base_path)
+    distillation_datasource = copy.deepcopy(predictor_datasource)
+    for i in range(len(distillation_datasource.dataloaders)):
+        if isinstance(distillation_datasource.dataloaders[i], DataloaderMixer):
+            distill_dataloader_mixer(
+                predictor_distillation,
+                os.path.join(base_path, str(i)),
+                predictor,
+                distillation_datasource.dataloaders[i],
+            )
+
+        else:
+            dataset = distill_binary_dataset(
+                predictor_distillation,
+                os.path.join(base_path, str(i)),
+                predictor,
+                [distillation_datasource.dataloaders[i]],
+            )
+            distillation_datasource.dataloaders[i] = torch.utils.data.DataLoader(
+                dataset,
+                batch_size=distillation_datasource.dataloaders[i].batch_size,
+            )
+
+    return predictor_datasource
+
+
 def distill_predictor(
     predictor_distillation,
     base_path,
@@ -787,7 +856,35 @@ def distill_predictor(
     if predictor_distillation.distill_from == "dataset":
         distillation_datasource = predictor_datasource
 
-    elif isinstance(predictor_datasource[0].dataset, Image2MixedDataset):
+    elif isinstance(predictor_datasource[0], DataloaderMixer) and isinstance(
+        predictor_datasource[1], WeightedDataloaderList
+    ):
+        distillation_datasource = []
+        distillation_datasource.append(
+            distill_dataloader_mixer(
+                predictor_distillation,
+                os.path.join(base_path, "training"),
+                predictor,
+                predictor_datasource[0],
+            )
+        )
+        print("distill validation dataset!")
+        distillation_datasource.append(copy.deepcopy(predictor_datasource[1]))
+        validation_datasets = distill_binary_dataset(
+            predictor_distillation,
+            os.path.join(base_path, "validation"),
+            predictor,
+            predictor_datasource[1].dataloaders,
+        )
+        for i in range(len(validation_datasets)):
+            distillation_datasource[1].dataloaders[i] = torch.utils.data.DataLoader(
+                validation_datasets[i],
+                batch_size=distillation_datasource[1].dataloaders[i].batch_size,
+            )
+
+    elif isinstance(predictor_datasource[0], Image2MixedDataset) or isinstance(
+        predictor_datasource[0].dataset, Image2MixedDataset
+    ):
         distillation_datasource = distill_binary_dataset(
             predictor_distillation, base_path, predictor, predictor_datasource
         )
@@ -799,7 +896,9 @@ def distill_predictor(
         predictor_distillation.task = predictor_datasource[0].task_config
 
     else:
-        raise Exception("Either distill from dataset or use available dataset type for relabeling")
+        raise Exception(
+            "Either distill from dataset or use available dataset type for relabeling"
+        )
 
     predictor_distilled = copy.deepcopy(predictor)
     if replace_with_activation == "leakysoftplus":

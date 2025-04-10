@@ -6,7 +6,7 @@ tracking_level                       :  3
 min_train_samples                    :  900
 finetune_iterations                  :  1
 max_validation_samples               :  100
-continuous_learning                  :  "retrain"
+continuous_learning                  :  "finetune"
 use_visualization                    :  False #True
 calculate_group_accuracies           :  True
 explainer                            :  <PEAL_BASE>/configs/explainers/pdc_default64x64.yaml
@@ -14,7 +14,7 @@ training                             :  <PEAL_BASE>/configs/training/img_finetun
 data                                 :  <PEAL_BASE>/configs/data/square_poisoned098.yaml
 test_data                            :  <PEAL_BASE>/configs/data/square_unpoisoned.yaml
 student                              :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned098/model.cpl
-teacher                              :  SegmentationMask
+teacher                              :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_unpoisoned/model.cpl
 generator                            :  $PEAL_RUNS/square/ddpm/config.yaml
 base_dir                             :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned098/pdc_cfkd
 task:

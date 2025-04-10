@@ -7,17 +7,16 @@ min_train_samples                    :  400
 finetune_iterations                  :  1
 max_validation_samples               :  100
 continuous_learning                  :  "finetune"
-replace_model                        :  True
 use_visualization                    :  True
 calculate_group_accuracies           :  True
-explainer                            :  <PEAL_BASE>/configs/explainers/pdc_default.yaml
+explainer                            :  <PEAL_BASE>/configs/explainers/pdc_blond_vs_male.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
-data                                 :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba500_poisoned096.yaml
+data                                 :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba_poisoned096.yaml
 test_data                            :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba.yaml
-student                              :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisoned096/model.cpl
-teacher                              :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisoned050/model.cpl
+student                              :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned096/model.cpl
+teacher                              :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_unpoisoned/model.cpl
 generator                            :  $PEAL_RUNS/celeba_copyrighttag/ddpm/config.yaml
-base_dir                             :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/unregularized0/classifier_poisoned096/pdc_cfkd
+base_dir                             :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned096/pdc_cfkd
 task:
   criterions:
     ce     : 1.0

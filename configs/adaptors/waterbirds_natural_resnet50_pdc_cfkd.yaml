@@ -13,7 +13,7 @@ explainer                            :  <PEAL_BASE>/configs/explainers/pdc_defau
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/waterbirds.yaml
 test_data                            :  <PEAL_BASE>/configs/data/waterbirds.yaml
-student                              :  $PEAL_RUNS/waterbirds/classifier_natural_new/model.cpl
+student                              :  $PEAL_RUNS/waterbirds/classifier_natural_new/config.yaml
 teacher                              :  SegmentationMask
 generator                            :  $PEAL_RUNS/waterbirds/ddpm/config.yaml
 base_dir                             :  $PEAL_RUNS/waterbirds/classifier_natural_new/pdc_cfkd

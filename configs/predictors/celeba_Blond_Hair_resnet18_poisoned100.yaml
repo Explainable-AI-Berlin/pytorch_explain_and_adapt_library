@@ -1,6 +1,6 @@
-# python train_predictor.py --config "<PEAL_BASE>/configs/predictors/celeba_Blond_Hair_classifier.yaml"
-model_path        : $PEAL_RUNS/celeba/Blond_Hair/classifier_natural
-data              : <PEAL_BASE>/configs/data/celeba.yaml
+# python train_predictor.py --config "<PEAL_BASE>/configs/predictors/celeba_Blond_Hair_resnet18_poisoned100.yaml"
+model_path        : $PEAL_RUNS/celeba/Blond_Hair/resnet18_poisoned100
+data              : <PEAL_BASE>/configs/data/celeba_Blond_Hair_confounding_Male_poisoned100.yaml
 training          : <PEAL_BASE>/configs/training/img_classifier_balanced.yaml
 architecture      : torchvision_resnet18
 task:

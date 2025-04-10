@@ -1,5 +1,5 @@
-# python train_predictor.py --config "<PEAL_BASE>/configs/predictors/celeba_Blond_Hair_classifier.yaml"
-model_path        : $PEAL_RUNS/celeba/Blond_Hair/classifier_natural
+# python train_predictor.py --config "<PEAL_BASE>/configs/predictors/celeba_Blond_Hair_vit_b_16.yaml"
+model_path        : $PEAL_RUNS/celeba/Blond_Hair/vit_b_16_natural
 data              : <PEAL_BASE>/configs/data/celeba.yaml
 training          : <PEAL_BASE>/configs/training/img_classifier_balanced.yaml
 architecture      : torchvision_resnet18
