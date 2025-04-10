@@ -809,6 +809,7 @@ class Image2ClassDataset(ImageDataset):
 
         self.hints_enabled = False
         self.idx_enabled = False
+        self.url_enabled = False
         self.task_config = task_config
         self.transform = transform
         self.return_dict = return_dict
@@ -894,6 +895,12 @@ class Image2ClassDataset(ImageDataset):
 
     def disable_idx(self):
         self.idx_enabled = False
+
+    def enable_url(self):
+        self.url_enabled = True
+
+    def disable_url(self):
+        self.url_enabled = False
 
     @property
     def output_size(self):
@@ -995,6 +1002,9 @@ class Image2ClassDataset(ImageDataset):
 
         if self.idx_enabled:
             return_dict["idx"] = idx
+
+        if self.url_enabled:
+            return_dict["url"] = os.path.join(*self.urls[idx])
 
         if self.string_description_enabled:
             return_dict["description"] = target_str

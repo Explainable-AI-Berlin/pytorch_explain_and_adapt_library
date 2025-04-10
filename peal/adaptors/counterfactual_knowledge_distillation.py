@@ -267,8 +267,8 @@ class CFKD(Adaptor):
             visualization (callable, optional):
                 The visualization function that is used for the run. Defaults to lambda x: x.
         """
-        # TODO make sure to use seeds everywhere!
         self.adaptor_config = load_yaml_config(adaptor_config, AdaptorConfig)
+        #assert self.adaptor_config.batch_size % 2 == 0, "only even batch sizes are supported so far!"
         self.adaptor_config.explainer.tracking_level = (
             self.adaptor_config.tracking_level
         )
@@ -306,8 +306,6 @@ class CFKD(Adaptor):
             test_config=self.adaptor_config.test_data,
             enable_hints=bool(teacher == "SegmentationMask"),
         )
-        if not isinstance(self.val_dataloader, torch.utils.data.DataLoader):
-            import pdb; pdb.set_trace()
 
         self.joint_validation_dataloader = WeightedDataloaderList([self.val_dataloader])
         self.adaptor_config.data = self.train_dataloader.dataset.config
@@ -1841,17 +1839,6 @@ class CFKD(Adaptor):
                 validation_stats=validation_prestats,
                 finetune_iteration=finetune_iteration,
             )
-            """if (
-                len(list(tracked_values.values())[0])
-                < self.adaptor_config.min_train_samples
-            ):
-                print("No counterfactuals could be found anymore!")
-                open(os.path.join(self.base_dir, "warning.txt"), "w").write(
-                    "No x_counterfactual_list could be found anymore in iteration "
-                    + str(finetune_iteration)
-                    + "!"
-                )
-                return self.student"""
 
             feedback, feedback_stats = self.retrieve_feedback(
                 tracked_values=tracked_values,

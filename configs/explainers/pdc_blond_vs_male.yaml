@@ -18,7 +18,7 @@ learning_rate: 300.0
 mask_momentum: 0.0
 max_avg_combination: 0.5
 max_samples: null
-merge_clusters: select_best
+merge_clusters: concatenate
 momentum: 0.9
 num_attempts: 2
 num_discretization_steps: 20

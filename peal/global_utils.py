@@ -496,7 +496,12 @@ def get_predictions(args):
         d["idx"] += list(img_file)
 
     print(acc / n)
-    df = pd.DataFrame(data=d)
+    try:
+        df = pd.DataFrame(data=d)
+
+    except Exception:
+        import pdb; pdb.set_trace()
+
     df.to_csv(
         args.label_path,
         index=False,

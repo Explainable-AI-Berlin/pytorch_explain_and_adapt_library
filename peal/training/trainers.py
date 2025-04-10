@@ -751,6 +751,7 @@ def distill_binary_dataset(
         distilled_dataset_config.confounding_factors = None
         distilled_dataset_config.confounder_probability = None
         distilled_dataset_config.dataset_class = None
+        distilled_dataset_config.output_type = "multiclass"
         distillation_datasource.append(
             get_datasets(
                 config=distilled_dataset_config, data_dir=class_predictions_path
