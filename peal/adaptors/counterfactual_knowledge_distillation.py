@@ -268,7 +268,7 @@ class CFKD(Adaptor):
                 The visualization function that is used for the run. Defaults to lambda x: x.
         """
         self.adaptor_config = load_yaml_config(adaptor_config, AdaptorConfig)
-        #assert self.adaptor_config.batch_size % 2 == 0, "only even batch sizes are supported so far!"
+        # assert self.adaptor_config.batch_size % 2 == 0, "only even batch sizes are supported so far!"
         self.adaptor_config.explainer.tracking_level = (
             self.adaptor_config.tracking_level
         )
@@ -306,6 +306,10 @@ class CFKD(Adaptor):
             test_config=self.adaptor_config.test_data,
             enable_hints=bool(teacher == "SegmentationMask"),
         )
+        if not isinstance(self.val_dataloader, torch.utils.data.DataLoader):
+            import pdb
+
+            pdb.set_trace()
 
         self.joint_validation_dataloader = WeightedDataloaderList([self.val_dataloader])
         self.adaptor_config.data = self.train_dataloader.dataset.config
@@ -458,7 +462,9 @@ class CFKD(Adaptor):
             )
             and not os.path.exists(boundary_path)
         ):
-            self.joint_validation_dataloader.dataloaders[0].dataset.visualize_decision_boundary(
+            self.joint_validation_dataloader.dataloaders[
+                0
+            ].dataset.visualize_decision_boundary(
                 self.student,
                 self.adaptor_config.training.test_batch_size,
                 self.device,
@@ -1216,6 +1222,7 @@ class CFKD(Adaptor):
             config=self.data_config,
             datasource=dataset_path,
         )
+        # import pdb; pdb.set_trace()
         log_images_to_writer(dataloader, writer, "train_" + str(finetune_iteration))
         dataloader = DataloaderMixer(self.adaptor_config.training, dataloader)
         # mixing ratio has to be flipped because in fact the old dataloader is the one appended
@@ -1236,7 +1243,11 @@ class CFKD(Adaptor):
             datasource=val_dataset_path,
         )
         if not isinstance(dataloader_val, torch.utils.data.DataLoader):
-            import pdb; pdb.set_trace()
+            # import pdb; pdb.set_trace()
+            open(os.path.join(self.adaptor_config.base_dir, "error.txt"), "w").write(
+                "dataloader_val in " + str(finetune_iteration) + " is empty!"
+            )
+            quit()
 
         self.joint_validation_dataloader.append(dataloader_val)
         log_images_to_writer(
@@ -1244,8 +1255,6 @@ class CFKD(Adaptor):
         )
 
         #
-        """mixing_ratio = min(0.5, 1 - self.feedback_accuracy)
-        writer.add_scalar("mixing_ratio", mixing_ratio, finetune_iteration)"""
         if not hasattr(self, "dataloader_mixer"):
             self.dataloader_mixer = DataloaderMixer(
                 self.adaptor_config.training, self.train_dataloader
@@ -1950,7 +1959,9 @@ class CFKD(Adaptor):
                 and not os.path.exists(decision_boundary_path)
                 and self.adaptor_config.tracking_level >= 1
             ):
-                self.joint_validation_dataloader.dataloaders[0].dataset.visualize_decision_boundary(
+                self.joint_validation_dataloader.dataloaders[
+                    0
+                ].dataset.visualize_decision_boundary(
                     self.student,
                     self.adaptor_config.training.test_batch_size,
                     self.device,

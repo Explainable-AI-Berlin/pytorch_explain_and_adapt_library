@@ -1,7 +1,7 @@
 allow_overlap: false
 batch_size: 1
 category: explainer
-clustering_strategy: highest_activation
+clustering_strategy: activation_clusters
 data_config: null
 dilation: 13
 dist_l1: 0.0005

@@ -318,7 +318,9 @@ class SquareDataset(Image2MixedDataset):
                             logits.append(predictor(current_batch.to(device)).detach())
                             current_batch = []
 
-                    logits.append(predictor(torch.stack(current_batch).to(device)).detach())
+                    if not len(current_batch) == 0:
+                        logits.append(predictor(torch.stack(current_batch).to(device)).detach())
+
                     logits = torch.cat(logits, dim=0).detach().cpu()
                     prediction_grid = torch.nn.Softmax(dim=1)(logits / temperature)[
                         :, 0
