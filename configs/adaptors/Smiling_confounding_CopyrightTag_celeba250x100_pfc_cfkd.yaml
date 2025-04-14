@@ -5,7 +5,6 @@ category                             :  "adaptor"
 batch_size                           :  10
 finetune_iterations                  :  1
 tracking_level                       :  0
-max_test_batches                     :  1
 min_train_samples                    :  150
 max_validation_samples               :  100
 continuous_learning                  :  "finetune"

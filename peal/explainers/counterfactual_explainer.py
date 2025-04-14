@@ -351,10 +351,8 @@ class TIMEConfig(ExplainerConfig):
     max_epoch: int = 30
     train_batch_size: int = 64
     image_size: int = 128
-    seed: int = 99999999
     y_target_goal_confidence: float = 0.9
     max_attacks: int = 1
-    max_samples: Union[int, type(None)] = None
     use_lora: bool = True
     learn_dataset_embedding: bool = False
 
@@ -869,24 +867,25 @@ class CounterfactualExplainer(ExplainerInterface):
         loss += dist_l1 * torch.mean(torch.stack(l1_losses))
         if not pbar is None:
             absolute_difference = torch.abs(x_in - img_predictor.detach().cpu())
-            pbar.set_description(
-                f"Creating {mode} Counterfactuals:"
-                + f"it: {i}"
-                + f"/{self.explainer_config.gradient_steps}"
-                + f", loss: {loss.detach().item():.2E}"
-                + f", target_confidence: [{best_score[0]:.2E}, {best_score[-1]:.2E}]"
-                + f", gradient_confidence: [{gradient_confidences_old[0]:.2E},"
-                + f"{gradient_confidences_old[-1]:.2E}]"
-                + f", visual_difference: [{torch.mean(absolute_difference[0]).item():.2E}, "
-                + f"{torch.mean(absolute_difference[-1]).item():.2E}]"
-                + ", ".join(
-                    [
-                        key + ": " + str(pbar.stored_values[key])
-                        for key in pbar.stored_values
-                    ]
+            if self.explainer_config.tracking_level >= 2:
+                pbar.set_description(
+                    f"Creating {mode} Counterfactuals:"
+                    + f"it: {i}"
+                    + f"/{self.explainer_config.gradient_steps}"
+                    + f", loss: {loss.detach().item():.2E}"
+                    + f", target_confidence: [{best_score[0]:.2E}, {best_score[-1]:.2E}]"
+                    + f", gradient_confidence: [{gradient_confidences_old[0]:.2E},"
+                    + f"{gradient_confidences_old[-1]:.2E}]"
+                    + f", visual_difference: [{torch.mean(absolute_difference[0]).item():.2E}, "
+                    + f"{torch.mean(absolute_difference[-1]).item():.2E}]"
+                    + ", ".join(
+                        [
+                            key + ": " + str(pbar.stored_values[key])
+                            for key in pbar.stored_values
+                        ]
+                    )
                 )
-            )
-            pbar.update(1)
+                pbar.update(1)
 
         img_predictor.retain_grad()
 
@@ -1086,7 +1085,6 @@ class CounterfactualExplainer(ExplainerInterface):
         Returns:
             dict: The batch with the counterfactuals added.
         """
-        print("in explain batch!")
         if explainer_path is None:
             os_sep = os.path.abspath(os.sep)
             if base_path[: len(os_sep)] == os_sep:
@@ -1123,7 +1121,6 @@ class CounterfactualExplainer(ExplainerInterface):
         elif isinstance(self.generator, InvertibleGenerator) and isinstance(
             self.explainer_config, PDCConfig
         ):
-            print("start creating predictor-distilled counterfactual!")
             (
                 batch["x_counterfactual_list"],
                 batch["z_difference_list"],

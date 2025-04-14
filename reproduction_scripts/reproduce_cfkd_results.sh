@@ -36,7 +36,7 @@ python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/camelyon17_pdc_cfkd.ya
 # Reproduce SOTA results on follicle dataset
 python train_generator.py --config "<PEAL_BASE>/configs/generators/follicle_ddpm.yaml"
 python train_predictor.py --config "<PEAL_BASE>/configs/predictors/follicle_cut_classifier.yaml"
-python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/follicles_pdc_human_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/confiegs/adaptors/follicles_pdc_human_cfkd.yaml"
 # run GroupDRO
 # run JTT
 # run DFR

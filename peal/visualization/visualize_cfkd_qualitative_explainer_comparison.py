@@ -7,6 +7,7 @@ from torchvision.transforms.functional import resize
 
 NUM_CLUSTERS = 2
 
+
 def plot_images_with_custom_padding(
     imgs, confidences, task_names, method_names, output_path
 ):
@@ -35,8 +36,12 @@ def plot_images_with_custom_padding(
 
             # Add confidence values below the image
             ax.text(
-                0.5, -0.1, f"{confidences[i, j]:.2f}", fontsize=8, ha='center',
-                transform=ax.transAxes
+                0.5,
+                -0.1,
+                f"{confidences[i, j]:.2f}",
+                fontsize=8,
+                ha="center",
+                transform=ax.transAxes,
             )
 
             if i == 0:  # Add task names as column headers
@@ -44,8 +49,12 @@ def plot_images_with_custom_padding(
 
             if j == 0:  # Add method names as row labels
                 ax.text(
-                    -1.0, 0.5, method_names[i], fontsize=8, ha='center',
-                    transform=ax.transAxes
+                    -1.0,
+                    0.5,
+                    method_names[i],
+                    fontsize=8,
+                    ha="center",
+                    transform=ax.transAxes,
                 )
 
     plt.tight_layout()
@@ -53,7 +62,7 @@ def plot_images_with_custom_padding(
         top=1 - sum(row_spacing) / num_methods,
         bottom=0 + sum(row_spacing) / num_methods,
         left=0 + sum(col_spacing) / num_tasks,
-        right=1 - sum(col_spacing) / num_tasks
+        right=1 - sum(col_spacing) / num_tasks,
     )
     plt.savefig(output_path, dpi=300)
     plt.close(fig)
@@ -62,46 +71,55 @@ def plot_images_with_custom_padding(
 if __name__ == "__main__":
     base_path = os.environ.get("PEAL_RUNS", "peal_runs")
     base_paths = [
-        base_path + "/celeba/Smiling/classifier_natural",
-        base_path + "/celeba/Blond_Hair/classifier_natural",
-        base_path + "/waterbirds/classifier_natural",
         base_path
-        + "/square/colora_confounding_colorb/torchvision/classifier_poisoned100",
+        + "/square/colora_confounding_colorb/torchvision/classifier_poisoned098",
+        base_path
+        + "/celeba_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned100",
+        base_path + "/celeba/camelyon17/classifier_poisoned100",
     ]
-    methods = ["ace_cfkd", "dime_cfkd", "fastdime_cfkd", "pdc_cfkd"]
+    methods = [
+        "ace_cfkd/0",
+        "ace_cfkd/1",
+        "dime_cfkd/0",
+        "dime_cfkd/1",
+        "fastdime_cfkd/0",
+        "fastdime_cfkd/1",
+        "pdc_cfkd_success/0",
+        "pdc_cfkd_success/1",
+    ]
     task_names = [
+        "Light to Dark FG",
+        "Dark to Light FG",
         "Serious to Smiling",
         "Smiling to Serious",
-        "Non-Blond to Blond",
-        "Blond to Non-Blond",
-        "Waterbird to Landbird",
-        "Landbird to Waterbird",
-        "Light to Dark BG",
-        "Dark to Light BG",
+        "Healthy to Cancer",
+        "Cancer to Healthy",
     ]
     method_names = [
         "Original",
-        "ACE (1)",
-        "ACE (2)",
-        "DiME (1)",
-        "DiME (2)",
-        "FastDiME (1)",
-        "FastDiME (2)",
-        "PDC (ours) (1)",
-        "PDC (ours) (2)",
+        "ACE (before)",
+        "ACE (after)",
+        "DiME (before)",
+        "DiME (after)",
+        "FastDiME (before)",
+        "FastDiME (after)",
+        "PDC (ours) (before)",
+        "PDC (ours) (after)",
     ]
-    sample_idxs = [[17, 43], [6, 23], [3, 30], [0, 11]]
-    imgs = torch.zeros([1 + 2 * len(methods), 2 * len(base_paths), 3, 128, 128])
-    target_confidences = torch.zeros([1 + 2 * len(methods), 2 * len(base_paths)])
+    sample_idxs = [[16, 0], [-1, -2], [-1, -2]]
+    imgs = torch.zeros([1 + len(methods), 2 * len(base_paths), 3, 128, 128])
+    target_confidences = torch.zeros([1 + len(methods), 2 * len(base_paths)])
 
     for dataset_idx in range(len(base_paths)):
         for method_idx in range(len(methods)):
             tracked_values_path = os.path.join(
                 base_paths[dataset_idx],
                 methods[method_idx],
-                "0",
                 "validation_tracked_cluster_values.npz",
             )
+            if not os.path.exists(tracked_values_path):
+                continue
+
             with open(tracked_values_path, "rb") as f:
                 tracked_values = np.load(f, allow_pickle=True)
 
@@ -115,10 +133,9 @@ if __name__ == "__main__":
                             tracked_values["y_target_start_confidence_list"][sample_idx]
                         )
 
-                    for cluster_idx in range(NUM_CLUSTERS):
-                        imgs[1 + 2 * method_idx + cluster_idx][
-                            2 * dataset_idx + i
-                        ] = resize(
+                    cluster_idx = 0
+                    imgs[1 + method_idx + cluster_idx][2 * dataset_idx + i] = (
+                        resize(
                             torch.from_numpy(
                                 tracked_values["clusters" + str(cluster_idx)][
                                     sample_idx
@@ -126,17 +143,19 @@ if __name__ == "__main__":
                             ),
                             [128, 128],
                         )
-                        target_confidences[1 + 2 * method_idx + cluster_idx][
-                            2 * dataset_idx + i
-                        ] = float(
-                            tracked_values["cluster_confidence" + str(cluster_idx)][
-                                sample_idx
-                            ]
-                        )
+                    )
+                    target_confidences[1 + method_idx + cluster_idx][
+                        2 * dataset_idx + i
+                    ] = float(
+                        tracked_values["cluster_confidence" + str(cluster_idx)][
+                            sample_idx
+                        ]
+                    )
+                    print(tracked_values_path)
 
     for method_idx, method_name in enumerate(method_names):
         plot_images_with_custom_padding(
-            imgs[method_idx:method_idx+1],
+            imgs[method_idx : method_idx + 1],
             target_confidences,
             task_names,
             [method_names[method_idx]],
@@ -151,4 +170,3 @@ if __name__ == "__main__":
         method_names,
         "collage_with_custom_padding.png",
     )
-

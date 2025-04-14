@@ -268,7 +268,9 @@ class CFKD(Adaptor):
                 The visualization function that is used for the run. Defaults to lambda x: x.
         """
         self.adaptor_config = load_yaml_config(adaptor_config, AdaptorConfig)
-        # assert self.adaptor_config.batch_size % 2 == 0, "only even batch sizes are supported so far!"
+        assert (
+            self.adaptor_config.batch_size % 2 == 0
+        ), "only even batch sizes are supported so far!"
         self.adaptor_config.explainer.tracking_level = (
             self.adaptor_config.tracking_level
         )
@@ -874,7 +876,9 @@ class CFKD(Adaptor):
                 remaining_sample_number = self.adaptor_config.min_train_samples - len(
                     list(tracked_values.values())[0]
                 )
-                print("remaining_sample_number: " + str(remaining_sample_number))
+                if self.adaptor_config.tracking_level > 0:
+                    print("remaining_sample_number: " + str(remaining_sample_number))
+
                 if remaining_sample_number <= 0:
                     break
 
@@ -1242,12 +1246,20 @@ class CFKD(Adaptor):
             config=self.validation_data_config,
             datasource=val_dataset_path,
         )
-        if not isinstance(dataloader_val, torch.utils.data.DataLoader):
+        if (
+            not isinstance(dataloader_val, torch.utils.data.DataLoader)
+            or len(dataloader_val.dataset)
+            < 2 * self.adaptor_config.training.val_batch_size
+        ):
             # import pdb; pdb.set_trace()
-            open(os.path.join(self.adaptor_config.base_dir, "error.txt"), "w").write(
-                "dataloader_val in " + str(finetune_iteration) + " is empty!"
-            )
-            quit()
+            open(
+                os.path.join(
+                    self.adaptor_config.base_dir,
+                    "error_iteration_" + str(finetune_iteration) + ".txt",
+                ),
+                "w",
+            ).write("dataloader_val in " + str(finetune_iteration) + " is too empty!")
+            return
 
         self.joint_validation_dataloader.append(dataloader_val)
         log_images_to_writer(
@@ -1896,9 +1908,7 @@ class CFKD(Adaptor):
                 self.adaptor_config.max_test_batches,
             )
             print("val_accuracy: " + str(val_accuracy))
-            writer.add_scalar(
-                "val_accuracy", val_accuracy, self.adaptor_config.current_iteration
-            )
+            writer.add_scalar("val_accuracy", val_accuracy, finetune_iteration)
             if hints_enabled_buffer:
                 self.val_dataloader.dataset.enable_hints()
 

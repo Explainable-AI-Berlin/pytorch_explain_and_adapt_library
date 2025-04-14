@@ -1,4 +1,4 @@
-# python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/camelyon17_pdc_cfkd.yaml"
+# python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/camelyon17_fastdime_cfkd.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  4
@@ -9,14 +9,14 @@ max_validation_samples               :  200
 continuous_learning                  :  "finetune"
 use_visualization                    :  True
 calculate_group_accuracies           :  True
-explainer                            :  <PEAL_BASE>/configs/explainers/pdc_blond_vs_male.yaml
+explainer                            :  <PEAL_BASE>/configs/explainers/fastdime_default.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/camelyon17_poisoned100.yaml
 test_data                            :  <PEAL_BASE>/configs/data/camelyon17_unpoisoned.yaml
 student                              :  $PEAL_RUNS/camelyon17/classifier_poisoned100/model.cpl
 teacher                              :  $PEAL_RUNS/camelyon17/classifier_unpoisoned/model.cpl
 generator                            :  $PEAL_RUNS/camelyon17/ddpm/config.yaml
-base_dir                             :  $PEAL_RUNS/camelyon17/classifier_poisoned100/pdc_cfkd
+base_dir                             :  $PEAL_RUNS/camelyon17/classifier_poisoned100/fastdime_cfkd
 task:
   criterions:
     ce     : 1.0
