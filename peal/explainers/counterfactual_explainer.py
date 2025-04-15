@@ -1454,11 +1454,13 @@ class CounterfactualExplainer(ExplainerInterface):
             )
 
         if self.explainer_config.merge_clusters == "concatenate":
-            for key in cluster_dicts[0].keys():
-                for cluster_idx in range(1, len(cluster_dicts)):
-                    explanations_dict_out[key] += cluster_dicts[
-                        sorted_cluster_idxs[cluster_idx]
-                    ][key]
+            for cluster_idx in range(1, len(cluster_dicts)):
+                for key in cluster_dicts[sorted_cluster_idxs[cluster_idx]].keys():
+                    try:
+                        explanations_dict_out[key] += cluster_dicts[sorted_cluster_idxs[cluster_idx]][key]
+
+                    except Exception:
+                        import pdb; pdb.set_trace()
 
         return explanations_dict_out
 

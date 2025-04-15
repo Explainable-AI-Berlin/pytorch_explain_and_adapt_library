@@ -971,6 +971,7 @@ class CFKD(Adaptor):
                 ),
                 student=self.student,
                 num_clusters=self.adaptor_config.explainer.num_attempts,
+                mode=mode,
                 **tracked_values,
             )
 

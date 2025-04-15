@@ -874,7 +874,7 @@ def distill_predictor(
             predictor_distillation,
             os.path.join(base_path, "validation"),
             predictor,
-            predictor_datasource[1].dataloaders,
+            distillation_datasource[1].dataloaders,
         )
         for i in range(len(validation_datasets)):
             distillation_datasource[1].dataloaders[i] = torch.utils.data.DataLoader(
@@ -913,5 +913,6 @@ def distill_predictor(
         datasource=distillation_datasource,
         model_path=os.path.join(base_path, "distilled_predictor"),
     )
+    #import pdb; pdb.set_trace()
     distillation_trainer.fit()
     return predictor_distilled

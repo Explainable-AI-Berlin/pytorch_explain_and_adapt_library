@@ -1,0 +1,11 @@
+# python train_predictor.py --config "<PEAL_BASE>/configs/predictors/celeba_latent_oracle.yaml"
+model_path        : $PEAL_RUNS/celeba/latent_oracle
+data              : <PEAL_BASE>/configs/data/celeba.yaml
+training          : <PEAL_BASE>/configs/training/img_classifier.yaml
+architecture      : torchvision_resnet18
+task:
+  criterions:
+    bce    : 1.0
+    l2     : 100.0
+  output_type             : multiclass
+  output_channels         : 40
