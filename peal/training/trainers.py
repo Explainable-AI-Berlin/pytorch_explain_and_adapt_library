@@ -729,24 +729,27 @@ def distill_binary_dataset(
     distillation_datasource = []
     for i in range(len(predictor_datasets)):
         if isinstance(predictor_datasets[i], torch.utils.data.DataLoader):
-            predictor_datasets[i] = predictor_datasets[i].dataset
+            predictor_dataset = predictor_datasets[i].dataset
+
+        else:
+            predictor_dataset = predictor_datasets[i]
 
         class_predictions_path = os.path.join(base_path, str(i) + "predictions.csv")
         Path(base_path).mkdir(exist_ok=True, parents=True)
         if not os.path.exists(class_predictions_path):
-            predictor_datasets[i].enable_url()
+            predictor_dataset.enable_url()
             prediction_args = types.SimpleNamespace(
                 batch_size=32,
-                dataset=predictor_datasets[i],
+                dataset=predictor_dataset,
                 classifier=predictor,
                 label_path=class_predictions_path,
                 partition="train",
                 label_query=0,
             )
             get_predictions(prediction_args)
-            predictor_datasets[i].disable_url()
+            predictor_dataset.disable_url()
 
-        distilled_dataset_config = copy.deepcopy(predictor_datasets[i].config)
+        distilled_dataset_config = copy.deepcopy(predictor_dataset.config)
         distilled_dataset_config.split = [1.0, 1.0] if i == 0 else [0.0, 1.0]
         distilled_dataset_config.confounding_factors = None
         distilled_dataset_config.confounder_probability = None
@@ -763,9 +766,9 @@ def distill_binary_dataset(
         distilled_predictor_config.data = distilled_dataset_config
         predictor_distillation = distilled_predictor_config
         distillation_datasource[i].task_config = predictor_distillation.task
-        distillation_datasource[i].task_config.x_selection = predictor_datasets[
+        distillation_datasource[
             i
-        ].task_config.x_selection
+        ].task_config.x_selection = predictor_dataset.task_config.x_selection
 
     return distillation_datasource
 
@@ -877,10 +880,16 @@ def distill_predictor(
             distillation_datasource[1].dataloaders,
         )
         for i in range(len(validation_datasets)):
-            distillation_datasource[1].dataloaders[i] = torch.utils.data.DataLoader(
-                validation_datasets[i],
-                batch_size=distillation_datasource[1].dataloaders[i].batch_size,
-            )
+            try:
+                distillation_datasource[1].dataloaders[i] = torch.utils.data.DataLoader(
+                    validation_datasets[i],
+                    batch_size=distillation_datasource[1].dataloaders[i].batch_size,
+                )
+
+            except Exception:
+                import pdb
+
+                pdb.set_trace()
 
     elif isinstance(predictor_datasource[0], Image2MixedDataset) or isinstance(
         predictor_datasource[0].dataset, Image2MixedDataset
@@ -913,6 +922,6 @@ def distill_predictor(
         datasource=distillation_datasource,
         model_path=os.path.join(base_path, "distilled_predictor"),
     )
-    #import pdb; pdb.set_trace()
+    # import pdb; pdb.set_trace()
     distillation_trainer.fit()
     return predictor_distilled

@@ -1,23 +1,21 @@
 # python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x098_pdc_smooth_cfkd.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
-batch_size                           :  2
-tracking_level                       :  3
-min_train_samples                    :  900
-finetune_iterations                  :  0
-max_validation_samples               :  100
-continuous_learning                  :  "retrain"
-replace_model                        :  True
-use_visualization                    :  True
+batch_size                           :  6
+tracking_level                       :  5
+min_train_samples                    :  800
+finetune_iterations                  :  1
+max_validation_samples               :  200
+continuous_learning                  :  "finetune"
 calculate_group_accuracies           :  True
-explainer                            :  <PEAL_BASE>/configs/explainers/pdc_sensitive.yaml
+explainer                            :  <PEAL_BASE>/configs/explainers/pdc_smooth.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
-data                                 :  <PEAL_BASE>/configs/data/square_poisoned100.yaml
+data                                 :  <PEAL_BASE>/configs/data/square_poisoned098.yaml
 test_data                            :  <PEAL_BASE>/configs/data/square_unpoisoned.yaml
-student                              :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned100/model.cpl
+student                              :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned098/model.cpl
 teacher                              :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_unpoisoned/model.cpl
 generator                            :  $PEAL_RUNS/square/ddpm/config.yaml
-base_dir                             :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_sensitive_cfkd
+base_dir                             :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned098/pdc_smooth_cfkd
 task:
   criterions:
     ce     : 1.0
