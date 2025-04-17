@@ -124,3 +124,4 @@ class PredictorConfig(BaseModel):
     distill_from: str = "predictor"
     weights_path: Union[str, type(None)] = None
     continue_training: bool = False
+    tracking_level: int = 4

@@ -7,7 +7,6 @@ min_train_samples                    :  800
 finetune_iterations                  :  1
 max_validation_samples               :  200
 continuous_learning                  :  "finetune"
-use_visualization                    :  True
 calculate_group_accuracies           :  True
 explainer                            :  <PEAL_BASE>/configs/explainers/pdc_default64x64.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml

@@ -20,7 +20,6 @@ def calculate_validation_statistics(
     use_confusion_matrix: bool,
     explainer: ExplainerInterface,
     max_validation_samples: int,
-    min_start_target_percentile: torch.tensor,
 ):
     """
     This function calculates the validation statistics for a given model and dataloader.
@@ -36,7 +35,6 @@ def calculate_validation_statistics(
         use_confusion_matrix (bool): _description_
         explainer (ExplainerInterface): _description_
         max_validation_samples (int): _description_
-        min_start_target_percentile (torch.tensor): _description_
 
     Returns:
         _type_: _description_
@@ -139,17 +137,7 @@ def calculate_validation_statistics(
 
         confidence_score_stats = []
         for i in range(output_size):
-            if len(confidence_scores[i]) >= 1:
-                confidence_score_stats.append(
-                    torch.quantile(
-                        torch.stack(confidence_scores[i], dim=1),
-                        min_start_target_percentile,
-                        dim=1,
-                    )
-                )
-
-            else:
-                confidence_score_stats.append(torch.zeros([output_size]))
+            confidence_score_stats.append(torch.zeros([output_size]))
 
         confidence_score_stats = torch.stack(confidence_score_stats)
         accuracy = correct / num_samples

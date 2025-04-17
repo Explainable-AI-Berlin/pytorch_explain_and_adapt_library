@@ -27,7 +27,7 @@ from peal.global_utils import (
     is_port_in_use,
     dict_to_bar_chart,
     embed_numberstring,
-    extract_penultima_activation,
+    extract_penultima_activation, cprint,
 )
 from peal.generators.interfaces import (
     InvertibleGenerator,
@@ -160,10 +160,11 @@ class PDCConfig(ExplainerConfig):
     The strategy on how to merge clusters when calculating them.
     E.g. select_best uses the cluster that does the most salient changes, while merge just merges all clusters.
     """
-    merge_clusters: str = "best"
+    merge_clusters: str = "select_best"
+    """
+    Whether to use the diversification tool that forbids changing the same area of the input image again or not.
+    """
     allow_overlap: bool = False
-    max_avg_combination: float = 0.5
-    repaint_frequency: int = 1
 
 
 class ACEConfig(ExplainerConfig):
@@ -571,6 +572,7 @@ class CounterfactualExplainer(ExplainerInterface):
                     self.predictor,
                     self.predictor_datasources,
                     replace_with_activation=self.explainer_config.replace_with_activation,
+                    tracking_level=self.explainer_config.tracking_level,
                 )
 
             else:
@@ -861,30 +863,37 @@ class CounterfactualExplainer(ExplainerInterface):
             current_inpaint = self.explainer_config.inpaint
 
         else:
-            dist_l1 = self.explainer_config.dist_l1 * (0.5 ** (num_attempts -1))
-            current_inpaint = self.explainer_config.inpaint * (0.5 ** (num_attempts -1))
+            dist_l1 = self.explainer_config.dist_l1 * (0.5 ** (num_attempts - 1))
+            current_inpaint = self.explainer_config.inpaint * (
+                0.5 ** (num_attempts - 1)
+            )
 
         loss += dist_l1 * torch.mean(torch.stack(l1_losses))
         if not pbar is None:
             absolute_difference = torch.abs(x_in - img_predictor.detach().cpu())
-            if self.explainer_config.tracking_level >= 2:
-                pbar.set_description(
-                    f"Creating {mode} Counterfactuals:"
-                    + f"it: {i}"
-                    + f"/{self.explainer_config.gradient_steps}"
-                    + f", loss: {loss.detach().item():.2E}"
-                    + f", target_confidence: [{best_score[0]:.2E}, {best_score[-1]:.2E}]"
-                    + f", gradient_confidence: [{gradient_confidences_old[0]:.2E},"
-                    + f"{gradient_confidences_old[-1]:.2E}]"
-                    + f", visual_difference: [{torch.mean(absolute_difference[0]).item():.2E}, "
-                    + f"{torch.mean(absolute_difference[-1]).item():.2E}]"
-                    + ", ".join(
-                        [
-                            key + ": " + str(pbar.stored_values[key])
-                            for key in pbar.stored_values
-                        ]
-                    )
+            if self.explainer_config.tracking_level >= 1:
+                description_str = f"Creating {mode} Counterfactuals:" + f"it: {i}"
+                description_str += f"/{self.explainer_config.gradient_steps}"
+                description_str += f", loss: {loss.detach().item():.2E}"
+                description_str += (
+                    f", target_confidence: [{best_score[0]:.2E}, {best_score[-1]:.2E}]"
                 )
+                description_str += f", visual_difference: [{torch.mean(absolute_difference[0]).item():.2E}, "
+                description_str += (
+                    f", gradient_confidence: [{gradient_confidences_old[0]:.2E},"
+                )
+                description_str += f"{gradient_confidences_old[-1]:.2E}]"
+                description_str += f"{torch.mean(absolute_difference[-1]).item():.2E}]"
+                description_str += ", ".join(
+                    [
+                        key + ": " + str(pbar.stored_values[key])
+                        for key in pbar.stored_values
+                    ]
+                )
+                if self.explainer_config.tracking_level < 4:
+                    description_str = description_str[:145]
+
+                pbar.set_description(description_str)
                 pbar.update(1)
 
         img_predictor.retain_grad()
@@ -919,10 +928,10 @@ class CounterfactualExplainer(ExplainerInterface):
             if current_inpaint > 0.0:
                 z[0].grad = boolmask_in * z[0].grad
 
-        #abs_grads = torch.abs(z[0].grad)
+        # abs_grads = torch.abs(z[0].grad)
         # z[0].grad[abs_grads < (abs_grads.max() / 10)] = 0
         # z[0].grad = torch.zeros_like(z[0].grad)
-        #z[0].data = z[0].data - 100.0 * z[0].grad
+        # z[0].data = z[0].data - 100.0 * z[0].grad
         optimizer.step()
         boolmask = torch.zeros_like(z[0].data)
         if self.explainer_config.iterationwise_encoding:
@@ -961,7 +970,6 @@ class CounterfactualExplainer(ExplainerInterface):
                     old_mask=torch.clone(boolmask),
                     mask_momentum=self.explainer_config.mask_momentum,
                     boolmask_in=boolmask_in,
-                    max_avg_combination=self.explainer_config.max_avg_combination,
                     exceptions=no_repaint_exceptions,
                 )
                 for sample_idx in range(z[0].data.shape[0]):
@@ -1017,7 +1025,7 @@ class CounterfactualExplainer(ExplainerInterface):
             if target_confidences[j] >= target_confidence_goal_current[j]:
                 not_finished_mask[j] = 0
 
-        if self.explainer_config.visualize_gradients:
+        if self.explainer_config.tracking_level >= 5 and self.explainer_config.visualize_gradients:
             gradients_path = str(
                 os.path.join(
                     base_path,
@@ -1244,6 +1252,9 @@ class CounterfactualExplainer(ExplainerInterface):
 
             explanations_list.append(current_dict)
 
+        assert (
+            len(explanations_list) % (batch_size * n_clusters) == 0
+        ), "restructing needed for clustering impossible!"
         explanations_list_by_source = [[] for i in range(n_clusters)]
         batch_counter = 0
         cluster_counter = 0
@@ -1308,17 +1319,11 @@ class CounterfactualExplainer(ExplainerInterface):
             if self.explainer_config.clustering_strategy == "highest_activation":
                 current_activations = []
                 for source_idx in range(len(explanations_list_by_source)):
-                    try:
-                        current_activations.append(
-                            explanations_list_by_source[source_idx][idx][
-                                "y_target_end_confidence_list"
-                            ]
-                        )
-
-                    except Exception as exp:
-                        import pdb
-
-                        pdb.set_trace()
+                    current_activations.append(
+                        explanations_list_by_source[source_idx][idx][
+                            "y_target_end_confidence_list"
+                        ]
+                    )
 
                 current_activations = torch.tensor(current_activations)
                 activations_order = torch.argsort(current_activations)
@@ -1457,10 +1462,14 @@ class CounterfactualExplainer(ExplainerInterface):
             for cluster_idx in range(1, len(cluster_dicts)):
                 for key in cluster_dicts[sorted_cluster_idxs[cluster_idx]].keys():
                     try:
-                        explanations_dict_out[key] += cluster_dicts[sorted_cluster_idxs[cluster_idx]][key]
+                        explanations_dict_out[key] += cluster_dicts[
+                            sorted_cluster_idxs[cluster_idx]
+                        ][key]
 
                     except Exception:
-                        import pdb; pdb.set_trace()
+                        import pdb
+
+                        pdb.set_trace()
 
         return explanations_dict_out
 
@@ -1607,9 +1616,9 @@ class CounterfactualExplainer(ExplainerInterface):
                         latent_diversity = 0.0
 
                 tracked_stats["latent_sparsity"] = latent_sparsity
-                print("latent_sparsity: " + str(latent_sparsity))
+                cprint("latent_sparsity: " + str(latent_sparsity), self.explainer_config.tracking_level, 2)
                 tracked_stats["latent_diversity"] = latent_diversity
-                print("latent_diversity: " + str(latent_diversity))
+                cprint("latent_diversity: " + str(latent_diversity), self.explainer_config.tracking_level, 2)
 
         return tracked_stats
 

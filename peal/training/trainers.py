@@ -27,7 +27,7 @@ from peal.global_utils import (
     requires_grad_,
     get_predictions,
     replace_relu_with_leakysoftplus,
-    replace_relu_with_leakyrelu,
+    replace_relu_with_leakyrelu, cprint,
 )
 from peal.training.interfaces import PredictorConfig
 from peal.training.loggers import log_images_to_writer
@@ -72,6 +72,7 @@ def calculate_test_accuracy(
     device,
     calculate_group_accuracies=False,
     max_test_batches=None,
+    tracking_level=2,
 ):
     # determine the test accuracy of the student
     correct = 0
@@ -103,13 +104,15 @@ def calculate_test_accuracy(
         y_pred = model(x.to(device)).argmax(-1).detach().to("cpu")
         correct += float(torch.sum(y_pred == y))
         num_samples += x.shape[0]
-        pbar.set_description(
-            "test_correct: "
-            + str(correct / num_samples)
-            + ", it: "
-            + str(it * x.shape[0])
-        )
-        pbar.update(1)
+        if tracking_level >= 1:
+            pbar.set_description(
+                "test_correct: "
+                + str(correct / num_samples)
+                + ", it: "
+                + str(it * x.shape[0])
+            )
+            pbar.update(1)
+
         if calculate_group_accuracies:
             for idx in range(x.shape[0]):
                 groups[int(group[idx])][0] += int(y_pred[idx] == y[idx])
@@ -153,7 +156,6 @@ class ModelTrainer:
         unit_test_train_loop=False,
         unit_test_single_sample=False,
         log_frequency=1000,
-        gigabyte_vram=None,
         val_dataloader_weights=[1.0],
     ):
         """ """
@@ -279,7 +281,7 @@ class ModelTrainer:
 
                 param_list = param_list_trained
 
-            print("trainable parameters: ", len(param_list))
+            cprint("trainable parameters: " + str(len(param_list)), self.config.tracking_level, 4)
             if self.config.training.optimizer == "sgd":
                 self.optimizer = torch.optim.SGD(
                     param_list,
@@ -481,8 +483,12 @@ class ModelTrainer:
                 ]
             )
 
-            pbar.write(current_state)
-            pbar.update(1)
+            if self.config.tracking_level < 4:
+                current_state = current_state[:145]
+
+            if self.config.tracking_level >= 1:
+                pbar.write(current_state)
+                pbar.update(1)
 
             #
             if mode == "train":
@@ -495,18 +501,14 @@ class ModelTrainer:
 
     def fit(self, continue_training=False, is_initialized=False):
         """ """
-        print("Training Config: " + str(self.config))
+        cprint("Training Config: " + str(self.config), self.config.tracking_level, 4)
         if not continue_training:
             if "orthogonality" in self.config.task.criterions.keys():
-                print("Orthogonal intialization!!!")
-                print("Orthogonal intialization!!!")
-                print("Orthogonal intialization!!!")
+                cprint("Orthogonal initialization!!!", self.config.tracking_level, 4)
                 orthogonal_initialization(self.model)
 
             else:
-                print("reset weights!!!")
-                print("reset weights!!!")
-                print("reset weights!!!")
+                print("Training Config: " + str(self.config))
                 reset_weights(self.model)
 
         if not is_initialized:
@@ -521,9 +523,7 @@ class ModelTrainer:
             Path(os.path.join(self.model_path, "logs")).mkdir(
                 parents=True, exist_ok=True
             )
-            print(os.path.join(self.model_path, "logs"))
-            print(os.path.join(self.model_path, "logs"))
-            print(os.path.join(self.model_path, "logs"))
+            cprint(os.path.join(self.model_path, "logs"), self.config.tracking_level, 4)
             writer = SummaryWriter(os.path.join(self.model_path, "logs"))
             self.logger.writer = writer
             os.makedirs(os.path.join(self.model_path, "outputs"))
@@ -602,7 +602,7 @@ class ModelTrainer:
                         self.model, self.train_dataloader.batch_size
                     )
                 )
-                print(train_generator_performance)
+                cprint(train_generator_performance, self.config.tracking_level, 4)
                 for key in train_generator_performance.keys():
                     self.logger.writer.add_scalar(
                         "epoch_train_" + key,
@@ -643,7 +643,7 @@ class ModelTrainer:
                 ].dataset.track_generator_performance(
                     self.model, self.val_dataloaders[0].batch_size
                 )
-                print(val_generator_performance)
+                cprint(val_generator_performance, self.config.tracking_level, 4)
                 for key in val_generator_performance.keys():
                     self.logger.writer.add_scalar(
                         "epoch_val_" + key,
@@ -818,8 +818,6 @@ def distill_1ofn_dataset(
 def distill_dataloader_mixer(
     predictor_distillation, base_path, predictor, predictor_datasource
 ):
-    print("distill_dataloader_mixer")
-    print(base_path)
     distillation_datasource = copy.deepcopy(predictor_datasource)
     for i in range(len(distillation_datasource.dataloaders)):
         if isinstance(distillation_datasource.dataloaders[i], DataloaderMixer):
@@ -851,11 +849,13 @@ def distill_predictor(
     predictor,
     predictor_datasource,
     replace_with_activation=None,
+    tracking_level=4,
 ):
     predictor_distillation = load_yaml_config(
         predictor_distillation,
         PredictorConfig,
     )
+    predictor_distillation.tracking_level = tracking_level
     if predictor_distillation.distill_from == "dataset":
         distillation_datasource = predictor_datasource
 
@@ -871,7 +871,7 @@ def distill_predictor(
                 predictor_datasource[0],
             )
         )
-        print("distill validation dataset!")
+        cprint("distill validation dataset!", tracking_level, 2)
         distillation_datasource.append(copy.deepcopy(predictor_datasource[1]))
         validation_datasets = distill_binary_dataset(
             predictor_distillation,
@@ -880,16 +880,10 @@ def distill_predictor(
             distillation_datasource[1].dataloaders,
         )
         for i in range(len(validation_datasets)):
-            try:
-                distillation_datasource[1].dataloaders[i] = torch.utils.data.DataLoader(
-                    validation_datasets[i],
-                    batch_size=distillation_datasource[1].dataloaders[i].batch_size,
-                )
-
-            except Exception:
-                import pdb
-
-                pdb.set_trace()
+            distillation_datasource[1].dataloaders[i] = torch.utils.data.DataLoader(
+                validation_datasets[i],
+                batch_size=distillation_datasource[1].dataloaders[i].batch_size,
+            )
 
     elif isinstance(predictor_datasource[0], Image2MixedDataset) or isinstance(
         predictor_datasource[0].dataset, Image2MixedDataset
@@ -922,6 +916,5 @@ def distill_predictor(
         datasource=distillation_datasource,
         model_path=os.path.join(base_path, "distilled_predictor"),
     )
-    # import pdb; pdb.set_trace()
     distillation_trainer.fit()
     return predictor_distilled

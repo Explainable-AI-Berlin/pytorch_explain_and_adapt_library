@@ -2,7 +2,7 @@
 model_path        : $PEAL_RUNS/celeba/latent_oracle
 data              : <PEAL_BASE>/configs/data/celeba.yaml
 training          : <PEAL_BASE>/configs/training/img_classifier.yaml
-architecture      : torchvision_resnet18
+architecture      : torchvision_vit_b_16
 task:
   criterions:
     bce    : 1.0

@@ -2,7 +2,7 @@
 model_path        : $PEAL_RUNS/celeba/Blond_Hair/vit_b_16_natural
 data              : <PEAL_BASE>/configs/data/celeba.yaml
 training          : <PEAL_BASE>/configs/training/img_classifier_balanced.yaml
-architecture      : torchvision_resnet18
+architecture      : torchvision_vit_b_16
 task:
   criterions:
     ce     : 1.0
