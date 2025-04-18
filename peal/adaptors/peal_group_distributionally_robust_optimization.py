@@ -264,7 +264,7 @@ class PealGroupDRO(Adaptor):
             self.model_path = self.adaptor_config.model_path
         else:
             self.model_path = Path(self.config.model_path)
-            name = "DRO_" + str(self.model_path.name)
+            name = "PEAL_DRO_" + str(self.model_path.name)
             self.model_path = str(self.model_path.with_name(name))
         ### END: DRO Alterations
 
@@ -376,7 +376,7 @@ class PealGroupDRO(Adaptor):
 
             for x, y in dataset_train:
                 y, confounder = y
-                group_idx = y + dataset_train.output_size * confounder
+                group_idx = y * dataset_train.output_size + confounder
                 group_array.append(group_idx)
 
             _group_array = torch.LongTensor([g.item() for g in group_array])
@@ -480,10 +480,13 @@ class PealGroupDRO(Adaptor):
                     # weight_decay=0.0001,
                     ### End: DRO Alterations
                 )
+                # TODO: Remove this comment after validating that PealGroupDRO works
+                """
                 lambda1 = lambda epoch: 0.95**epoch
                 self.scheduler = torch.optim.lr_scheduler.LambdaLR(
                     self.optimizer, lr_lambda=lambda1
                 )
+                """
 
             elif self.config.training.optimizer == "adam":
                 self.optimizer = torch.optim.Adam(
@@ -708,7 +711,7 @@ class PealGroupDRO(Adaptor):
 
             ### BEGIN: DRO Alterations
             # import pdb; pdb.set_trace()
-            group_idx = y + dataloader.dataset.output_size * has_confounder
+            group_idx = y * dataloader.dataset.output_size + has_confounder
 
             for criterion in self.regularization_criterions.keys():
                 criterion_loss = self.config.task.criterions[
