@@ -1,5 +1,9 @@
 """
-Taken from the following repository: https://github.com/kohpangwei/group_DRO
+Adapted from the code for "Distributionally Robust Neural Networks for Group Shifts: On the Importance of Regularization
+for Worst-Case Generalization"
+
+doi: https://doi.org/10.48550/arXiv.1911.08731
+Repository: https://github.com/kohpangwei/group_DRO/tree/master
 
 Notes: In the future, we might need to pass self.device
 """
@@ -11,7 +15,19 @@ import torch.nn.functional as F
 import numpy as np
 
 class LossComputer:
-    def __init__(self, criterion, is_robust, dataset, alpha=None, gamma=0.1, adj=None, min_var_weight=0, step_size=0.01, normalize_loss=False, btl=False):
+    def __init__(
+            self,
+            criterion,
+            is_robust,
+            dataset,
+            alpha=None,
+            gamma=0.1,
+            adj=None,
+            min_var_weight=0,
+            step_size=0.01,
+            normalize_loss=False,
+            btl=False,
+            replication=False):
         self.criterion = criterion
         self.is_robust = is_robust
         self.gamma = gamma
@@ -21,15 +37,18 @@ class LossComputer:
         self.normalize_loss = normalize_loss
         self.btl = btl
 
-        self.n_groups, self.group_counts, self.group_frac = self.get_group_stats(dataset)
-        self.group_counts = self.group_counts.cuda()
-        self.group_frac = self.group_frac.cuda()
+        if replication:
+            self.n_groups = dataset.n_groups
+            self.group_counts = dataset.group_counts().cuda()
+            self.group_frac = self.group_counts / self.group_counts.sum()
+            # self.group_str = dataset.group_str
+        else:
+            self.n_groups, self.group_counts, self.group_frac = self.get_group_stats(dataset)
+            self.group_counts = self.group_counts.cuda()
+            self.group_frac = self.group_frac.cuda()
 
         """
-        self.n_groups = dataset.n_groups
-        self.group_counts = dataset.group_counts().cuda()
-        self.group_frac = self.group_counts/self.group_counts.sum()
-        # self.group_str = dataset.group_str
+
         """
 
         if adj is not None:
@@ -112,8 +131,16 @@ class LossComputer:
 
         # import pdb; pdb.set_trace()
         # TODO: GPT says the leak might be here
-        self.adv_probs = self.adv_probs * torch.exp(self.step_size*adjusted_loss.data)
-        self.adv_probs = self.adv_probs/(self.adv_probs.sum())
+        # self.adv_probs = self.adv_probs * torch.exp(self.step_size*adjusted_loss.data)
+        # self.adv_probs = self.adv_probs/(self.adv_probs.sum())
+
+        # step 2: update adversarial probabilities without tracking gradients
+        with torch.no_grad():
+            # detach adjusted_loss so it doesn’t carry history
+            scaled = torch.exp(self.step_size * adjusted_loss.detach())
+            new_probs = self.adv_probs * scaled
+            new_probs = new_probs / new_probs.sum()
+            self.adv_probs = new_probs
 
         robust_loss = group_loss @ self.adv_probs
         return robust_loss, self.adv_probs
@@ -150,12 +177,13 @@ class LossComputer:
         return group_loss, group_count
 
     def update_exp_avg_loss(self, group_loss, group_count):
-        prev_weights = (1 - self.gamma*(group_count>0).float()) * (self.exp_avg_initialized>0).float()
-        curr_weights = 1 - prev_weights
-        # import pdb; pdb.set_trace()
-        # TODO: Maybe detach gorup_loss?
-        self.exp_avg_loss = self.exp_avg_loss * prev_weights + group_loss * curr_weights
-        self.exp_avg_initialized = (self.exp_avg_initialized>0) + (group_count>0)
+        with torch.no_grad():
+            prev_weights = (1 - self.gamma*(group_count>0).float()) * (self.exp_avg_initialized>0).float()
+            curr_weights = 1 - prev_weights
+            # import pdb; pdb.set_trace()
+            # TODO: Maybe detach gorup_loss?
+            self.exp_avg_loss = self.exp_avg_loss * prev_weights + group_loss * curr_weights
+            self.exp_avg_initialized = (self.exp_avg_initialized>0) + (group_count>0)
 
     def reset_stats(self):
         self.processed_data_counts = torch.zeros(self.n_groups).cuda()
