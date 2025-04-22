@@ -465,7 +465,16 @@ class ModelTrainer:
             # Backpropagation
             loss.backward()
             current_state = "Model Training: " + mode + "_it: " + str(batch_idx)
+            if "validation_accuracy" in pbar.stored_values.keys():
+                current_state += pbar.stored_values["validation_accuracy"]
+
             current_state += ", loss: " + str(loss.detach().item())
+            current_state += ", ".join(
+                [
+                    key + ": " + str(pbar.stored_values[key])
+                    for key in pbar.stored_values
+                ]
+            )
             current_state += ", lr: " + str(
                 self.scheduler.get_last_lr()
                 if hasattr(self, "scheduler")
@@ -476,15 +485,9 @@ class ModelTrainer:
                 if not source_distibution is None
                 else ""
             )
-            current_state += ", ".join(
-                [
-                    key + ": " + str(pbar.stored_values[key])
-                    for key in pbar.stored_values
-                ]
-            )
 
             if self.config.tracking_level < 4:
-                current_state = current_state[:145]
+                current_state = current_state[:80]
 
             if self.config.tracking_level >= 1:
                 pbar.write(current_state)

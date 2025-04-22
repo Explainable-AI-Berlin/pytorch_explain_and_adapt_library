@@ -2,7 +2,7 @@ category: explainer
 explainer_type: PDC
 # parameters analyzed in ablation study
 use_gradient_filtering: true
-distilled_predictor: <PEAL_BASE>/configs/predictors/sensitive_distillation.yaml
+distilled_predictor: null
 dist_l1: 0.0005
 inpaint: 0.15
 allow_overlap: false

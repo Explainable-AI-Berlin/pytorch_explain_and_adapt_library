@@ -5,7 +5,7 @@ use_gradient_filtering: true
 distilled_predictor: <PEAL_BASE>/configs/predictors/sensitive_distillation.yaml
 dist_l1: 0.0005
 inpaint: 0.15
-allow_overlap: false
+allow_overlap: true
 # parameters constant in ablation study
 dilation: 13
 clustering_strategy: activation_clusters

@@ -165,6 +165,10 @@ class PDCConfig(ExplainerConfig):
     Whether to use the diversification tool that forbids changing the same area of the input image again or not.
     """
     allow_overlap: bool = False
+    """
+    Whether to use a generative model to filter the gradients or not.
+    """
+    use_gradient_filtering: bool = True
 
 
 class ACEConfig(ExplainerConfig):
@@ -602,10 +606,16 @@ class CounterfactualExplainer(ExplainerInterface):
 
         x_predictor = torch.clone(x_in)
         x = self.val_dataset.project_to_pytorch_default(x_predictor)
-        x = self.generator.dataset.project_from_pytorch_default(x)
-        x = torchvision.transforms.Resize(self.generator.config.data.input_size[1:])(x)
+        if self.explainer_config.use_gradient_filtering:
+            x = self.generator.dataset.project_from_pytorch_default(x)
+            x = torchvision.transforms.Resize(self.generator.config.data.input_size[1:])(x)
+
         if not self.explainer_config.iterationwise_encoding:
-            z_original = self.generator.encode(x.to(self.device), stochastic=False)
+            if self.explainer_config.use_gradient_filtering:
+                z_original = self.generator.encode(x.to(self.device), stochastic=False)
+
+            else:
+                z_original = [x.to(self.device)]
 
             if isinstance(z_original, list):
                 z = []
@@ -709,14 +719,20 @@ class CounterfactualExplainer(ExplainerInterface):
 
         if not self.explainer_config.iterationwise_encoding:
             z_encoded = [z_elem.to(self.device) for z_elem in z]
-            counterfactual = self.generator.decode(z_encoded).detach().cpu()
+            if self.explainer_config.use_gradient_filtering:
+                counterfactual = self.generator.decode(z_encoded).detach().cpu()
+
+            else:
+                counterfactual = z_encoded[0].detach().cpu()
 
         else:
             counterfactual = best_z.clone().detach()
 
-        counterfactual = self.generator.dataset.project_to_pytorch_default(
-            counterfactual
-        )
+        if self.explainer_config.use_gradient_filtering:
+            counterfactual = self.generator.dataset.project_to_pytorch_default(
+                counterfactual
+            )
+
         counterfactual = torchvision.transforms.Resize(
             self.val_dataset.config.input_size[1:]
         )(counterfactual)
@@ -798,7 +814,12 @@ class CounterfactualExplainer(ExplainerInterface):
         if self.explainer_config.iterationwise_encoding:
             # TODO this only works if generator is normalized in -1 and 1
             z[0].data = torch.clamp(z[0].data, -1, 1)
-            z_default = self.generator.dataset.project_to_pytorch_default(z[0])
+            if self.explainer_config.use_gradient_filtering:
+                z_default = self.generator.dataset.project_to_pytorch_default(z[0])
+
+            else:
+                z_default = z[0]
+
             z_predictor_original = self.val_dataset.project_from_pytorch_default(
                 z_default
             ).to(self.device)
@@ -811,20 +832,29 @@ class CounterfactualExplainer(ExplainerInterface):
 
             clean_img_old = torch.clone(z_default).detach().cpu()
 
-            z_encoded = self.generator.encode(
-                z[0].to(self.device),
-                t=self.explainer_config.sampling_time_fraction,
-                stochastic=self.explainer_config.stochastic,
-            )
+            if self.explainer_config.use_gradient_filtering:
+                z_encoded = self.generator.encode(
+                    z[0].to(self.device),
+                    t=self.explainer_config.sampling_time_fraction,
+                    stochastic=self.explainer_config.stochastic,
+                )
+
+            else:
+                z_encoded = z[0].to(self.device)
 
         else:
             z_encoded = [z_elem.to(self.device) for z_elem in z]
 
         optimizer.zero_grad()
-        img_decoded = self.generator.decode(
-            z_encoded, t=self.explainer_config.sampling_time_fraction
-        )
-        img_default = self.generator.dataset.project_to_pytorch_default(img_decoded)
+        if self.explainer_config.use_gradient_filtering:
+            img_decoded = self.generator.decode(
+                z_encoded, t=self.explainer_config.sampling_time_fraction
+            )
+            img_default = self.generator.dataset.project_to_pytorch_default(img_decoded)
+
+        else:
+            img_default = z_encoded
+
         if self.val_dataset.config.normalization is None:
             img_default = torch.clamp(img_default, 0, 1)
 
@@ -891,7 +921,7 @@ class CounterfactualExplainer(ExplainerInterface):
                     ]
                 )
                 if self.explainer_config.tracking_level < 4:
-                    description_str = description_str[:145]
+                    description_str = description_str[:80]
 
                 pbar.set_description(description_str)
                 pbar.update(1)
@@ -936,10 +966,16 @@ class CounterfactualExplainer(ExplainerInterface):
         boolmask = torch.zeros_like(z[0].data)
         if self.explainer_config.iterationwise_encoding:
             z[0].data = torch.clamp(z[0].data, -1, 1)
-            pe = self.generator.dataset.project_to_pytorch_default(
-                torch.clone(z[0]).detach().cpu()
-            )
-            z_default = self.generator.dataset.project_to_pytorch_default(z[0])
+            if self.explainer_config.use_gradient_filtering:
+                pe = self.generator.dataset.project_to_pytorch_default(
+                    torch.clone(z[0]).detach().cpu()
+                )
+                z_default = self.generator.dataset.project_to_pytorch_default(z[0])
+
+            else:
+                pe = torch.clone(z[0]).detach().cpu()
+                z_default = z[0]
+
             z_predictor = self.val_dataset.project_from_pytorch_default(z_default).to(
                 self.device
             )
@@ -997,7 +1033,12 @@ class CounterfactualExplainer(ExplainerInterface):
                             z[0].data[j] = z_old[j]"""
 
         z[0].data = torch.clamp(z[0].data, -1, 1)
-        z_default = self.generator.dataset.project_to_pytorch_default(z[0])
+        if self.explainer_config.use_gradient_filtering:
+            z_default = self.generator.dataset.project_to_pytorch_default(z[0])
+
+        else:
+            z_default = z[0]
+
         z_predictor_original = self.val_dataset.project_from_pytorch_default(
             z_default
         ).to(self.device)
@@ -1034,13 +1075,19 @@ class CounterfactualExplainer(ExplainerInterface):
                 )
             )
             Path(gradients_path).mkdir(parents=True, exist_ok=True)
+            if self.explainer_config.use_gradient_filtering:
+                z_encoded_visualization = self.generator.dataset.project_to_pytorch_default(
+                    z_encoded.detach().cpu()
+                )
+
+            else:
+                z_encoded_visualization = z_encoded.detach().cpu()
+
             visualize_step(
                 x=x_in,
                 z=z,
                 clean_img_old=clean_img_old,
-                z_encoded=self.generator.dataset.project_to_pytorch_default(
-                    z_encoded.detach().cpu()
-                ),
+                z_encoded=z_encoded_visualization,
                 img_predictor=img_predictor,
                 pe=pe,
                 boolmask=boolmask,
