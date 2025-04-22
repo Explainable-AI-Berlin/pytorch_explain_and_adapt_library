@@ -54,6 +54,8 @@ from peal.adaptors.interfaces import Adaptor, AdaptorConfig
 from torch import nn
 
 from peal.dependencies.group_dro.loss import LossComputer
+from peal.dependencies.group_dro.data.data import prepare_data
+
 
 # from memory_profiler import profile
 
@@ -77,7 +79,6 @@ class GroupDROConfig(AdaptorConfig):
     """
     The config template for an adaptor
     """
-
     adaptor_type: str = "GroupDRO"
     """
     The config of the predictor to be adapted.
@@ -99,7 +100,12 @@ class GroupDROConfig(AdaptorConfig):
     """
     reweight_groups: bool = False
     """
-    Resets weights if true.
+    Use paper's datasets. Only accepts "celebA", "waterbirds" and None, with None indicating to not use the paper's 
+    datasets, but rather the one specified in predictor's data config.
+    """
+    replication_dataset: str = None
+    """
+    Resets weights of the model if true.
     """
     reset_weights: bool = True
     """
@@ -188,6 +194,307 @@ class GroupDRO(Adaptor):
         ############################################################
         # Load dataset
         ############################################################
+        if self.adaptor_config.replication_dataset is None:
+            self._load_PEAL_dataset(datasource)
+        elif self.adaptor_config.replication_dataset in ["celeba", "waterbirds"]:
+            print("Loading replication dataset", self.adaptor_config.replication_dataset)
+            self._load_replication_dataset(self.adaptor_config.replication_dataset)
+        else:
+            raise NotImplementedError(
+                f"Dataset {self.adaptor_config.replication_dataset} not implemented. Only celebA and waterbirds are implemented."
+            )
+
+
+        #########################################################
+        # Initialize model
+        #########################################################
+
+        if model is None:
+            if (
+                not self.task_config.x_selection is None
+                and not self.data_config.input_type == "image"
+            ):
+                input_channels = len(self.task_config.x_selection)
+            elif not(self.adaptor_config.replication_dataset is None):
+                input_channels = 3
+            else:
+                input_channels = self.data_config.input_size[0]
+
+            if not self.task_config.output_channels is None:
+                output_channels = self.task_config.output_channels
+            elif not(self.adaptor_config.replication_dataset is None):
+                output_channels = 2
+            else:
+                output_channels = self.data_config.output_size[0]
+
+            if (isinstance(self.architecture_config, ArchitectureConfig)
+                    and not(self.adaptor_config.replication_dataset is None)):
+                self.model = SequentialModel(
+                    self.architecture_config,
+                    input_channels,
+                    output_channels,
+                    self.training_config.dropout,
+                )
+            elif (
+                isinstance(self.architecture_config, str)
+                and self.architecture_config[:12] == "torchvision_"
+            ):
+                self.model = TorchvisionModel(
+                    self.architecture_config[12:], output_channels
+                )
+
+            else:
+                raise Exception("Architecture not available!")
+
+        else:
+            self.model = model
+
+        if self.adaptor_config.reset_weights:
+            reset_weights(self.model)
+
+        self.model.to(self.device)
+
+        # Initialize objective function
+        objective_found = False
+        for k in self.task_config.criterions.keys():
+            if k in dro_criterions.keys() and not objective_found:
+                self.objective = dro_criterions[k]
+                objective_found = True
+            elif k not in ['l2']:
+                if objective_found:
+                    raise Exception(
+                        f"Multiple objectives found. Only one (non l2) objective is allowed. Found: {self.task_config.criterions.keys()}"
+                    )
+                else:
+                    raise Exception(
+                        f"Criterion {k} not supported. Supported criteria are: {dro_criterions.keys()}"
+                    )
+
+
+    def run(self, continue_training=False, is_initialized=False):
+
+        # TODO: Create setup for the run. Roughly should be the contents of run_expt.py
+
+        if continue_training:
+            raise NotImplementedError(
+                "Continue training not implemented. Please implement this."
+            )
+
+        # Move previous run directory if it exists
+        if not is_initialized and os.path.exists(self.model_path):
+                shutil.move(
+                    self.model_path,
+                    self.model_path + "_old_" + datetime.now().strftime("%Y%m%d_%H%M%S")
+                )
+
+        # Create directories where model history will be located
+        os.makedirs(os.path.join(self.model_path, "checkpoints"))
+
+        # Log config file
+        save_yaml_config(self.adaptor_config, os.path.join(self.model_path, "config.yaml"))
+
+        # Set generalization adjustment
+        if self.adaptor_config.replication_dataset is None:
+            n_groups = 2 ** self.train_dataloader.dataset.output_size
+        else:
+            n_groups = self.train_dataloader.dataset.n_groups
+        adjustments = self.adaptor_config.generalization_adjustment
+        if (type(adjustments) in [float, int]):
+            adjustments = [adjustments]
+        if len(adjustments) == 1:
+            adjustments = np.array(adjustments * n_groups)
+        elif len(adjustments) == n_groups:
+            adjustments = np.array(adjustments)
+        else:
+            raise ValueError(
+                f"generalization_adjustment must be a float, int or list of length 1 or {n_groups}. This is found in DROConfig."
+            )
+
+        # Instantiate training loss computer
+        train_loss_computer = LossComputer(
+            self.objective,
+            is_robust=self.adaptor_config.is_robust,
+            dataset=self.train_dataloader.dataset,
+            alpha=self.adaptor_config.alpha,
+            gamma=self.adaptor_config.gamma,
+            adj=adjustments,
+            normalize_loss=self.adaptor_config.use_normalized_loss,
+            btl=self.adaptor_config.btl,
+            min_var_weight=self.adaptor_config.minimum_variational_weight,
+            replication=(self.adaptor_config.replication_dataset is not None),
+        )
+
+        # Instantiate optimizer
+        if self.training_config.optimizer != "sgd":
+            raise NotImplementedError(
+                f"Optimizer {self.training_config.optimizer} not implemented. Only SGD is implemented."
+            )
+
+        optimizer = torch.optim.SGD(
+            filter(lambda p: p.requires_grad, self.model.parameters()),
+            lr=self.training_config.learning_rate,
+            momentum=0.9,
+            weight_decay=self.task_config.criterions['l2']
+        )
+
+        # Instantiate scheduler
+        # TODO: Integrate scheduler. Currently there are no references to it in the code.
+        if self.adaptor_config.scheduler:
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                optimizer,
+                'min',
+                factor=0.1,
+                patience=5,
+                threshold=0.0001,
+                min_lr=0,
+                eps=1e-08)
+        else:
+            scheduler = None
+
+        # Instantiate progress bar
+        pbar = tqdm(
+            total = self.training_config.max_epochs
+            * (len(self.train_dataloader) + len(self.val_dataloaders)),
+            ncols=80
+        )
+        pbar.stored_values = {}
+
+
+        val_accuracy_max = 0.0
+        # TODO: Set range argument to self.training_config.epochs (or similar)
+        self.log_memory_usage(pbar)
+        for epoch in range(self.training_config.max_epochs):
+
+            pbar.stored_values["Epoch"] = epoch
+
+            # Train epoch
+            self.run_epoch(
+                epoch,
+                self.model,
+                optimizer,
+                self.train_dataloader,
+                train_loss_computer,
+                is_training=True,
+                pbar=pbar)
+
+            gc.collect()
+
+            val_loss_computer = LossComputer(
+                self.objective,
+                is_robust=self.adaptor_config.is_robust,
+                dataset=self.val_dataloaders.dataset,
+                step_size=self.adaptor_config.robust_step_size,
+                alpha=self.adaptor_config.alpha,
+                replication=(self.adaptor_config.replication_dataset is not None),
+            )
+
+            # Validation epoch
+            self.run_epoch(
+                epoch,
+                self.model,
+                optimizer,
+                self.val_dataloaders,
+                val_loss_computer,
+                is_training=False,
+                pbar=pbar)
+
+            self.log_memory_usage(pbar)
+            gc.collect()
+
+            # TODO: Inspect learning rate (low priority) (I think the GroupDRO code is just logging it)
+
+            # TODO: Save model in checkpoints
+            torch.save(
+                self.model.state_dict(),
+                os.path.join(self.model_path, "checkpoints", f"{epoch}.cpl")
+            )
+
+            val_accuracy = val_loss_computer.avg_acc
+
+            if val_accuracy > val_accuracy_max:
+                val_accuracy_max = val_accuracy
+                # Save the model
+                torch.save(
+                    self.model.state_dict(),
+                    os.path.join(self.model_path, "checkpoints", "final.cpl")
+                )
+
+            # TODO: Implement automatic adjustment
+
+
+
+    def run_epoch(self, epoch, model, optimizer, loader, loss_computer, is_training, pbar=None):
+
+        if is_training:
+            model.train()
+        else:
+            model.eval()
+
+        self.log_memory_usage(pbar)
+
+        with torch.set_grad_enabled(is_training):
+            for batch_idx, batch in enumerate(loader):
+
+                conf = None
+                if self.adaptor_config.replication_dataset is None:
+                    x, y = batch
+                    y, conf = y # Group is included in the label, need to separate
+                    group = y * loader.dataset.output_size + conf
+                else:
+                    x, y, group = batch
+
+                x = x.to(self.device)
+                y = y.to(self.device)
+                group = group.to(self.device)
+
+                outputs = model(x)
+
+                loss_main = loss_computer.loss(outputs, y , group, is_training)
+
+                if is_training:
+                    optimizer.zero_grad()
+                    loss_main.backward()
+                    optimizer.step()
+
+                if batch_idx % 10 == 0:
+                    self.log_memory_usage(pbar)
+
+                # Update progress bar
+                pbar.update(1)
+
+                del x, y, group, conf, batch
+
+        # Output state of the epoch to the terminal
+        current_state = "Model Training: " + ("train" if is_training else "val") + "_it:" + str(batch_idx)
+        current_state += ", loss:" + f"{loss_computer.avg_actual_loss.item():.8f}"
+        current_state += ", acc:" + f"{loss_computer.avg_acc.item():.8f}"
+        current_state += ", "
+        current_state += ", ".join(
+            [key + ": " + str(pbar.stored_values[key]) for key in pbar.stored_values]
+        )
+        pbar.write(current_state)
+        loss_computer.reset_stats()
+
+
+    def log_memory_usage(self, pbar=None):
+        """
+        Logs the memory usage of the model.
+        """
+
+        to_out = f"Memory usage: CPU: {psutil.Process(os.getpid()).memory_info().rss / 1024 ** 2:.2f} MB"
+
+        if torch.cuda.is_available():
+            allocated_memory = torch.cuda.memory_allocated() / 1024 ** 2
+            reserved_memory = torch.cuda.memory_reserved() / 1024 ** 2
+            to_out += f", GPU: {allocated_memory:.2f} MB allocated, {reserved_memory:.2f} MB reserved"
+
+        if pbar is None:
+            print(to_out)
+        else:
+            pbar.write(to_out)
+
+
+    def _load_PEAL_dataset(self, datasource=None):
         if datasource is None:
             datasource = self.data_config.dataset_path
 
@@ -254,269 +561,59 @@ class GroupDRO(Adaptor):
             num_workers=0
         )
 
+    def _load_replication_dataset(self, replication_dataset):
 
-        #########################################################
-        # Initialize model
-        #########################################################
+        peal_data = os.environ.get("PEAL_DATA", "datasets")
 
-        if model is None:
-            if (
-                not self.task_config.x_selection is None
-                and not self.data_config.input_type == "image"
-            ):
-                input_channels = len(self.task_config.x_selection)
-            else:
-                input_channels = self.data_config.input_size[0]
+        # TODO: Perhpaps these are better set as function arguments?
+        if replication_dataset == "celeba":
+            dataset = "CelebA"
+            target_name = "Blond_Hair"
+            confounder_names = ["Male"]
+        elif replication_dataset == "waterbirds":
+            dataset = "CUB"
+            target_name = "y"
+            confounder_names = ["place"]
 
-            if not self.task_config.output_channels is None:
-                output_channels = self.task_config.output_channels
-            else:
-                output_channels = self.data_config.output_size[0]
-
-            if isinstance(self.architecture_config, ArchitectureConfig):
-                self.model = SequentialModel(
-                    self.architecture_config,
-                    input_channels,
-                    output_channels,
-                    self.training_config.dropout,
-                )
-            elif (
-                isinstance(self.architecture_config, str)
-                and self.architecture_config[:12] == "torchvision_"
-            ):
-                self.model = TorchvisionModel(
-                    self.architecture_config[12:], output_channels
-                )
-
-            else:
-                raise Exception("Architecture not available!")
-
+        if self.predictor_config.architecture.startswith("torchvision_"):
+            model = self.predictor_config.architecture[12:]
         else:
-            self.model = model
+            raise ValueError(f"Architecture {self.predictor_config.architecture} not supported. "
+                             + "Supported architectures are: torchvision_wideresnet50, torchvision_resnet50 "
+                             + "and torchvision_vision34.")
 
-        if self.adaptor_config.reset_weights:
-            reset_weights(self.model)
+        if model not in ['wideresnet50', 'resnet50', 'resnet34']:
+            raise ValueError(f"Architecture {self.predictor_config.architecture} not supported. "
+                             + "Supported architectures are: torchvision_wideresnet50, torchvision_resnet50 "
+                             + "and torchvision_vision34.")
 
-        self.model.to(self.device)
-
-        # Initialize objective function
-        objective_found = False
-        for k in self.task_config.criterions.keys():
-            if k in dro_criterions.keys() and not objective_found:
-                self.objective = dro_criterions[k]
-                objective_found = True
-            elif k not in ['l2']:
-                if objective_found:
-                    raise Exception(
-                        f"Multiple objectives found. Only one (non l2) objective is allowed. Found: {self.task_config.criterions.keys()}"
-                    )
-                else:
-                    raise Exception(
-                        f"Criterion {k} not supported. Supported criteria are: {dro_criterions.keys()}"
-                    )
-
-
-    def run(self, continue_training=False, is_initialized=False):
-
-        # TODO: Create setup for the run. Roughly should be the contents of run_expt.py
-
-        if continue_training:
-            raise NotImplementedError(
-                "Continue training not implemented. Please implement this."
-            )
-
-        # Move previous run directory if it exists
-        if not is_initialized and os.path.exists(self.model_path):
-                shutil.move(
-                    self.model_path,
-                    self.model_path + "_old_" + datetime.now().strftime("%Y%m%d_%H%M%S")
-                )
-
-        # Create directories where model history will be located
-        os.makedirs(os.path.join(self.model_path, "checkpoints"))
-
-        # Log config file
-        save_yaml_config(self.adaptor_config, os.path.join(self.model_path, "config.yaml"))
-
-        # Set generalization adjustment
-        n_groups = 2 ** self.train_dataloader.dataset.output_size
-        adjustments = self.adaptor_config.generalization_adjustment
-        if (type(adjustments) in [float, int]):
-            adjustments = [adjustments]
-        if len(adjustments) == 1:
-            adjustments = np.array(adjustments * n_groups)
-        elif len(adjustments) == n_groups:
-            adjustments = np.array(adjustments)
-        else:
-            raise ValueError(
-                f"generalization_adjustment must be a float, int or list of length 1 or {n_groups}. This is found in DROConfig."
-            )
-
-        # Instantiate training loss computer
-        train_loss_computer = LossComputer(
-            self.objective,
-            is_robust=self.adaptor_config.is_robust,
-            dataset=self.train_dataloader.dataset,
-            alpha=self.adaptor_config.alpha,
-            gamma=self.adaptor_config.gamma,
-            adj=adjustments,
-            normalize_loss=self.adaptor_config.use_normalized_loss,
-            btl=self.adaptor_config.btl,
-            min_var_weight=self.adaptor_config.minimum_variational_weight,
+        train_data, val_data, test_data = prepare_data(
+            root_dir=peal_data,
+            dataset=dataset,
+            target_name=target_name,
+            confounder_names=confounder_names,
+            model=model,
+            augment_data=False,
+            fraction=1.0,
+            shift_type='confounder',
+            train=True
         )
 
-        # Instantiate optimizer
-        if self.training_config.optimizer != "sgd":
-            raise NotImplementedError(
-                f"Optimizer {self.training_config.optimizer} not implemented. Only SGD is implemented."
-            )
-
-        optimizer = torch.optim.SGD(
-            filter(lambda p: p.requires_grad, self.model.parameters()),
-            lr=self.training_config.learning_rate,
-            momentum=0.9,
-            weight_decay=self.task_config.criterions['l2']
+        self.train_dataloader = train_data.get_loader(
+            train=True,
+            reweight_groups=self.adaptor_config.reweight_groups,
+            batch_size=self.training_config.train_batch_size,
+            num_workers=0
         )
-
-        # Instantiate scheduler
-        # TODO: Integrate scheduler. Currently there are no references to it in the code.
-        if self.adaptor_config.scheduler:
-            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-                optimizer,
-                'min',
-                factor=0.1,
-                patience=5,
-                threshold=0.0001,
-                min_lr=0,
-                eps=1e-08)
-        else:
-            scheduler = None
-
-        # Instantiate progress bar
-        pbar = tqdm(
-            total = self.training_config.max_epochs
-            * (len(self.train_dataloader) + len(self.val_dataloaders)),
-            ncols=80
+        self.val_dataloaders = val_data.get_loader(
+            train=False,
+            reweight_groups=None,
+            batch_size=self.training_config.val_batch_size,
+            num_workers=0
         )
-        pbar.stored_values = {}
-
-
-        val_accuracy_max = 0.0
-        # TODO: Set range argument to self.training_config.epochs (or similar)
-        self.log_memory_usage(pbar)
-        for epoch in range(self.training_config.max_epochs):
-
-            pbar.stored_values["Epoch"] = epoch
-
-            # Train epoch
-            self.run_epoch(
-                epoch,
-                self.model,
-                optimizer,
-                self.train_dataloader,
-                train_loss_computer,
-                is_training=True,
-                pbar=pbar)
-
-            val_loss_computer = LossComputer(
-                self.objective,
-                is_robust=self.adaptor_config.is_robust,
-                dataset=self.val_dataloaders.dataset,
-                step_size=self.adaptor_config.robust_step_size,
-                alpha=self.adaptor_config.alpha,
-            )
-
-            # Validation epoch
-            self.run_epoch(
-                epoch,
-                self.model,
-                optimizer,
-                self.val_dataloaders,
-                val_loss_computer,
-                is_training=False,
-                pbar=pbar)
-
-            self.log_memory_usage(pbar)
-
-            # TODO: Inspect learning rate (low priority) (I think the GroupDRO code is just logging it)
-
-            # TODO: Save model in checkpoints
-            torch.save(
-                self.model.state_dict(),
-                os.path.join(self.model_path, "checkpoints", f"{epoch}.cpl")
-            )
-
-            val_accuracy = val_loss_computer.avg_acc
-
-            if val_accuracy > val_accuracy_max:
-                val_accuracy_max = val_accuracy
-                # Save the model
-                torch.save(
-                    self.model.state_dict(),
-                    os.path.join(self.model_path, "checkpoints", "final.cpl")
-                )
-
-            # TODO: Implement automatic adjustment
-
-
-
-    def run_epoch(self, epoch, model, optimizer, loader, loss_computer, is_training, pbar=None):
-
-        if is_training:
-            model.train()
-        else:
-            model.eval()
-
-        with torch.set_grad_enabled(is_training):
-            for batch_idx, batch in enumerate(loader):
-
-                x, y = batch
-                y, conf = y # Group is included in the label, need to separate
-                group = y * loader.dataset.output_size + conf
-                x = x.to(self.device)
-                y = y.to(self.device)
-                group = group.to(self.device)
-
-                outputs = model(x)
-
-                loss_main = loss_computer.loss(outputs, y , group, is_training)
-
-                if is_training:
-                    optimizer.zero_grad()
-                    loss_main.backward()
-                    optimizer.step()
-
-                if batch_idx % 10 == 0:
-                    self.log_memory_usage(pbar)
-
-                # Update progress bar
-                pbar.update(1)
-
-        # Output state of the epoch to the terminal
-        current_state = "Model Training: " + ("train" if is_training else "val") + "_it:" + str(batch_idx)
-        current_state += ", loss:" + f"{loss_computer.avg_actual_loss.item():.8f}"
-        current_state += ", acc:" + f"{loss_computer.avg_acc.item():.8f}"
-        current_state += ", "
-        current_state += ", ".join(
-            [key + ": " + str(pbar.stored_values[key]) for key in pbar.stored_values]
+        self.test_dataloader = test_data.get_loader(
+            train=False,
+            reweight_groups=None,
+            batch_size=self.training_config.test_batch_size,
+            num_workers=0
         )
-        pbar.write(current_state)
-        loss_computer.reset_stats()
-
-
-    def log_memory_usage(self, pbar=None):
-        """
-        Logs the memory usage of the model.
-        """
-
-        to_out = f"Memory usage: CPU: {psutil.Process(os.getpid()).memory_info().rss / 1024 ** 2:.2f} MB"
-
-        if torch.cuda.is_available():
-            allocated_memory = torch.cuda.memory_allocated() / 1024 ** 2
-            reserved_memory = torch.cuda.memory_reserved() / 1024 ** 2
-            to_out += f", GPU: {allocated_memory:.2f} MB allocated, {reserved_memory:.2f} MB reserved"
-
-        if pbar is None:
-            print(to_out)
-        else:
-            pbar.write(to_out)
