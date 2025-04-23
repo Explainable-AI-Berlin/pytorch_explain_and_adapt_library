@@ -1322,10 +1322,14 @@ class CounterfactualExplainer(ExplainerInterface):
                 explanations[0]["x_list"][None, ...].to(self.device), self.predictor
             )
             for i in range(len(explanations)):
-                assert (
-                    torch.sum(explanations[0]["x_list"] != explanations[i]["x_list"])
-                    == 0
-                )
+                if torch.sum(explanations[0]["x_list"] != explanations[i]["x_list"]) != 0:
+                    if self.explainer_config.tracking_level >= 5:
+                        print("x list is not matching across samples!")
+                        import pdb; pdb.set_trace()
+
+                    else:
+                        raise Exception("x list is not matching across samples!")
+
                 activation_current = extract_penultima_activation(
                     explanations[i]["x_counterfactual_list"][None, ...].to(self.device),
                     self.predictor,
