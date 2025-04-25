@@ -930,7 +930,9 @@ class CFKD(Adaptor):
             else:
                 continue_collecting = False
 
-        cprint("x counterfactual list generated!!!", self.adaptor_config.tracking_level, 2)
+        cprint(
+            "x counterfactual list generated!!!", self.adaptor_config.tracking_level, 2
+        )
         pbar.close()
         return tracked_values
 
@@ -939,7 +941,11 @@ class CFKD(Adaptor):
             self.base_dir, str(finetune_iteration), "tracked_values.npz"
         )
         if self.overwrite or not os.path.exists(tracked_values_path):
-            cprint("Start generating tracked values!!!", self.adaptor_config.tracking_level, 2)
+            cprint(
+                "Start generating tracked values!!!",
+                self.adaptor_config.tracking_level,
+                2,
+            )
             tracked_values = self.generate_x_counterfactual_list(
                 error_matrix=validation_stats["error_matrix"],
                 confidence_score_stats=validation_stats["confidence_score_stats"],
@@ -959,13 +965,13 @@ class CFKD(Adaptor):
             if len(list(tracked_values.values())[0]) == 0:
                 return tracked_values
 
-            if self.adaptor_config.tracking_level > 0:
+            if self.adaptor_config.tracking_level >= 2:
                 with open(
                     tracked_values_path,
                     "wb",
                 ) as f:
                     tracked_values_file = {}
-                    for key in self.tracked_keys:
+                    for key in tracked_values.keys():
                         if isinstance(tracked_values[key][0], torch.Tensor):
                             tracked_values_file[key] = torch.stack(
                                 tracked_values[key], dim=0
@@ -1010,6 +1016,7 @@ class CFKD(Adaptor):
         if self.overwrite or not os.path.exists(
             os.path.join(self.base_dir, str(finetune_iteration), mode + "_feedback.txt")
         ):
+            cprint("retrieve feedback!", self.adaptor_config.tracking_level, 2)
             feedback = self.teacher.get_feedback(
                 base_dir=os.path.join(
                     self.base_dir, str(finetune_iteration), mode + "_teacher"
@@ -1032,6 +1039,7 @@ class CFKD(Adaptor):
                 f.write("\n".join(feedback))
 
         else:
+            cprint("load feedback!", self.adaptor_config.tracking_level, 2)
             with open(
                 os.path.join(
                     self.base_dir, str(finetune_iteration), mode + "_feedback.txt"
@@ -1040,7 +1048,9 @@ class CFKD(Adaptor):
             ) as f:
                 feedback = f.read().split("\n")
 
-        # TODO this is not correct for calculating training stats.
+        if mode == "train":
+            return feedback, {}
+
         num_samples = len(tracked_values["y_list"])
 
         # TODO this seems like a bug!
@@ -1145,7 +1155,11 @@ class CFKD(Adaptor):
             )
             flip_rate_distilled = len(flipped_samples) / num_samples
             feedback_stats["flip_rate_distilled"] = float(flip_rate_distilled)
-            cprint("flip_rate_distilled: " + str(flip_rate_distilled), self.adaptor_config.tracking_level, 2)
+            cprint(
+                "flip_rate_distilled: " + str(flip_rate_distilled),
+                self.adaptor_config.tracking_level,
+                2,
+            )
             num_true_1sided_distilled = len(
                 list(
                     filter(
@@ -1179,7 +1193,11 @@ class CFKD(Adaptor):
                 fa_1sided_distilled = 0.0
 
             feedback_stats["feedback_accuracy_distilled"] = float(fa_1sided_distilled)
-            cprint("feedback_accuracy_distilled: " + str(fa_1sided_distilled), self.adaptor_config.tracking_level, 2)
+            cprint(
+                "feedback_accuracy_distilled: " + str(fa_1sided_distilled),
+                self.adaptor_config.tracking_level,
+                2,
+            )
             tracked_stats = self.explainer.calculate_latent_difference_stats(
                 tracked_values
             )
@@ -1207,12 +1225,12 @@ class CFKD(Adaptor):
         ):
             print("missmatch in list lengths while dataset creation!")
             if self.adaptor_config.tracking_level >= 2:
-                import pdb; pdb.set_trace()
+                import pdb
+
+                pdb.set_trace()
 
             else:
-                raise Exception(
-                    "missmatch in list lengths while dataset creation!"
-                )
+                raise Exception("missmatch in list lengths while dataset creation!")
 
         dataset_dir = os.path.join(
             self.base_dir, str(finetune_iteration), mode + "_dataset"
@@ -1226,21 +1244,21 @@ class CFKD(Adaptor):
         sample_names = []
         for sample_idx in range(len(feedback)):
             """if feedback[sample_idx] == "true":
-                sample_name = (
-                    "true_"
-                    + str(int(y_source_list[sample_idx]))
-                    + "_to_"
-                    + str(int(y_target_list[sample_idx]))
-                    + "_"
-                    + str(sample_idx)
-                )
-                x_list.append(x_counterfactual_list[sample_idx])
-                if not hint_list is None:
-                    hint_list_dataset.append(hint_list[sample_idx])
-    
-                y_counterfactual_list.append(int(y_target_list[sample_idx]))
-                sample_names.append(sample_name)
-                sample_idx += 1"""
+            sample_name = (
+                "true_"
+                + str(int(y_source_list[sample_idx]))
+                + "_to_"
+                + str(int(y_target_list[sample_idx]))
+                + "_"
+                + str(sample_idx)
+            )
+            x_list.append(x_counterfactual_list[sample_idx])
+            if not hint_list is None:
+                hint_list_dataset.append(hint_list[sample_idx])
+
+            y_counterfactual_list.append(int(y_target_list[sample_idx]))
+            sample_names.append(sample_name)
+            sample_idx += 1"""
 
             if feedback[sample_idx] == "false":
                 sample_name = (
@@ -1528,7 +1546,11 @@ class CFKD(Adaptor):
         )
         for path in paths:
             img_success.save(path.replace(".png", "_success.png"))
-            cprint("Saved: " + path.replace(".png", "_success.png"), self.adaptor_config.tracking_level, 2)
+            cprint(
+                "Saved: " + path.replace(".png", "_success.png"),
+                self.adaptor_config.tracking_level,
+                2,
+            )
 
         img = create_comparison(
             explainer=self.explainer,
@@ -1571,7 +1593,11 @@ class CFKD(Adaptor):
             self.base_dir, str(finetune_iteration), "validation_tracked_values.npz"
         )
         if self.overwrite or not os.path.exists(validation_values_path):
-            cprint("calculate validation tracked values from scratch!!!", self.adaptor_config.tracking_level, 2)
+            cprint(
+                "calculate validation tracked values from scratch!!!",
+                self.adaptor_config.tracking_level,
+                2,
+            )
             x_list_collection = []
             x_counterfactual_collection = []
             y_confidence_list = []
@@ -1579,7 +1605,9 @@ class CFKD(Adaptor):
             validation_tracked_values = None
             validation_stats = []
             for i in range(self.adaptor_config.validation_runs):
-                cprint("Validation run: " + str(i), self.adaptor_config.tracking_level, 2)
+                cprint(
+                    "Validation run: " + str(i), self.adaptor_config.tracking_level, 2
+                )
                 self.explainer.explainer_config = copy.deepcopy(
                     original_explainer_config
                 )
@@ -1667,7 +1695,7 @@ class CFKD(Adaptor):
             }
             self.explainer.explainer_config = original_explainer_config
 
-            if self.adaptor_config.tracking_level > 0:
+            if self.adaptor_config.tracking_level >= 2:
                 os.makedirs(
                     os.path.join(self.base_dir, str(finetune_iteration)), exist_ok=True
                 )
@@ -1714,7 +1742,11 @@ class CFKD(Adaptor):
         else:
             # TODO think about this again
             if self.adaptor_config.tracking_level > 0:
-                cprint("load validation tracked values!!!", self.adaptor_config.tracking_level, 2)
+                cprint(
+                    "load validation tracked values!!!",
+                    self.adaptor_config.tracking_level,
+                    2,
+                )
                 with open(
                     validation_values_path,
                     "rb",
@@ -1726,7 +1758,9 @@ class CFKD(Adaptor):
                             torch.tensor(validation_tracked_value_file[key])
                         )
 
-                cprint("load validation prestats!!!", self.adaptor_config.tracking_level, 2)
+                cprint(
+                    "load validation prestats!!!", self.adaptor_config.tracking_level, 2
+                )
                 with open(
                     os.path.join(
                         self.base_dir,
@@ -1743,7 +1777,11 @@ class CFKD(Adaptor):
                         )
 
             if "collage_path_list" in self.tracked_keys:
-                cprint("recreate validation collage path!", self.adaptor_config.tracking_level, 2)
+                cprint(
+                    "recreate validation collage path!",
+                    self.adaptor_config.tracking_level,
+                    2,
+                )
                 get_collage_path = lambda x: os.path.join(
                     self.base_dir,
                     str(finetune_iteration),
@@ -1781,31 +1819,54 @@ class CFKD(Adaptor):
                 str(finetune_iteration),
                 "validation_tracked_cluster_values.npz",
             )
-            validation_tracked_values = self.explainer.cluster_explanations(
-                validation_tracked_values,
-                self.adaptor_config.batch_size,
-                self.adaptor_config.explainer.num_attempts,
-            )
-            if self.adaptor_config.tracking_level > 0:
+            if os.path.exists(validation_cluster_values_path):
+                cprint(
+                    "load clustered counterfactual explanations!",
+                    self.adaptor_config.tracking_level,
+                    2,
+                )
                 with open(
                     validation_cluster_values_path,
-                    "wb",
+                    "rb",
                 ) as f:
-                    tracked_values_file = {}
-                    for key in validation_tracked_values.keys():
-                        if isinstance(validation_tracked_values[key][0], torch.Tensor):
-                            tracked_values_file[key] = torch.stack(
-                                validation_tracked_values[key], dim=0
-                            ).numpy()
+                    validation_tracked_values = {}
+                    validation_tracked_value_file = np.load(f, allow_pickle=True)
+                    for key in validation_tracked_value_file.keys():
+                        validation_tracked_values[key] = list(
+                            torch.tensor(validation_tracked_value_file[key])
+                        )
 
-                        elif isinstance(
-                            validation_tracked_values[key][0], int
-                        ) or isinstance(validation_tracked_values[key][0], float):
-                            tracked_values_file[key] = np.array(
-                                validation_tracked_values[key]
-                            )
+            else:
+                cprint(
+                    "cluster counterfactual explanations!",
+                    self.adaptor_config.tracking_level,
+                    2,
+                )
+                validation_tracked_values = self.explainer.cluster_explanations(
+                    validation_tracked_values,
+                    self.adaptor_config.batch_size,
+                    self.adaptor_config.explainer.num_attempts,
+                )
+                if self.adaptor_config.tracking_level > 0:
+                    with open(
+                        validation_cluster_values_path,
+                        "wb",
+                    ) as f:
+                        tracked_values_file = {}
+                        for key in validation_tracked_values.keys():
+                            if isinstance(validation_tracked_values[key][0], torch.Tensor):
+                                tracked_values_file[key] = torch.stack(
+                                    validation_tracked_values[key], dim=0
+                                ).numpy()
 
-                    np.savez(f, **tracked_values_file)
+                            elif isinstance(
+                                validation_tracked_values[key][0], int
+                            ) or isinstance(validation_tracked_values[key][0], float):
+                                tracked_values_file[key] = np.array(
+                                    validation_tracked_values[key]
+                                )
+
+                        np.savez(f, **tracked_values_file)
 
         if self.adaptor_config.tracking_level > 0 and hasattr(
             self.joint_validation_dataloader.dataloaders[0].dataset,
@@ -1826,7 +1887,11 @@ class CFKD(Adaptor):
                 validation_tracked_values["y_target_list"],
                 validation_tracked_values["hint_list"],
             )
-            cprint("global counterfactual visualization saved!!!", self.adaptor_config.tracking_level, 2)
+            cprint(
+                "global counterfactual visualization saved!!!",
+                self.adaptor_config.tracking_level,
+                2,
+            )
 
         return validation_tracked_values, validation_stats
 
@@ -1836,7 +1901,11 @@ class CFKD(Adaptor):
         if not self.overwrite and os.path.exists(
             os.path.join(self.base_dir, str(finetune_iteration), "validation_stats.npz")
         ):
-            cprint("load already completed validation stats!!!", self.adaptor_config.tracking_level, 2)
+            cprint(
+                "load already completed validation stats!!!",
+                self.adaptor_config.tracking_level,
+                2,
+            )
             with open(
                 os.path.join(
                     self.base_dir, str(finetune_iteration), "validation_stats.npz"
@@ -1895,7 +1964,11 @@ class CFKD(Adaptor):
         """
         Run the counterfactual knowledge distillation
         """
-        cprint("Adaptor Config: " + str(self.adaptor_config), self.adaptor_config.tracking_level, 2)
+        cprint(
+            "Adaptor Config: " + str(self.adaptor_config),
+            self.adaptor_config.tracking_level,
+            2,
+        )
         validation_prestats, validation_tracked_values, writer = self.initialize_run()
 
         # iterate over the finetune iterations
@@ -1903,7 +1976,12 @@ class CFKD(Adaptor):
             self.adaptor_config.current_iteration + 1,
             self.adaptor_config.finetune_iterations + 1,
         ):
-            cprint("Start retrieving training counterfactuals for iteration " + str(finetune_iteration), self.adaptor_config.tracking_level, 2)
+            cprint(
+                "Start retrieving training counterfactuals for iteration "
+                + str(finetune_iteration),
+                self.adaptor_config.tracking_level,
+                2,
+            )
             tracked_values = self.retrieve_counterfactual_list(
                 validation_stats=validation_prestats,
                 finetune_iteration=finetune_iteration,
@@ -1956,7 +2034,11 @@ class CFKD(Adaptor):
                 self.adaptor_config.max_test_batches,
                 tracking_level=self.adaptor_config.tracking_level,
             )
-            cprint("val_accuracy: " + str(val_accuracy), self.adaptor_config.tracking_level, 2)
+            cprint(
+                "val_accuracy: " + str(val_accuracy),
+                self.adaptor_config.tracking_level,
+                2,
+            )
             writer.add_scalar("val_accuracy", val_accuracy, finetune_iteration)
             if hints_enabled_buffer:
                 self.val_dataloader.dataset.enable_hints()
@@ -1994,19 +2076,45 @@ class CFKD(Adaptor):
                     worst_group_accuracy,
                     finetune_iteration,
                 )
-                cprint("group_accuracies: " + str(group_accuracies), self.adaptor_config.tracking_level, 2)
-                cprint("group_distribution: " + str(group_distribution), self.adaptor_config.tracking_level, 2)
-                cprint("group_sizes: " + str(groups), self.adaptor_config.tracking_level, 2)
-                cprint("worst_group_accuracy: " + str(worst_group_accuracy), self.adaptor_config.tracking_level, 2)
+                cprint(
+                    "group_accuracies: " + str(group_accuracies),
+                    self.adaptor_config.tracking_level,
+                    2,
+                )
+                cprint(
+                    "group_distribution: " + str(group_distribution),
+                    self.adaptor_config.tracking_level,
+                    2,
+                )
+                cprint(
+                    "group_sizes: " + str(groups), self.adaptor_config.tracking_level, 2
+                )
+                cprint(
+                    "worst_group_accuracy: " + str(worst_group_accuracy),
+                    self.adaptor_config.tracking_level,
+                    2,
+                )
                 avg_group_accuracy = np.mean(group_accuracies)
-                cprint("avg_group_accuracy: " + str(avg_group_accuracy), self.adaptor_config.tracking_level, 2)
+                cprint(
+                    "avg_group_accuracy: " + str(avg_group_accuracy),
+                    self.adaptor_config.tracking_level,
+                    2,
+                )
                 writer.add_scalar(
                     "test_avg_group_accuracy", avg_group_accuracy, finetune_iteration
                 )
 
             writer.add_scalar("test_accuracy", test_accuracy, finetune_iteration)
-            cprint("test_accuracy: " + str(test_accuracy), self.adaptor_config.tracking_level, 2)
-            cprint("Start to retrieve validation stats", self.adaptor_config.tracking_level, 2)
+            cprint(
+                "test_accuracy: " + str(test_accuracy),
+                self.adaptor_config.tracking_level,
+                2,
+            )
+            cprint(
+                "Start to retrieve validation stats",
+                self.adaptor_config.tracking_level,
+                2,
+            )
 
             decision_boundary_path = os.path.join(
                 self.base_dir, str(finetune_iteration), "decision_boundary.png"

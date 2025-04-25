@@ -25,7 +25,7 @@ from pathlib import Path
 
 
 def cprint(s, a, b):
-    if a < b:
+    if a >= b:
         print(s)
 
 

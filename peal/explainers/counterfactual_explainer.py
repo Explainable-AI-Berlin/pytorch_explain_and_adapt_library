@@ -1582,15 +1582,20 @@ class CounterfactualExplainer(ExplainerInterface):
                         - explanations_dict["x_list"][i]
                         for i in range(len(explanations_dict["clusters0"]))
                     ]
-                    foreground_change = [
-                        torch.sum(
-                            torch.abs(
-                                x_difference_list[i] * explanations_dict["hint_list"][i]
+                    try:
+                        foreground_change = [
+                            torch.sum(
+                                torch.abs(
+                                    x_difference_list[i] * explanations_dict["hint_list"][i]
+                                )
+                                / torch.sum(explanations_dict["hint_list"][i])
                             )
-                            / torch.sum(explanations_dict["hint_list"][i])
-                        )
-                        for i in range(len(explanations_dict["hint_list"]))
-                    ]
+                            for i in range(len(x_difference_list))
+                        ]
+
+                    except Exception:
+                        import pdb; pdb.set_trace()
+
                     background_change = [
                         torch.sum(
                             torch.abs(
@@ -1601,7 +1606,7 @@ class CounterfactualExplainer(ExplainerInterface):
                                 torch.abs(1 - explanations_dict["hint_list"][i])
                             )
                         )
-                        for i in range(len(explanations_dict["hint_list"]))
+                        for i in range(len(x_difference_list))
                     ]
                     latent_differences.append(
                         torch.transpose(
