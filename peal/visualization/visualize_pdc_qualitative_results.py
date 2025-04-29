@@ -18,7 +18,7 @@ def plot_images_with_custom_padding(
 
     # Create GridSpec for precise control over spacings
     fig = plt.figure(figsize=(2 * num_tasks, 2 * num_methods))
-    grid = GridSpec(num_methods, num_tasks, figure=fig, hspace=0, wspace=0.1)
+    grid = GridSpec(num_methods, num_tasks, figure=fig, hspace=0.2, wspace=0.2)
 
     for i in range(num_methods):
         for j in range(num_tasks):
@@ -63,10 +63,10 @@ if __name__ == "__main__":
     base_path = os.environ.get("PEAL_RUNS", "peal_runs")
     base_paths = [
         base_path + "/celeba/Smiling/classifier_natural",
-        base_path + "/celeba/Blond_Hair/classifier_natural",
-        base_path + "/waterbirds/classifier_natural",
-        base_path
-        + "/square/colora_confounding_colorb/torchvision/classifier_poisoned100",
+        base_path + "/celeba/Blond_Hair/classifier_natural_success",
+        base_path + "/square/colora_confounding_colorb/torchvision/classifier_poisoned098",
+        base_path + "/celeba_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned100",
+        base_path + "/camelyon17/classifier_poisoned100",
     ]
     methods = ["ace_cfkd", "dime_cfkd", "fastdime_cfkd", "pdc_cfkd"]
     task_names = [
@@ -74,10 +74,12 @@ if __name__ == "__main__":
         "Smiling to Serious",
         "Non-Blond to Blond",
         "Blond to Non-Blond",
-        "Waterbird to Landbird",
-        "Landbird to Waterbird",
-        "Light to Dark BG",
-        "Dark to Light BG",
+        "DF+LB to LF+DB",
+        "LF+DB to DF+LB",
+        "Serious+None\n to\n Smiling+CRT",
+        "Smiling+CRT\n to\n Serious+None",
+        "Benign+H1\n to\n Cancer+H2",
+        "Cancer+H2\n to\n Benign+H1",
     ]
     method_names = [
         "Original",
@@ -90,7 +92,7 @@ if __name__ == "__main__":
         "PDC (ours) (1)",
         "PDC (ours) (2)",
     ]
-    sample_idxs = [[17, 43], [6, 23], [3, 30], [0, 11]]
+    sample_idxs = [[17, 43], [6, 23], [3, 2], [8, 4], [7, 9]]
     imgs = torch.zeros([1 + 2 * len(methods), 2 * len(base_paths), 3, 128, 128])
     target_confidences = torch.zeros([1 + 2 * len(methods), 2 * len(base_paths)])
 
@@ -102,6 +104,9 @@ if __name__ == "__main__":
                 "0",
                 "validation_tracked_cluster_values.npz",
             )
+            if not os.path.exists(tracked_values_path):
+                continue
+
             with open(tracked_values_path, "rb") as f:
                 tracked_values = np.load(f, allow_pickle=True)
 
