@@ -1,4 +1,6 @@
 import argparse
+import types
+
 import torch
 import os
 
@@ -21,8 +23,6 @@ def main():
 
     # TODO this can't be done properly before bug is fixed...
     model_config = load_yaml_config(args.model_config)
-    if not isinstance(model_config.data, DataConfig):
-        model_config.data = DataConfig(**model_config.data)
 
     if not isinstance(model_config.training, TrainingConfig):
         model_config.training = TrainingConfig(**model_config.training)
@@ -31,7 +31,12 @@ def main():
         model_config.task = TaskConfig(**model_config.task)
 
     if not args.data_config is None:
-        model_config.data = load_yaml_config(args.data_config, DataConfig)
+        model_config.data = load_yaml_config(args.data_config)
+
+    if not isinstance(model_config.data, DataConfig):
+        if type(model_config.data) == types.SimpleNamespace:
+            model_config.data = vars(model_config.data)
+        model_config.data = DataConfig(**model_config.data)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     if not args.model_path is None:

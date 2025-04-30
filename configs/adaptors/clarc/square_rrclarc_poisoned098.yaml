@@ -1,19 +1,26 @@
 category: "adaptor"
 adaptor_type: "RRClArC"
-base_dir: $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned098_sidney/rrclarc
-model_path: $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned098_sidney/model.cpl
+base_dir: $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned098/rrclarc
+model_path: $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned098/model.cpl
 data: <PEAL_BASE>/configs/data/square_poisoned098.yaml
-unpoisoned_data: <PEAL_BASE>/configs/data/square_unpoisoned.yaml
-correction_strength: [100, 1000, 5000, 20000, 100000, 250000, 1000000, 2000000, 5000000, 7000000]
-layer_index: [1, 5, 10, 11, -2]
+unpoisoned_data: <PEAL_BASE>/configs/data/square_poisoned098.yaml
+group_labels: $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned098/spray_analysis/group_labels_attrbs-layer-6.json
 projection_type: 'pcav' # 'pcav', 'svm', 'simple'
-#cav_mode: "cavs_max" # 'cavs_max', 'cavs_mean'; only relevant when using projection_type 'pcav'
-#mean_grad: True
+# cav_mode: "cavs_max" # 'cavs_max', 'cavs_mean'; only relevant when using projection_type 'pcav'
+layer_index: [1, 9, 10, 11]
+correction_strength: [5000, 20000, 100000, 250000, 1000000, 2500000, 5000000, 7000000, 8000000]
+attacked_class: 1
+# mean_grad: True
+save_model: False
+use_perfect_annotations: False
 rrc_loss: "l2" # 'l2', 'cosine'
 gradient_target: "all" # 'all', 'all_random', 'attacked_class', 'max'
-attacked_class: 0
-save_model: True
-use_perfect_annotations: True
+task:
+  y_selection: [ClassA]
+  output_type: 'singleclass'
+  output_channels: 2
+  criterions:
+    l2: 1.0
 training:
   train_batch_size: 256
   val_batch_size: 256
@@ -21,8 +28,3 @@ training:
   learning_rate: 5.0e-05
   optimizer: "sgd"
   max_epochs: 100
-task:
-  y_selection: [ClassA, ClassB]
-  output_type: 'multiclass'
-  criterions:
-    l2: 1.0

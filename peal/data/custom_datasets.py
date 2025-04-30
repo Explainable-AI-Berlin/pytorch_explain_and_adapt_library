@@ -1,8 +1,12 @@
+import copy
+import csv
 import os
 import random
 import shutil
 import tarfile
 from pathlib import Path
+from typing import Union
+
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
@@ -10,6 +14,7 @@ import torchvision
 from PIL import Image
 import matplotlib.cm as cm
 import requests
+from torch.utils.data import DataLoader, ConcatDataset
 
 from torchvision.transforms import ToTensor
 from wilds import get_dataset
@@ -29,15 +34,9 @@ from peal.dependencies.FastDiME_CelebA.eval_utils.oracle_metrics import OracleMe
 
 class MnistDataset(Image2ClassDataset):
     def __init__(self, config: DataConfig, **kwargs):
-
         if not os.path.exists(config.dataset_path):
-            print(f"creating new dataset with coloring {config.coloring} at {config.dataset_path}")
-            coloring = {class_coloring[0] : class_coloring[1] for class_coloring in config.coloring}
-            raw_path = config.dataset_path if config.raw_path is None else config.raw_path
-
-            random.seed(0)
             mnist_dataset_train = torchvision.datasets.MNIST(
-                root=raw_path + "_train_raw",
+                root=config.dataset_path + "_train_raw",
                 train=True,
                 download=True,
                 transform=None,
@@ -50,34 +49,157 @@ class MnistDataset(Image2ClassDataset):
                 if not os.path.exists(f"{img_dir}/{label}"):
                     os.makedirs(f"{img_dir}/{label}")
 
-                if label in coloring and random.random() < coloring[label]:
-                    img = np.asarray(img)
-                    zeros = np.zeros(img.shape, dtype=np.uint8)
-                    img = np.stack([img, zeros, zeros], axis=2)
-                    img = Image.fromarray(img)
-
                 img.save(f"{img_dir}/{label}/{idxs[label]}.png")
                 idxs[label] += 1
 
             mnist_dataset_val = torchvision.datasets.MNIST(
-                root=raw_path + "_val_raw",
+                root=config.dataset_path + "_val_raw",
                 train=False,
                 download=True,
                 transform=None,
             )
             for i in range(len(mnist_dataset_val)):
                 img, label = mnist_dataset_val[i]
-
-                if label in coloring and random.random() < coloring[label]:
-                    img = np.asarray(img)
-                    zeros = np.zeros(img.shape, dtype=np.uint8)
-                    img = np.stack([img, zeros, zeros], axis=2)
-                    img = Image.fromarray(img)
-
                 img.save(f"{img_dir}/{label}/{idxs[label]}.png")
                 idxs[label] += 1
 
         super(MnistDataset, self).__init__(config=config, **kwargs)
+
+
+class ColoredMnistConfig(DataConfig):
+    config_name: str = "ColoredMnistConfig"
+    coloring: list[tuple[int, float]] = []
+    raw_path: Union[type(None), str] = None
+    group_map: str = None
+
+
+class ColoredMnist(Image2ClassDataset):
+    def __init__(self, mode: str, config: ColoredMnistConfig, **kwargs):
+        self.config = copy.deepcopy(config)
+        if not os.path.exists(self.config.dataset_path):
+            self._create_dataset()
+
+        if mode == "val":
+            self.config.x_selection = "imgs_val"
+            self.config.split = [0, 1]
+        elif mode == "test":
+            self.config.x_selection = "imgs_test"
+            self.config.split = [0, 0]
+        else:
+            self.config.x_selection = "imgs_train"
+            self.config.split = [1, 1]
+
+        self.group_labels = {}
+        group_map_file = self.config.group_map or os.path.join(self.config.dataset_path, "data.csv")
+        with open(group_map_file, 'r') as f:
+            reader = csv.reader(f)
+            header = next(reader)
+            col_filename = header.index("Name")
+            col_colored = header.index("Colored")
+            for row in reader:
+                self.group_labels[row[col_filename]] = int(row[col_colored])
+
+        super(ColoredMnist, self).__init__(config=self.config, mode=mode, **kwargs)
+
+    def has_confounder(self, filename: str) -> int:
+        return self.group_labels[filename]
+
+    def _create_dataset(self):
+        print(f"creating new ColoredMnist dataset with coloring {self.config.coloring} at {self.config.dataset_path}")
+        np.random.seed(0 if self.config.seed is None else self.config.seed)
+
+        data_info = {"Name": [], "Digit": [], "Colored": [], "Subset": []}
+
+        def color_sample(coloring_wanted, coloring_actual, label, img):
+            if label in coloring_wanted and coloring_actual[label] < coloring_wanted[label]:
+                coloring_actual[label] += 1
+                img = np.asarray(img)
+                zeros = np.zeros(img.shape, dtype=np.uint8)
+                img = np.stack([img, zeros, zeros], axis=2)
+                img = Image.fromarray(img)
+                data_info["Colored"].append(1)
+            else:
+                data_info["Colored"].append(0)
+            return img
+
+        number_samples_max_train = 4500
+        number_samples_max_val_and_test = 750
+        coloring_train = {class_coloring[0] : round(class_coloring[1] * number_samples_max_train)
+                          for class_coloring in self.config.coloring}
+        coloring_val_and_test = {class_coloring[0] : round(class_coloring[1] * number_samples_max_val_and_test)
+                                 for class_coloring in self.config.coloring}
+
+        raw_path = self.config.dataset_path if self.config.raw_path is None else self.config.raw_path
+
+        mnist_dataset_train = torchvision.datasets.MNIST(
+            root=raw_path + "_train_raw",
+            train=True,
+            download=True,
+            transform=None,
+        )
+        mnist_dataset_val = torchvision.datasets.MNIST(
+            root=raw_path + "_val_raw",
+            train=False,
+            download=True,
+            transform=None,
+        )
+        data = ConcatDataset([mnist_dataset_train, mnist_dataset_val])
+
+        dir_train = os.path.join(self.config.dataset_path, "imgs_train")
+        Path(dir_train).mkdir(parents=True, exist_ok=False)
+        dir_val = os.path.join(self.config.dataset_path, "imgs_val")
+        Path(dir_val).mkdir(parents=True, exist_ok=False)
+        dir_test = os.path.join(self.config.dataset_path, "imgs_test")
+        Path(dir_test).mkdir(parents=True, exist_ok=False)
+        for i in range(10):
+            Path(os.path.join(dir_train, str(i))).mkdir()
+            Path(os.path.join(dir_val, str(i))).mkdir()
+            Path(os.path.join(dir_test, str(i))).mkdir()
+
+        number_samples_train = [0] * 10
+        number_samples_val = [0] * 10
+        number_samples_test = [0] * 10
+        coloring_actual_train = [0] * 10
+        coloring_actual_val = [0] * 10
+        coloring_actual_test = [0] * 10
+
+        current = 0
+
+        idxs = np.arange(len(data))
+        idxs = np.random.permutation(idxs)
+        for idx in idxs:
+            img, label = data[idx]
+            if number_samples_train[label] < number_samples_max_train:
+                number_samples_train[label] += 1
+                img = color_sample(coloring_train, coloring_actual_train, label, img)
+                filename = os.path.join(dir_train, str(label), str(current).zfill(6) + ".png")
+                data_info["Subset"].append("train")
+
+            elif number_samples_val[label] < number_samples_max_val_and_test:
+                number_samples_val[label] += 1
+                img = color_sample(coloring_val_and_test, coloring_actual_val, label, img)
+                filename = os.path.join(dir_val, str(label), str(current).zfill(6) + ".png")
+                data_info["Subset"].append("val")
+
+            elif number_samples_test[label] < number_samples_max_val_and_test:
+                number_samples_test[label] += 1
+                img = color_sample(coloring_val_and_test, coloring_actual_test, label, img)
+                filename = os.path.join(dir_test, str(label), str(current).zfill(6) + ".png")
+                data_info["Subset"].append("test")
+
+            else:
+                continue
+
+            img.save(filename)
+            data_info["Name"].append(str(current).zfill(6) + ".png")
+            data_info["Digit"].append(label)
+            current += 1
+
+        with open(os.path.join(self.config.dataset_path, "data.csv"), 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(data_info.keys())
+            writer.writerows(zip(*data_info.values()))
+
 
 
 def plot_latents_with_arrows(

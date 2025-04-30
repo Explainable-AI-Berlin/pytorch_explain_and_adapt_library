@@ -1,0 +1,19 @@
+base_dir: $PEAL_RUNS/mnist-colored/cprob50-ctarget0/spray_analysis
+data: <PEAL_BASE>/configs/data/mnist-colored/mnist-colored-cprob50-ctarget0.yaml
+model: $PEAL_RUNS/mnist-colored/cprob50-ctarget0/model.cpl
+port: 8080
+use_relative_concept_importance: True
+sum_attribution_channels: False # no effect if use_relative_concept_importance=True
+normalize_attribtions: True
+attribution_layer: 6
+class_idxs: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] # all other classes are assumed to have only non-confounders
+classes_total: 10
+num_clusters_max: 6
+num_eigval: 32
+default_value: 0
+tsne_perplexity: 90.0
+umap_neighbors: 50
+max_samples: 100000
+task:
+  output_type: 'singleclass'
+  output_channels: 2

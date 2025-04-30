@@ -245,5 +245,3 @@ class DataConfig(BaseModel):
     x_selection: str = "imgs"
 
     full_confounder_config: Union[type(None), list[float]] = None
-    coloring: list[tuple[int, float]] = []
-    raw_path: Union[type(None), str] = None

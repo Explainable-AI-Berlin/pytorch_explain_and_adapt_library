@@ -104,8 +104,6 @@ from torch import nn
 
 from peal.dependencies.group_dro.loss import LossComputer
 
-from memory_profiler import profile
-
 
 dro_criterions = {
     "ce": nn.CrossEntropyLoss(reduction='none'),
@@ -128,6 +126,10 @@ class PealGroupDROConfig(AdaptorConfig):
     The config of the predictor to be adapted.
     """
     predictor: PredictorConfig = None
+    """
+    The data config.
+    """
+    data: DataConfig = None
     """
     Parameters for the Gorup_DRO loss computer
     """
@@ -159,54 +161,6 @@ class PealGroupDROConfig(AdaptorConfig):
     The name of the class.
     """
     __name__: str = "peal.PealGroupDROConfig"
-
-    def __init__(
-        self,
-        predictor: Union[dict, PredictorConfig] = None,
-        is_robust: bool = False,
-        alpha: float = None,
-        gamma: float = 0.1,
-        adj: float = None,
-        min_var_weight: float = 0,
-        step_size: float = 0.01,
-        normalize_loss: bool = False,
-        btl: bool = False,
-        reset_weights: bool = True,
-        model_path: str = None,
-        seed: int = 0,
-        **kwargs,
-    ):
-        """
-        The config template for the DRO adaptor.
-        Sets the values of the config that are listed above.
-
-        TODO: Run checks to assure all values are filled, including with defaults, if necessary
-        Args:
-            so weiter und so fort
-        """
-
-        # TODO: We are using pydantic to create the config file. Be sure to check that it's written in this style
-
-        if isinstance(predictor, PredictorConfig):
-            self.predictor = predictor
-        elif isinstance(predictor, dict):
-            self.predictor = PredictorConfig(**predictor)
-        else:
-            raise TypeErorr(f"predictor is of type {type(predictor)}; expecting type dict or PredictorConfig")
-
-        self.is_robust = is_robust
-        self.alpha = alpha
-        self.gamma = gamma
-        self.adj = adj
-        self.min_var_weight = min_var_weight
-        self.step_size = step_size
-        self.normalize_loss = normalize_loss
-        self.btl = btl
-
-        self.reset_weights = reset_weights
-        self.model_path = model_path
-        self.seed = seed
-        self.kwargs = kwargs
 
 
 
@@ -243,6 +197,8 @@ class PealGroupDRO(Adaptor):
         self.reset_weights = self.adaptor_config.reset_weights
         config = self.adaptor_config.predictor
         self.config = load_yaml_config(config)
+        if self.adaptor_config.data is not None:
+            self.config.data = load_yaml_config(self.adaptor_config.data)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.val_dataloader_weights = val_dataloader_weights
 

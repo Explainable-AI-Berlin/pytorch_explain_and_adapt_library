@@ -816,6 +816,7 @@ class Image2ClassDataset(ImageDataset):
         self.urls = []
         self.idx_to_name = os.listdir(self.root_dir)
         self.string_description_enabled = False
+        self.groups_enabled = False
 
         self.idx_to_name.sort()
         for target_str in self.idx_to_name:
@@ -898,6 +899,8 @@ class Image2ClassDataset(ImageDataset):
 
     @property
     def output_size(self):
+        if len(self.config.output_size) == 1:
+            return self.config.output_size[0]
         return self.config.output_size
 
     def set_task_specific_urls(self):
@@ -951,11 +954,19 @@ class Image2ClassDataset(ImageDataset):
         print("enabled class restriction for target class(es):", str(class_idx))
 
     def disable_class_restriction(self):
-        if hasattr(self, "backup_urls"):
-            self.urls = copy.deepcopy(self.backup_urls)
-
+        self.urls = copy.deepcopy(self.backup_urls)
         self.class_restriction_enabled = False
         print("disabled class restriction")
+
+    def enable_groups(self):
+        self.groups_enabled = True
+
+    def disable_groups(self):
+        self.groups_enabled = False
+
+    def has_confounder(self, filename: str) -> int:
+        print("'has_confounder' not implemented!!!")
+        return 0
 
     def __getitem__(self, idx):
         if (
@@ -1021,6 +1032,9 @@ class Image2ClassDataset(ImageDataset):
 
         if self.url_enabled:
             return_dict["url"] = file
+
+        if self.groups_enabled:
+            return_dict["has_confounder"] = self.has_confounder(file)
 
         if self.return_dict:
             return return_dict

@@ -3,6 +3,9 @@ import torch
 import os
 import pathlib
 
+from torch.utils.data import DataLoader
+
+from peal.data.custom_datasets import ColoredMnistConfig
 from peal.data.dataset_factory import get_datasets
 from peal.data.interfaces import DataConfig
 from peal.global_utils import load_yaml_config
@@ -25,7 +28,7 @@ if __name__ == '__main__':
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    data_config = load_yaml_config(args.data_config, config_model=DataConfig)
+    data_config = load_yaml_config(args.data_config)
     dataset = get_datasets(data_config)[2]
 
     original_model = None

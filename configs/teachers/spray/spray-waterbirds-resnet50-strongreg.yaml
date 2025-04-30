@@ -1,0 +1,21 @@
+base_dir: $PEAL_RUNS/waterbirds/resnet50_classifier_strong_regularization/spray_analysis
+data: <PEAL_BASE>/configs/data/waterbirds.yaml
+model: $PEAL_RUNS/waterbirds/resnet50_classifier_strong_regularization/model.cpl
+port: 8080
+use_relative_concept_importance: True
+sum_attribution_channels: False # no effect if use_relative_concept_importance=True
+normalize_attribtions: True
+skip_wrongly_classified_samples: True
+attribution_layer: -2
+class_idxs: [0, 1]
+classes_total: 2
+num_clusters_max: 6
+num_eigval: 32
+tsne_perplexity: 64.0
+umap_neighbors: 32
+task:
+  y_selection: [y]
+  output_type: 'singleclass'
+  output_channels: 2
+  criterions:
+    l2: 1.0
