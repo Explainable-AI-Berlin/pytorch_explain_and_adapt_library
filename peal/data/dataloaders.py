@@ -411,6 +411,9 @@ class DataloaderMixer(DataLoader):
 
 class WeightedDataloaderList:
     def __init__(self, dataloaders, weights=None):
+        for dataloader in dataloaders:
+            assert isinstance(dataloader, torch.utils.data.DataLoader), str(dataloader) + " is not dataloader!"
+
         self.dataloaders = dataloaders
         if not weights is None:
             self.weights = weights
@@ -419,6 +422,7 @@ class WeightedDataloaderList:
             self.weights = torch.ones([len(self.dataloaders)]) / len(self.dataloaders)
 
     def append(self, dataloader):
+        assert isinstance(dataloader, torch.utils.data.DataLoader), str(dataloader) + " is not dataloader!"
         self.dataloaders.append(dataloader)
         self.weights *= 0.5
         self.weights = torch.cat([self.weights, torch.tensor([0.5])])

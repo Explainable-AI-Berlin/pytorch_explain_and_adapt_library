@@ -16,13 +16,17 @@ import inspect
 import pkgutil
 import importlib
 import importlib.util
-import torch.nn.functional as F
 import matplotlib.pyplot as plt
 
 from pkg_resources import resource_filename
 from pydantic import BaseModel
 from tqdm import tqdm
 from pathlib import Path
+
+
+def cprint(s, a, b):
+    if a >= b:
+        print(s)
 
 
 def dict_to_bar_chart(input_dict, name):
@@ -587,6 +591,7 @@ def extract_penultima_activation(x, predictor):
         submodules = list(submodules[0].children())
 
     feature_extractor = torch.nn.Sequential(*submodules[:-1])
+    import pdb; pdb.set_trace()
     return feature_extractor(x)
 
 

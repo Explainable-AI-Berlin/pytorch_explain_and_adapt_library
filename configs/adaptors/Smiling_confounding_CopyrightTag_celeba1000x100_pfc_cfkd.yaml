@@ -9,7 +9,7 @@ max_validation_samples               :  200
 continuous_learning                  :  "finetune"
 calculate_group_accuracies           :  True
 explainer                            :  <PEAL_BASE>/configs/explainers/perfect_false_counterfactuals.yaml
-training                             :  <PEAL_BASE>/configs/training/sensitive_distillation.yaml
+training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba_poisoned100.yaml
 test_data                            :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba.yaml
 base_dir                             :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned100/cfkd_perfect_false_counterfactuals1000

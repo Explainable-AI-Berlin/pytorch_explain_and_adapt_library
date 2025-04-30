@@ -21,6 +21,7 @@ class Model2ModelTeacher(TeacherInterface):
         base_dir=None,
         y_target_list=None,
         student=None,
+        mode="train",
         **kwargs
     ):
         feedback = []
@@ -78,7 +79,7 @@ class Model2ModelTeacher(TeacherInterface):
             teacher_original.append(pred_original)
             teacher_counterfactual.append(pred_counterfactual)
 
-        if self.tracking_level > 1:
+        if self.tracking_level >= 2 and mode == "validation" or self.tracking_level >= 4 and mode == "train":
             self.dataset.generate_contrastive_collage(
                 y_counterfactual_teacher_list=teacher_counterfactual,
                 y_original_teacher_list=teacher_original,

@@ -1,5 +1,5 @@
 # python generate_dataset.py --config "<PEAL_BASE>/configs/data/celeba_copyrighttag.yaml"
-dataset_class           : celeba
+dataset_class           : CelebACopyrighttagDataset
 dataset_origin_path     : $PEAL_DATA/celeba
 dataset_path            : $PEAL_DATA/celeba_copyrighttag
 num_samples             : 202599

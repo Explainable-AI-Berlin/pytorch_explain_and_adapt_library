@@ -27,7 +27,7 @@ from peal.global_utils import (
     is_port_in_use,
     dict_to_bar_chart,
     embed_numberstring,
-    extract_penultima_activation,
+    extract_penultima_activation, cprint,
 )
 from peal.generators.interfaces import (
     InvertibleGenerator,
@@ -42,7 +42,7 @@ from peal.training.trainers import distill_predictor
 from peal.visualization.visualize_counterfactual_gradients import visualize_step
 
 
-class PDCConfig(ExplainerConfig):
+class SCEConfig(ExplainerConfig):
     """
     This class defines the config of a DiffeoCF.
     """
@@ -50,7 +50,7 @@ class PDCConfig(ExplainerConfig):
     """
     The type of explanation that shall be used.
     """
-    explainer_type: str = "PDCConfig"
+    explainer_type: str = "SCEConfig"
     """
     The path to the predictor that shall be explained.
     """
@@ -160,10 +160,15 @@ class PDCConfig(ExplainerConfig):
     The strategy on how to merge clusters when calculating them.
     E.g. select_best uses the cluster that does the most salient changes, while merge just merges all clusters.
     """
-    merge_clusters: str = "best"
+    merge_clusters: str = "select_best"
+    """
+    Whether to use the diversification tool that forbids changing the same area of the input image again or not.
+    """
     allow_overlap: bool = False
-    max_avg_combination: float = 0.5
-    repaint_frequency: int = 1
+    """
+    Whether to use a generative model to filter the gradients or not.
+    """
+    use_gradient_filtering: bool = True
 
 
 class ACEConfig(ExplainerConfig):
@@ -351,10 +356,8 @@ class TIMEConfig(ExplainerConfig):
     max_epoch: int = 30
     train_batch_size: int = 64
     image_size: int = 128
-    seed: int = 99999999
     y_target_goal_confidence: float = 0.9
     max_attacks: int = 1
-    max_samples: Union[int, type(None)] = None
     use_lora: bool = True
     learn_dataset_embedding: bool = False
 
@@ -573,6 +576,7 @@ class CounterfactualExplainer(ExplainerInterface):
                     self.predictor,
                     self.predictor_datasources,
                     replace_with_activation=self.explainer_config.replace_with_activation,
+                    tracking_level=self.explainer_config.tracking_level,
                 )
 
             else:
@@ -602,10 +606,16 @@ class CounterfactualExplainer(ExplainerInterface):
 
         x_predictor = torch.clone(x_in)
         x = self.val_dataset.project_to_pytorch_default(x_predictor)
-        x = self.generator.dataset.project_from_pytorch_default(x)
-        x = torchvision.transforms.Resize(self.generator.config.data.input_size[1:])(x)
+        if self.explainer_config.use_gradient_filtering:
+            x = self.generator.dataset.project_from_pytorch_default(x)
+            x = torchvision.transforms.Resize(self.generator.config.data.input_size[1:])(x)
+
         if not self.explainer_config.iterationwise_encoding:
-            z_original = self.generator.encode(x.to(self.device), stochastic=False)
+            if self.explainer_config.use_gradient_filtering:
+                z_original = self.generator.encode(x.to(self.device), stochastic=False)
+
+            else:
+                z_original = [x.to(self.device)]
 
             if isinstance(z_original, list):
                 z = []
@@ -709,14 +719,20 @@ class CounterfactualExplainer(ExplainerInterface):
 
         if not self.explainer_config.iterationwise_encoding:
             z_encoded = [z_elem.to(self.device) for z_elem in z]
-            counterfactual = self.generator.decode(z_encoded).detach().cpu()
+            if self.explainer_config.use_gradient_filtering:
+                counterfactual = self.generator.decode(z_encoded).detach().cpu()
+
+            else:
+                counterfactual = z_encoded[0].detach().cpu()
 
         else:
             counterfactual = best_z.clone().detach()
 
-        counterfactual = self.generator.dataset.project_to_pytorch_default(
-            counterfactual
-        )
+        if self.explainer_config.use_gradient_filtering:
+            counterfactual = self.generator.dataset.project_to_pytorch_default(
+                counterfactual
+            )
+
         counterfactual = torchvision.transforms.Resize(
             self.val_dataset.config.input_size[1:]
         )(counterfactual)
@@ -798,7 +814,12 @@ class CounterfactualExplainer(ExplainerInterface):
         if self.explainer_config.iterationwise_encoding:
             # TODO this only works if generator is normalized in -1 and 1
             z[0].data = torch.clamp(z[0].data, -1, 1)
-            z_default = self.generator.dataset.project_to_pytorch_default(z[0])
+            if self.explainer_config.use_gradient_filtering:
+                z_default = self.generator.dataset.project_to_pytorch_default(z[0])
+
+            else:
+                z_default = z[0]
+
             z_predictor_original = self.val_dataset.project_from_pytorch_default(
                 z_default
             ).to(self.device)
@@ -811,20 +832,29 @@ class CounterfactualExplainer(ExplainerInterface):
 
             clean_img_old = torch.clone(z_default).detach().cpu()
 
-            z_encoded = self.generator.encode(
-                z[0].to(self.device),
-                t=self.explainer_config.sampling_time_fraction,
-                stochastic=self.explainer_config.stochastic,
-            )
+            if self.explainer_config.use_gradient_filtering:
+                z_encoded = self.generator.encode(
+                    z[0].to(self.device),
+                    t=self.explainer_config.sampling_time_fraction,
+                    stochastic=self.explainer_config.stochastic,
+                )
+
+            else:
+                z_encoded = z[0].to(self.device)
 
         else:
             z_encoded = [z_elem.to(self.device) for z_elem in z]
 
         optimizer.zero_grad()
-        img_decoded = self.generator.decode(
-            z_encoded, t=self.explainer_config.sampling_time_fraction
-        )
-        img_default = self.generator.dataset.project_to_pytorch_default(img_decoded)
+        if self.explainer_config.use_gradient_filtering:
+            img_decoded = self.generator.decode(
+                z_encoded, t=self.explainer_config.sampling_time_fraction
+            )
+            img_default = self.generator.dataset.project_to_pytorch_default(img_decoded)
+
+        else:
+            img_default = z_encoded
+
         if self.val_dataset.config.normalization is None:
             img_default = torch.clamp(img_default, 0, 1)
 
@@ -863,30 +893,38 @@ class CounterfactualExplainer(ExplainerInterface):
             current_inpaint = self.explainer_config.inpaint
 
         else:
-            dist_l1 = self.explainer_config.dist_l1 * (0.5 ** (num_attempts -1))
-            current_inpaint = self.explainer_config.inpaint * (0.5 ** (num_attempts -1))
+            dist_l1 = self.explainer_config.dist_l1 * (0.5 ** (num_attempts - 1))
+            current_inpaint = self.explainer_config.inpaint * (
+                0.5 ** (num_attempts - 1)
+            )
 
         loss += dist_l1 * torch.mean(torch.stack(l1_losses))
         if not pbar is None:
             absolute_difference = torch.abs(x_in - img_predictor.detach().cpu())
-            pbar.set_description(
-                f"Creating {mode} Counterfactuals:"
-                + f"it: {i}"
-                + f"/{self.explainer_config.gradient_steps}"
-                + f", loss: {loss.detach().item():.2E}"
-                + f", target_confidence: [{best_score[0]:.2E}, {best_score[-1]:.2E}]"
-                + f", gradient_confidence: [{gradient_confidences_old[0]:.2E},"
-                + f"{gradient_confidences_old[-1]:.2E}]"
-                + f", visual_difference: [{torch.mean(absolute_difference[0]).item():.2E}, "
-                + f"{torch.mean(absolute_difference[-1]).item():.2E}]"
-                + ", ".join(
+            if self.explainer_config.tracking_level >= 1:
+                description_str = f"Creating {mode} Counterfactuals:" + f"it: {i}"
+                description_str += f"/{self.explainer_config.gradient_steps}"
+                description_str += f", loss: {loss.detach().item():.2E}"
+                description_str += (
+                    f", target_confidence: [{best_score[0]:.2E}, {best_score[-1]:.2E}]"
+                )
+                description_str += f", visual_difference: [{torch.mean(absolute_difference[0]).item():.2E}, "
+                description_str += (
+                    f", gradient_confidence: [{gradient_confidences_old[0]:.2E},"
+                )
+                description_str += f"{gradient_confidences_old[-1]:.2E}]"
+                description_str += f"{torch.mean(absolute_difference[-1]).item():.2E}]"
+                description_str += ", ".join(
                     [
                         key + ": " + str(pbar.stored_values[key])
                         for key in pbar.stored_values
                     ]
                 )
-            )
-            pbar.update(1)
+                if self.explainer_config.tracking_level < 4:
+                    description_str = description_str[:80]
+
+                pbar.set_description(description_str)
+                pbar.update(1)
 
         img_predictor.retain_grad()
 
@@ -920,18 +958,24 @@ class CounterfactualExplainer(ExplainerInterface):
             if current_inpaint > 0.0:
                 z[0].grad = boolmask_in * z[0].grad
 
-        #abs_grads = torch.abs(z[0].grad)
+        # abs_grads = torch.abs(z[0].grad)
         # z[0].grad[abs_grads < (abs_grads.max() / 10)] = 0
         # z[0].grad = torch.zeros_like(z[0].grad)
-        #z[0].data = z[0].data - 100.0 * z[0].grad
+        # z[0].data = z[0].data - 100.0 * z[0].grad
         optimizer.step()
         boolmask = torch.zeros_like(z[0].data)
         if self.explainer_config.iterationwise_encoding:
             z[0].data = torch.clamp(z[0].data, -1, 1)
-            pe = self.generator.dataset.project_to_pytorch_default(
-                torch.clone(z[0]).detach().cpu()
-            )
-            z_default = self.generator.dataset.project_to_pytorch_default(z[0])
+            if self.explainer_config.use_gradient_filtering:
+                pe = self.generator.dataset.project_to_pytorch_default(
+                    torch.clone(z[0]).detach().cpu()
+                )
+                z_default = self.generator.dataset.project_to_pytorch_default(z[0])
+
+            else:
+                pe = torch.clone(z[0]).detach().cpu()
+                z_default = z[0]
+
             z_predictor = self.val_dataset.project_from_pytorch_default(z_default).to(
                 self.device
             )
@@ -962,7 +1006,6 @@ class CounterfactualExplainer(ExplainerInterface):
                     old_mask=torch.clone(boolmask),
                     mask_momentum=self.explainer_config.mask_momentum,
                     boolmask_in=boolmask_in,
-                    max_avg_combination=self.explainer_config.max_avg_combination,
                     exceptions=no_repaint_exceptions,
                 )
                 for sample_idx in range(z[0].data.shape[0]):
@@ -990,7 +1033,12 @@ class CounterfactualExplainer(ExplainerInterface):
                             z[0].data[j] = z_old[j]"""
 
         z[0].data = torch.clamp(z[0].data, -1, 1)
-        z_default = self.generator.dataset.project_to_pytorch_default(z[0])
+        if self.explainer_config.use_gradient_filtering:
+            z_default = self.generator.dataset.project_to_pytorch_default(z[0])
+
+        else:
+            z_default = z[0]
+
         z_predictor_original = self.val_dataset.project_from_pytorch_default(
             z_default
         ).to(self.device)
@@ -1018,7 +1066,7 @@ class CounterfactualExplainer(ExplainerInterface):
             if target_confidences[j] >= target_confidence_goal_current[j]:
                 not_finished_mask[j] = 0
 
-        if self.explainer_config.visualize_gradients:
+        if self.explainer_config.tracking_level >= 5 and self.explainer_config.visualize_gradients:
             gradients_path = str(
                 os.path.join(
                     base_path,
@@ -1027,13 +1075,19 @@ class CounterfactualExplainer(ExplainerInterface):
                 )
             )
             Path(gradients_path).mkdir(parents=True, exist_ok=True)
+            if self.explainer_config.use_gradient_filtering:
+                z_encoded_visualization = self.generator.dataset.project_to_pytorch_default(
+                    z_encoded.detach().cpu()
+                )
+
+            else:
+                z_encoded_visualization = z_encoded.detach().cpu()
+
             visualize_step(
                 x=x_in,
                 z=z,
                 clean_img_old=clean_img_old,
-                z_encoded=self.generator.dataset.project_to_pytorch_default(
-                    z_encoded.detach().cpu()
-                ),
+                z_encoded=z_encoded_visualization,
                 img_predictor=img_predictor,
                 pe=pe,
                 boolmask=boolmask,
@@ -1086,7 +1140,6 @@ class CounterfactualExplainer(ExplainerInterface):
         Returns:
             dict: The batch with the counterfactuals added.
         """
-        print("in explain batch!")
         if explainer_path is None:
             os_sep = os.path.abspath(os.sep)
             if base_path[: len(os_sep)] == os_sep:
@@ -1121,9 +1174,8 @@ class CounterfactualExplainer(ExplainerInterface):
             )
 
         elif isinstance(self.generator, InvertibleGenerator) and isinstance(
-            self.explainer_config, PDCConfig
+            self.explainer_config, SCEConfig
         ):
-            print("start creating predictor-distilled counterfactual!")
             (
                 batch["x_counterfactual_list"],
                 batch["z_difference_list"],
@@ -1247,6 +1299,9 @@ class CounterfactualExplainer(ExplainerInterface):
 
             explanations_list.append(current_dict)
 
+        assert (
+            len(explanations_list) % (batch_size * n_clusters) == 0
+        ), "restructing needed for clustering impossible!"
         explanations_list_by_source = [[] for i in range(n_clusters)]
         batch_counter = 0
         cluster_counter = 0
@@ -1267,10 +1322,14 @@ class CounterfactualExplainer(ExplainerInterface):
                 explanations[0]["x_list"][None, ...].to(self.device), self.predictor
             )
             for i in range(len(explanations)):
-                assert (
-                    torch.sum(explanations[0]["x_list"] != explanations[i]["x_list"])
-                    == 0
-                )
+                if torch.sum(explanations[0]["x_list"] != explanations[i]["x_list"]) != 0:
+                    if self.explainer_config.tracking_level >= 5:
+                        print("x list is not matching across samples!")
+                        import pdb; pdb.set_trace()
+
+                    else:
+                        raise Exception("x list is not matching across samples!")
+
                 activation_current = extract_penultima_activation(
                     explanations[i]["x_counterfactual_list"][None, ...].to(self.device),
                     self.predictor,
@@ -1311,17 +1370,11 @@ class CounterfactualExplainer(ExplainerInterface):
             if self.explainer_config.clustering_strategy == "highest_activation":
                 current_activations = []
                 for source_idx in range(len(explanations_list_by_source)):
-                    try:
-                        current_activations.append(
-                            explanations_list_by_source[source_idx][idx][
-                                "y_target_end_confidence_list"
-                            ]
-                        )
-
-                    except Exception as exp:
-                        import pdb
-
-                        pdb.set_trace()
+                    current_activations.append(
+                        explanations_list_by_source[source_idx][idx][
+                            "y_target_end_confidence_list"
+                        ]
+                    )
 
                 current_activations = torch.tensor(current_activations)
                 activations_order = torch.argsort(current_activations)
@@ -1457,11 +1510,17 @@ class CounterfactualExplainer(ExplainerInterface):
             )
 
         if self.explainer_config.merge_clusters == "concatenate":
-            for key in cluster_dicts[0].keys():
-                for cluster_idx in range(1, len(cluster_dicts)):
-                    explanations_dict_out[key] += cluster_dicts[
-                        sorted_cluster_idxs[cluster_idx]
-                    ][key]
+            for cluster_idx in range(1, len(cluster_dicts)):
+                for key in cluster_dicts[sorted_cluster_idxs[cluster_idx]].keys():
+                    try:
+                        explanations_dict_out[key] += cluster_dicts[
+                            sorted_cluster_idxs[cluster_idx]
+                        ][key]
+
+                    except Exception:
+                        import pdb
+
+                        pdb.set_trace()
 
         return explanations_dict_out
 
@@ -1523,15 +1582,20 @@ class CounterfactualExplainer(ExplainerInterface):
                         - explanations_dict["x_list"][i]
                         for i in range(len(explanations_dict["clusters0"]))
                     ]
-                    foreground_change = [
-                        torch.sum(
-                            torch.abs(
-                                x_difference_list[i] * explanations_dict["hint_list"][i]
+                    try:
+                        foreground_change = [
+                            torch.sum(
+                                torch.abs(
+                                    x_difference_list[i] * explanations_dict["hint_list"][i]
+                                )
+                                / torch.sum(explanations_dict["hint_list"][i])
                             )
-                            / torch.sum(explanations_dict["hint_list"][i])
-                        )
-                        for i in range(len(explanations_dict["hint_list"]))
-                    ]
+                            for i in range(len(x_difference_list))
+                        ]
+
+                    except Exception:
+                        import pdb; pdb.set_trace()
+
                     background_change = [
                         torch.sum(
                             torch.abs(
@@ -1542,7 +1606,7 @@ class CounterfactualExplainer(ExplainerInterface):
                                 torch.abs(1 - explanations_dict["hint_list"][i])
                             )
                         )
-                        for i in range(len(explanations_dict["hint_list"]))
+                        for i in range(len(x_difference_list))
                     ]
                     latent_differences.append(
                         torch.transpose(
@@ -1608,9 +1672,9 @@ class CounterfactualExplainer(ExplainerInterface):
                         latent_diversity = 0.0
 
                 tracked_stats["latent_sparsity"] = latent_sparsity
-                print("latent_sparsity: " + str(latent_sparsity))
+                cprint("latent_sparsity: " + str(latent_sparsity), self.explainer_config.tracking_level, 2)
                 tracked_stats["latent_diversity"] = latent_diversity
-                print("latent_diversity: " + str(latent_diversity))
+                cprint("latent_diversity: " + str(latent_diversity), self.explainer_config.tracking_level, 2)
 
         return tracked_stats
 

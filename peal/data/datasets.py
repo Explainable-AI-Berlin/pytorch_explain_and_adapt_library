@@ -798,7 +798,11 @@ class Image2ClassDataset(ImageDataset):
         """
         self.config = config
         if root_dir is None:
-            root_dir = config.dataset_path
+            if data_dir is None:
+                root_dir = config.dataset_path
+
+            else:
+                root_dir = data_dir
 
         self.root_dir = os.path.join(root_dir, self.config.x_selection)
 

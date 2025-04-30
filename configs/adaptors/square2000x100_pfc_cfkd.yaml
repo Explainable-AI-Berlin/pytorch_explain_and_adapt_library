@@ -10,7 +10,7 @@ continuous_learning                  :  "finetune"
 use_visualization                    :  False
 calculate_group_accuracies           :  True
 explainer                            :  <PEAL_BASE>/configs/explainers/perfect_false_counterfactuals.yaml
-training                             :  <PEAL_BASE>/configs/training/sensitive_distillation.yaml
+training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/square_poisoned100.yaml
 test_data                            :  <PEAL_BASE>/configs/data/square_unpoisoned.yaml
 student                              :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned100/model.cpl

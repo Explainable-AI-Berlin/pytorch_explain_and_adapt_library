@@ -1,0 +1,27 @@
+# python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square_sce_cfkd_unit_test.yaml"
+adaptor_type                         :  "CFKD"
+category                             :  "adaptor"
+batch_size                           :  1
+tracking_level                       :  0
+min_train_samples                    :  5
+finetune_iterations                  :  2
+max_validation_samples               :  5
+max_test_batches                     :  1
+continuous_learning                  :  "retrain"
+use_visualization                    :  False
+calculate_group_accuracies           :  True
+explainer                            :  <PEAL_BASE>/configs/explainers/sce_unit_test.yaml
+training                             :  <PEAL_BASE>/configs/training/unit_test.yaml
+data                                 :  <PEAL_BASE>/configs/data/square40_poisoned100.yaml
+test_data                            :  <PEAL_BASE>/configs/data/square40_unpoisoned.yaml
+student                              :  $PEAL_RUNS/square40/classifier_unit_test/model.cpl
+teacher                              :  SegmentationMask
+generator                            :  $PEAL_RUNS/square40/ddpm_unit_test/config.yaml
+base_dir                             :  $PEAL_RUNS/square40/classifier_unit_test/sce_cfkd_unit_test
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [ClassA]

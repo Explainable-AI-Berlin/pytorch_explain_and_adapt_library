@@ -2,14 +2,14 @@
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  6
-tracking_level                       :  3
+tracking_level                       :  4
 min_train_samples                    :  800
 finetune_iterations                  :  1
 max_validation_samples               :  200
 continuous_learning                  :  "finetune"
 use_visualization                    :  True
 calculate_group_accuracies           :  True
-explainer                            :  <PEAL_BASE>/configs/explainers/fastdime_default64x64.yaml
+explainer                            :  <PEAL_BASE>/configs/explainers/fastdime_default.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/square_poisoned098.yaml
 test_data                            :  <PEAL_BASE>/configs/data/square_unpoisoned.yaml
