@@ -149,3 +149,12 @@ python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/camelyon17_ace_cfkd.ya
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/camelyon17_dime_cfkd.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/camelyon17_fastdime_cfkd.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/camelyon17_pdc_cfkd.yaml"
+
+
+
+# Reproduction of results on VitB16
+python train_predictor.py --config "<PEAL_BASE>/configs/predictors/camelyon17_vit_b_16.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/camelyon17_vit_b_16_ace_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/camelyon17_vit_b_16_dime_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/camelyon17_vit_b_16_fastdime_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/camelyon17_vit_b_16_pdc_cfkd.yaml"

@@ -591,6 +591,7 @@ def extract_penultima_activation(x, predictor):
         submodules = list(submodules[0].children())
 
     feature_extractor = torch.nn.Sequential(*submodules[:-1])
+    import pdb; pdb.set_trace()
     return feature_extractor(x)
 
 
