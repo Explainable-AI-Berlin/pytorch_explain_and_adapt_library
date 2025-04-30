@@ -33,9 +33,9 @@ python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Smiling_natural
 # metrics: tensorboard --logdir $PEAL_BASE/celeba/Smiling/classifier_natural/fastdime_cfkd/logs
 
 # get the explanations for PDC
-python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Smiling_natural_pdc_cfkd.yaml"
-# you can see the collages in $PEAL_BASE/celeba/Smiling/classifier_natural/pdc_cfkd/0/validation_collages0
-# metrics: tensorboard --logdir $PEAL_BASE/celeba/Smiling/classifier_natural/pdc_cfkd/logs
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Smiling_natural_sce_cfkd.yaml"
+# you can see the collages in $PEAL_BASE/celeba/Smiling/classifier_natural/sce_cfkd/0/validation_collages0
+# metrics: tensorboard --logdir $PEAL_BASE/celeba/Smiling/classifier_natural/sce_cfkd/logs
 
 # Blond_Hair
 # Train the classifier that shall be analyzed
@@ -57,9 +57,9 @@ python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_natu
 # metrics: tensorboard --logdir $PEAL_BASE/celeba/Blond_Hair/classifier_natural/fastdime_cfkd/logs
 
 # get the explanations for PDC
-python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_natural_pdc_cfkd.yaml"
-# you can see the collages in $PEAL_BASE/celeba/Blond_Hair/classifier_natural/pdc_cfkd/0/validation_collages0
-# metrics: tensorboard --logdir $PEAL_BASE/celeba/Blond_Hair/classifier_natural/pdc_cfkd/logs
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_natural_sce_cfkd.yaml"
+# you can see the collages in $PEAL_BASE/celeba/Blond_Hair/classifier_natural/sce_cfkd/0/validation_collages0
+# metrics: tensorboard --logdir $PEAL_BASE/celeba/Blond_Hair/classifier_natural/sce_cfkd/logs
 
 
 # Reproduction of results on VitB16
@@ -67,7 +67,7 @@ python train_predictor.py --config "<PEAL_BASE>/configs/predictors/celeba_Blond_
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_vit_b_16_ace_cfkd.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_vit_b_16_dime_cfkd.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_vit_b_16_fastdime_cfkd.yaml"
-python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_vit_b_16_pdc_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_vit_b_16_sce_cfkd.yaml"
 
 
 # Reproduce the results on the square dataset
@@ -80,30 +80,6 @@ python train_predictor.py --config "<PEAL_BASE>/configs/predictors/square_classi
 
 # train the predictor that shall be analyzed
 python train_predictor.py --config "<PEAL_BASE>/configs/predictors/square_classifier_unpoisoned.yaml"
-
-# get the explanations for ACE
-python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x098_ace_pe_only_cfkd.yaml"
-# you can the the global visualization in
-# $PEAL_BASE/square/colora_confounding_colorb/torchvision/classifier_poisoned100/ace_pe_cfkd/0/val_counterfactuals_global.png
-# you can see the collages in $PEAL_BASE/square/colora_confounding_colorb/torchvision/classifier_poisoned100/ace_pe_cfkd/0/validation_collages0
-
-# get the explanations for smooth PDC
-python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x098_pdc_smooth_cfkd.yaml"
-# you can the the global visualization in
-# $PEAL_BASE/square/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_smooth_cfkd/0/val_counterfactuals_global.png
-# you can see the collages in $PEAL_BASE/square/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_smooth_cfkd/0/validation_collages0
-
-# get the explanations for sparse PDC
-python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x098_pdc_sparse_cfkd.yaml"
-# you can the the global visualization in
-# $PEAL_BASE/square/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_sparse_cfkd/0/val_counterfactuals_global.png
-# you can see the collages in $PEAL_BASE/square/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_sparse_cfkd/0/validation_collages0
-
-# get the explanations for diverse PDC
-python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x098_pdc_cfkd.yaml"
-# you can the the global visualization in
-# $PEAL_BASE/square/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_cfkd/0/val_counterfactuals_global.png
-# you can see the collages in $PEAL_BASE/square/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_cfkd/0/validation_collages0
 
 # get the explanations for ACE
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x098_ace_cfkd.yaml"
@@ -129,15 +105,25 @@ python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x098_fastdim
 # square unbiased is also used for reporting the metrics from the experiments
 # metrics: tensorboard --logdir $PEAL_BASE/square/colora_confounding_colorb/torchvision/classifier_poisoned100/fastdime_cfkd/logs
 
+# get the explanations for SCE
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x098_sce_cfkd.yaml"
+# you can the the global visualization in
+# $PEAL_BASE/square/colora_confounding_colorb/torchvision/classifier_poisoned100/sce_cfkd/0/val_counterfactuals_global.png
+# you can see the collages in $PEAL_BASE/square/colora_confounding_colorb/torchvision/classifier_poisoned100/sce_cfkd/0/validation_collages0
+
 
 # For Smiling confounding Copyrighttag
 python train_generator.py --config "<PEAL_BASE>/configs/generators/celeba_copyrighttag_ddpm.yaml"
 python train_predictor.py --config "<PEAL_BASE>/configs/predictors/celeba_copyrighttag_poisoned100.yaml"
 python train_predictor.py --config "<PEAL_BASE>/configs/predictors/celeba_copyrighttag_unpoisoned.yaml"
-python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_pfc_cfkd.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_ace_cfkd.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_dime_cfkd.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_fastdime_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_sce_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_sce_no_sparsity_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_sce_no_smoothing_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_sce_no_gradient_filtering_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_sce_no_exploration_cfkd.yaml"
 
 
 # For the Camelyon17 dataset
@@ -148,7 +134,7 @@ python train_predictor.py --config "<PEAL_BASE>/configs/predictors/camelyon17_la
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/camelyon17_ace_cfkd.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/camelyon17_dime_cfkd.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/camelyon17_fastdime_cfkd.yaml"
-python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/camelyon17_pdc_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/camelyon17_sce_cfkd.yaml"
 
 
 
@@ -157,4 +143,4 @@ python train_predictor.py --config "<PEAL_BASE>/configs/predictors/camelyon17_vi
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/camelyon17_vit_b_16_ace_cfkd.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/camelyon17_vit_b_16_dime_cfkd.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/camelyon17_vit_b_16_fastdime_cfkd.yaml"
-python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/camelyon17_vit_b_16_pdc_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/camelyon17_vit_b_16_sce_cfkd.yaml"

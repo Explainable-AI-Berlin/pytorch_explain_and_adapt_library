@@ -18,31 +18,31 @@ python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_ace_pe_
 # you can see the collages in $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/ace_pe_cfkd/0/validation_collages0
 
 # get the explanations for non-adversarial PDC
-python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_pdc_nonadversarial_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_sce_nonadversarial_cfkd.yaml"
 # you can the the global visualization in
 # $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_nonadversarial_cfkd/0/val_counterfactuals_global.png
 # you can see the collages in $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_nonadversarial_cfkd/0/validation_collages0
 
 # get the explanations for sensitive PDC
-python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_pdc_sensitive_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_sce_sensitive_cfkd.yaml"
 # you can the the global visualization in
 # $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_sensitive_cfkd/0/val_counterfactuals_global.png
 # you can see the collages in $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_sensitive_cfkd/0/validation_collages0
 
 # get the explanations for sparse PDC
-python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_pdc_sparse_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_sce_sparse_cfkd.yaml"
 # you can the the global visualization in
 # $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_sparse_cfkd/0/val_counterfactuals_global.png
 # you can see the collages in $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_sparse_cfkd/0/validation_collages0
 
 # get the explanations for diverse PDC
-python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_pdc_diverse_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_sce_diverse_cfkd.yaml"
 # you can the the global visualization in
 # $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_diverse_cfkd/0/val_counterfactuals_global.png
 # you can see the collages in $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_diverse_cfkd/0/validation_collages0
 
 # get the explanations for unbiased PDC
-python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_pdc_unbiased_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_sce_unbiased_cfkd.yaml"
 # you can the the global visualization in
 # $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_unbiased_cfkd/0/val_counterfactuals_global.png
 # you can see the collages in $PEAL_BASE/square3/colora_confounding_colorb/torchvision/classifier_poisoned100/pdc_unbiased_cfkd/0/validation_collages0_0
@@ -100,7 +100,7 @@ python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Smiling_natural
 # metrics: tensorboard --logdir $PEAL_BASE/celeba/Smiling/classifier_natural/fastdime_cfkd/logs
 
 # get the explanations for PDC
-python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Smiling_natural_pdc_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Smiling_natural_sce_cfkd.yaml"
 # you can see the collages in $PEAL_BASE/celeba/Smiling/classifier_natural/pdc_cfkd/0/validation_collages0
 # metrics: tensorboard --logdir $PEAL_BASE/celeba/Smiling/classifier_natural/pdc_cfkd/logs
 
@@ -124,7 +124,7 @@ python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_natu
 # metrics: tensorboard --logdir $PEAL_BASE/celeba/Blond_Hair/classifier_natural/fastdime_cfkd/logs
 
 # get the explanations for PDC
-python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_natural_pdc_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_natural_sce_cfkd.yaml"
 # you can see the collages in $PEAL_BASE/celeba/Blond_Hair/classifier_natural/pdc_cfkd/0/validation_collages0
 # metrics: tensorboard --logdir $PEAL_BASE/celeba/Blond_Hair/classifier_natural/pdc_cfkd/logs
 
@@ -152,7 +152,7 @@ python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/waterbirds_natural_fas
 # metrics: tensorboard --logdir $PEAL_BASE/waterbirds/classifier_natural/fastdime_cfkd/logs
 
 # get the explanations for PDC
-python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/waterbirds_natural_pdc_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/waterbirds_natural_sce_cfkd.yaml"
 # you can see the collages in $PEAL_BASE/waterbirds/classifier_natural/pdc_cfkd/0/validation_collages0
 # metrics: tensorboard --logdir $PEAL_BASE/waterbirds/classifier_natural/pdc_cfkd/logs
 
@@ -171,7 +171,7 @@ python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_resn
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_resnet50_fastdime_cfkd.yaml"
 
 #
-python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_resnet50_pdc_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_resnet50_sce_cfkd.yaml"
 
 
 # Reproduction of results on VitB16
@@ -188,4 +188,4 @@ python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_vit_
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_vit_b_16_fastdime_cfkd.yaml"
 
 #
-python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_vit_b_16_pdc_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_vit_b_16_sce_cfkd.yaml"

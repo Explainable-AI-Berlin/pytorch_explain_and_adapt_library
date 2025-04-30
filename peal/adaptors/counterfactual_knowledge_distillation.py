@@ -51,7 +51,7 @@ from peal.generators.interfaces import GeneratorConfig
 from peal.training.interfaces import TrainingConfig, PredictorConfig
 from peal.architectures.interfaces import TaskConfig
 from peal.explainers.interfaces import ExplainerConfig
-from peal.explainers.counterfactual_explainer import PDCConfig
+from peal.explainers.counterfactual_explainer import SCEConfig
 from peal.adaptors.interfaces import AdaptorConfig, Adaptor
 
 
@@ -93,7 +93,7 @@ class CFKDConfig(AdaptorConfig):
     All parameters regarding paths, where the generator is from etc in there are overwritten by CFKD and only
     used if the information is not available for CFKD
     """
-    explainer: ExplainerConfig = PDCConfig()
+    explainer: ExplainerConfig = SCEConfig()
     """
     The config of the training used for finetuning the student model.
     If not set student config can be used.

@@ -42,7 +42,7 @@ from peal.training.trainers import distill_predictor
 from peal.visualization.visualize_counterfactual_gradients import visualize_step
 
 
-class PDCConfig(ExplainerConfig):
+class SCEConfig(ExplainerConfig):
     """
     This class defines the config of a DiffeoCF.
     """
@@ -50,7 +50,7 @@ class PDCConfig(ExplainerConfig):
     """
     The type of explanation that shall be used.
     """
-    explainer_type: str = "PDCConfig"
+    explainer_type: str = "SCEConfig"
     """
     The path to the predictor that shall be explained.
     """
@@ -1174,7 +1174,7 @@ class CounterfactualExplainer(ExplainerInterface):
             )
 
         elif isinstance(self.generator, InvertibleGenerator) and isinstance(
-            self.explainer_config, PDCConfig
+            self.explainer_config, SCEConfig
         ):
             (
                 batch["x_counterfactual_list"],

@@ -1,23 +1,21 @@
 # python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/camelyon17_sce_cfkd.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
-batch_size                           :  2
-tracking_level                       :  3
-min_train_samples                    :  400
-finetune_iterations                  :  0
-max_validation_samples               :  100
+batch_size                           :  4
+tracking_level                       :  5
+min_train_samples                    :  800
+finetune_iterations                  :  1
+max_validation_samples               :  200
 continuous_learning                  :  "finetune"
-replace_model                        :  True
-use_visualization                    :  True
 calculate_group_accuracies           :  True
-explainer                            :  <PEAL_BASE>/configs/explainers/camelyon17_sce.yaml
+explainer                            :  <PEAL_BASE>/configs/explainers/sce_default128x128.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/camelyon17_poisoned100.yaml
 test_data                            :  <PEAL_BASE>/configs/data/camelyon17_unpoisoned.yaml
-student                              :  $PEAL_RUNS/camelyon17/classifier_unpoisoned/model.cpl
-teacher                              :  Baseline:false
+student                              :  $PEAL_RUNS/camelyon17/classifier_poisoned100/model.cpl
+teacher                              :  $PEAL_RUNS/camelyon17/classifier_unpoisoned/model.cpl
 generator                            :  $PEAL_RUNS/camelyon17/ddpm/config.yaml
-base_dir                             :  $PEAL_RUNS/camelyon17/classifier_unpoisoned/cfkd
+base_dir                             :  $PEAL_RUNS/camelyon17/classifier_poisoned100/sce_cfkd
 task:
   criterions:
     ce     : 1.0

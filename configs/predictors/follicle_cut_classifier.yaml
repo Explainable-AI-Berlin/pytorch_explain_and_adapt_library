@@ -2,7 +2,7 @@
 model_path        : $PEAL_RUNS/follicles_cut/classifier_natural
 training          : <PEAL_BASE>/configs/training/img_classifier_balanced.yaml
 architecture      : torchvision_resnet18
-data              : <PEAL_BASE>/configs/data/follicles_pdc_mask_cfkd.yaml
+data              : <PEAL_BASE>/configs/data/follicles_sce_mask_cfkd.yaml
 task:
   criterions:
     ce     : 1.0
