@@ -62,14 +62,6 @@ python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_natu
 # metrics: tensorboard --logdir $PEAL_BASE/celeba/Blond_Hair/classifier_natural/sce_cfkd/logs
 
 
-# Reproduction of results on VitB16
-python train_predictor.py --config "<PEAL_BASE>/configs/predictors/celeba_Blond_Hair_vit_b_16.yaml"
-python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_vit_b_16_ace_cfkd.yaml"
-python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_vit_b_16_dime_cfkd.yaml"
-python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_vit_b_16_fastdime_cfkd.yaml"
-python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_vit_b_16_sce_cfkd.yaml"
-
-
 # Reproduce the results on the square dataset
 
 # train the generator that is used for the counterfactual explainer (the dataset will be generated automatically)

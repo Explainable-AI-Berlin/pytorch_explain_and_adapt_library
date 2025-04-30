@@ -723,13 +723,13 @@ class WaterbirdsDataset(Image2MixedDataset):
 
 def download_celeba_to(target_dir):
     print('This still has to be implemented!')
-    import pdb; pdb.set_trace()
     import kagglehub
 
     # Download latest version
     path = kagglehub.dataset_download("jessicali9530/celeba-dataset")
+    print("Path to downloaded dataset files:", path)
+    shutil.move(path, target_dir)
 
-    print("Path to dataset files:", path)
 
 
 class CelebADataset(Image2MixedDataset):
