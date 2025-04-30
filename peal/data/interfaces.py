@@ -153,6 +153,10 @@ class DataConfig(BaseModel):
     """
     dataset_path: Union[type(None), str] = None
     """
+    The path to the dataset origin this dataset got derived from.
+    """
+    dataset_origin_path: Union[type(None), str] = None
+    """
     The number of samples in the dataset.
     Sometimes important when executing specific experiments.
     """

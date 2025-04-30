@@ -16,13 +16,17 @@ import inspect
 import pkgutil
 import importlib
 import importlib.util
-import torch.nn.functional as F
 import matplotlib.pyplot as plt
 
 from pkg_resources import resource_filename
 from pydantic import BaseModel
 from tqdm import tqdm
 from pathlib import Path
+
+
+def cprint(s, a, b):
+    if a >= b:
+        print(s)
 
 
 def dict_to_bar_chart(input_dict, name):
@@ -496,7 +500,12 @@ def get_predictions(args):
         d["idx"] += list(img_file)
 
     print(acc / n)
-    df = pd.DataFrame(data=d)
+    try:
+        df = pd.DataFrame(data=d)
+
+    except Exception:
+        import pdb; pdb.set_trace()
+
     df.to_csv(
         args.label_path,
         index=False,
@@ -582,6 +591,7 @@ def extract_penultima_activation(x, predictor):
         submodules = list(submodules[0].children())
 
     feature_extractor = torch.nn.Sequential(*submodules[:-1])
+    import pdb; pdb.set_trace()
     return feature_extractor(x)
 
 

@@ -301,9 +301,6 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
                 if exceptions[i] == 1:
                     boolmask[i] = 0
 
-                else:
-                    print("boolmask1: " + str(torch.sum(1 == boolmask[i]) / torch.sum(1 == torch.ones_like(boolmask[i]))))
-
         noise_fn = torch.randn_like if stochastic else torch.zeros_like
 
         ce = torch.clone(pe)

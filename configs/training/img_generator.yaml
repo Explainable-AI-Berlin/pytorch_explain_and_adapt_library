@@ -1,14 +1,14 @@
-'train_batch_size'        : 50
-'val_batch_size'          : 5
-'test_batch_size'         : 1
-'base_batch_size'         : 32 # for 64 x 64 image with 40GB VRAM
-'gigabyte_vram'           : 40
-'assumed_input_size'      : [3, 64, 64]
-'max_epochs'              : 400
-'learning_rate'           : 0.000001
-'optimizer'               : 'adam'
-'global_train_step'       : 0
-'global_validation_step'  : 0
-'epoch'                   : -1
-'steps_per_epoch'         : 10000
-'verbosity'               : 1
+train_batch_size        : 50
+val_batch_size          : 5
+test_batch_size         : 1
+base_batch_size         : 32 # for 64 x 64 image with 40GB VRAM
+gigabyte_vram           : 40
+assumed_input_size      : [3, 64, 64]
+max_epochs              : 400
+learning_rate           : 0.000001
+optimizer               : adam
+global_train_step       : 0
+global_validation_step  : 0
+epoch                   : -1
+steps_per_epoch         : 10000
+verbosity               : 1

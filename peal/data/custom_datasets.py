@@ -20,7 +20,7 @@ from torchvision.transforms import ToTensor
 from wilds import get_dataset
 
 from peal.data.dataloaders import DataloaderMixer, WeightedDataloaderList
-from peal.data.dataset_generators import SquareDatasetGenerator
+from peal.data.dataset_generators import SquareDatasetGenerator, ConfounderDatasetGenerator
 from peal.data.datasets import (
     Image2ClassDataset,
     Image2MixedDataset,
@@ -461,7 +461,9 @@ class SquareDataset(Image2MixedDataset):
                             logits.append(predictor(current_batch.to(device)).detach())
                             current_batch = []
 
-                    logits.append(predictor(torch.stack(current_batch).to(device)).detach())
+                    if not len(current_batch) == 0:
+                        logits.append(predictor(torch.stack(current_batch).to(device)).detach())
+
                     logits = torch.cat(logits, dim=0).detach().cpu()
                     prediction_grid = torch.nn.Softmax(dim=1)(logits / temperature)[
                         :, 0
@@ -733,7 +735,27 @@ class Camelyon17AugmentedDataset(Image2MixedDataset):
             with open(f"{config.dataset_path}/data.csv", "w") as f:
                 f.write("\n".join(lines))
 
+        peal_runs = os.environ.get("PEAL_RUNS", "peal_runs")
+        oracle_path = os.path.join(peal_runs, "camelyon17", "latent_oracle", "model.cpl")
+        if os.path.exists(oracle_path):
+            self.oracle = torch.load(oracle_path)
+            self.oracle.eval()
+
         super(Camelyon17AugmentedDataset, self).__init__(config=config, **kwargs)
+
+    def sample_to_latent(self, sample, mask=None):
+        self.oracle.to(sample.device)
+        sample_inflated = False
+        if not len(sample.shape) == 4:
+            sample_inflated = True
+            sample = sample.unsqueeze(0)
+
+        latent = self.oracle(sample)
+
+        if sample_inflated:
+            latent = latent[0]
+
+        return latent
 
 
 class RxRx1AugmentedDataset(Image2MixedDataset):
@@ -761,20 +783,6 @@ class WaterbirdsDataset(Image2MixedDataset):
         print("instantiate waterbirds dataset!")
         dataset_labels = os.path.join(config.dataset_path, "data.csv")
         if not os.path.exists(dataset_labels):
-            """original_dataset = get_dataset(dataset="waterbirds", download=True)
-            Path(os.path.join(config.dataset_path, "imgs")).mkdir(
-                parents=True, exist_ok=True
-            )
-            lines = ["img, label, confounder"]
-            for i in range(len(original_dataset)):
-                img, label, meta = original_dataset[i]
-                img_name = f"{embed_numberstring(i, 7)}.png"
-                img.save(f"{config.dataset_path}/imgs/{img_name}")
-                lines.append(f"{img_name}, {label}, {meta[0]}")
-
-            with open(f"{config.dataset_path}/data.csv", "w") as f:
-                f.write("\n".join(lines))"""
-
             # Download the segmentations
             download_path = os.path.join(config.dataset_path, "downloads")
             Path(download_path).mkdir(parents=True, exist_ok=True)
@@ -856,25 +864,59 @@ class WaterbirdsDataset(Image2MixedDataset):
         super(WaterbirdsDataset, self).__init__(config=config, **kwargs)
 
 
+def download_celeba_to(target_dir):
+    print('This still has to be implemented!')
+    import kagglehub
+
+    # Download latest version
+    path = kagglehub.dataset_download("jessicali9530/celeba-dataset")
+    print("Path to downloaded dataset files:", path)
+    shutil.move(path, target_dir)
+
+
+
 class CelebADataset(Image2MixedDataset):
     def __init__(self, config, **kwargs):
+        if not os.path.exists(config.dataset_path):
+            download_celeba_to(config.dataset_path)
+
         super(CelebADataset, self).__init__(config=config, **kwargs)
         # these weights have to be downloaded and placed from the ACE repository manually
         ORACLEPATH = "pretrained_models/oracle.pth"
         if os.path.exists(ORACLEPATH):
-            self.oracle = OracleMetrics(weights_path=ORACLEPATH, device="cpu")
-            self.oracle.eval()
+            self.oracle_metric = OracleMetrics(weights_path=ORACLEPATH, device="cpu")
+            self.oracle_metric.eval()
+            self.oracle = lambda sample: self.oracle_metric.oracle(sample)[0]
+
+        else:
+            peal_runs = os.environ.get("PEAL_RUNS", "peal_runs")
+            oracle_path = os.path.join(peal_runs, "camelyon17", "latent_oracle", "model.cpl")
+            if os.path.exists(oracle_path):
+                self.oracle = torch.load(oracle_path)
+                self.oracle.eval()
 
     def sample_to_latent(self, sample, mask=None):
-        self.oracle.oracle.to(sample.device)
+        self.oracle.to(sample.device)
         sample_inflated = False
         if not len(sample.shape) == 4:
             sample_inflated = True
             sample = sample.unsqueeze(0)
 
-        latent = self.oracle.oracle(sample)[1]
+        latent = self.oracle(sample)
 
         if sample_inflated:
             latent = latent[0]
 
         return latent
+
+
+class CelebACopyrighttagDataset(Image2MixedDataset):
+    def __init__(self, config, **kwargs):
+        if not os.path.exists(config.dataset_origin_path):
+            download_celeba_to(config.dataset_origin_path)
+
+        if not os.path.exists(config.dataset_path):
+            cdg = ConfounderDatasetGenerator(**config.__dict__, data_config=config)
+            cdg.generate_dataset()
+
+        super(CelebACopyrighttagDataset, self).__init__(config=config, **kwargs)

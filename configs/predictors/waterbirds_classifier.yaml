@@ -2,6 +2,7 @@ model_path        : $PEAL_RUNS/waterbirds/classifier_natural
 training          : <PEAL_BASE>/configs/training/img_classifier_balanced.yaml
 architecture      : torchvision_resnet18
 data              : <PEAL_BASE>/configs/data/waterbirds.yaml
+continue_training : True
 task:
   criterions:
     ce     : 1.0
