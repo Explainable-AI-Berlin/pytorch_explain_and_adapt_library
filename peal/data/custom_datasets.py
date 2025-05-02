@@ -729,7 +729,8 @@ def download_celeba_to(target_dir):
     path = kagglehub.dataset_download("jessicali9530/celeba-dataset")
     print("Path to downloaded dataset files:", path)
     shutil.move(path, target_dir)
-
+    shutil.move(os.path.join(target_dir, "list_attr_celeba.csv"), os.path.join(target_dir, "data.csv"))
+    shutil.move(os.path.join(target_dir, "img_align_celeba", "img_align_celeba"), os.path.join(target_dir, "imgs"))
 
 
 class CelebADataset(Image2MixedDataset):

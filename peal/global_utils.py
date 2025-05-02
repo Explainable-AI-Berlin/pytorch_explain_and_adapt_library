@@ -586,13 +586,16 @@ def extract_penultima_activation(x, predictor):
     import pdb; pdb.set_trace()
     second_last_activation = find_activation(output, depth=2)
     predictor.eval()"""
-    submodules = list(predictor.children())
-    while len(submodules) == 1:
-        submodules = list(submodules[0].children())
+    if hasattr(predictor, "feature_extractor"):
+        return predictor.feature_extractor(x)
 
-    feature_extractor = torch.nn.Sequential(*submodules[:-1])
-    import pdb; pdb.set_trace()
-    return feature_extractor(x)
+    else:
+        submodules = list(predictor.children())
+        while len(submodules) == 1:
+            submodules = list(submodules[0].children())
+
+        feature_extractor = torch.nn.Sequential(*submodules[:-1])
+        return feature_extractor(x)
 
 
 def set_random_seed(seed: int):

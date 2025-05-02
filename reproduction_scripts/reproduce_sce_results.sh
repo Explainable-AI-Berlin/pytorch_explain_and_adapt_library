@@ -103,6 +103,10 @@ python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x098_sce_cfk
 # $PEAL_BASE/square/colora_confounding_colorb/torchvision/classifier_poisoned100/sce_cfkd/0/val_counterfactuals_global.png
 # you can see the collages in $PEAL_BASE/square/colora_confounding_colorb/torchvision/classifier_poisoned100/sce_cfkd/0/validation_collages0
 
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_ace_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_dime_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x100_fastdime_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x098_sce_cfkd.yaml"
 
 # For Smiling confounding Copyrighttag
 python train_generator.py --config "<PEAL_BASE>/configs/generators/celeba_copyrighttag_ddpm.yaml"
@@ -117,6 +121,11 @@ python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_Co
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_sce_no_gradient_filtering_cfkd.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_sce_no_exploration_cfkd.yaml"
 
+# vit-b-16 experiments
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_vit_b_16_ace_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_vit_b_16_dime_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_vit_b_16_fastdime_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_vit_b_16_sce_cfkd.yaml"
 
 # For the Camelyon17 dataset
 python train_generator.py --config "<PEAL_BASE>/configs/generators/camelyon17_ddpm.yaml"
