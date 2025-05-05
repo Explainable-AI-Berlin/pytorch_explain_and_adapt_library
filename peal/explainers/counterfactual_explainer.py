@@ -526,7 +526,7 @@ class CounterfactualExplainer(ExplainerInterface):
         Returns:
             _type_: _description_
         """
-        if num_attempts > 1 and not self.explainer_config.allow_overlap:
+        if num_attempts > 1:
             (
                 previous_counterfactual_list,
                 previous_attributions_list,
@@ -543,7 +543,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 num_attempts - 1,
             )
 
-        else:
+        if num_attempts == 1 or self.explainer_config.allow_overlap:
             boolmask_in = torch.ones_like(x_in)
             previous_target_confidences_list = None
 
