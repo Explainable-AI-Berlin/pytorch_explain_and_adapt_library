@@ -241,6 +241,31 @@ class TorchvisionModel(torch.nn.Module):
 
         return x
 
+    def feature_extractor(self, x):
+        if not hasattr(self, "model_type") or self.model_type[:len("resnet")] == "resnet":
+            submodules = list(self.children())
+            while len(submodules) == 1:
+                submodules = list(submodules[0].children())
+
+            feature_extractor = torch.nn.Sequential(*submodules[:-1])
+            return feature_extractor(x)
+
+        else:
+            # Reshape and permute the input tensor
+            x = self._process_input(x)
+            n = x.shape[0]
+
+            # Expand the class token to the full batch
+            batch_class_token = self.model.class_token.expand(n, -1, -1)
+            x = torch.cat([batch_class_token, x], dim=1)
+            # torch.Size([128, 197, 768])
+            x = self.model.encoder(x)
+
+            # Classifier "token" as used by standard language architectures
+            x = x[:, 0]
+
+            return x
+
     def forward(self, x: torch.Tensor):
         if not hasattr(self, "model_type") or self.model_type[:len("resnet")] == "resnet":
             return self.model(x)
