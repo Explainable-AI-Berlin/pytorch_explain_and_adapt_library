@@ -27,7 +27,8 @@ from peal.global_utils import (
     is_port_in_use,
     dict_to_bar_chart,
     embed_numberstring,
-    extract_penultima_activation, cprint,
+    extract_penultima_activation,
+    cprint,
 )
 from peal.generators.interfaces import (
     InvertibleGenerator,
@@ -545,6 +546,8 @@ class CounterfactualExplainer(ExplainerInterface):
 
         if num_attempts == 1 or self.explainer_config.allow_overlap:
             boolmask_in = torch.ones_like(x_in)
+
+        if num_attempts == 1:
             previous_target_confidences_list = None
 
         if not self.explainer_config.distilled_predictor is None:
@@ -559,9 +562,9 @@ class CounterfactualExplainer(ExplainerInterface):
             )
             if not os.path.exists(distilled_path):
                 if isinstance(self.explainer_config.distilled_predictor, dict):
-                    self.explainer_config.distilled_predictor["data"] = (
-                        self.val_dataset.config
-                    )
+                    self.explainer_config.distilled_predictor[
+                        "data"
+                    ] = self.val_dataset.config
 
                 elif isinstance(
                     self.explainer_config.distilled_predictor, PredictorConfig
@@ -608,7 +611,9 @@ class CounterfactualExplainer(ExplainerInterface):
         x = self.val_dataset.project_to_pytorch_default(x_predictor)
         if self.explainer_config.use_gradient_filtering:
             x = self.generator.dataset.project_from_pytorch_default(x)
-            x = torchvision.transforms.Resize(self.generator.config.data.input_size[1:])(x)
+            x = torchvision.transforms.Resize(
+                self.generator.config.data.input_size[1:]
+            )(x)
 
         if not self.explainer_config.iterationwise_encoding:
             if self.explainer_config.use_gradient_filtering:
@@ -1066,7 +1071,10 @@ class CounterfactualExplainer(ExplainerInterface):
             if target_confidences[j] >= target_confidence_goal_current[j]:
                 not_finished_mask[j] = 0
 
-        if self.explainer_config.tracking_level >= 5 and self.explainer_config.visualize_gradients:
+        if (
+            self.explainer_config.tracking_level >= 5
+            and self.explainer_config.visualize_gradients
+        ):
             gradients_path = str(
                 os.path.join(
                     base_path,
@@ -1076,8 +1084,10 @@ class CounterfactualExplainer(ExplainerInterface):
             )
             Path(gradients_path).mkdir(parents=True, exist_ok=True)
             if self.explainer_config.use_gradient_filtering:
-                z_encoded_visualization = self.generator.dataset.project_to_pytorch_default(
-                    z_encoded.detach().cpu()
+                z_encoded_visualization = (
+                    self.generator.dataset.project_to_pytorch_default(
+                        z_encoded.detach().cpu()
+                    )
                 )
 
             else:
@@ -1245,6 +1255,16 @@ class CounterfactualExplainer(ExplainerInterface):
             self.explainer_config.clustering_strategy = clustering_strategy_buffer
             self.explainer_config.merge_clusters = merge_clusters_buffer
 
+        if self.explainer_config.num_attempts >= 2:
+            batch_size = int(len(batch["x_list"]) / self.explainer_config.num_attempts)
+            if not torch.sum(batch["x_list"][0] != batch["x_list"][batch_size]) == 0:
+                import pdb
+
+                pdb.set_trace()
+
+            else:
+                print("Match!!!")
+
         batch_out = {}
         if remove_below_threshold:
             for key in batch.keys():
@@ -1256,7 +1276,7 @@ class CounterfactualExplainer(ExplainerInterface):
         else:
             batch_out = batch
 
-        if self.tracking_level >= 2:
+        if self.tracking_level >= 4:
             try:
                 (
                     batch_out["x_attribution_list"],
@@ -1322,10 +1342,15 @@ class CounterfactualExplainer(ExplainerInterface):
                 explanations[0]["x_list"][None, ...].to(self.device), self.predictor
             )
             for i in range(len(explanations)):
-                if torch.sum(explanations[0]["x_list"] != explanations[i]["x_list"]) != 0:
+                if (
+                    torch.sum(explanations[0]["x_list"] != explanations[i]["x_list"])
+                    != 0
+                ):
                     if self.explainer_config.tracking_level >= 5:
                         print("x list is not matching across samples!")
-                        import pdb; pdb.set_trace()
+                        import pdb
+
+                        pdb.set_trace()
 
                     else:
                         raise Exception("x list is not matching across samples!")
@@ -1586,7 +1611,8 @@ class CounterfactualExplainer(ExplainerInterface):
                         foreground_change = [
                             torch.sum(
                                 torch.abs(
-                                    x_difference_list[i] * explanations_dict["hint_list"][i]
+                                    x_difference_list[i]
+                                    * explanations_dict["hint_list"][i]
                                 )
                                 / torch.sum(explanations_dict["hint_list"][i])
                             )
@@ -1594,7 +1620,9 @@ class CounterfactualExplainer(ExplainerInterface):
                         ]
 
                     except Exception:
-                        import pdb; pdb.set_trace()
+                        import pdb
+
+                        pdb.set_trace()
 
                     background_change = [
                         torch.sum(
@@ -1672,9 +1700,17 @@ class CounterfactualExplainer(ExplainerInterface):
                         latent_diversity = 0.0
 
                 tracked_stats["latent_sparsity"] = latent_sparsity
-                cprint("latent_sparsity: " + str(latent_sparsity), self.explainer_config.tracking_level, 2)
+                cprint(
+                    "latent_sparsity: " + str(latent_sparsity),
+                    self.explainer_config.tracking_level,
+                    2,
+                )
                 tracked_stats["latent_diversity"] = latent_diversity
-                cprint("latent_diversity: " + str(latent_diversity), self.explainer_config.tracking_level, 2)
+                cprint(
+                    "latent_diversity: " + str(latent_diversity),
+                    self.explainer_config.tracking_level,
+                    2,
+                )
 
         return tracked_stats
 

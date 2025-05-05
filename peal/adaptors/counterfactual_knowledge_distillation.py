@@ -253,6 +253,8 @@ class CFKD(Adaptor):
                 The visualization function that is used for the run. Defaults to lambda x: x.
         """
         self.adaptor_config = load_yaml_config(adaptor_config, AdaptorConfig)
+        self.adaptor_config.data.in_memory = self.adaptor_config.in_memory
+        self.adaptor_config.test_data.in_memory = self.adaptor_config.in_memory
         assert (
             self.adaptor_config.batch_size % 2 == 0
         ), "only even batch sizes are supported so far!"
@@ -1103,7 +1105,7 @@ class CFKD(Adaptor):
         }
         cprint("flip_rate: " + str(flip_rate), self.adaptor_config.tracking_level, 2)
 
-        if self.adaptor_config.tracking_level >= 4:
+        if self.adaptor_config.calculate_explainer_stats:
             # this is only for scientific experiments and could also be sourced out into another file!
             # distill into equivalent model
             predictor_distillation = load_yaml_config(

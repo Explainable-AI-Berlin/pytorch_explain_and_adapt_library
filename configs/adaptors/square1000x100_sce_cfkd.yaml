@@ -2,7 +2,7 @@
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  6
-tracking_level                       :  4
+tracking_level                       :  3
 min_train_samples                    :  900
 finetune_iterations                  :  2
 max_validation_samples               :  100

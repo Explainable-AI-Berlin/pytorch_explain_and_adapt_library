@@ -464,9 +464,9 @@ class ModelTrainer:
 
             # Backpropagation
             loss.backward()
-            current_state = "Model Training: " + mode + "_it: " + str(batch_idx)
-            if "validation_accuracy" in pbar.stored_values.keys():
-                current_state += pbar.stored_values["validation_accuracy"]
+            current_state = "MT: " + mode + "_it: " + str(batch_idx)
+            if "val_acc" in pbar.stored_values.keys():
+                current_state += str(round(float(pbar.stored_values["val_acc"]), 3))
 
             current_state += ", loss: " + str(loss.detach().item())
             current_state += ", ".join(
@@ -489,7 +489,7 @@ class ModelTrainer:
             if self.config.tracking_level < 4:
                 current_state = current_state[:80]
 
-            if self.config.tracking_level >= 1:
+            if self.config.tracking_level >= 4:
                 pbar.write(current_state)
                 pbar.update(1)
 
@@ -585,6 +585,7 @@ class ModelTrainer:
                     val_accuracy = min(val_accuracy, val_accuracy_current)
 
         self.logger.writer.add_scalar("epoch_validation_accuracy", val_accuracy, -1)
+        pbar.stored_values["val_acc"] = val_accuracy
 
         self.config.training.epoch = 0
         while self.config.training.epoch < self.config.training.max_epochs:
@@ -640,6 +641,7 @@ class ModelTrainer:
             self.logger.writer.add_scalar(
                 "epoch_validation_accuracy", val_accuracy, self.config.training.epoch
             )
+            pbar.stored_values["val_acc"] = val_accuracy
             if isinstance(self.model, Generator):
                 val_generator_performance = self.val_dataloaders[
                     0

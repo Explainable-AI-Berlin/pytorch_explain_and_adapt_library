@@ -247,3 +247,7 @@ class DataConfig(BaseModel):
     has to be in the first column.
     """
     x_selection: str = "imgs"
+    """
+    Whether to load all datasets into the RAM or not. Careful with big datasets!
+    """
+    in_memory: bool = False
