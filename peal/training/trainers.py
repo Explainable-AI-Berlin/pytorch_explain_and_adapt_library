@@ -531,18 +531,16 @@ class ModelTrainer:
             self.logger.writer = writer
             os.makedirs(os.path.join(self.model_path, "outputs"))
             os.makedirs(os.path.join(self.model_path, "checkpoints"))
-            open(os.path.join(self.model_path, "platform.txt"), "w").write(
-                platform.node()
-            )
-
-            log_images_to_writer(self.train_dataloader, self.logger.writer, "train")
-            log_images_to_writer(
-                self.val_dataloaders[0], self.logger.writer, "validation0_"
-            )
-            if len(self.val_dataloaders) > 1:
-                log_images_to_writer(
-                    self.val_dataloaders[1], self.logger.writer, "validation1_"
+            if self.config.tracking_level >= 3:
+                open(os.path.join(self.model_path, "platform.txt"), "w").write(
+                    platform.node()
                 )
+
+                log_images_to_writer(self.train_dataloader, self.logger.writer, "train")
+                for i in range(len(self.val_dataloaders)):
+                    log_images_to_writer(
+                        self.val_dataloaders[i], self.logger.writer, "validation" + str(i) + "_"
+                    )
 
             self.config.is_loaded = True
             save_yaml_config(self.config, os.path.join(self.model_path, "config.yaml"))

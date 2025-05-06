@@ -45,4 +45,4 @@ class AdaptorConfig(BaseModel):
     """
     Whether to load all datasets into the RAM or not. Careful with big datasets!
     """
-    in_memory: bool = True
+    in_memory: bool = False

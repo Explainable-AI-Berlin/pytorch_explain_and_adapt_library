@@ -3,9 +3,9 @@ adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  6
 tracking_level                       :  3
-min_train_samples                    :  900
-finetune_iterations                  :  2
-max_validation_samples               :  100
+min_train_samples                    :  800
+finetune_iterations                  :  1
+max_validation_samples               :  200
 continuous_learning                  :  "finetune"
 calculate_group_accuracies           :  True
 explainer                            :  <PEAL_BASE>/configs/explainers/sce_default64x64.yaml
