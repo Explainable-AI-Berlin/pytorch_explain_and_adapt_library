@@ -466,7 +466,7 @@ class ModelTrainer:
             loss.backward()
             current_state = "MT: " + mode + "_it: " + str(batch_idx)
             if "val_acc" in pbar.stored_values.keys():
-                current_state += str(round(float(pbar.stored_values["val_acc"]), 3))
+                current_state += ", val_acc: " + str(round(float(pbar.stored_values["val_acc"]), 3))
 
             current_state += ", loss: " + str(loss.detach().item())
             current_state += ", ".join(
@@ -487,10 +487,10 @@ class ModelTrainer:
             )
 
             if self.config.tracking_level < 4:
-                current_state = current_state[:80]
+                current_state = current_state[:199]
 
-            if self.config.tracking_level >= 4:
-                pbar.write(current_state)
+            if self.config.tracking_level >= 2:
+                pbar.set_postfix_str(current_state)
                 pbar.update(1)
 
             #
@@ -536,8 +536,10 @@ class ModelTrainer:
                     platform.node()
                 )
 
+                print("log train images!")
                 log_images_to_writer(self.train_dataloader, self.logger.writer, "train")
                 for i in range(len(self.val_dataloaders)):
+                    print("log validation" + str(i) + " images!")
                     log_images_to_writer(
                         self.val_dataloaders[i], self.logger.writer, "validation" + str(i) + "_"
                     )
@@ -554,7 +556,8 @@ class ModelTrainer:
             * (
                 len(self.train_dataloader)
                 + int(np.sum(list(map(lambda dl: len(dl), self.val_dataloaders))))
-            )
+            ),
+            ncols=200
         )
         pbar.stored_values = {}
         val_accuracy_max = 0.0

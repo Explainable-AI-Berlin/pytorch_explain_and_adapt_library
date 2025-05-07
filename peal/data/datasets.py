@@ -920,7 +920,7 @@ class Image2ClassDataset(ImageDataset):
         self.in_memory_images = {}
         for target_str, file in self.urls:
             img = Image.open(os.path.join(self.root_dir, target_str, file))
-            self.in_memory_images[os.path.join(target_str, file)] = img
+            self.in_memory_images[os.path.join(target_str, file)] = np.array(img)
 
         if self.config.has_hints:
             self.in_memory_masks = {}
@@ -934,7 +934,7 @@ class Image2ClassDataset(ImageDataset):
                 else:
                     raise Exception(os.path.join(self.mask_dir, target_str, file) + " not found!")
 
-                self.in_memory_masks[os.path.join(target_str, file)] = Image.open(mask_path)
+                self.in_memory_masks[os.path.join(target_str, file)] = np.array(Image.open(mask_path))
 
 
     def class_idx_to_name(self, class_idx):
@@ -1039,7 +1039,7 @@ class Image2ClassDataset(ImageDataset):
         target_str, file = self.urls[idx]
 
         if self.config.in_memory:
-            img = self.in_memory_images[os.path.join(target_str, file)]
+            img = Image.fromarray(self.in_memory_images[os.path.join(target_str, file)])
 
         else:
             img = Image.open(os.path.join(self.root_dir, target_str, file))
@@ -1058,7 +1058,7 @@ class Image2ClassDataset(ImageDataset):
 
         if self.hints_enabled:
             if self.config.in_memory:
-                mask = self.in_memory_masks[os.path.join(target_str, file)]
+                mask = Image.fromarray(self.in_memory_masks[os.path.join(target_str, file)])
 
             else:
                 if os.path.exists(os.path.join(self.mask_dir, file)):

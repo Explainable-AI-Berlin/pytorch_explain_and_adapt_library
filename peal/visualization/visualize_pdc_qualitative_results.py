@@ -2,6 +2,7 @@ import torch
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import torchvision.utils
 from matplotlib.gridspec import GridSpec
 from torchvision.transforms.functional import resize
 
@@ -89,10 +90,11 @@ if __name__ == "__main__":
         "DiME (2)",
         "FastDiME (1)",
         "FastDiME (2)",
-        "PDC (ours) (1)",
-        "PDC (ours) (2)",
+        "SCE (ours) (1)",
+        "SCE (ours) (2)",
     ]
-    sample_idxs = [[17, 43], [6, 23], [3, 2], [8, 4], [7, 9]]
+    # 23
+    sample_idxs = [[17, 43], [20, 23], [3, 2], [8, 4], [7, 9]]
     imgs = torch.zeros([1 + 2 * len(methods), 2 * len(base_paths), 3, 128, 128])
     target_confidences = torch.zeros([1 + 2 * len(methods), 2 * len(base_paths)])
 
@@ -112,18 +114,21 @@ if __name__ == "__main__":
 
                 for i, sample_idx in enumerate(sample_idxs[dataset_idx]):
                     if method_idx == 0:
-                        imgs[0][2 * dataset_idx + i] = resize(
+                        img = resize(
                             torch.from_numpy(tracked_values["x_list"][sample_idx]),
                             [128, 128],
                         )
-                        target_confidences[0][2 * dataset_idx + i] = float(
+                        imgs[0][2 * dataset_idx + i] = img
+                        c = float(
                             tracked_values["y_target_start_confidence_list"][sample_idx]
                         )
+                        target_confidences[0][2 * dataset_idx + i] = c
+                        string = task_names[dataset_idx] + "_" + methods[method_idx] + "_" + str(i) + "_" + str(int(100 * c)) + ".png"
+                        string = string.replace(" ", "_").replace("-","_").replace("\n", "").replace("+", "_")
+                        torchvision.utils.save_image(img, os.path.join("vis_imgs", string))
 
                     for cluster_idx in range(NUM_CLUSTERS):
-                        imgs[1 + 2 * method_idx + cluster_idx][
-                            2 * dataset_idx + i
-                        ] = resize(
+                        img = resize(
                             torch.from_numpy(
                                 tracked_values["clusters" + str(cluster_idx)][
                                     sample_idx
@@ -131,22 +136,29 @@ if __name__ == "__main__":
                             ),
                             [128, 128],
                         )
-                        target_confidences[1 + 2 * method_idx + cluster_idx][
+                        imgs[1 + 2 * method_idx + cluster_idx][
                             2 * dataset_idx + i
-                        ] = float(
+                        ] = img
+                        c = float(
                             tracked_values["cluster_confidence" + str(cluster_idx)][
                                 sample_idx
                             ]
                         )
+                        target_confidences[1 + 2 * method_idx + cluster_idx][
+                            2 * dataset_idx + i
+                        ] = c
+                        s = task_names[dataset_idx] + "_" + methods[method_idx] + "_" + str(i) + "_" + str(int(100 * c)) + ".png"
+                        s = s.replace(" ", "_").replace("-","_").replace("\n", "").replace("+", "_")
+                        torchvision.utils.save_image(img, os.path.join("vis_imgs", s))
 
-    for method_idx, method_name in enumerate(method_names):
+    """for method_idx, method_name in enumerate(method_names):
         plot_images_with_custom_padding(
             imgs[method_idx:method_idx+1],
             target_confidences,
             task_names,
             [method_names[method_idx]],
             method_name + ".png",
-        )
+        )"""
 
     imgs_reshaped = imgs.reshape([-1] + list(imgs.shape)[2:])
     plot_images_with_custom_padding(
@@ -154,6 +166,6 @@ if __name__ == "__main__":
         target_confidences,
         task_names,
         method_names,
-        "collage_with_custom_padding.png",
+        "vis_imgs/collage_with_custom_padding.png",
     )
 
