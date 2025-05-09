@@ -131,6 +131,44 @@ The biggest effort is to reformat the dataset to a ```peal.data.datasets.Image2M
 All labels have to be written into a "<PEAL_DATA>/my_data/data.csv" file with the header "ImagePath,Label1,Label2,...LabelN".
 It could also only have one label with "ImagePath,Label1" and we can only optimize for like this anyway.
 
+Next, you have to convert your predictor into an ONNX model with binary output.
+An example for an ImageNet classifier would be the following:
+
+```
+import torch
+import os
+import torchvision
+
+class BinaryImageNetModel(torch.nn.Module):
+    def __init__(self, class1, class2):
+        super(BinaryImageNetModel, self).__init__()
+        self.model = torchvision.models.resnet18(pretrained=True)
+        self.class1 = class1
+        self.class2 = class2
+
+    def forward(self, x):
+        logits_full = self.model(x)
+        return logits_full[:, [self.class1, self.class2]]
+
+wulf_vs_husky_classifier = BinaryImageNetModel(248, 269)
+wulf_vs_husky_classifier.eval()
+
+os.makedirs("$PEAL_RUNS/imagenet")
+os.makedirs("$PEAL_RUNS/imagenet/wulf_vs_husky_classifier")
+dummy_input = torch.randn(1, 3, 224, 224)  # standard ResNet input
+torch.onnx.export(
+    wulf_vs_husky_classifier,
+    dummy_input,
+    "$PEAL_RUNS/wulf_vs_husky_classifier/model.onnx",
+    input_names=["input"],
+    output_names=["output"],
+    dynamic_axes={"input": {0: "batch_size"}, "output": {0: "batch_size"}},
+    opset_version=11
+)
+```
+
+
+
 **Installation Instructions:**
 
 pip install peal

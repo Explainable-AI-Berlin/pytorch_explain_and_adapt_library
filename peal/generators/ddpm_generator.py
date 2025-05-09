@@ -131,6 +131,7 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         super().__init__()
         self.predictor_distilled = None
         self.config = load_yaml_config(config)
+        self.config.image_size = self.config.data.input_size[-1]
 
         self.dataset = get_datasets(self.config.data)[0]
 

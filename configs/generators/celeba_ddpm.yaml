@@ -3,5 +3,4 @@ generator_type : DDPM
 category : generator
 base_path : $PEAL_RUNS/celeba/ddpm
 data: <PEAL_BASE>/configs/data/celeba_generator.yaml
-image_size: 128
 batch_size: 100

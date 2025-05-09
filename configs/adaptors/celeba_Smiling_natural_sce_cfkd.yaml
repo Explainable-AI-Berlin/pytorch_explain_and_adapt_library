@@ -4,11 +4,12 @@ category                             :  "adaptor"
 batch_size                           :  4
 tracking_level                       :  5
 finetune_iterations                  :  0
-max_validation_samples               :  100
+max_validation_samples               :  200
 calculate_group_accuracies           :  False
 explainer                            :  <PEAL_BASE>/configs/explainers/sce_default128x128.yaml
 data                                 :  <PEAL_BASE>/configs/data/celeba.yaml
 student                              :  $PEAL_RUNS/celeba/Smiling/classifier_natural/model.cpl
+teacher                              :  Baseline:true
 generator                            :  $PEAL_RUNS/celeba/ddpm/config.yaml
 base_dir                             :  $PEAL_RUNS/celeba/Smiling/classifier_natural/sce_cfkd
 task:
