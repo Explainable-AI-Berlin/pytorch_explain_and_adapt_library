@@ -99,24 +99,25 @@ Then, the dataset_class and confounding_factors have to be removed
 (because you do have neither for your new dataset yet).
 Then, num_samples, input_size and output_size should be adapted to your dataset.
 Now, one has to copy configs/generators/celeba_ddpm.yaml to configs/generators/my_data_ddpm.yaml.
-In this file one has to replace base_path with "$PEAL_RUNS/my_path/ddpm" and data with "<PEAL_BASE>/configs/data/celeba_generator.yaml".
+In this file one has to replace base_path with "$PEAL_RUNS/my_data/ddpm" and data with "<PEAL_BASE>/configs/data/celeba_generator.yaml".
 Now you can train your DDPM generator with:
 
-```python train_generator.py --config "<PEAL_BASE>/configs/generators/my_path_ddpm.yaml"```
+```python train_generator.py --config "<PEAL_BASE>/configs/generators/my_data_ddpm.yaml"```
 
 In parallel you can copy "configs/predictors/celeba_classifier_smiling.yaml" to "configs/predictors/my_data_classifier_smiling.yaml".
 Here, you have to replace model_path with "$PEAL_RUNS/my_data/classifier", data with "<PEAL_BASE>/configs/data/my_data.yaml" and y_selection with "[Label1]".
 Now you can train your predictor with:
 
-```python train_predictor.py --config "<PEAL_BASE>/configs/predictors/my_path_classifier.yaml"```
+```python train_predictor.py --config "<PEAL_BASE>/configs/predictors/my_data_classifier.yaml"```
 
-After finishing generator and predictor training you can copy "configs/adaptors/celeba_Smiling_natural_sce_cfkd.yaml" to "configs/adaptors/my_data_sce_cfkd.yaml".
+After finishing generator and predictor training you can copy "configs/adaptors/celeba_Smiling_natural_sce_cfkd.yaml" 
+to "configs/adaptors/my_data_sce_cfkd.yaml".
 Overwrite data with "<PEAL_BASE>/configs/data/my_data.yaml", student with "$PEAL_RUNS/my_data/classifier/model.cpl",
 generator with "$PEAL_RUNS/my_data/ddpm/config.yaml", base_dir with "$PEAL_RUNS/my_data/classifier/sce_cfkd" and
 y_selection with "[Label1]".
 Now you can run SCE with:
 
-```python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Smiling_natural_sce_cfkd.yaml"```
+```python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/my_data_sce_cfkd.yaml"```
 
 Now you can find your counterfactuals under "$PEAL_RUNS/my_data/classifier/sce_cfkd/validation_collages".
 If you further want to process them you can load the .npz array "$PEAL_RUNS/my_data/classifier/sce_cfkd/validation_tracked_values.npz".
