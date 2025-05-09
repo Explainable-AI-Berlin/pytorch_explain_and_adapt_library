@@ -140,6 +140,47 @@ def calculate_test_accuracy(
         return correct / test_dataloader.dataset.__len__()
 
 
+def get_predictor(config, model=None):
+    if model is None:
+        if (
+            not config.task.x_selection is None
+            and not config.data.input_type == "image"
+        ):
+            input_channels = len(config.task.x_selection)
+
+        else:
+            input_channels = config.data.input_size[0]
+
+        if not config.task.output_channels is None:
+            output_channels = config.task.output_channels
+
+        else:
+            output_channels = config.data.output_size[0]
+
+        if isinstance(config.architecture, ArchitectureConfig):
+            model = SequentialModel(
+                config.architecture,
+                input_channels,
+                output_channels,
+                config.training.dropout,
+            )
+
+        elif (
+            isinstance(config.architecture, str)
+            and config.architecture[:12] == "torchvision_"
+        ):
+            model = TorchvisionModel(
+                config.architecture[12:],
+                output_channels,
+                config.data.input_size[-1],
+            )
+
+        else:
+            raise Exception("Architecture not available!")
+
+        return model
+
+
 class ModelTrainer:
     """ """
 
@@ -171,45 +212,7 @@ class ModelTrainer:
         else:
             self.model_path = self.config.model_path
 
-        if model is None:
-            if (
-                not self.config.task.x_selection is None
-                and not self.config.data.input_type == "image"
-            ):
-                input_channels = len(self.config.task.x_selection)
-
-            else:
-                input_channels = self.config.data.input_size[0]
-
-            if not self.config.task.output_channels is None:
-                output_channels = self.config.task.output_channels
-
-            else:
-                output_channels = self.config.data.output_size[0]
-
-            if isinstance(self.config.architecture, ArchitectureConfig):
-                self.model = SequentialModel(
-                    self.config.architecture,
-                    input_channels,
-                    output_channels,
-                    self.config.training.dropout,
-                )
-
-            elif (
-                isinstance(self.config.architecture, str)
-                and self.config.architecture[:12] == "torchvision_"
-            ):
-                self.model = TorchvisionModel(
-                    self.config.architecture[12:],
-                    output_channels,
-                    self.config.data.input_size[-1],
-                )
-
-            else:
-                raise Exception("Architecture not available!")
-
-        else:
-            self.model = model
+        self.model = get_predictor(self.config, model)
 
         self.model.to(self.device)
 
@@ -909,7 +912,13 @@ def distill_predictor(
             "Either distill from dataset or use available dataset type for relabeling"
         )
 
-    predictor_distilled = copy.deepcopy(predictor)
+    if isinstance(predictor, torch.nn.Module):
+        predictor_distilled = copy.deepcopy(predictor)
+
+    else:
+        # TODO how can I determine that there are no gradients anymore?
+        get_predictor(predictor_distillation)
+
     if replace_with_activation == "leakysoftplus":
         predictor_distilled = replace_relu_with_leakysoftplus(predictor_distilled)
 
