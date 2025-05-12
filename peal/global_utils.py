@@ -407,11 +407,9 @@ def orthogonal_initialization(model):
 def reset_weights(model):
     for idx, layer in enumerate(model.children()):
         if hasattr(layer, "reset_parameters"):
-            print(f"Resetting parameters of layer: {layer}")
             layer.reset_parameters()
 
         else:
-            print(f"Layer {idx} does not have a reset_parameters method")
             reset_weights(layer)
 
 

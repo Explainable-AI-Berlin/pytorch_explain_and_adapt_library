@@ -30,11 +30,8 @@ def get_predictor(predictor, device="cuda"):
         if predictor[-4:] == ".cpl":
             return torch.load(predictor, map_location=device), None
 
-        """
-        TODO
         elif predictor[-5:] == ".onnx":
             return torch.onnx.load(predictor, map_location=device), None
-        """
 
     else:
         predictor_config = load_yaml_config(predictor)

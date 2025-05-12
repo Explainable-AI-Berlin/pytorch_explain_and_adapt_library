@@ -140,6 +140,47 @@ def calculate_test_accuracy(
         return correct / test_dataloader.dataset.__len__()
 
 
+def get_predictor(config, model=None):
+    if model is None:
+        if (
+            not config.task.x_selection is None
+            and not config.data.input_type == "image"
+        ):
+            input_channels = len(config.task.x_selection)
+
+        else:
+            input_channels = config.data.input_size[0]
+
+        if not config.task.output_channels is None:
+            output_channels = config.task.output_channels
+
+        else:
+            output_channels = config.data.output_size[0]
+
+        if isinstance(config.architecture, ArchitectureConfig):
+            model = SequentialModel(
+                config.architecture,
+                input_channels,
+                output_channels,
+                config.training.dropout,
+            )
+
+        elif (
+            isinstance(config.architecture, str)
+            and config.architecture[:12] == "torchvision_"
+        ):
+            model = TorchvisionModel(
+                config.architecture[12:],
+                output_channels,
+                config.data.input_size[-1],
+            )
+
+        else:
+            raise Exception("Architecture not available!")
+
+        return model
+
+
 class ModelTrainer:
     """ """
 
@@ -171,45 +212,7 @@ class ModelTrainer:
         else:
             self.model_path = self.config.model_path
 
-        if model is None:
-            if (
-                not self.config.task.x_selection is None
-                and not self.config.data.input_type == "image"
-            ):
-                input_channels = len(self.config.task.x_selection)
-
-            else:
-                input_channels = self.config.data.input_size[0]
-
-            if not self.config.task.output_channels is None:
-                output_channels = self.config.task.output_channels
-
-            else:
-                output_channels = self.config.data.output_size[0]
-
-            if isinstance(self.config.architecture, ArchitectureConfig):
-                self.model = SequentialModel(
-                    self.config.architecture,
-                    input_channels,
-                    output_channels,
-                    self.config.training.dropout,
-                )
-
-            elif (
-                isinstance(self.config.architecture, str)
-                and self.config.architecture[:12] == "torchvision_"
-            ):
-                self.model = TorchvisionModel(
-                    self.config.architecture[12:],
-                    output_channels,
-                    self.config.data.input_size[-1],
-                )
-
-            else:
-                raise Exception("Architecture not available!")
-
-        else:
-            self.model = model
+        self.model = get_predictor(self.config, model)
 
         self.model.to(self.device)
 
@@ -464,9 +467,9 @@ class ModelTrainer:
 
             # Backpropagation
             loss.backward()
-            current_state = "Model Training: " + mode + "_it: " + str(batch_idx)
-            if "validation_accuracy" in pbar.stored_values.keys():
-                current_state += pbar.stored_values["validation_accuracy"]
+            current_state = "MT: " + mode + "_it: " + str(batch_idx)
+            if "val_acc" in pbar.stored_values.keys():
+                current_state += ", val_acc: " + str(round(float(pbar.stored_values["val_acc"]), 3))
 
             current_state += ", loss: " + str(loss.detach().item())
             current_state += ", ".join(
@@ -487,10 +490,10 @@ class ModelTrainer:
             )
 
             if self.config.tracking_level < 4:
-                current_state = current_state[:80]
+                current_state = current_state[:199]
 
-            if self.config.tracking_level >= 1:
-                pbar.write(current_state)
+            if self.config.tracking_level >= 2:
+                pbar.set_postfix_str(current_state)
                 pbar.update(1)
 
             #
@@ -531,18 +534,18 @@ class ModelTrainer:
             self.logger.writer = writer
             os.makedirs(os.path.join(self.model_path, "outputs"))
             os.makedirs(os.path.join(self.model_path, "checkpoints"))
-            open(os.path.join(self.model_path, "platform.txt"), "w").write(
-                platform.node()
-            )
-
-            log_images_to_writer(self.train_dataloader, self.logger.writer, "train")
-            log_images_to_writer(
-                self.val_dataloaders[0], self.logger.writer, "validation0_"
-            )
-            if len(self.val_dataloaders) > 1:
-                log_images_to_writer(
-                    self.val_dataloaders[1], self.logger.writer, "validation1_"
+            if self.config.tracking_level >= 3:
+                open(os.path.join(self.model_path, "platform.txt"), "w").write(
+                    platform.node()
                 )
+
+                print("log train images!")
+                log_images_to_writer(self.train_dataloader, self.logger.writer, "train")
+                for i in range(len(self.val_dataloaders)):
+                    print("log validation" + str(i) + " images!")
+                    log_images_to_writer(
+                        self.val_dataloaders[i], self.logger.writer, "validation" + str(i) + "_"
+                    )
 
             self.config.is_loaded = True
             save_yaml_config(self.config, os.path.join(self.model_path, "config.yaml"))
@@ -556,7 +559,8 @@ class ModelTrainer:
             * (
                 len(self.train_dataloader)
                 + int(np.sum(list(map(lambda dl: len(dl), self.val_dataloaders))))
-            )
+            ),
+            ncols=200
         )
         pbar.stored_values = {}
         val_accuracy_max = 0.0
@@ -585,6 +589,7 @@ class ModelTrainer:
                     val_accuracy = min(val_accuracy, val_accuracy_current)
 
         self.logger.writer.add_scalar("epoch_validation_accuracy", val_accuracy, -1)
+        pbar.stored_values["val_acc"] = val_accuracy
 
         self.config.training.epoch = 0
         while self.config.training.epoch < self.config.training.max_epochs:
@@ -640,6 +645,7 @@ class ModelTrainer:
             self.logger.writer.add_scalar(
                 "epoch_validation_accuracy", val_accuracy, self.config.training.epoch
             )
+            pbar.stored_values["val_acc"] = val_accuracy
             if isinstance(self.model, Generator):
                 val_generator_performance = self.val_dataloaders[
                     0
@@ -906,7 +912,13 @@ def distill_predictor(
             "Either distill from dataset or use available dataset type for relabeling"
         )
 
-    predictor_distilled = copy.deepcopy(predictor)
+    if isinstance(predictor, torch.nn.Module):
+        predictor_distilled = copy.deepcopy(predictor)
+
+    else:
+        # TODO how can I determine that there are no gradients anymore?
+        get_predictor(predictor_distillation)
+
     if replace_with_activation == "leakysoftplus":
         predictor_distilled = replace_relu_with_leakysoftplus(predictor_distilled)
 

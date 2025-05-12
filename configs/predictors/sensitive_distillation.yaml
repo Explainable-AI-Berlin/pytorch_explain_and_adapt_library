@@ -1,5 +1,6 @@
 training          : <PEAL_BASE>/configs/training/sensitive_distillation.yaml
 distill_from      : predictor
+architecture      : torchvision_resnet18
 task:
   criterions:
     ce     : 1.0

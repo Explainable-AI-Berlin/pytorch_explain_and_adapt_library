@@ -104,8 +104,6 @@ from torch import nn
 
 from peal.dependencies.group_dro.loss import LossComputer
 
-from memory_profiler import profile
-
 
 dro_criterions = {
     "ce": nn.CrossEntropyLoss(reduction='none'),

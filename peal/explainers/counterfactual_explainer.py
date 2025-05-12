@@ -27,7 +27,8 @@ from peal.global_utils import (
     is_port_in_use,
     dict_to_bar_chart,
     embed_numberstring,
-    extract_penultima_activation, cprint,
+    extract_penultima_activation,
+    cprint,
 )
 from peal.generators.interfaces import (
     InvertibleGenerator,
@@ -543,9 +544,11 @@ class CounterfactualExplainer(ExplainerInterface):
                 num_attempts - 1,
             )
 
+        else:
+            previous_target_confidences_list = None
+
         if num_attempts == 1 or self.explainer_config.allow_overlap:
             boolmask_in = torch.ones_like(x_in)
-            previous_target_confidences_list = None
 
         if not self.explainer_config.distilled_predictor is None:
             if base_path is None:
@@ -559,9 +562,9 @@ class CounterfactualExplainer(ExplainerInterface):
             )
             if not os.path.exists(distilled_path):
                 if isinstance(self.explainer_config.distilled_predictor, dict):
-                    self.explainer_config.distilled_predictor["data"] = (
-                        self.val_dataset.config
-                    )
+                    self.explainer_config.distilled_predictor[
+                        "data"
+                    ] = self.val_dataset.config
 
                 elif isinstance(
                     self.explainer_config.distilled_predictor, PredictorConfig
@@ -608,7 +611,9 @@ class CounterfactualExplainer(ExplainerInterface):
         x = self.val_dataset.project_to_pytorch_default(x_predictor)
         if self.explainer_config.use_gradient_filtering:
             x = self.generator.dataset.project_from_pytorch_default(x)
-            x = torchvision.transforms.Resize(self.generator.config.data.input_size[1:])(x)
+            x = torchvision.transforms.Resize(
+                self.generator.config.data.input_size[1:]
+            )(x)
 
         if not self.explainer_config.iterationwise_encoding:
             if self.explainer_config.use_gradient_filtering:
@@ -1066,7 +1071,10 @@ class CounterfactualExplainer(ExplainerInterface):
             if target_confidences[j] >= target_confidence_goal_current[j]:
                 not_finished_mask[j] = 0
 
-        if self.explainer_config.tracking_level >= 5 and self.explainer_config.visualize_gradients:
+        if (
+            self.explainer_config.tracking_level >= 5
+            and self.explainer_config.visualize_gradients
+        ):
             gradients_path = str(
                 os.path.join(
                     base_path,
@@ -1076,8 +1084,10 @@ class CounterfactualExplainer(ExplainerInterface):
             )
             Path(gradients_path).mkdir(parents=True, exist_ok=True)
             if self.explainer_config.use_gradient_filtering:
-                z_encoded_visualization = self.generator.dataset.project_to_pytorch_default(
-                    z_encoded.detach().cpu()
+                z_encoded_visualization = (
+                    self.generator.dataset.project_to_pytorch_default(
+                        z_encoded.detach().cpu()
+                    )
                 )
 
             else:
@@ -1256,23 +1266,17 @@ class CounterfactualExplainer(ExplainerInterface):
         else:
             batch_out = batch
 
-        if self.tracking_level >= 2:
-            try:
-                (
-                    batch_out["x_attribution_list"],
-                    batch_out["collage_path_list"],
-                ) = self.val_dataset.generate_contrastive_collage(
-                    target_confidence_goal=target_confidence_goal,
-                    base_path=base_path,
-                    predictor=self.predictor,
-                    start_idx=start_idx * self.explainer_config.num_attempts,
-                    **batch_out,
-                )
-
-            except Exception:
-                import pdb
-
-                pdb.set_trace()
+        if self.tracking_level >= 4:
+            (
+                batch_out["x_attribution_list"],
+                batch_out["collage_path_list"],
+            ) = self.val_dataset.generate_contrastive_collage(
+                target_confidence_goal=target_confidence_goal,
+                base_path=base_path,
+                predictor=self.predictor,
+                start_idx=start_idx * self.explainer_config.num_attempts,
+                **batch_out,
+            )
 
         else:
             x_attribution_list = []
@@ -1322,10 +1326,15 @@ class CounterfactualExplainer(ExplainerInterface):
                 explanations[0]["x_list"][None, ...].to(self.device), self.predictor
             )
             for i in range(len(explanations)):
-                if torch.sum(explanations[0]["x_list"] != explanations[i]["x_list"]) != 0:
-                    if self.explainer_config.tracking_level >= 5:
+                if (
+                    torch.sum(explanations[0]["x_list"] != explanations[i]["x_list"])
+                    != 0
+                ):
+                    if self.explainer_config.tracking_level >= 4:
                         print("x list is not matching across samples!")
-                        import pdb; pdb.set_trace()
+                        import pdb
+
+                        pdb.set_trace()
 
                     else:
                         raise Exception("x list is not matching across samples!")
@@ -1526,155 +1535,153 @@ class CounterfactualExplainer(ExplainerInterface):
 
     def calculate_latent_difference_stats(self, explanations_dict):
         tracked_stats = {}
-        if self.explainer_config.tracking_level >= 3:
-            latent_differences = None
-            if hasattr(self.val_dataset, "sample_to_latent"):
-                latents_original = []
-                for i, e in enumerate(
-                    explanations_dict["x_list"][: len(explanations_dict["clusters0"])]
+        latent_differences = None
+        if hasattr(self.val_dataset, "sample_to_latent"):
+            latents_original = []
+            for i, e in enumerate(
+                explanations_dict["x_list"][: len(explanations_dict["clusters0"])]
+            ):
+                hint = (
+                    explanations_dict["hint_list"][i]
+                    if "hint_list" in explanations_dict.keys()
+                    else None
+                )
+                latents_original.append(
+                    self.val_dataset.sample_to_latent(e.to(self.device), hint).cpu()
+                )
+
+            latents_counterfactual = []
+            latent_differences = []
+            for c in range(self.explainer_config.num_attempts):
+                latents_counterfactual.append(
+                    [
+                        self.val_dataset.sample_to_latent(
+                            e.to(self.device),
+                            (
+                                explanations_dict["hint_list"][i]
+                                if "hint_list" in explanations_dict.keys()
+                                else None
+                            ),
+                        ).cpu()
+                        for i, e in enumerate(
+                            explanations_dict["clusters" + str(c)]
+                        )
+                    ]
+                )
+
+                latent_differences.append(
+                    [
+                        latents_counterfactual[c][i] - latents_original[i]
+                        for i in range(len(latents_original))
+                    ]
+                )
+
+        elif "hint_list" in explanations_dict.keys():
+            latent_differences = []
+            for c in range(self.explainer_config.num_attempts):
+                x_difference_list = [
+                    explanations_dict["clusters" + str(c)][i]
+                    - explanations_dict["x_list"][i]
+                    for i in range(len(explanations_dict["clusters0"]))
+                ]
+                foreground_change = [
+                    torch.sum(
+                        torch.abs(
+                            x_difference_list[i]
+                            * explanations_dict["hint_list"][i]
+                        )
+                        / torch.sum(explanations_dict["hint_list"][i])
+                    )
+                    for i in range(len(x_difference_list))
+                ]
+
+                background_change = [
+                    torch.sum(
+                        torch.abs(
+                            x_difference_list[i]
+                            * torch.abs(1 - explanations_dict["hint_list"][i])
+                        )
+                        / torch.sum(
+                            torch.abs(1 - explanations_dict["hint_list"][i])
+                        )
+                    )
+                    for i in range(len(x_difference_list))
+                ]
+                latent_differences.append(
+                    torch.transpose(
+                        torch.tensor([foreground_change, background_change]), 0, 1
+                    )
+                )
+
+        if not latent_differences is None:
+            for latent_difference in latent_differences:
+                assert len(latent_difference) == len(explanations_dict["clusters0"])
+
+            latent_differences_valid = []
+            for i in range(len(latent_differences[0])):
+                if (
+                    explanations_dict["y_target_end_confidence_distilled_list"][i]
+                    > 0.5
                 ):
-                    hint = (
-                        explanations_dict["hint_list"][i]
-                        if "hint_list" in explanations_dict.keys()
-                        else None
-                    )
-                    latents_original.append(
-                        self.val_dataset.sample_to_latent(e.to(self.device), hint).cpu()
-                    )
+                    latent_difference_current = []
+                    for j in range(len(latent_differences)):
+                        latent_difference_current.append(latent_differences[j][i])
 
-                latents_counterfactual = []
-                latent_differences = []
-                for c in range(self.explainer_config.num_attempts):
-                    latents_counterfactual.append(
-                        [
-                            self.val_dataset.sample_to_latent(
-                                e.to(self.device),
-                                (
-                                    explanations_dict["hint_list"][i]
-                                    if "hint_list" in explanations_dict.keys()
-                                    else None
-                                ),
-                            ).cpu()
-                            for i, e in enumerate(
-                                explanations_dict["clusters" + str(c)]
-                            )
-                        ]
-                    )
+                    latent_differences_valid.append(latent_difference_current)
 
-                    try:
-                        latent_differences.append(
-                            [
-                                latents_counterfactual[c][i] - latents_original[i]
-                                for i in range(len(latents_original))
-                            ]
-                        )
+            if len(latent_differences_valid) == 0:
+                latent_sparsity = 0.0
+                latent_diversity = 0.0
 
-                    except Exception as exp:
-                        import pdb
-
-                        pdb.set_trace()
-
-            elif "hint_list" in explanations_dict.keys():
-                latent_differences = []
-                for c in range(self.explainer_config.num_attempts):
-                    x_difference_list = [
-                        explanations_dict["clusters" + str(c)][i]
-                        - explanations_dict["x_list"][i]
-                        for i in range(len(explanations_dict["clusters0"]))
-                    ]
-                    try:
-                        foreground_change = [
-                            torch.sum(
-                                torch.abs(
-                                    x_difference_list[i] * explanations_dict["hint_list"][i]
-                                )
-                                / torch.sum(explanations_dict["hint_list"][i])
-                            )
-                            for i in range(len(x_difference_list))
-                        ]
-
-                    except Exception:
-                        import pdb; pdb.set_trace()
-
-                    background_change = [
-                        torch.sum(
-                            torch.abs(
-                                x_difference_list[i]
-                                * torch.abs(1 - explanations_dict["hint_list"][i])
-                            )
-                            / torch.sum(
-                                torch.abs(1 - explanations_dict["hint_list"][i])
-                            )
-                        )
-                        for i in range(len(x_difference_list))
-                    ]
-                    latent_differences.append(
-                        torch.transpose(
-                            torch.tensor([foreground_change, background_change]), 0, 1
-                        )
-                    )
-
-            if not latent_differences is None:
-                for latent_difference in latent_differences:
-                    assert len(latent_difference) == len(explanations_dict["clusters0"])
-
-                latent_differences_valid = []
-                for i in range(len(latent_differences[0])):
-                    if (
-                        explanations_dict["y_target_end_confidence_distilled_list"][i]
-                        > 0.5
-                    ):
-                        latent_difference_current = []
-                        for j in range(len(latent_differences)):
-                            latent_difference_current.append(latent_differences[j][i])
-
-                        latent_differences_valid.append(latent_difference_current)
-
-                if len(latent_differences_valid) == 0:
-                    latent_sparsity = 0.0
-                    latent_diversity = 0.0
-
-                else:
-                    latent_sparsities = []
-                    for i in range(len(latent_differences_valid)):
-                        if latent_differences_valid[i][0].abs().max() == 0.0:
-                            latent_sparsity = 0.0
-
-                        else:
-                            latent_sparsity = float(
-                                (
-                                    latent_differences_valid[i][0].abs().sum()
-                                    - latent_differences_valid[i][0].abs().max()
-                                )
-                                / (len(latent_differences_valid[i][0]) - 1)
-                                / latent_differences_valid[i][0].abs().max()
-                            )
-
-                        latent_sparsities.append(latent_sparsity)
-
-                    latent_sparsity = 1.0 - float(
-                        torch.mean(torch.tensor(latent_sparsities))
-                    )
-                    if self.explainer_config.num_attempts >= 2:
-                        cosine_similiarities_list = [
-                            torch.abs(
-                                torch.nn.CosineSimilarity(dim=0)(
-                                    latent_differences_valid[i][0],
-                                    latent_differences_valid[i][1],
-                                )
-                            )
-                            for i in range(len(latent_differences_valid))
-                        ]
-                        cosine_similiarities = torch.tensor(cosine_similiarities_list)
-                        latent_diversity = 1.0 - float(torch.mean(cosine_similiarities))
+            else:
+                latent_sparsities = []
+                for i in range(len(latent_differences_valid)):
+                    if latent_differences_valid[i][0].abs().max() == 0.0:
+                        latent_sparsity = 0.0
 
                     else:
-                        latent_diversity = 0.0
+                        latent_sparsity = float(
+                            (
+                                latent_differences_valid[i][0].abs().sum()
+                                - latent_differences_valid[i][0].abs().max()
+                            )
+                            / (len(latent_differences_valid[i][0]) - 1)
+                            / latent_differences_valid[i][0].abs().max()
+                        )
 
-                tracked_stats["latent_sparsity"] = latent_sparsity
-                cprint("latent_sparsity: " + str(latent_sparsity), self.explainer_config.tracking_level, 2)
-                tracked_stats["latent_diversity"] = latent_diversity
-                cprint("latent_diversity: " + str(latent_diversity), self.explainer_config.tracking_level, 2)
+                    latent_sparsities.append(latent_sparsity)
+
+                latent_sparsity = 1.0 - float(
+                    torch.mean(torch.tensor(latent_sparsities))
+                )
+                if self.explainer_config.num_attempts >= 2:
+                    cosine_similiarities_list = [
+                        torch.abs(
+                            torch.nn.CosineSimilarity(dim=0)(
+                                latent_differences_valid[i][0],
+                                latent_differences_valid[i][1],
+                            )
+                        )
+                        for i in range(len(latent_differences_valid))
+                    ]
+                    cosine_similiarities = torch.tensor(cosine_similiarities_list)
+                    latent_diversity = 1.0 - float(torch.mean(cosine_similiarities))
+
+                else:
+                    latent_diversity = 0.0
+
+            tracked_stats["latent_sparsity"] = latent_sparsity
+            cprint(
+                "latent_sparsity: " + str(latent_sparsity),
+                self.explainer_config.tracking_level,
+                2,
+            )
+            tracked_stats["latent_diversity"] = latent_diversity
+            cprint(
+                "latent_diversity: " + str(latent_diversity),
+                self.explainer_config.tracking_level,
+                2,
+            )
 
         return tracked_stats
 
