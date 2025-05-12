@@ -752,10 +752,18 @@ class Image2MixedDataset(ImageDataset):
             return_dict["hint"] = mask_tensor
 
         if self.groups_enabled:
-            has_confounder = targets[
-                self.attributes.index(self.config.confounding_factors[-1])
-            ]
-            return_dict["has_confounder"] = has_confounder
+            if len(self.config.confounding_factors) == 2:
+                has_confounder = targets[
+                    self.attributes.index(self.config.confounding_factors[-1])
+                ]
+                return_dict["has_confounder"] = has_confounder
+
+            else:
+                has_confounder = []
+                for factor in self.config.confounding_factors[1:]:
+                    has_confounder = targets[self.attributes.index(factor)]
+
+                return_dict["has_confounder"] = has_confounder
 
         if self.idx_enabled:
             return_dict["idx"] = idx

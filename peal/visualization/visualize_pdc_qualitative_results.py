@@ -123,7 +123,7 @@ if __name__ == "__main__":
                             tracked_values["y_target_start_confidence_list"][sample_idx]
                         )
                         target_confidences[0][2 * dataset_idx + i] = c
-                        string = task_names[dataset_idx] + "_" + methods[method_idx] + "_" + str(i) + "_" + str(int(100 * c)) + ".png"
+                        string = task_names[2 * dataset_idx + i] + "_Original_" + str(int(100 * c)) + ".png"
                         string = string.replace(" ", "_").replace("-","_").replace("\n", "").replace("+", "_")
                         torchvision.utils.save_image(img, os.path.join("vis_imgs", string))
 
@@ -147,7 +147,7 @@ if __name__ == "__main__":
                         target_confidences[1 + 2 * method_idx + cluster_idx][
                             2 * dataset_idx + i
                         ] = c
-                        s = task_names[dataset_idx] + "_" + methods[method_idx] + "_" + str(i) + "_" + str(int(100 * c)) + ".png"
+                        s = task_names[2 * dataset_idx + i] + "_" + methods[method_idx] + "_" + str(cluster_idx) + "_" + str(int(100 * c)) + ".png"
                         s = s.replace(" ", "_").replace("-","_").replace("\n", "").replace("+", "_")
                         torchvision.utils.save_image(img, os.path.join("vis_imgs", s))
 
