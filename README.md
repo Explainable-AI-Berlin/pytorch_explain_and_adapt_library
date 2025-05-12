@@ -84,6 +84,91 @@ Hence, the config files can be given as YAML files, but will be parsed as Python
 In this process only the values that are set in the YAML file are overwritten in the Python template, the rest of the values will stay at the default.
 The documentation can be found in the corresponding Python classes in the code.
 
+**How to use a custom binary image classification dataset with a predictor and a generator from PEAL**
+
+This can be done no code with the Command Line Interface of PEAL!!!
+The biggest effort is to reformat the dataset to a ```peal.data.datasets.Image2MixedDataset```.
+All labels have to be written into a "<PEAL_DATA>/my_data/data.csv" file with the header "ImagePath,Label1,Label2,...LabelN".
+It could also only have one label with "ImagePath,Label1" and we can only optimize for like this anyway.
+All Images have to be placed in the folder "<PEAL_DATA>/my_data" in the correct relative path.
+
+Then, one can copy and adapt the config files for CelebA Smiling.
+First, one has to copy configs/data/celeba.yaml to configs/data/my_data.yaml.
+Then, one has to copy configs/data/celeba_generator.yaml to configs/data/my_data_generator.yaml.
+Then, the dataset_class and confounding_factors have to be removed
+(because you do have neither for your new dataset yet).
+Then, num_samples, input_size and output_size should be adapted to your dataset.
+Now, one has to copy configs/generators/celeba_ddpm.yaml to configs/generators/my_data_ddpm.yaml.
+In this file one has to replace base_path with "$PEAL_RUNS/my_data/ddpm" and data with "<PEAL_BASE>/configs/data/celeba_generator.yaml".
+Now you can train your DDPM generator with:
+
+```python train_generator.py --config "<PEAL_BASE>/configs/generators/my_data_ddpm.yaml"```
+
+In parallel you can copy "configs/predictors/celeba_classifier_smiling.yaml" to "configs/predictors/my_data_classifier_smiling.yaml".
+Here, you have to replace model_path with "$PEAL_RUNS/my_data/classifier", data with "<PEAL_BASE>/configs/data/my_data.yaml" and y_selection with "[Label1]".
+Now you can train your predictor with:
+
+```python train_predictor.py --config "<PEAL_BASE>/configs/predictors/my_data_classifier.yaml"```
+
+After finishing generator and predictor training you can copy "configs/adaptors/celeba_Smiling_natural_sce_cfkd.yaml" 
+to "configs/adaptors/my_data_sce_cfkd.yaml".
+Overwrite data with "<PEAL_BASE>/configs/data/my_data.yaml", student with "$PEAL_RUNS/my_data/classifier/model.cpl",
+generator with "$PEAL_RUNS/my_data/ddpm/config.yaml", base_dir with "$PEAL_RUNS/my_data/classifier/sce_cfkd" and
+y_selection with "[Label1]".
+Now you can run SCE with:
+
+```python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/my_data_sce_cfkd.yaml"```
+
+Now you can find your counterfactuals under "$PEAL_RUNS/my_data/classifier/sce_cfkd/validation_collages".
+If you further want to process them you can load the .npz array "$PEAL_RUNS/my_data/classifier/sce_cfkd/validation_tracked_values.npz".
+The originals in this array can be found under the key "x_list" and the counterfactuals under "x_counterfactual_list".
+
+
+**How to use a custom image dataset and a custom predictor**
+
+This can be done no code with the Command Line Interface of PEAL!!!
+The biggest effort is to reformat the dataset to a ```peal.data.datasets.Image2MixedDataset```.
+All labels have to be written into a "<PEAL_DATA>/my_data/data.csv" file with the header "ImagePath,Label1,Label2,...LabelN".
+It could also only have one label with "ImagePath,Label1" and we can only optimize for like this anyway.
+
+Next, you have to convert your predictor into an ONNX model with binary output.
+An example for an ImageNet classifier would be the following:
+
+```
+import torch
+import os
+import torchvision
+
+class BinaryImageNetModel(torch.nn.Module):
+    def __init__(self, class1, class2):
+        super(BinaryImageNetModel, self).__init__()
+        self.model = torchvision.models.resnet18(pretrained=True)
+        self.class1 = class1
+        self.class2 = class2
+
+    def forward(self, x):
+        logits_full = self.model(x)
+        return logits_full[:, [self.class1, self.class2]]
+
+wulf_vs_husky_classifier = BinaryImageNetModel(248, 269)
+wulf_vs_husky_classifier.eval()
+
+os.makedirs("$PEAL_RUNS/imagenet")
+os.makedirs("$PEAL_RUNS/imagenet/wulf_vs_husky_classifier")
+dummy_input = torch.randn(1, 3, 224, 224)  # standard ResNet input
+torch.onnx.export(
+    wulf_vs_husky_classifier,
+    dummy_input,
+    "$PEAL_RUNS/wulf_vs_husky_classifier/model.onnx",
+    input_names=["input"],
+    output_names=["output"],
+    dynamic_axes={"input": {0: "batch_size"}, "output": {0: "batch_size"}},
+    opset_version=11
+)
+```
+
+
+
 **Installation Instructions:**
 
 pip install peal

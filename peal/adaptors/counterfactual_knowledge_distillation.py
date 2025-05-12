@@ -69,11 +69,11 @@ class CFKDConfig(AdaptorConfig):
     The actual number could be higher since not for every sample a counterfactual can be found
     and processing is done in batches.
     """
-    min_train_samples: PositiveInt = 500
+    min_train_samples: PositiveInt = 800
     """
     The maximum number of validation samples that are used for tracking stats every iteration.
     """
-    max_validation_samples: PositiveInt = 100
+    max_validation_samples: PositiveInt = 200
     """
     The maximum number of test batches.
     If set to None the test will be done on the full test set.
