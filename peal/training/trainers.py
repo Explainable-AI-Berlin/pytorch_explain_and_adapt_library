@@ -178,7 +178,7 @@ def get_predictor(config, model=None):
         else:
             raise Exception("Architecture not available!")
 
-        return model
+    return model
 
 
 class ModelTrainer:
@@ -214,7 +214,11 @@ class ModelTrainer:
 
         self.model = get_predictor(self.config, model)
 
-        self.model.to(self.device)
+        try:
+            self.model.to(self.device)
+
+        except Exception:
+            import pdb; pdb.set_trace()
 
         # either the dataloaders have to be given or the path to the dataset
         (
