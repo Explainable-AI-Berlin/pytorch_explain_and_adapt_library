@@ -6,4 +6,5 @@ input_size              : [3, 256, 256]
 output_type             : singleclass
 output_size             : [1000]
 downsize                : Resize
+x_selection             : ""
 normalization           : [0.5,0.5]

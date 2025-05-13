@@ -16,14 +16,19 @@ class BinaryImageNetModel(torch.nn.Module):
         return logits_full[:, [self.class1, self.class2]]
 
 
-def convert_to_binary_onnx(class1=248, class2=269, name="wulf_vs_husky"):
+def convert_to_binary_onnx(class1=248, class2=269, name="husky_vs_wulf"):
     binary_classifier = BinaryImageNetModel(class1, class2)
     binary_classifier.eval()
+    peal_runs = os.environ.get('PEAL_RUNS')
 
-    os.makedirs("$PEAL_RUNS/imagenet")
-    os.makedirs("$PEAL_RUNS/imagenet/" + name + "_classifier")
+    if not os.path.exists(peal_runs + "/imagenet"):
+        os.makedirs(peal_runs + "/imagenet")
+
+    if not os.path.exists(peal_runs + "/imagenet/" + name + "_classifier"):
+        os.makedirs(peal_runs + "/imagenet/" + name + "_classifier")
+
     dummy_input = torch.randn(1, 3, 224, 224)  # standard ResNet input
-    OUTPUT_PATH = "$PEAL_RUNS/imagenet/" + name + "_classifier/model.onnx"
+    OUTPUT_PATH = peal_runs + "/imagenet/" + name + "_classifier/model.onnx"
     torch.onnx.export(
         binary_classifier,
         dummy_input,
@@ -33,6 +38,7 @@ def convert_to_binary_onnx(class1=248, class2=269, name="wulf_vs_husky"):
         dynamic_axes={"input": {0: "batch_size"}, "output": {0: "batch_size"}},
         opset_version=11,
     )
+    print("onnx model saved at: " + OUTPUT_PATH)
 
 
 if __name__ == "__main__":
@@ -47,7 +53,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--name",
         type=str,
-        default="wulf_vs_husky",
+        default="husky_vs_wulf",
         help="Name value (default: wulf_vs_husky)",
     )
     args = parser.parse_args()

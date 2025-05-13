@@ -161,6 +161,7 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         else:
             self.model_path = os.path.join(self.model_dir, "final.pt")
             if not os.path.exists(self.model_path) and self.config.download_weights:
+                Path(self.model_dir).mkdir(exist_ok=True)
                 wget.download(self.config.download_weights, self.model_path)
 
             if os.path.exists(self.model_path) and self.config.is_trained:

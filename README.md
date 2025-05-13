@@ -182,6 +182,20 @@ and base_dir with "$PEAL_RUNS/my_data/classifier/sce_cfkd".
 Now you have to reformat your dataset to a ```peal.data.datasets.Image2MixedDataset```.
 All labels have to be written into a "<PEAL_DATA>/my_data/data.csv" file with the header "ImagePath,Label1,Label2,...LabelN".
 It could also only have one label with "ImagePath,Label1" and we can only optimize for like this anyway.
+In the case of the ImageNet wulf vs husky task, one can use the header "ImagePath,IsWulf" and now adds all relative paths to
+images of huskies and wulfs to get a csv in the format:
+
+| ImagePath           | IsWulf |
+|---------------------|--------|
+| path_to_husky_0.png | 0      |
+| path_to_husky_1.png | 0      |
+| ...                 | ...    |
+| path_to_husky_N.png | 0      |
+| path_to_wulf_0.png  | 1      |
+| path_to_wulf_1.png  | 1      |
+| ...                 | ...    |
+| path_to_wulf_N.png  | 1      |
+
 Next, one has to copy "configs/data/imagenet.yaml" to "configs/data/my_data.yaml".
 In the new file you have to change input_size and normalization to the values your classifier was trained with.
 Then, in "configs/adaptors/my_data_sce_cfkd.yaml" one has to overwrite data with "<PEAL_BASE>/configs/data/my_data.yaml", and

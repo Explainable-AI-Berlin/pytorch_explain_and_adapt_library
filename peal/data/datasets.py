@@ -876,6 +876,9 @@ class Image2ClassDataset(ImageDataset):
 
         self.idx_to_name.sort()
         for target_str in self.idx_to_name:
+            if not os.path.isdir(os.path.join(self.root_dir, target_str)):
+                continue
+
             files = os.listdir(os.path.join(self.root_dir, target_str))
             files.sort()
             for file in files:
