@@ -3,4 +3,6 @@ generator_type : DDPM
 category : generator
 base_path : $PEAL_RUNS/celeba/ddpm
 data: <PEAL_BASE>/configs/data/imagenet_generator.yaml
+download_weights: https://openaipublic.blob.core.windows.net/diffusion/jul-2021/256x256_diffusion.pt
 batch_size: 50
+is_trained: true
