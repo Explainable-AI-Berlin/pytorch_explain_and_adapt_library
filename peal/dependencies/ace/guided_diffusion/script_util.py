@@ -175,11 +175,6 @@ def create_model(
     else:
         channel_mult = tuple(int(ch_mult) for ch_mult in channel_mult.split(","))
 
-    print(image_size)
-    print(channel_mult)
-    print(channel_mult)
-    print(channel_mult)
-    print(channel_mult)
     attention_ds = []
     for res in attention_resolutions.split(","):
         attention_ds.append(image_size // int(res))

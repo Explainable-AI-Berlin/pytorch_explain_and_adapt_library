@@ -768,6 +768,9 @@ def distill_binary_dataset(
         distilled_dataset_config.confounder_probability = None
         distilled_dataset_config.dataset_class = None
         distilled_dataset_config.output_type = "multiclass"
+        print(predictor_dataset)
+        print(distilled_dataset_config)
+        #import pdb; pdb.set_trace()
         distillation_datasource.append(
             get_datasets(
                 config=distilled_dataset_config, data_dir=class_predictions_path
@@ -833,20 +836,27 @@ def distill_dataloader_mixer(
 ):
     distillation_datasource = copy.deepcopy(predictor_datasource)
     for i in range(len(distillation_datasource.dataloaders)):
+        print(os.path.join(base_path, str(i)))
+        print(os.path.join(base_path, str(i)))
+        print(os.path.join(base_path, str(i)))
+        print(distillation_datasource.dataloaders[i].dataset.config)
+        print("")
+        print("")
+        print("")
         if isinstance(distillation_datasource.dataloaders[i], DataloaderMixer):
             distill_dataloader_mixer(
-                predictor_distillation,
-                os.path.join(base_path, str(i)),
-                predictor,
-                distillation_datasource.dataloaders[i],
+                predictor_distillation=predictor_distillation,
+                base_path=os.path.join(base_path, str(i)),
+                predictor=predictor,
+                predictor_datasource=copy.deepcopy(distillation_datasource.dataloaders[i]),
             )
 
         else:
             dataset = distill_binary_dataset(
-                predictor_distillation,
-                os.path.join(base_path, str(i)),
-                predictor,
-                [distillation_datasource.dataloaders[i]],
+                predictor_distillation=predictor_distillation,
+                base_path=os.path.join(base_path, str(i)),
+                predictor=predictor,
+                predictor_datasets=copy.deepcopy([distillation_datasource.dataloaders[i]]),
             )
             distillation_datasource.dataloaders[i] = torch.utils.data.DataLoader(
                 dataset,
@@ -881,7 +891,7 @@ def distill_predictor(
                 predictor_distillation,
                 os.path.join(base_path, "training"),
                 predictor,
-                predictor_datasource[0],
+                copy.deepcopy(predictor_datasource[0]),
             )
         )
         cprint("distill validation dataset!", tracking_level, 2)
@@ -921,7 +931,7 @@ def distill_predictor(
 
     else:
         # TODO how can I determine that there are no gradients anymore?
-        get_predictor(predictor_distillation)
+        predictor_distilled = get_predictor(predictor_distillation)
 
     if replace_with_activation == "leakysoftplus":
         predictor_distilled = replace_relu_with_leakysoftplus(predictor_distilled)

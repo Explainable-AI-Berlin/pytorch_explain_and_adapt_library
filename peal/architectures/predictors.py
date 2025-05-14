@@ -23,7 +23,7 @@ from peal.global_utils import load_yaml_config
 
 
 def get_predictor(predictor, device="cuda"):
-    if isinstance(predictor, torch.nn.Module):
+    if isinstance(predictor, torch.nn.Module) or callable(predictor):
         return predictor, None
 
     elif isinstance(predictor, str):
@@ -42,9 +42,10 @@ def get_predictor(predictor, device="cuda"):
             input_name = session.get_inputs()[0].name
 
             # Run inference
-            onnx_model = lambda input_data: torch.from_numpy(
-                session.run(None, {input_name: input_data.cpu().numpy()})
-            ).to(device)
+            def onnx_model(input_data):
+                session_output = session.run(None, {input_name: input_data.cpu().numpy()})
+                return torch.from_numpy(session_output[0]).to(device)
+
             #onnx_model = lambda input_data: torch.randint(0, 1, (input_data.shape[0])).to(device)
             return onnx_model, None
 

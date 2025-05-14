@@ -165,10 +165,9 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
                 wget.download(self.config.download_weights, self.model_path)
 
             if os.path.exists(self.model_path) and self.config.is_trained:
+                state_dict = load_state_dict(self.model_path, map_location=device)
                 print("load ddpm model weights!!!")
-                self.model.load_state_dict(
-                    load_state_dict(self.model_path, map_location=device)
-                )
+                self.model.load_state_dict(state_dict)
 
             else:
                 print("No ddpm model weights yet!!!")

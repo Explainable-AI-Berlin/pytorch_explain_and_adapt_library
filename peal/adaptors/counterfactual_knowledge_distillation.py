@@ -171,7 +171,7 @@ class CFKDConfig(AdaptorConfig):
     """
     Whether to calculate group accuracies or not. This can only be done if confounding factors are known.
     """
-    calculate_group_accuracies: bool = True
+    calculate_group_accuracies: bool = False
     """
     Whether to overwrite the logs and cache intermediate results.
     If overwrite is set to False cached results are loaded. If CFKDConfig is stored as yaml on disk overwrite is 

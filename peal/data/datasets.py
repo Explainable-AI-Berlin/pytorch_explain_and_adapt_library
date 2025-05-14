@@ -475,6 +475,7 @@ class Image2MixedDataset(ImageDataset):
 
         else:
             self.root_dir = root_dir
+            self.config.dataset_path = root_dir
 
         self.transform = transform
         self.task_config = task_config
@@ -856,6 +857,8 @@ class Image2ClassDataset(ImageDataset):
 
             else:
                 root_dir = data_dir
+
+        self.config.dataset_path = root_dir
 
         self.root_dir = os.path.join(root_dir, self.config.x_selection)
 
