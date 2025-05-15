@@ -829,7 +829,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 z_default
             ).to(self.device)
             pred_original = torch.nn.functional.softmax(
-                self.predictor(z_predictor_original) / self.explainer_config.temperature
+                self.predictor(z_predictor_original.detach()) / self.explainer_config.temperature
             )
             target_confidences = torch.zeros_like(target_confidence_goal_current)
             for j in range(len(target_confidences)):

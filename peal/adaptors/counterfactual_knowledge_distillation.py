@@ -98,7 +98,7 @@ class CFKDConfig(AdaptorConfig):
     The config of the training used for finetuning the student model.
     If not set student config can be used.
     """
-    training: Union[TrainingConfig, type(None)] = None
+    training: Union[TrainingConfig, type(None)] = TrainingConfig()
     """
     The config of the data used to create the counterfactuals from.
     """
@@ -171,7 +171,7 @@ class CFKDConfig(AdaptorConfig):
     """
     Whether to calculate group accuracies or not. This can only be done if confounding factors are known.
     """
-    calculate_group_accuracies: bool = True
+    calculate_group_accuracies: bool = False
     """
     Whether to overwrite the logs and cache intermediate results.
     If overwrite is set to False cached results are loaded. If CFKDConfig is stored as yaml on disk overwrite is 
@@ -209,6 +209,11 @@ class CFKDConfig(AdaptorConfig):
     The performance of the generative model measured e.g. in FID score.
     """
     generator_performance: dict = {}
+    """
+    The restriction to interesting counterfactual transitions.
+    Helpful in the case of datasets with a lot of classes and heavy modes like ImageNet.
+    """
+    transition_restrictions: Union[list, type(None)] = None
 
 
 class CFKD(Adaptor):
@@ -253,13 +258,21 @@ class CFKD(Adaptor):
                 The visualization function that is used for the run. Defaults to lambda x: x.
         """
         self.adaptor_config = load_yaml_config(adaptor_config, AdaptorConfig)
+        if self.adaptor_config.test_data is None:
+            self.adaptor_config.test_data = self.adaptor_config.data
+
         self.adaptor_config.data.in_memory = self.adaptor_config.in_memory
         self.adaptor_config.test_data.in_memory = self.adaptor_config.in_memory
+        '''
         assert (
             self.adaptor_config.batch_size % 2 == 0
         ), "only even batch sizes are supported so far!"
+        '''
         self.adaptor_config.explainer.tracking_level = (
             self.adaptor_config.tracking_level
+        )
+        self.adaptor_config.explainer.transition_restrictions = (
+            self.adaptor_config.transition_restrictions
         )
         self.base_dir = (
             base_dir if not base_dir is None else self.adaptor_config.base_dir
@@ -272,19 +285,25 @@ class CFKD(Adaptor):
                 self.adaptor_config.student, device=self.device
             )
 
-        self.original_student = student
-        self.original_student.eval()
         self.overwrite = (
             overwrite if not overwrite is None else self.adaptor_config.overwrite
         )
         self.adaptor_config.overwrite = False
-        self.student = copy.deepcopy(student)
-        self.student.eval()
+        self.original_student = student
+        if isinstance(student, torch.nn.Module):
+            self.original_student.eval()
+            self.student = copy.deepcopy(student)
+            self.student.eval()
+
+        else:
+            self.student = student
+
         teacher = teacher if not teacher is None else self.adaptor_config.teacher
 
         # kind of dirty, but also very confusing if not done this way since validation batches are fed directly
         # into the explainer and thereby potentially causing VRAM overflows otherwise
         self.adaptor_config.training.val_batch_size = self.adaptor_config.batch_size
+
         (
             self.train_dataloader,
             self.val_dataloader,

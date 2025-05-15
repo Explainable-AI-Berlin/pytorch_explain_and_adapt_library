@@ -99,12 +99,12 @@ Then, the dataset_class and confounding_factors have to be removed
 (because you do have neither for your new dataset yet).
 Then, num_samples, input_size and output_size should be adapted to your dataset.
 Now, one has to copy configs/generators/celeba_ddpm.yaml to configs/generators/my_data_ddpm.yaml.
-In this file one has to replace base_path with "$PEAL_RUNS/my_data/ddpm" and data with "<PEAL_BASE>/configs/data/celeba_generator.yaml".
+In this file one has to replace base_path with "$PEAL_RUNS/my_data/ddpm" and data with "<PEAL_BASE>/configs/data/my_data_generator.yaml".
 Now you can train your DDPM generator with:
 
 ```python train_generator.py --config "<PEAL_BASE>/configs/generators/my_data_ddpm.yaml"```
 
-In parallel you can copy "configs/predictors/celeba_classifier_smiling.yaml" to "configs/predictors/my_data_classifier_smiling.yaml".
+In parallel you can copy "configs/predictors/celeba_classifier_smiling.yaml" to "configs/predictors/my_data_classifier.yaml".
 Here, you have to replace model_path with "$PEAL_RUNS/my_data/classifier", data with "<PEAL_BASE>/configs/data/my_data.yaml" and y_selection with "[Label1]".
 Now you can train your predictor with:
 
@@ -126,10 +126,18 @@ The originals in this array can be found under the key "x_list" and the counterf
 
 **How to use a custom image dataset and a custom predictor**
 
-This can be done no code with the Command Line Interface of PEAL!!!
-The biggest effort is to reformat the dataset to a ```peal.data.datasets.Image2MixedDataset```.
-All labels have to be written into a "<PEAL_DATA>/my_data/data.csv" file with the header "ImagePath,Label1,Label2,...LabelN".
-It could also only have one label with "ImagePath,Label1" and we can only optimize for like this anyway.
+
+First, you can copy "configs/adaptors/imagenet_husky_vs_wulf_sce_cfkd.yaml" to "configs/adaptors/my_data_sce_cfkd.yaml".
+
+If you do not wish to use the ImageNet DDPM as generative model one has to copy "configs/data/imagenet_generator.yaml" to "configs/data/my_data_generator.yaml".
+Then, the dataset_class in "configs/data/my_data_generator.yaml" has to be removed.
+Then, num_samples, input_size and output_size should be adapted to your dataset.
+If you do not want to bootstrap your DDPM with Imagenet 256x256 weights you have to remove download_weights.
+Now, one has to copy configs/generators/imagenet_ddpm.yaml to configs/generators/my_data_ddpm.yaml.
+In this file one has to replace base_path with "$PEAL_RUNS/my_data/ddpm" and data with "<PEAL_BASE>/configs/data/my_data_generator.yaml".
+Now you can train your DDPM generator with:
+```python train_generator.py --config "<PEAL_BASE>/configs/generators/my_data_ddpm.yaml"```
+Then, in "configs/adaptors/my_data_sce_cfkd.yaml" one has to overwrite generator with "$PEAL_RUNS/my_data_ddpm.yaml".
 
 Next, you have to convert your predictor into an ONNX model with binary output.
 An example for an ImageNet classifier would be the following:
@@ -156,16 +164,48 @@ wulf_vs_husky_classifier.eval()
 os.makedirs("$PEAL_RUNS/imagenet")
 os.makedirs("$PEAL_RUNS/imagenet/wulf_vs_husky_classifier")
 dummy_input = torch.randn(1, 3, 224, 224)  # standard ResNet input
+OUTPUT_PATH = "$PEAL_RUNS/wulf_vs_husky_classifier/model.onnx"
 torch.onnx.export(
     wulf_vs_husky_classifier,
     dummy_input,
-    "$PEAL_RUNS/wulf_vs_husky_classifier/model.onnx",
+    OUTPUT_PATH,
     input_names=["input"],
     output_names=["output"],
     dynamic_axes={"input": {0: "batch_size"}, "output": {0: "batch_size"}},
     opset_version=11
 )
 ```
+You have to create an equivalent code snippet for your model and save it under OUTPUT_PATH="$PEAL_RUNS/my_data/classifier/model.onnx".
+Now in "configs/adaptors/my_data_sce_cfkd.yaml" one has to overwrite student with "$PEAL_RUNS/my_data/classifier/model.onnx"
+and base_dir with "$PEAL_RUNS/my_data/classifier/sce_cfkd".
+
+Now you have to reformat your dataset to a ```peal.data.datasets.Image2MixedDataset```.
+All labels have to be written into a "<PEAL_DATA>/my_data/data.csv" file with the header "ImagePath,Label1,Label2,...LabelN".
+It could also only have one label with "ImagePath,Label1" and we can only optimize for like this anyway.
+In the case of the ImageNet wulf vs husky task, one can use the header "ImagePath,IsWulf" and now adds all relative paths to
+images of huskies and wulfs to get a csv in the format:
+
+| ImagePath           | IsWulf |
+|---------------------|--------|
+| path_to_husky_0.png | 0      |
+| path_to_husky_1.png | 0      |
+| ...                 | ...    |
+| path_to_husky_N.png | 0      |
+| path_to_wulf_0.png  | 1      |
+| path_to_wulf_1.png  | 1      |
+| ...                 | ...    |
+| path_to_wulf_N.png  | 1      |
+
+Next, one has to copy "configs/data/imagenet.yaml" to "configs/data/my_data.yaml".
+In the new file you have to change input_size and normalization to the values your classifier was trained with.
+Then, in "configs/adaptors/my_data_sce_cfkd.yaml" one has to overwrite data with "<PEAL_BASE>/configs/data/my_data.yaml", and
+y_selection with "[Label1]".
+
+Next, you can run SCE with:
+```python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/my_data_sce_cfkd.yaml"```
+Now you can find your counterfactuals under "$PEAL_RUNS/my_data/classifier/sce_cfkd/validation_collages".
+If you further want to process them you can load the .npz array "$PEAL_RUNS/my_data/classifier/sce_cfkd/validation_tracked_values.npz".
+The originals in this array can be found under the key "x_list" and the counterfactuals under "x_counterfactual_list".
 
 
 

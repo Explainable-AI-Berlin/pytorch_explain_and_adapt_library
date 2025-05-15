@@ -475,6 +475,7 @@ class Image2MixedDataset(ImageDataset):
 
         else:
             self.root_dir = root_dir
+            self.config.dataset_path = root_dir
 
         self.transform = transform
         self.task_config = task_config
@@ -857,6 +858,8 @@ class Image2ClassDataset(ImageDataset):
             else:
                 root_dir = data_dir
 
+        self.config.dataset_path = root_dir
+
         self.root_dir = os.path.join(root_dir, self.config.x_selection)
 
         if self.config.has_hints:
@@ -876,6 +879,9 @@ class Image2ClassDataset(ImageDataset):
 
         self.idx_to_name.sort()
         for target_str in self.idx_to_name:
+            if not os.path.isdir(os.path.join(self.root_dir, target_str)):
+                continue
+
             files = os.listdir(os.path.join(self.root_dir, target_str))
             files.sort()
             for file in files:
