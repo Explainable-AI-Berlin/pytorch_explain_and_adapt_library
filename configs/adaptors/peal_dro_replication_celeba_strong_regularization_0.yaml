@@ -1,7 +1,7 @@
-adaptor_type  : "DRO"
+adaptor_type  : "PealGroupDRO"
 category      : "adaptor"
 predictor     : <PEAL_BASE>/configs/predictors/dro_replication_celeba_Blond_Hair_confounding_Male_classifier_strong_regularization.yaml
-model_path    : $PEAL_RUNS/celeba/Blond_Hair_confounding_Male/peal_dro_classifier_strong_regularization
+model_path    : $PEAL_RUNS/celeba/Blond_Hair_confounding_Male/dro_resnet50_classifier_strong_regularization
 is_robust     : True
 alpha         : 0.01
 gamma         : 0.1

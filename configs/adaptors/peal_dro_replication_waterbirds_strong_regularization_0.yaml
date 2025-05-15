@@ -1,7 +1,7 @@
 adaptor_type  : "PealGroupDRO"
 category      : "adaptor"
 predictor     : <PEAL_BASE>/configs/predictors/dro_replication_waterbirds_classifier_strong_regularization.yaml
-model_path    : $PEAL_RUNS/waterbirds/peal_dro_classifier_strong_regularization_0
+model_path    : $PEAL_RUNS/waterbirds/dro_resnet50_classifier_strong_regularization_0
 is_robust     : True
 alpha         : 0.01
 gamma         : 0.1

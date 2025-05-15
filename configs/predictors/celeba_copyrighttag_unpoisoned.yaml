@@ -2,7 +2,7 @@
 model_path        : $PEAL_RUNS//celeba_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_unpoisoned
 data              : <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba.yaml
 training          : <PEAL_BASE>/configs/training/img_classifier.yaml
-architecture      : torchvision_vit_b_16
+architecture      : torchvision_resnet18
 task:
   criterions:
     ce     : 1.0

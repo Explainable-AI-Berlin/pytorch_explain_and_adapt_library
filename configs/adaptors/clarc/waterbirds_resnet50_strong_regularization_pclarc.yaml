@@ -6,15 +6,14 @@ data: <PEAL_BASE>/configs/data/waterbirds.yaml
 unpoisoned_data: <PEAL_BASE>/configs/data/waterbirds.yaml
 group_labels: $PEAL_RUNS/waterbirds/resnet50_classifier_strong_regularization/spray_analysis/group_labels_attrbs-layer--2.json
 projection_type: 'pcav' # 'pcav', 'svm', 'simple'
-# cav_mode: "cavs_max" # 'cavs_max', 'cavs_mean'; only relevant when using projection_type 'pcav'
-layer_index: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21] # 0 for input, -1 for penultimate layer
-#correction_strength: [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 2.0, 2.5, 3.0]
-correction_strength: [1.8, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0, 3.2, 3.4, 3.6, 3.8, 4.0, 5.0]
+cav_mode: "cavs_max" # 'cavs_max', 'cavs_mean'; only relevant when using projection_type 'pcav'
+layer_index: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21] # 0 for input, -1 for penultimate layer
+correction_strength: [0.4, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4, 2.5, 2.6, 2.8, 3.0, 3.2, 3.4, 3.6, 3.8, 4.0, 5.0]
 attacked_class: 1
 finetune: False
 save_model: False
 use_perfect_annotations: False
-max_samples: 2000
+#max_samples: 2000
 reverse_cav_direction: True
 task:
   y_selection: [y]

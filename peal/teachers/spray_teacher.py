@@ -11,7 +11,7 @@ import numpy as np
 import yaml
 from corelay.pipeline.spectral import SpectralClustering
 from corelay.processor.base import Processor
-from corelay.processor.clustering import KMeans, AgglomerativeClustering
+from corelay.processor.clustering import KMeans, AgglomerativeClustering, HDBSCAN, DBSCAN
 from corelay.processor.embedding import EigenDecomposition, TSNEEmbedding, UMAPEmbedding
 from corelay.processor.flow import Sequential, Parallel
 from crp.attribution import CondAttribution
@@ -223,11 +223,13 @@ class Spray(TeacherInterface):
             embedding=EigenDecomposition(n_eigval=self.config.num_eigval, is_output=True),
             clustering=Parallel([
                 Parallel([
-                    KMeans(n_clusters=number_of_clusters, kwargs={"max_iter": 500}) for number_of_clusters in number_of_clusters_list
+                    KMeans(n_clusters=number_of_clusters, kwargs={"max_iter": 700}) for number_of_clusters in number_of_clusters_list
                 ], broadcast=True),
                 Parallel([
                     AgglomerativeClustering(n_clusters=number_of_clusters) for number_of_clusters in number_of_clusters_list
                 ], broadcast=True),
+                DBSCAN(),
+                HDBSCAN(),
                 TSNEEmbedding(perplexity=self.config.tsne_perplexity, kwargs={"learning_rate": "auto", "init": "pca"}),
                 UMAPEmbedding(n_neighbors=self.config.umap_neighbors)
             ], broadcast=True, is_output=True)
@@ -244,7 +246,7 @@ class Spray(TeacherInterface):
                 attribution_data = attributions_file['attribution'][indices_of_samples_in_class, :]
                 print(f"len attribution data for class {class_idx}: {len(attribution_data)}")
 
-            (eigenvalues, embedding), (kmeans, ac, tsne, umap) = pipeline(attribution_data)
+            (eigenvalues, embedding), (kmeans, ac, dbscan, hdbscan, tsne, umap) = pipeline(attribution_data)
 
             with h5py.File(analysis_db_path, 'a') as analysis_file:
 
@@ -285,6 +287,15 @@ class Spray(TeacherInterface):
                         embedding.shape[1],
                         dtype=np.uint32
                     )
+
+                cluster_group['DBSCAN'] = dbscan
+                cluster_group['DBSCAN'].attrs['embedding'] = 'spectral'
+                cluster_group['DBSCAN'].attrs['index'] = np.arange(embedding.shape[1], dtype=np.uint32)
+
+                cluster_group['HDBSCAN'] = hdbscan
+                cluster_group['HDBSCAN'].attrs['embedding'] = 'spectral'
+                cluster_group['HDBSCAN'].attrs['index'] = np.arange(embedding.shape[1], dtype=np.uint32)
+
         return analysis_db_path
 
     def _create_label_map(self) -> str:
@@ -469,8 +480,10 @@ CLASS_NAMES = {
     "ColoredMnist": ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
     "Follicles": ['0', '1'],
     "CelebaMale": ["0 - Female", "1 - Male"],
+    "CelebaSmiling": ["0 - Not Smiling", "1 - Smiling"],
     "CelebaBlond": ["0 - Not Blond", "1 - Blond"],
     "WaterbirdsDataset": ["0 - Landbird", "1 - Waterbird"],
+    "Camelyon17AugmentedDataset": ["0 - No Tumor", "1 - Tumor"]
 }
 
 class Flatten(Processor):

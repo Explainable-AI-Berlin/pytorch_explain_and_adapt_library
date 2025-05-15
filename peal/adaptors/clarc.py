@@ -43,7 +43,7 @@ class ClArCConfig(AdaptorConfig):
     cav_mode: str = None
     save_model: bool = True
     use_perfect_annotations: bool = False
-    max_samples: int = 5000
+    max_samples: int = 999999
     reverse_cav_direction: bool = False
 
 
@@ -148,6 +148,13 @@ class ClArC(Adaptor):
             x = batch["x"].to(self.device)
             activation = x if feature_extractor is None else feature_extractor(x).detach()
 
+            if self.config.cav_mode == "cavs_max":
+                activation = activation.flatten(start_dim=2).max(2).values
+            elif self.config.cav_mode == "cavs_mean":
+                activation = activation.mean((2, 3))
+            else:
+                activation = activation.flatten(start_dim=1)
+
             if self.config.use_perfect_annotations:
                 group_labels = batch["has_confounder"].squeeze()
             else:
@@ -165,13 +172,6 @@ class ClArC(Adaptor):
         non_confounders = torch.stack(non_confounders)
         activations = torch.cat((non_confounders, confounders))
         annotations = torch.cat((torch.zeros(len(non_confounders)), torch.ones(len(confounders)))).to(self.device)
-
-        if self.config.cav_mode == "cavs_max":
-            activations = activations.flatten(start_dim=2).max(2).values
-        elif self.config.cav_mode == "cavs_mean":
-            activations = activations.mean((2, 3))
-        else:
-            activations = activations.flatten(start_dim=1)
 
         num_artifact_samples = torch.sum(annotations == 1).item()
         print(f"Number of artifact samples: {num_artifact_samples}; Number of non-artifact samples: {len(annotations) - num_artifact_samples}")

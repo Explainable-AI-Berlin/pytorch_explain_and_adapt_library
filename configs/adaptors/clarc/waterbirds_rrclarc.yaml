@@ -3,18 +3,19 @@ adaptor_type: "RRClArC"
 base_dir: $PEAL_RUNS/waterbirds/classifier_natural/rrclarc
 model_path: $PEAL_RUNS/waterbirds/classifier_natural/model.cpl
 data: <PEAL_BASE>/configs/data/waterbirds.yaml
-#unpoisoned_data: <PEAL_BASE>/configs/data/waterbirds.yaml
+unpoisoned_data: <PEAL_BASE>/configs/data/waterbirds.yaml
 group_labels: $PEAL_RUNS/waterbirds/classifier_natural/spray_analysis/group_labels_attrbs-layer--2.json
 projection_type: 'pcav' # 'pcav', 'svm', 'simple'
 # cav_mode: "cavs_max" # 'cavs_max', 'cavs_mean'; only relevant when using projection_type 'pcav'
-layer_index: [9, 11, 12]
-correction_strength: [1000, 5000, 20000, 100000, 250000, 1000000, 2500000, 5000000, 7000000]
+layer_index: [7, 8, 9]
+correction_strength: [100, 1000, 5000, 20000, 100000, 250000, 1000000, 2500000, 5000000]
 attacked_class: 1
-# mean_grad: True
+mean_grad: False
 save_model: False
 use_perfect_annotations: False
 rrc_loss: "l2" # 'l2', 'cosine'
 gradient_target: "all" # 'all', 'all_random', 'attacked_class', 'max'
+reverse_cav_direction: True
 task:
   y_selection: [y]
   x_selection: [""]
@@ -28,4 +29,4 @@ training:
   test_batch_size: 128
   learning_rate: 5.0e-05
   optimizer: "sgd"
-  max_epochs: 20
+  max_epochs: 30
