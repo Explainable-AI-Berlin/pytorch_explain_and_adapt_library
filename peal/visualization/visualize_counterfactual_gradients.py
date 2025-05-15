@@ -43,7 +43,7 @@ def create_label_image(text, image_size, font_size=50):
 
 @torch.no_grad()
 def visualize_step(
-    x: torch.Tensor,
+    x_original: torch.Tensor,
     z_encoded: torch.Tensor,
     img_predictor: torch.Tensor,
     pe: torch.Tensor,
@@ -57,43 +57,45 @@ def visualize_step(
     best_z=None,
     best_mask=None,
 ):
-    transform = torchvision.transforms.Resize(x.size()[2])
+    transform = torchvision.transforms.Resize(x_original.size()[2])
     original_vs_counterfactual = []
-    for it in range(x.shape[0]):
-        if x.size() != pe.size():
+    for it in range(x_original.shape[0]):
+        if x_original.size() != pe.size():
             pe = transform(pe)
-        original_vs_counterfactual.append(high_contrast_heatmap(x[it], pe[it])[0])
+        original_vs_counterfactual.append(high_contrast_heatmap(x_original[it], pe[it])[0])
 
-    ref = torch.zeros_like(x[0])
+    ref = torch.zeros_like(x_original[0])
     gradient_img = []
-    for it in range(x.shape[0]):
+    for it in range(x_original.shape[0]):
         gradient_img.append(
             high_contrast_heatmap(ref, img_predictor.grad[it].detach().cpu())[0]
         )
+
     if z:
         gradient_z = []
         ref = torch.zeros_like(z[0][0])
-        clean_img_new = 0.5 * z[0].data.detach().cpu() + 0.5
+        clean_img_new = z[0].data.detach().cpu()
         clean_img_new = (
-            transform(clean_img_new) if z[0].size() != x.size() else clean_img_new
+            transform(clean_img_new) if z[0].size() != x_original.size() else clean_img_new
         )
-        for it in range(x.shape[0]):
+        for it in range(x_original.shape[0]):
             grad_heatmap = high_contrast_heatmap(ref, -z[0].grad[it].detach().cpu())[0]
-            if z[0].size() != x.size():
+            if z[0].size() != x_original.size():
                 if latent_decoder:
                     with torch.no_grad():
                         grad_heatmap = latent_decoder(grad_heatmap.to(z[0].device))
+
             grad_heatmap = transform(grad_heatmap)
 
             gradient_z.append(grad_heatmap)
 
-    best_img = 0.5 * best_z.data.detach().cpu() + 0.5
+    best_img = best_z.data.detach().cpu()
 
-    if clean_img_old.size() != x.size():
+    if clean_img_old.size() != x_original.size():
         clean_img_old = transform(clean_img_old)
 
     if boolmask is not None:
-        if boolmask.size()[2] != x.size()[2]:
+        if boolmask.size()[2] != x_original.size()[2]:
             if latent_decoder:
                 with torch.no_grad():
                     boolmask = latent_decoder(boolmask)
@@ -103,7 +105,7 @@ def visualize_step(
         if boolmask.shape[1] == 1:
             boolmask = torch.cat(3 * [boolmask.detach().cpu()], dim=1)
 
-    if best_mask.size()[2] != x.size()[2]:
+    if best_mask.size()[2] != x_original.size()[2]:
         if latent_decoder:
             with torch.no_grad():
                 best_mask = latent_decoder(best_mask)
@@ -113,12 +115,12 @@ def visualize_step(
     if best_mask.shape[1] == 1:
         best_mask = torch.cat(3 * [best_mask.detach().cpu()], dim=1)
 
-    if boolmask_in.size()[2] != x.size()[2]:
+    if boolmask_in.size()[2] != x_original.size()[2]:
         boolmask_in = transform(boolmask_in)
 
     if z is None and boolmask is None:
         components = [
-            (x, "Input (x)"),
+            (x_original, "Input (x)"),
             (z_encoded.detach().cpu(), "Encoded Z"),
             (img_predictor.cpu().detach(), "Predictor Img"),
             (torch.stack(gradient_z), "Z Gradients"),
@@ -128,7 +130,7 @@ def visualize_step(
 
     else:
         components = [
-            (x, "Input (x)"),
+            (x_original, "Input (x)"),
             (clean_img_old, "Clean Old"),
             (z_encoded.detach().cpu(), "Encoded Z"),
             (img_predictor.cpu().detach(), "Predictor Img"),
