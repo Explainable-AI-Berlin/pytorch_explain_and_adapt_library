@@ -61,9 +61,7 @@ def calculate_validation_statistics(
         )
         pbar.stored_values = {}
 
-        print("start iteration over validation dataset!")
         for it, (x, y) in enumerate(dataloader):
-            print(it)
             pred_confidences = (
                 torch.nn.Softmax(dim=-1)(
                     model(x.to(device)) / explainer.explainer_config.temperature
@@ -71,7 +69,6 @@ def calculate_validation_statistics(
                 .detach()
                 .cpu()
             )
-            print('A')
             y_pred = logits_to_prediction(pred_confidences)
             if "hint_list" in tracked_keys or "idx_list" in tracked_keys:
                 y_res = y[1:]
@@ -82,13 +79,17 @@ def calculate_validation_statistics(
                 if "idx_list" in tracked_keys:
                     idxs = y_res[-1]
 
-            for i in range(y.shape[0]):
-                if y_pred[i] == y[i]:
-                    correct += 1
-                    confidence_scores[int(y[i])].append(pred_confidences[i])
+            try:
+                for i in range(y.shape[0]):
+                    if y_pred[i] == y[i]:
+                        correct += 1
+                        confidence_scores[int(y[i])].append(pred_confidences[i])
 
-                confusion_matrix[int(y[i])][int(y_pred[i])] += 1
-                num_samples += 1
+                    confusion_matrix[int(y[i])][int(y_pred[i])] += 1
+                    num_samples += 1
+
+            except Exception:
+                import pdb; pdb.set_trace()
 
 
             pbar.stored_values["acc"] = correct / num_samples
@@ -107,7 +108,6 @@ def calculate_validation_statistics(
                 batch["hint_list"] = hints
 
             if "idx_list" in tracked_keys:
-                print(idxs)
                 batch["idx_list"] = idxs
 
             batch["y_source_list"] = y_pred
@@ -115,7 +115,6 @@ def calculate_validation_statistics(
             batch["y_target_start_confidence_list"] = torch.stack(
                 batch_target_start_confidences, 0
             )
-            print('explain batch!')
             results = explainer.explain_batch(
                 batch=batch,
                 base_path=base_path,

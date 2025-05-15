@@ -8,6 +8,8 @@ import blobfile as bf
 
 from datetime import datetime
 from pathlib import Path
+
+import wget
 from mpi4py import MPI
 from torch import nn
 from types import SimpleNamespace
@@ -16,7 +18,7 @@ from typing import Union
 
 from peal.dependencies.FastDiME_CelebA.core.sample_utils import PerceptualLoss
 from peal.generators.interfaces import EditCapableGenerator, InvertibleGenerator
-from peal.global_utils import load_yaml_config, generate_smooth_mask
+from peal.global_utils import load_yaml_config, generate_smooth_mask, save_yaml_config
 
 # from peal.dependencies.DiME.main import main as dime_main
 from peal.dependencies.FastDiME_CelebA.main import main as fastdime_main
@@ -101,6 +103,7 @@ class DDPMConfig(GeneratorConfig):
     x_selection: Union[list, type(None)] = None
     is_trained: bool = False
     best_fid: float = 1e9
+    download_weights: Union[str, type(None)] = None
 
 
 def load_state_dict(path, **kwargs):
@@ -131,6 +134,7 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         super().__init__()
         self.predictor_distilled = None
         self.config = load_yaml_config(config)
+        self.config.image_size = self.config.data.input_size[-1]
 
         self.dataset = get_datasets(self.config.data)[0]
 
@@ -150,14 +154,20 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         if os.path.exists(self.model_path) and self.config.is_trained:
             print("load ddpm model weights!!!")
             self.model.load_state_dict(torch.load(self.model_path, map_location=device))
+            save_yaml_config(
+                self.config, os.path.join(self.model_dir, "config.yaml")
+            )
 
         else:
             self.model_path = os.path.join(self.model_dir, "final.pt")
+            if not os.path.exists(self.model_path) and self.config.download_weights:
+                Path(self.model_dir).mkdir(exist_ok=True)
+                wget.download(self.config.download_weights, self.model_path)
+
             if os.path.exists(self.model_path) and self.config.is_trained:
+                state_dict = load_state_dict(self.model_path, map_location=device)
                 print("load ddpm model weights!!!")
-                self.model.load_state_dict(
-                    load_state_dict(self.model_path, map_location=device)
-                )
+                self.model.load_state_dict(state_dict)
 
             else:
                 print("No ddpm model weights yet!!!")

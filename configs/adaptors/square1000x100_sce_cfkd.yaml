@@ -3,20 +3,19 @@ adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  6
 tracking_level                       :  3
-min_train_samples                    :  900
-finetune_iterations                  :  2
-max_validation_samples               :  100
+min_train_samples                    :  800
+finetune_iterations                  :  1
+max_validation_samples               :  200
 continuous_learning                  :  "finetune"
-use_visualization                    :  True
 calculate_group_accuracies           :  True
 explainer                            :  <PEAL_BASE>/configs/explainers/sce_default64x64.yaml
-training                             :  <PEAL_BASE>/configs/training/sensitive_distillation.yaml
+training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/square_poisoned100.yaml
 test_data                            :  <PEAL_BASE>/configs/data/square_unpoisoned.yaml
 student                              :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned100/model.cpl
 teacher                              :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_unpoisoned/model.cpl
 generator                            :  $PEAL_RUNS/square/ddpm/config.yaml
-base_dir                             :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned100/sce_cfkd_distilled_from_predictor2
+base_dir                             :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned100/sce_cfkd
 task:
   criterions:
     ce     : 1.0

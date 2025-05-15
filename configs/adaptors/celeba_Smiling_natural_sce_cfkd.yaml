@@ -1,21 +1,15 @@
 # python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Smiling_natural_sce_cfkd.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
-batch_size                           :  3
-tracking_level                       :  3
-min_train_samples                    :  900
+batch_size                           :  4
+tracking_level                       :  5
 finetune_iterations                  :  0
-max_test_batches                     :  10
-max_validation_samples               :  100
-continuous_learning                  :  "retrain"
-use_visualization                    :  False
-calculate_group_accuracies           :  True
-explainer                            :  <PEAL_BASE>/configs/explainers/sce_default64x64.yaml
-training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
+max_validation_samples               :  200
+calculate_group_accuracies           :  False
+explainer                            :  <PEAL_BASE>/configs/explainers/sce_default128x128.yaml
 data                                 :  <PEAL_BASE>/configs/data/celeba.yaml
-test_data                            :  <PEAL_BASE>/configs/data/celeba.yaml
 student                              :  $PEAL_RUNS/celeba/Smiling/classifier_natural/model.cpl
-teacher                              :  $PEAL_RUNS/celeba/Smiling/classifier_natural/model.cpl
+teacher                              :  Baseline:true
 generator                            :  $PEAL_RUNS/celeba/ddpm/config.yaml
 base_dir                             :  $PEAL_RUNS/celeba/Smiling/classifier_natural/sce_cfkd
 task:

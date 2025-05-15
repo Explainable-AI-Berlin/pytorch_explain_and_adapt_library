@@ -23,18 +23,31 @@ from peal.global_utils import load_yaml_config
 
 
 def get_predictor(predictor, device="cuda"):
-    if isinstance(predictor, torch.nn.Module):
+    if isinstance(predictor, torch.nn.Module) or callable(predictor):
         return predictor, None
 
     elif isinstance(predictor, str):
         if predictor[-4:] == ".cpl":
             return torch.load(predictor, map_location=device), None
 
-        """
-        TODO
         elif predictor[-5:] == ".onnx":
-            return torch.onnx.load(predictor, map_location=device), None
-        """
+            import onnxruntime as ort
+
+            # Load the ONNX model
+            session = ort.InferenceSession(
+                predictor, providers=["CUDAExecutionProvider"]
+            )
+
+            # Get input name for the model
+            input_name = session.get_inputs()[0].name
+
+            # Run inference
+            def onnx_model(input_data):
+                session_output = session.run(None, {input_name: input_data.cpu().numpy()})
+                return torch.from_numpy(session_output[0]).to(device)
+
+            #onnx_model = lambda input_data: torch.randint(0, 1, (input_data.shape[0])).to(device)
+            return onnx_model, None
 
     else:
         predictor_config = load_yaml_config(predictor)
@@ -205,14 +218,18 @@ class TorchvisionModel(torch.nn.Module):
                 ) ** 2 + 1  # 64 patches + class token
                 if num_patches < self.model.encoder.pos_embedding.shape[1]:
                     self.model.encoder.pos_embedding = torch.nn.Parameter(
-                        self.model.encoder.pos_embedding[:,:num_patches]
+                        self.model.encoder.pos_embedding[:, :num_patches]
                     )
                 else:
                     self.model.encoder.pos_embedding = torch.nn.Parameter(
-                        torch.zeros(1, num_patches, self.model.encoder.pos_embedding.shape[2])
+                        torch.zeros(
+                            1, num_patches, self.model.encoder.pos_embedding.shape[2]
+                        )
                     )
                     # reinitialize the positional embedding to random values.
-                    torch.nn.init.trunc_normal_(self.model.encoder.pos_embedding, std=0.02)
+                    torch.nn.init.trunc_normal_(
+                        self.model.encoder.pos_embedding, std=0.02
+                    )
 
             if num_classes != 1000:
                 self.model.heads.head = torch.nn.Linear(
@@ -242,7 +259,10 @@ class TorchvisionModel(torch.nn.Module):
         return x
 
     def feature_extractor(self, x):
-        if not hasattr(self, "model_type") or self.model_type[:len("resnet")] == "resnet":
+        if (
+            not hasattr(self, "model_type")
+            or self.model_type[: len("resnet")] == "resnet"
+        ):
             submodules = list(self.children())
             while len(submodules) == 1:
                 submodules = list(submodules[0].children())
@@ -267,7 +287,10 @@ class TorchvisionModel(torch.nn.Module):
             return x
 
     def forward(self, x: torch.Tensor):
-        if not hasattr(self, "model_type") or self.model_type[:len("resnet")] == "resnet":
+        if (
+            not hasattr(self, "model_type")
+            or self.model_type[: len("resnet")] == "resnet"
+        ):
             return self.model(x)
 
         else:

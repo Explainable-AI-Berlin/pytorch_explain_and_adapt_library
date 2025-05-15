@@ -69,11 +69,11 @@ class CFKDConfig(AdaptorConfig):
     The actual number could be higher since not for every sample a counterfactual can be found
     and processing is done in batches.
     """
-    min_train_samples: PositiveInt = 500
+    min_train_samples: PositiveInt = 800
     """
     The maximum number of validation samples that are used for tracking stats every iteration.
     """
-    max_validation_samples: PositiveInt = 100
+    max_validation_samples: PositiveInt = 200
     """
     The maximum number of test batches.
     If set to None the test will be done on the full test set.
@@ -98,7 +98,7 @@ class CFKDConfig(AdaptorConfig):
     The config of the training used for finetuning the student model.
     If not set student config can be used.
     """
-    training: Union[TrainingConfig, type(None)] = None
+    training: Union[TrainingConfig, type(None)] = TrainingConfig()
     """
     The config of the data used to create the counterfactuals from.
     """
@@ -171,7 +171,7 @@ class CFKDConfig(AdaptorConfig):
     """
     Whether to calculate group accuracies or not. This can only be done if confounding factors are known.
     """
-    calculate_group_accuracies: bool = True
+    calculate_group_accuracies: bool = False
     """
     Whether to overwrite the logs and cache intermediate results.
     If overwrite is set to False cached results are loaded. If CFKDConfig is stored as yaml on disk overwrite is 
@@ -209,6 +209,11 @@ class CFKDConfig(AdaptorConfig):
     The performance of the generative model measured e.g. in FID score.
     """
     generator_performance: dict = {}
+    """
+    The restriction to interesting counterfactual transitions.
+    Helpful in the case of datasets with a lot of classes and heavy modes like ImageNet.
+    """
+    transition_restrictions: Union[list, type(None)] = None
 
 
 class CFKD(Adaptor):
@@ -253,11 +258,21 @@ class CFKD(Adaptor):
                 The visualization function that is used for the run. Defaults to lambda x: x.
         """
         self.adaptor_config = load_yaml_config(adaptor_config, AdaptorConfig)
+        if self.adaptor_config.test_data is None:
+            self.adaptor_config.test_data = self.adaptor_config.data
+
+        self.adaptor_config.data.in_memory = self.adaptor_config.in_memory
+        self.adaptor_config.test_data.in_memory = self.adaptor_config.in_memory
+        '''
         assert (
             self.adaptor_config.batch_size % 2 == 0
         ), "only even batch sizes are supported so far!"
+        '''
         self.adaptor_config.explainer.tracking_level = (
             self.adaptor_config.tracking_level
+        )
+        self.adaptor_config.explainer.transition_restrictions = (
+            self.adaptor_config.transition_restrictions
         )
         self.base_dir = (
             base_dir if not base_dir is None else self.adaptor_config.base_dir
@@ -270,19 +285,25 @@ class CFKD(Adaptor):
                 self.adaptor_config.student, device=self.device
             )
 
-        self.original_student = student
-        self.original_student.eval()
         self.overwrite = (
             overwrite if not overwrite is None else self.adaptor_config.overwrite
         )
         self.adaptor_config.overwrite = False
-        self.student = copy.deepcopy(student)
-        self.student.eval()
+        self.original_student = student
+        if isinstance(student, torch.nn.Module):
+            self.original_student.eval()
+            self.student = copy.deepcopy(student)
+            self.student.eval()
+
+        else:
+            self.student = student
+
         teacher = teacher if not teacher is None else self.adaptor_config.teacher
 
         # kind of dirty, but also very confusing if not done this way since validation batches are fed directly
         # into the explainer and thereby potentially causing VRAM overflows otherwise
         self.adaptor_config.training.val_batch_size = self.adaptor_config.batch_size
+
         (
             self.train_dataloader,
             self.val_dataloader,
@@ -293,11 +314,6 @@ class CFKD(Adaptor):
             test_config=self.adaptor_config.test_data,
             enable_hints=bool(teacher == "SegmentationMask"),
         )
-        if not isinstance(self.val_dataloader, torch.utils.data.DataLoader):
-            import pdb
-
-            pdb.set_trace()
-
         self.joint_validation_dataloader = WeightedDataloaderList([self.val_dataloader])
         self.adaptor_config.data = self.train_dataloader.dataset.config
 
@@ -361,7 +377,7 @@ class CFKD(Adaptor):
         )
 
         if teacher[:5] == "human":
-            assert self.adaptor_config.tracking_level >= 2, "Tracking level too low!"
+            assert self.adaptor_config.tracking_level >= 4, "Tracking level too low!"
 
         self.explainer = CounterfactualExplainer(
             predictor=self.student,
@@ -383,7 +399,7 @@ class CFKD(Adaptor):
             "y_target_start_confidence_list",
         ]
 
-        if self.adaptor_config.tracking_level >= 2:
+        if self.adaptor_config.tracking_level >= 4:
             self.tracked_keys.extend(
                 [
                     "z_difference_list",
@@ -441,7 +457,7 @@ class CFKD(Adaptor):
 
         boundary_path = os.path.join(self.base_dir, "0", "decision_boundary.png")
         if (
-            self.adaptor_config.tracking_level >= 1
+            self.adaptor_config.tracking_level >= 4
             and not os.path.exists(boundary_path)
             and hasattr(
                 self.joint_validation_dataloader.dataloaders[0].dataset,
@@ -883,11 +899,6 @@ class CFKD(Adaptor):
             ):
                 break
 
-            cprint(
-                "continue from " + str(len(list(tracked_values.values())[0])),
-                self.adaptor_config.tracking_level,
-                4,
-            )
             for i in range(num_batches_per_iteration):
                 batch = self.get_batch(error_matrix, i % 2)
                 values = self.explainer.explain_batch(
@@ -917,12 +928,6 @@ class CFKD(Adaptor):
                 remaining_sample_number = self.adaptor_config.min_train_samples - len(
                     list(tracked_values.values())[0]
                 )
-                if self.adaptor_config.tracking_level > 0:
-                    cprint(
-                        "remaining_sample_number: " + str(remaining_sample_number),
-                        self.adaptor_config.tracking_level,
-                        4,
-                    )
 
                 if remaining_sample_number <= 0:
                     break
@@ -965,7 +970,7 @@ class CFKD(Adaptor):
             if len(list(tracked_values.values())[0]) == 0:
                 return tracked_values
 
-            if self.adaptor_config.tracking_level >= 2:
+            if self.adaptor_config.tracking_level >= 3:
                 with open(
                     tracked_values_path,
                     "wb",
@@ -1103,7 +1108,7 @@ class CFKD(Adaptor):
         }
         cprint("flip_rate: " + str(flip_rate), self.adaptor_config.tracking_level, 2)
 
-        if self.adaptor_config.tracking_level >= 4:
+        if self.adaptor_config.calculate_explainer_stats:
             # this is only for scientific experiments and could also be sourced out into another file!
             # distill into equivalent model
             predictor_distillation = load_yaml_config(
@@ -1224,7 +1229,7 @@ class CFKD(Adaptor):
             == len(y_target_list)
         ):
             print("missmatch in list lengths while dataset creation!")
-            if self.adaptor_config.tracking_level >= 2:
+            if self.adaptor_config.tracking_level >= 5:
                 import pdb
 
                 pdb.set_trace()
@@ -1321,7 +1326,6 @@ class CFKD(Adaptor):
             or len(dataloader_val.dataset)
             < 2 * self.adaptor_config.training.val_batch_size
         ):
-            # import pdb; pdb.set_trace()
             open(
                 os.path.join(
                     self.adaptor_config.base_dir,
@@ -1355,18 +1359,6 @@ class CFKD(Adaptor):
             transform=self.val_dataloader.dataset.transform,
         )
 
-        """y_list_dataset = [
-            self.dataloader_mixer.dataloaders[0].dataset[idx][1]
-            for idx in range(len(self.dataloader_mixer.dataloaders[0].dataset))
-        ]
-        for c in range(self.output_size):
-            writer.add_scalar(
-                "class_ratio_" + str(c),
-                np.sum((torch.tensor(y_list_dataset) == c).numpy())
-                / len(y_list_dataset),
-                finetune_iteration,
-            )"""
-
         if self.overwrite or not os.path.exists(
             os.path.join(
                 self.base_dir,
@@ -1378,7 +1370,6 @@ class CFKD(Adaptor):
             if os.path.exists(
                 os.path.join(self.base_dir, str(finetune_iteration), "finetuned_model")
             ):
-                # move from self.base_dir to self.base_dir + "_old_" + {date}_{timestamp}
                 shutil.move(
                     os.path.join(
                         self.base_dir, str(finetune_iteration), "finetuned_model"
@@ -1447,7 +1438,6 @@ class CFKD(Adaptor):
             map_location=self.device,
         )
         self.explainer.predictor = self.student
-        # TODO support multiple validation datasets for the sake of distillation!!!
         self.explainer.predictor_datasources = [
             self.dataloader_mixer,
             self.joint_validation_dataloader,
@@ -1695,7 +1685,7 @@ class CFKD(Adaptor):
             }
             self.explainer.explainer_config = original_explainer_config
 
-            if self.adaptor_config.tracking_level >= 2:
+            if self.adaptor_config.tracking_level >= 3:
                 os.makedirs(
                     os.path.join(self.base_dir, str(finetune_iteration)), exist_ok=True
                 )
@@ -1847,7 +1837,7 @@ class CFKD(Adaptor):
                     self.adaptor_config.batch_size,
                     self.adaptor_config.explainer.num_attempts,
                 )
-                if self.adaptor_config.tracking_level > 0:
+                if self.adaptor_config.tracking_level >= 3:
                     with open(
                         validation_cluster_values_path,
                         "wb",
@@ -1868,7 +1858,7 @@ class CFKD(Adaptor):
 
                         np.savez(f, **tracked_values_file)
 
-        if self.adaptor_config.tracking_level > 0 and hasattr(
+        if self.adaptor_config.tracking_level >= 4 and hasattr(
             self.joint_validation_dataloader.dataloaders[0].dataset,
             "global_counterfactual_visualization",
         ):
@@ -1939,7 +1929,7 @@ class CFKD(Adaptor):
         for key in validation_feedback_stats.keys():
             validation_stats[key] = validation_feedback_stats[key]
 
-        if self.adaptor_config.tracking_level > 0:
+        if self.adaptor_config.tracking_level >= 3:
             with open(
                 os.path.join(
                     self.base_dir, str(finetune_iteration), "validation_stats.npz"
@@ -1967,7 +1957,7 @@ class CFKD(Adaptor):
         cprint(
             "Adaptor Config: " + str(self.adaptor_config),
             self.adaptor_config.tracking_level,
-            2,
+            4,
         )
         validation_prestats, validation_tracked_values, writer = self.initialize_run()
 
@@ -2125,7 +2115,7 @@ class CFKD(Adaptor):
                     "visualize_decision_boundary",
                 )
                 and not os.path.exists(decision_boundary_path)
-                and self.adaptor_config.tracking_level >= 1
+                and self.adaptor_config.tracking_level >= 4
             ):
                 self.joint_validation_dataloader.dataloaders[
                     0
