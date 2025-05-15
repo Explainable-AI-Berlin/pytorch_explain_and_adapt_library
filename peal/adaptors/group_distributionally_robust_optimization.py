@@ -318,6 +318,7 @@ class GroupDRO(Adaptor):
             alpha=self.adaptor_config.alpha,
             gamma=self.adaptor_config.gamma,
             adj=adjustments,
+            step_size=self.adaptor_config.robust_step_size,
             normalize_loss=self.adaptor_config.use_normalized_loss,
             btl=self.adaptor_config.btl,
             min_var_weight=self.adaptor_config.minimum_variational_weight,
@@ -362,7 +363,7 @@ class GroupDRO(Adaptor):
 
         val_accuracy_max = 0.0
         # TODO: Set range argument to self.training_config.epochs (or similar)
-        self.log_memory_usage(pbar)
+        # self.log_memory_usage(pbar)
         for epoch in range(self.training_config.max_epochs):
 
             pbar.stored_values["Epoch"] = epoch
@@ -398,7 +399,7 @@ class GroupDRO(Adaptor):
                 is_training=False,
                 pbar=pbar)
 
-            self.log_memory_usage(pbar)
+            # self.log_memory_usage(pbar)
             gc.collect()
 
             # TODO: Inspect learning rate (low priority) (I think the GroupDRO code is just logging it)
@@ -430,7 +431,7 @@ class GroupDRO(Adaptor):
         else:
             model.eval()
 
-        self.log_memory_usage(pbar)
+        # self.log_memory_usage(pbar)
 
         with torch.set_grad_enabled(is_training):
             for batch_idx, batch in enumerate(loader):
@@ -456,8 +457,8 @@ class GroupDRO(Adaptor):
                     loss_main.backward()
                     optimizer.step()
 
-                if batch_idx % 10 == 0:
-                    self.log_memory_usage(pbar)
+                # if batch_idx % 10 == 0:
+                #     self.log_memory_usage(pbar)
 
                 # Update progress bar
                 pbar.update(1)
@@ -475,11 +476,11 @@ class GroupDRO(Adaptor):
         pbar.write(current_state)
         loss_computer.reset_stats()
 
-
+    """
     def log_memory_usage(self, pbar=None):
-        """
-        Logs the memory usage of the model.
-        """
+    """
+    # Logs the memory usage of the model.
+    """
 
         to_out = f"Memory usage: CPU: {psutil.Process(os.getpid()).memory_info().rss / 1024 ** 2:.2f} MB"
 
@@ -492,6 +493,7 @@ class GroupDRO(Adaptor):
             print(to_out)
         else:
             pbar.write(to_out)
+    """
 
 
     def _load_PEAL_dataset(self, datasource=None):
