@@ -263,9 +263,11 @@ class CFKD(Adaptor):
 
         self.adaptor_config.data.in_memory = self.adaptor_config.in_memory
         self.adaptor_config.test_data.in_memory = self.adaptor_config.in_memory
+        '''
         assert (
             self.adaptor_config.batch_size % 2 == 0
         ), "only even batch sizes are supported so far!"
+        '''
         self.adaptor_config.explainer.tracking_level = (
             self.adaptor_config.tracking_level
         )

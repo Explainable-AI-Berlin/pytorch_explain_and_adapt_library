@@ -7,12 +7,11 @@ min_train_samples                    :  800 #480
 finetune_iterations                  :  1
 max_validation_samples               :  200 #59
 continuous_learning                  :  "finetune"
-use_visualization                    :  True
 calculate_group_accuracies           :  True
 explainer                            :  <PEAL_BASE>/configs/explainers/sce_default128x128.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
-data                                 :  <PEAL_BASE>/configs/data/follicles_hints.yaml
-test_data                            :  <PEAL_BASE>/configs/data/follicles_hints.yaml
+data                                 :  <PEAL_BASE>/configs/data/follicles.yaml
+test_data                            :  <PEAL_BASE>/configs/data/follicles.yaml
 student                              :  $PEAL_RUNS/follicles_cut/classifier_natural/model.cpl
 teacher                              :  Baseline:false
 generator                            :  $PEAL_RUNS/follicles_cut/ddpm/config.yaml
