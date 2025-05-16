@@ -482,6 +482,9 @@ def get_predictions(args):
             elif len(y) == 3:
                 (lab, hint, img_file) = y
 
+            elif len(y) == 4:
+                (lab, hint, idx, img_file) = y
+
         img = img.to(device)
         try:
             lab = lab.to(device)
