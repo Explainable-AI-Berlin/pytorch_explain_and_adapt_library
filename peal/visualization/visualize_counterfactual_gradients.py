@@ -46,6 +46,7 @@ def visualize_step(
     x_original: torch.Tensor,
     z_encoded: torch.Tensor,
     img_predictor: torch.Tensor,
+    img_predictor_unnormalized: torch.Tensor,
     pe: torch.Tensor,
     filename: str,
     z: Optional[torch.Tensor] = None,
@@ -68,7 +69,7 @@ def visualize_step(
     gradient_img = []
     for it in range(x_original.shape[0]):
         gradient_img.append(
-            high_contrast_heatmap(ref, img_predictor.grad[it].detach().cpu())[0]
+            high_contrast_heatmap(ref, img_predictor_unnormalized.grad[it].detach().cpu())[0]
         )
 
     if z:

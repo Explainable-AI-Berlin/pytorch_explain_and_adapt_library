@@ -894,6 +894,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 float(pred_original[i][y_target[i]]) for i in range(len(y_target))
             ]
 
+        print("img_predictor: " + str([img_predictor.min(), img_predictor.max()]))
         logits_gradient = (
             gradient_predictor(img_predictor) / self.explainer_config.temperature
         )
@@ -982,9 +983,11 @@ class CounterfactualExplainer(ExplainerInterface):
         # z[0].grad[abs_grads < (abs_grads.max() / 10)] = 0
         # z[0].grad = torch.zeros_like(z[0].grad)
         # z[0].data = z[0].data - 100.0 * z[0].grad
+        print("z[0].data before optimizer step: " + str([z[0].data.min(), z[0].data.max()]))
         optimizer.step()
         boolmask = torch.zeros_like(z[0].data)
         if self.explainer_config.iterationwise_encoding:
+            print("z[0].data before pe: " + str([z[0].data.min(), z[0].data.max()]))
             z[0].data = torch.clamp(z[0].data, 0, 1)
             if self.explainer_config.use_gradient_filtering:
                 """pe = self.generator.dataset.project_to_pytorch_default(
@@ -992,6 +995,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 )
                 z_default = self.generator.dataset.project_to_pytorch_default(z[0])
                 """
+                # should be in [0,1] on predictor resolution
                 pe = torch.clone(z[0]).detach().cpu()
                 print("pe: " + str([pe.min(), pe.max()]))
                 z_default = z[0]
@@ -1136,7 +1140,8 @@ class CounterfactualExplainer(ExplainerInterface):
                 z=z,
                 clean_img_old=clean_img_old,
                 z_encoded=z_encoded_visualization,
-                img_predictor=img_predictor,
+                img_predictor=self.val_dataset.project_to_pytorch_default(img_predictor),
+                img_predictor_unnormalized=img_predictor,
                 pe=pe,
                 boolmask=boolmask,
                 filename=os.path.join(
