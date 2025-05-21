@@ -70,7 +70,7 @@ def calculate_validation_statistics(
                 .cpu()
             )
             y_pred = logits_to_prediction(pred_confidences)
-            if "hint_list" in tracked_keys or "idx_list" in tracked_keys:
+            if ("hint_list" in tracked_keys or "idx_list" in tracked_keys) and isinstance(y, list):
                 y_res = y[1:]
                 y = y[0]
                 if "hint_list" in tracked_keys:
@@ -79,17 +79,13 @@ def calculate_validation_statistics(
                 if "idx_list" in tracked_keys:
                     idxs = y_res[-1]
 
-            try:
-                for i in range(y.shape[0]):
-                    if y_pred[i] == y[i]:
-                        correct += 1
-                        confidence_scores[int(y[i])].append(pred_confidences[i])
+            for i in range(y.shape[0]):
+                if y_pred[i] == y[i]:
+                    correct += 1
+                    confidence_scores[int(y[i])].append(pred_confidences[i])
 
-                    confusion_matrix[int(y[i])][int(y_pred[i])] += 1
-                    num_samples += 1
-
-            except Exception:
-                import pdb; pdb.set_trace()
+                confusion_matrix[int(y[i])][int(y_pred[i])] += 1
+                num_samples += 1
 
 
             pbar.stored_values["acc"] = correct / num_samples
