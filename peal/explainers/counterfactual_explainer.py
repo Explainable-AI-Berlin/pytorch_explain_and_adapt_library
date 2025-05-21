@@ -624,10 +624,8 @@ class CounterfactualExplainer(ExplainerInterface):
             gradient_predictor = self.predictor
 
         x_predictor = torch.clone(x_in)
-        print("x_predictor: " + str([x_predictor.min(), x_predictor.max()]))
         # should be always in [0,1] and in the resolution of the predictor
         x_original = self.val_dataset.project_to_pytorch_default(x_predictor)
-        print("x_original: " + str([x_original.min(), x_original.max()]))
 
         if not self.explainer_config.iterationwise_encoding:
             """if self.explainer_config.use_gradient_filtering:
@@ -656,7 +654,6 @@ class CounterfactualExplainer(ExplainerInterface):
 
         else:
             z_original = x_original.to(self.device)
-            print("z_original: " + str([z_original.min(), z_original.max()]))
             z = nn.Parameter(torch.clone(z_original.detach().cpu()), requires_grad=True)
             z_original = [z_original]
             z = [z]
@@ -753,7 +750,6 @@ class CounterfactualExplainer(ExplainerInterface):
 
         # bring the counterfactual back to the predictor normalization
         counterfactual = to_predictor(counterfactual)
-        print("counterfactual: " + str([counterfactual.min(), counterfactual.max()]))
         logits = self.predictor(counterfactual.to(self.device))
         logit_confidences = (
             torch.nn.Softmax(dim=-1)(logits / self.explainer_config.temperature)
@@ -832,12 +828,10 @@ class CounterfactualExplainer(ExplainerInterface):
     ):
         if self.explainer_config.iterationwise_encoding:
             # always in [0,1] with resolution of discriminator
-            print("z[0].data: " + str([z[0].data.min(), z[0].data.max()]))
             z[0].data = torch.clamp(z[0].data, 0, 1)
             z_default = z[0]
 
             z_predictor_original = to_predictor(z_default).to(self.device)
-            print("z_predictor_original: " + str([z_predictor_original.min(), z_predictor_original.max()]))
             pred_original = torch.nn.functional.softmax(
                 self.predictor(z_predictor_original.detach()) / self.explainer_config.temperature
             )
@@ -849,13 +843,11 @@ class CounterfactualExplainer(ExplainerInterface):
 
             if self.explainer_config.use_gradient_filtering:
                 z_generator = to_generator(z[0])
-                print("z_generator: " + str([z_generator.min(), z_generator.max()]))
                 z_encoded = self.generator.encode(
                     z_generator.to(self.device),
                     t=self.explainer_config.sampling_time_fraction,
                     stochastic=self.explainer_config.stochastic,
                 )
-                print("z_encoded: " + str([z_encoded.min(), z_encoded.max()]))
 
             else:
                 z_encoded = z[0].to(self.device)
@@ -868,14 +860,11 @@ class CounterfactualExplainer(ExplainerInterface):
             img_decoded = self.generator.decode(
                 z_encoded, t=self.explainer_config.sampling_time_fraction
             )
-            print("img_decoded: " + str([img_decoded.min(), img_decoded.max()]))
             img_default = self.generator.dataset.project_to_pytorch_default(img_decoded)
             if not img_default.shape[-2:] == self.val_dataset.config.input_size[1:]:
                 img_default = torchvision.transforms.Resize(
                     self.val_dataset.config.input_size[1:]
                 )(img_default)
-
-            print("img_default: " + str([img_default.min(), img_default.max()]))
 
         else:
             img_default = z_encoded
@@ -894,7 +883,6 @@ class CounterfactualExplainer(ExplainerInterface):
                 float(pred_original[i][y_target[i]]) for i in range(len(y_target))
             ]
 
-        print("img_predictor: " + str([img_predictor.min(), img_predictor.max()]))
         logits_gradient = (
             gradient_predictor(img_predictor) / self.explainer_config.temperature
         )
@@ -983,21 +971,13 @@ class CounterfactualExplainer(ExplainerInterface):
         # z[0].grad[abs_grads < (abs_grads.max() / 10)] = 0
         # z[0].grad = torch.zeros_like(z[0].grad)
         # z[0].data = z[0].data - 100.0 * z[0].grad
-        print("z[0].data before optimizer step: " + str([z[0].data.min(), z[0].data.max()]))
         optimizer.step()
         boolmask = torch.zeros_like(z[0].data)
         if self.explainer_config.iterationwise_encoding:
-            print("z[0].data before pe: " + str([z[0].data.min(), z[0].data.max()]))
             z[0].data = torch.clamp(z[0].data, 0, 1)
             if self.explainer_config.use_gradient_filtering:
-                """pe = self.generator.dataset.project_to_pytorch_default(
-                    torch.clone(z[0]).detach().cpu()
-                )
-                z_default = self.generator.dataset.project_to_pytorch_default(z[0])
-                """
                 # should be in [0,1] on predictor resolution
                 pe = torch.clone(z[0]).detach().cpu()
-                print("pe: " + str([pe.min(), pe.max()]))
                 z_default = z[0]
 
             else:
@@ -1039,14 +1019,12 @@ class CounterfactualExplainer(ExplainerInterface):
                     boolmask_in=boolmask_in,
                     exceptions=no_repaint_exceptions,
                 )
-                print("z_updated: " + str([z_updated.min(), z_updated.max()]))
                 if not boolmask.shape[-2:] == self.val_dataset.config.input_size[1:]:
                     boolmask = torchvision.transforms.Resize(
                         self.val_dataset.config.input_size[1:]
                     )(boolmask)
 
                 z_generator_current = self.generator.dataset.project_to_pytorch_default(z_updated)
-                print("z_generator_current: " + str([z_generator_current.min(), z_generator_current.max()]))
                 if not z_generator_current.shape[-2:] == self.val_dataset.config.input_size[1:]:
                     z_generator_current = torchvision.transforms.Resize(
                         self.val_dataset.config.input_size[1:]
@@ -1059,24 +1037,6 @@ class CounterfactualExplainer(ExplainerInterface):
                     ):
                         z[0].data[sample_idx] = z_generator_current[sample_idx]
 
-            """z_default = self.generator.dataset.project_to_pytorch_default(z[0])
-            z_predictor = self.val_dataset.project_from_pytorch_default(z_default).to(
-                self.device
-            )
-            pred_new = torch.nn.functional.softmax(
-                gradient_predictor(z_predictor) / self.explainer_config.temperature
-            )
-            if self.explainer_config.greedy:
-                for j in range(gradient_confidences_old.shape[0]):
-                    if mask[j] == 1:
-                        if pred_new[j, int(y_target[j])] >= gradient_confidences_old[j]:
-                            gradient_confidences_old[j] = pred_new[j, int(y_target[j])]
-                            print("Update " + str(j))
-
-                        else:
-                            z[0].data[j] = z_old[j]"""
-
-        print("z_bef: " + str([z[0].data.min(), z[0].data.max()]))
         z[0].data = torch.clamp(z[0].data, 0, 1)
         z_default = z[0]
 
