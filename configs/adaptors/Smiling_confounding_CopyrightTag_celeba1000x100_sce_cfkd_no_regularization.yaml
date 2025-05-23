@@ -8,6 +8,7 @@ finetune_iterations                  :  1
 max_validation_samples               :  200
 continuous_learning                  :  "finetune"
 calculate_group_accuracies           :  True
+calculate_explainer_stats            :  False
 explainer                            :  <PEAL_BASE>/configs/explainers/sce_default128x128.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning_adamw.yaml
 data                                 :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba_poisoned100.yaml
