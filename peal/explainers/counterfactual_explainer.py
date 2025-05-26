@@ -12,10 +12,8 @@ import torchvision
 from flask import render_template, Flask, request
 from numpy.f2py.auxfuncs import throw_error
 from pydantic import PositiveInt
-
 from torch import nn
 from typing import Union
-
 from tqdm import tqdm
 
 from peal.architectures.predictors import get_predictor
@@ -1354,6 +1352,14 @@ class CounterfactualExplainer(ExplainerInterface):
         collage_path_base = None
         if self.explainer_config.clustering_strategy == "activation_clusters":
             explanations_beginning = [e[0] for e in explanations_list_by_source]
+            """
+            from torch_kmeans import KMeans
+            activations = extract_feature_difference(explanations_list_by_source)
+            activations = torch.stack([a / a.norm() for a in activations])
+            kmeans = KMeans(n_clusters=4)
+            kmeans.fit(activations)
+            import pdb; pdb.set_trace()
+            """
             cluster_means = extract_feature_difference(explanations_beginning)
             cluster_lists[0] = [explanations_list_by_source[0][0]]
             cluster_lists[1] = [explanations_list_by_source[1][0]]

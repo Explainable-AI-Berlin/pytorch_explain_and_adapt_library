@@ -62,6 +62,9 @@ def calculate_validation_statistics(
         pbar.stored_values = {}
 
         for it, (x, y) in enumerate(dataloader):
+            if num_samples >= int(max_validation_samples / len(dataloaders)) or x.shape[0] != dataloader.batch_size:
+                break
+
             pred_confidences = (
                 torch.nn.Softmax(dim=-1)(
                     model(x.to(device)) / explainer.explainer_config.temperature
@@ -124,9 +127,6 @@ def calculate_validation_statistics(
             #    import pdb; pdb.set_trace()
             for key in set(results.keys()).intersection(set(tracked_values.keys())):
                 tracked_values[key].extend(results[key])
-
-            if num_samples >= max_validation_samples:
-                break
 
         pbar.close()
 

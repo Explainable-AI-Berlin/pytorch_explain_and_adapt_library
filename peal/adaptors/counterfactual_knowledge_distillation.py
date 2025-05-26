@@ -1809,6 +1809,8 @@ class CFKD(Adaptor):
                 str(finetune_iteration),
                 "validation_tracked_cluster_values.npz",
             )
+            """
+            TODO loading collage paths does not work yet...
             if os.path.exists(validation_cluster_values_path):
                 cprint(
                     "load clustered counterfactual explanations!",
@@ -1827,36 +1829,37 @@ class CFKD(Adaptor):
                         )
 
             else:
-                cprint(
-                    "cluster counterfactual explanations!",
-                    self.adaptor_config.tracking_level,
-                    2,
-                )
-                validation_tracked_values = self.explainer.cluster_explanations(
-                    validation_tracked_values,
-                    self.adaptor_config.batch_size,
-                    self.adaptor_config.explainer.num_attempts,
-                )
-                if self.adaptor_config.tracking_level >= 3:
-                    with open(
-                        validation_cluster_values_path,
-                        "wb",
-                    ) as f:
-                        tracked_values_file = {}
-                        for key in validation_tracked_values.keys():
-                            if isinstance(validation_tracked_values[key][0], torch.Tensor):
-                                tracked_values_file[key] = torch.stack(
-                                    validation_tracked_values[key], dim=0
-                                ).numpy()
+            """
+            cprint(
+                "cluster counterfactual explanations!",
+                self.adaptor_config.tracking_level,
+                2,
+            )
+            validation_tracked_values = self.explainer.cluster_explanations(
+                validation_tracked_values,
+                self.adaptor_config.batch_size,
+                self.adaptor_config.explainer.num_attempts,
+            )
+            if self.adaptor_config.tracking_level >= 3:
+                with open(
+                    validation_cluster_values_path,
+                    "wb",
+                ) as f:
+                    tracked_values_file = {}
+                    for key in validation_tracked_values.keys():
+                        if isinstance(validation_tracked_values[key][0], torch.Tensor):
+                            tracked_values_file[key] = torch.stack(
+                                validation_tracked_values[key], dim=0
+                            ).numpy()
 
-                            elif isinstance(
-                                validation_tracked_values[key][0], int
-                            ) or isinstance(validation_tracked_values[key][0], float):
-                                tracked_values_file[key] = np.array(
-                                    validation_tracked_values[key]
-                                )
+                        elif isinstance(
+                            validation_tracked_values[key][0], int
+                        ) or isinstance(validation_tracked_values[key][0], float):
+                            tracked_values_file[key] = np.array(
+                                validation_tracked_values[key]
+                            )
 
-                        np.savez(f, **tracked_values_file)
+                    np.savez(f, **tracked_values_file)
 
         if self.adaptor_config.tracking_level >= 4 and hasattr(
             self.joint_validation_dataloader.dataloaders[0].dataset,
