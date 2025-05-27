@@ -1346,21 +1346,23 @@ class CounterfactualExplainer(ExplainerInterface):
                 )
                 difference_list.append(activation_current - activation_ref)
 
+            #import pdb; pdb.set_trace()
             return difference_list
 
         cluster_lists = [[] for i in range(n_clusters)]
         collage_path_base = None
         if self.explainer_config.clustering_strategy == "activation_clusters":
             explanations_beginning = [e[0] for e in explanations_list_by_source]
+            cluster_means = extract_feature_difference(explanations_beginning)
             """
             from torch_kmeans import KMeans
-            activations = extract_feature_difference(explanations_list_by_source)
-            activations = torch.stack([a / a.norm() for a in activations])
+            activations = [extract_feature_difference([e[i] for e in explanations_list_by_source]) for i in range(len(explanations_list_by_source[0]))]
+            activations_stacked = torch.cat([torch.stack(a) for a in activations])
+            activations_normalized = activations_stacked / torch.norm(activations_stacked, dim=2, keepdim=True)
             kmeans = KMeans(n_clusters=4)
-            kmeans.fit(activations)
+            kmeans.fit(torch.stack([activations_normalized,activations_normalized]))
             import pdb; pdb.set_trace()
             """
-            cluster_means = extract_feature_difference(explanations_beginning)
             cluster_lists[0] = [explanations_list_by_source[0][0]]
             cluster_lists[1] = [explanations_list_by_source[1][0]]
             if "collage_path_list" in explanations_beginning[0].keys():
