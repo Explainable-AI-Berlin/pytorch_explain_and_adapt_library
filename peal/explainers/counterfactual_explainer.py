@@ -1306,7 +1306,7 @@ class CounterfactualExplainer(ExplainerInterface):
 
         assert (
             len(explanations_list) % (batch_size * n_clusters) == 0
-        ), "restructing needed for clustering impossible!"
+        ), "restructuring needed for clustering impossible!"
         explanations_list_by_source = [[] for i in range(n_clusters)]
         batch_counter = 0
         cluster_counter = 0

@@ -1053,23 +1053,31 @@ class CFKD(Adaptor):
             ) as f:
                 feedback = f.read().split("\n")
 
-        if mode == "train":
-            return feedback, {}
+        return feedback
 
+    def calculate_feedback_stats(self, tracked_values, feedback, finetune_iteration):
         num_samples = len(tracked_values["y_list"])
 
         # TODO this seems like a bug!
+        num_samples = int(len(feedback) / self.adaptor_config.explainer.num_attempts)
         feedback = feedback[:num_samples]
+        # this is not always a perfect match, because some explanations might be filtered out
+        if finetune_iteration == 0:
+            flip_rate_reference = max(num_samples, self.adaptor_config.max_validation_samples)
+
+        else:
+            flip_rate_reference = num_samples
+
         flip_rate = (
             len(
                 list(
                     filter(
                         lambda x: x >= 0.51,
-                        tracked_values["y_target_end_confidence_list"],
+                        tracked_values["y_target_end_confidence_list"][:num_samples],
                     )
                 )
             )
-            / num_samples
+            / flip_rate_reference
         )
         ood_rate = (
             len(list(filter(lambda sample: sample == "ood", feedback))) / num_samples
@@ -1155,10 +1163,10 @@ class CFKD(Adaptor):
             flipped_samples = list(
                 filter(
                     lambda x: x > 0.5,
-                    tracked_values["y_target_end_confidence_distilled_list"],
+                    tracked_values["y_target_end_confidence_distilled_list"][:num_samples],
                 )
             )
-            flip_rate_distilled = len(flipped_samples) / num_samples
+            flip_rate_distilled = len(flipped_samples) / flip_rate_reference
             feedback_stats["flip_rate_distilled"] = float(flip_rate_distilled)
             cprint(
                 "flip_rate_distilled: " + str(flip_rate_distilled),
@@ -1209,7 +1217,7 @@ class CFKD(Adaptor):
             for key in tracked_stats.keys():
                 feedback_stats[key] = tracked_stats[key]
 
-        return feedback, feedback_stats
+        return feedback_stats
 
     def create_dataset(
         self,
@@ -1915,10 +1923,16 @@ class CFKD(Adaptor):
 
         validation_stats = validation_prestats
 
-        validation_feedback, validation_feedback_stats = self.retrieve_feedback(
+        validation_feedback = self.retrieve_feedback(
             tracked_values=validation_tracked_values,
             finetune_iteration=finetune_iteration,
             mode="validation",
+        )
+
+        validation_feedback_stats = self.calculate_feedback_stats(
+            tracked_values=validation_tracked_values,
+            feedback=validation_feedback,
+            finetune_iteration=finetune_iteration,
         )
 
         self.create_dataset(
@@ -1980,7 +1994,7 @@ class CFKD(Adaptor):
                 finetune_iteration=finetune_iteration,
             )
 
-            feedback, feedback_stats = self.retrieve_feedback(
+            feedback = self.retrieve_feedback(
                 tracked_values=tracked_values,
                 finetune_iteration=finetune_iteration,
                 mode="train",
