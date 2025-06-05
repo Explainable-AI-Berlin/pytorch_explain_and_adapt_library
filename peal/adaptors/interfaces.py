@@ -27,9 +27,22 @@ class AdaptorConfig(BaseModel):
     """
     The seed of all randomness to make results reproducible.
     """
-    seed: Union[int, type(None)] = None
+    seed: Union[int, type(None)] = 0
     """
     How many intermediate results are cached an visualized.
-    Goes from 0 = None over 1 = caching only to 2 = essential visualizations to 3 = expensive visualizations, 4 = all.
+    0   -> None
+    >=1 -> only progress bars
+    >=2 -> prints
+    >=3 -> caching
+    >=4 -> visualizations
+    >=5 -> everything, including expensive visualizations and tracking of values not mentioned by papers
     """
     tracking_level: int = 0
+    """
+    Whether to calculate explainer stats like sparsity, diversity, etc.
+    """
+    calculate_explainer_stats: bool = True
+    """
+    Whether to load all datasets into the RAM or not. Careful with big datasets!
+    """
+    in_memory: bool = False

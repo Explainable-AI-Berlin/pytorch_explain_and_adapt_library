@@ -1,7 +1,7 @@
 # python -W ignore train_generator.py --config "<PEAL_BASE>/configs/generators/follicle_glow.yaml"
 generator_type: 'GlowGenerator'
 category: 'generator'
-data : '<PEAL_BASE>/configs/data/follicles.yaml'
+data : '<PEAL_BASE>/configs/data/follicles_sce_mask_cfkd.yaml'
 base_path: '$PEAL_RUNS/follicles_cut/glow'
 img_size: 128
 lr: 1e-6

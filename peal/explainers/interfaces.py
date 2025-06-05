@@ -61,7 +61,7 @@ class ExplainerConfig(BaseModel):
     The seed of all randomness to make results reproducible.
     """
     seed: int = 0
-    """"
+    """
     The restriction to interesting counterfactual transitions.
     Helpful in the case of datasets with a lot of classes and heavy modes like ImageNet.
     """

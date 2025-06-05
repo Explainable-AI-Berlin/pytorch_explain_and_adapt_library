@@ -16,13 +16,17 @@ import inspect
 import pkgutil
 import importlib
 import importlib.util
-import torch.nn.functional as F
 import matplotlib.pyplot as plt
 
 from pkg_resources import resource_filename
 from pydantic import BaseModel
 from tqdm import tqdm
 from pathlib import Path
+
+
+def cprint(s, a, b):
+    if a >= b:
+        print(s)
 
 
 def dict_to_bar_chart(input_dict, name):
@@ -403,11 +407,9 @@ def orthogonal_initialization(model):
 def reset_weights(model):
     for idx, layer in enumerate(model.children()):
         if hasattr(layer, "reset_parameters"):
-            print(f"Resetting parameters of layer: {layer}")
             layer.reset_parameters()
 
         else:
-            print(f"Layer {idx} does not have a reset_parameters method")
             reset_weights(layer)
 
 
@@ -496,7 +498,12 @@ def get_predictions(args):
         d["idx"] += list(img_file)
 
     print(acc / n)
-    df = pd.DataFrame(data=d)
+    try:
+        df = pd.DataFrame(data=d)
+
+    except Exception:
+        import pdb; pdb.set_trace()
+
     df.to_csv(
         args.label_path,
         index=False,
@@ -577,12 +584,16 @@ def extract_penultima_activation(x, predictor):
     import pdb; pdb.set_trace()
     second_last_activation = find_activation(output, depth=2)
     predictor.eval()"""
-    submodules = list(predictor.children())
-    while len(submodules) == 1:
-        submodules = list(submodules[0].children())
+    if hasattr(predictor, "feature_extractor"):
+        return predictor.feature_extractor(x)
 
-    feature_extractor = torch.nn.Sequential(*submodules[:-1])
-    return feature_extractor(x)
+    else:
+        submodules = list(predictor.children())
+        while len(submodules) == 1:
+            submodules = list(submodules[0].children())
+
+        feature_extractor = torch.nn.Sequential(*submodules[:-1])
+        return feature_extractor(x)
 
 
 def set_random_seed(seed: int):

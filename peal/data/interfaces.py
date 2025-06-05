@@ -153,6 +153,10 @@ class DataConfig(BaseModel):
     """
     dataset_path: Union[type(None), str] = None
     """
+    The path to the dataset origin this dataset got derived from.
+    """
+    dataset_origin_path: Union[type(None), str] = None
+    """
     The number of samples in the dataset.
     Sometimes important when executing specific experiments.
     """
@@ -243,3 +247,7 @@ class DataConfig(BaseModel):
     has to be in the first column.
     """
     x_selection: str = "imgs"
+    """
+    Whether to load all datasets into the RAM or not. Careful with big datasets!
+    """
+    in_memory: bool = False

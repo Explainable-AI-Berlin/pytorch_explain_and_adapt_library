@@ -1,0 +1,94 @@
+# python -W ignore train_generator.py --config "<PEAL_BASE>/configs/generators/imagenet_ddpm.yaml"
+generator_type : DDPM
+category : generator
+base_path : $PEAL_RUNS/imagenet/ddpm256x256
+data: <PEAL_BASE>/configs/data/imagenet_generator.yaml
+download_weights: https://openaipublic.blob.core.windows.net/diffusion/jul-2021/256x256_diffusion_uncond.pt
+batch_size: 50
+is_trained: true
+old_generator_type : AceDDPMAdaptorAligned
+attack_checkpoint_backward_steps: 1
+attack_epsilon: 255
+attack_iterations: 100 #50
+attack_joint: true
+attack_joint_checkpoint: false
+attack_joint_shortcut: false128
+attack_method: PGD
+attack_step: 1.0
+attention_resolutions: 32,16,8
+best_fid: 100000000000000.0
+channel_mult: ''
+chunk: 0
+chunks: 1
+class_cond: false
+classifier_scales: 8,10,15
+clip_denoised: true
+cudnn_deterministic: false
+diffusion_steps: 1000
+dist_l1: 0.00001 #0.0
+dist_l2: 0.0 #1.0
+dist_schedule: none
+dropout: 0.0
+ema_rate: '0.9999'
+exp_name: example_name
+fp16_scale_growth: 1e-3
+gpu: '0'
+gpus: ''
+guided_iterations: 9999999
+image_size: 256
+l1_loss: 0.05
+l2_loss: 0.0
+l_perc: 30.0
+l_perc_layer: 18
+label_query: -1
+label_target: -1
+learn_sigma: true
+log_interval: 10
+lr: 0.0001
+lr_anneal_steps: 0
+max_train_steps: 1000000
+merge_and_eval: false
+merge_chunks: false
+method: ace #dime
+microbatch: -1
+noise_schedule: linear
+num_batches: 1
+num_channels: 256
+num_chunks: 1
+num_head_channels: 64
+num_heads: 4
+num_heads_upsample: -1
+num_res_blocks: 2
+num_samples: 500000000000
+predict_xstart: false
+resblock_updown: true
+rescale_learned_sigmas: false
+rescale_timesteps: false
+resume_checkpoint: ''
+sampling_dilation: 15
+sampling_inpaint: 0.15
+sampling_scale: 1.0
+sampling_stochastic: true
+sampling_time_fraction: 0.3 #0.1
+save_images: true
+save_interval: 10000
+save_x_t: true
+save_z_t: true
+schedule_sampler: uniform
+seed: 4
+start_step: 100 #60
+steps_per_epoch: 1000000
+target_label: -1
+timestep_respacing: '200'
+train_batch_size: 10
+use_checkpoint: false
+use_ddim: false
+use_fp16: false
+use_hdf5: false
+use_kl: false
+use_logits: true
+use_new_attention_order: false
+use_sampling_on_x_t: true
+use_scale_shift_norm: true
+use_train: false
+weight_decay: 0.0

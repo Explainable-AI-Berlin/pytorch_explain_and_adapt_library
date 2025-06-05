@@ -1,0 +1,20 @@
+# python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/imagenet_husky_vs_wulf_sce_cfkd.yaml"
+adaptor_type                         :  "CFKD"
+category                             :  "adaptor"
+batch_size                           :  2
+tracking_level                       :  5
+finetune_iterations                  :  0
+max_validation_samples               :  200
+explainer                            :  <PEAL_BASE>/configs/explainers/sce_default256x256.yaml
+data                                 :  <PEAL_BASE>/configs/data/imagenet_husky_vs_wulf_resnet18.yaml
+student                              :  $PEAL_RUNS/imagenet/husky_vs_wulf_classifier/model.onnx
+teacher                              :  Baseline:true
+generator                            :  <PEAL_BASE>/configs/generators/imagenet_ddpm.yaml
+base_dir                             :  $PEAL_RUNS/imagenet/husky_vs_wulf_classifier/sce_cfkd
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [IsWulf]

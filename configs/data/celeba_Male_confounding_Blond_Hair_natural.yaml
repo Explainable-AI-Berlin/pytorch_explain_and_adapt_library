@@ -4,4 +4,4 @@ input_type              : image
 input_size              : [3, 128, 128]
 output_type             : multiclass
 output_size             : [40]
-confounding_factors     : [Male, Blond_Hair] #copyrighttag]
+confounding_factors     : [Male, Blond_Hair]

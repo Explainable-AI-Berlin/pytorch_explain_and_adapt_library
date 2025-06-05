@@ -1,4 +1,5 @@
-training          : <PEAL_BASE>/configs/training/img_finetuning.yaml
+training          : <PEAL_BASE>/configs/training/img_distillation.yaml
+distill_from      : predictor
 task:
   criterions:
     ce     : 1.0

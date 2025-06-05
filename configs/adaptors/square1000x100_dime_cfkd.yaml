@@ -2,12 +2,11 @@
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  6
-tracking_level                       :  3
-min_train_samples                    :  900
-finetune_iterations                  :  0
-max_validation_samples               :  100
-continuous_learning                  :  "retrain"
-use_visualization                    :  True
+tracking_level                       :  5
+min_train_samples                    :  800
+finetune_iterations                  :  1
+max_validation_samples               :  200
+continuous_learning                  :  "finetune"
 calculate_group_accuracies           :  True
 explainer                            :  <PEAL_BASE>/configs/explainers/dime_default.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml

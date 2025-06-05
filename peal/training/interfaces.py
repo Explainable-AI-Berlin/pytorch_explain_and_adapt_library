@@ -41,15 +41,15 @@ class TrainingConfig(BaseModel):
     """
     optimizer: str = "Adam"
     """
-    The train batch size. Can either be set manually or be left empty and calulated by adaptive batch_size.
+    The train batch size. Can either be set manually or be left empty and calculated by adaptive batch_size.
     """
     train_batch_size: PositiveInt = 1
     """
-    The val batch size. Can either be set manually or be left empty and calulated by adaptive batch_size.
+    The val batch size. Can either be set manually or be left empty and calculated by adaptive batch_size.
     """
     val_batch_size: PositiveInt = 1
     """
-    The test batch size. Can either be set manually or be left empty and calulated by adaptive batch_size.
+    The test batch size. Can either be set manually or be left empty and calculated by adaptive batch_size.
     """
     test_batch_size: PositiveInt = 1
     """
@@ -70,6 +70,7 @@ class TrainingConfig(BaseModel):
     use_mixup: bool = False
     mixup_alpha: float = 1.0
     label_smoothing: float = 0.0
+    early_stopping_goal: str = "average_accuracy"
 
 
 class PredictorConfig(BaseModel):
@@ -120,47 +121,7 @@ class PredictorConfig(BaseModel):
     """
     Where to distill from if used for distillation. Could either be done from the dataset or from the model.
     """
-    distill_from: str = "dataset"
-
-    '''def __init__(
-        self,
-        training: Union[dict, TrainingConfig],
-        task: Union[dict, TaskConfig],
-        architecture: Union[dict, ArchitectureConfig] = None,
-        data: Union[dict, DataConfig] = None,
-        model_path: str = None,
-        model_type: str = None,
-        seed: int = None,
-        **kwargs
-    ):
-        if isinstance(architecture, dict):
-            self.architecture = ArchitectureConfig(**architecture)
-
-        else:
-            self.architecture = architecture
-
-        self.training = (
-            training
-            if isinstance(training, TrainingConfig)
-            else TrainingConfig(**training)
-        )
-        self.task = task if isinstance(task, TaskConfig) else TaskConfig(**task)
-        if isinstance(data, DataConfig):
-            self.data = data
-
-        elif data is None:
-            self.data = None
-
-        else:
-            self.data = DataConfig(**data)
-
-        if not model_path is None:
-            self.model_path = model_path
-
-        if not model_type is None:
-            self.model_type = model_type
-
-        if not seed is None:
-            self.seed = seed
-
-        self.kwargs = kwargs'''
+    distill_from: str = "predictor"
+    weights_path: Union[str, type(None)] = None
+    continue_training: bool = False
+    tracking_level: int = 4

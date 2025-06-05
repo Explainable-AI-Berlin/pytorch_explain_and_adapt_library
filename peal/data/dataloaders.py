@@ -183,6 +183,30 @@ class DataloaderMixer(DataLoader):
         self.hints_enabled = False
         self.class_balancing_enabled = False
 
+    def __getstate__(self):
+        return {
+            "train_config" : self.train_config,
+            "dataloaders" : self.dataloaders,
+            "batch_size" : self.batch_size,
+            "priorities" : self.priorities,
+            "dataset" : self.dataset,
+            "return_src_internal" : self.return_src_internal,
+            "hints_enabled" : self.hints_enabled,
+            "class_balancing_enabled" : self.class_balancing_enabled,
+        }
+
+    def __setstate__(self, state):
+        self.train_config = state["train_config"]
+        self.dataloaders = state["dataloaders"]
+        self.batch_size = state["batch_size"]
+        self.priorities = state["priorities"]
+        self.dataset = state["dataset"]
+        self.return_src_internal = state["return_src_internal"]
+        self.hints_enabled = state["hints_enabled"]
+        self.class_balancing_enabled = state["class_balancing_enabled"]
+        self.iterators = [None for it in range(len(self.dataloaders))]
+        self.reset()
+
     @property
     def return_src(self):
         if (
@@ -387,6 +411,9 @@ class DataloaderMixer(DataLoader):
 
 class WeightedDataloaderList:
     def __init__(self, dataloaders, weights=None):
+        for dataloader in dataloaders:
+            assert isinstance(dataloader, torch.utils.data.DataLoader), str(dataloader) + " is not dataloader!"
+
         self.dataloaders = dataloaders
         if not weights is None:
             self.weights = weights
@@ -395,6 +422,7 @@ class WeightedDataloaderList:
             self.weights = torch.ones([len(self.dataloaders)]) / len(self.dataloaders)
 
     def append(self, dataloader):
+        assert isinstance(dataloader, torch.utils.data.DataLoader), str(dataloader) + " is not dataloader!"
         self.dataloaders.append(dataloader)
         self.weights *= 0.5
         self.weights = torch.cat([self.weights, torch.tensor([0.5])])

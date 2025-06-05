@@ -475,6 +475,7 @@ class Image2MixedDataset(ImageDataset):
 
         else:
             self.root_dir = root_dir
+            self.config.dataset_path = root_dir
 
         self.transform = transform
         self.task_config = task_config
@@ -520,6 +521,42 @@ class Image2MixedDataset(ImageDataset):
             and self.task_specific_keys is None
         ):
             self.set_task_specific_keys()
+
+        if self.config.in_memory:
+            self.load_in_memory()
+
+    def load_in_memory(self):
+        print('load dataset into memory!!')
+        self.in_memory_images = {}
+        self.in_memory_masks = {}
+        for name in self.keys:
+            img = np.array(Image.open(os.path.join(self.root_dir, self.config.x_selection, name)))
+            self.in_memory_images[name] = img
+
+            if self.config.has_hints:
+                option1 = os.path.join(self.root_dir, "masks", name)
+                option2 = os.path.join(self.root_dir, "masks", name.split("/")[-1])
+                option3 = option2[:-4] + ".png"
+                option4 = option1[:-4] + ".png"
+                if os.path.exists(option1):
+                    mask = Image.open(os.path.join(self.root_dir, "masks", name))
+
+                elif os.path.exists(option2):
+                    mask = Image.open(option2)
+
+                elif os.path.exists(option3):
+                    mask = Image.open(option3)
+
+                elif os.path.exists(option4):
+                    mask = Image.open(option4)
+
+                else:
+                    assert (
+                        not self.config.has_hints
+                    ), "Hints not found despite claim that they exist!"
+                    mask = Image.new("RGB", img.size, (0, 0, 0))
+
+                self.in_memory_masks[name] = np.array(mask)
 
     @property
     def output_size(self):
@@ -641,7 +678,12 @@ class Image2MixedDataset(ImageDataset):
 
         name = self.keys[idx]
 
-        img = Image.open(os.path.join(self.root_dir, self.config.x_selection, name))
+        if self.config.in_memory:
+            img = Image.fromarray(self.in_memory_images[name])
+
+        else:
+            img = Image.open(os.path.join(self.root_dir, self.config.x_selection, name))
+
         state = torch.get_rng_state()
         img_tensor = self.transform(img)
 
@@ -674,27 +716,31 @@ class Image2MixedDataset(ImageDataset):
         return_dict = {"x": img_tensor, "y": target}
 
         if self.hints_enabled:
-            option1 = os.path.join(self.root_dir, "masks", name)
-            option2 = os.path.join(self.root_dir, "masks", name.split("/")[-1])
-            option3 = option2[:-4] + ".png"
-            option4 = option1[:-4] + ".png"
-            if os.path.exists(option1):
-                mask = Image.open(os.path.join(self.root_dir, "masks", name))
-
-            elif os.path.exists(option2):
-                mask = Image.open(option2)
-
-            elif os.path.exists(option3):
-                mask = Image.open(option3)
-
-            elif os.path.exists(option4):
-                mask = Image.open(option4)
+            if self.config.in_memory:
+                mask = Image.fromarray(self.in_memory_masks[name])
 
             else:
-                assert (
-                    not self.config.has_hints
-                ), "Hints not found despite claim that they exist!"
-                mask = Image.new("RGB", img.size, (0, 0, 0))
+                option1 = os.path.join(self.root_dir, "masks", name)
+                option2 = os.path.join(self.root_dir, "masks", name.split("/")[-1])
+                option3 = option2[:-4] + ".png"
+                option4 = option1[:-4] + ".png"
+                if os.path.exists(option1):
+                    mask = Image.open(os.path.join(self.root_dir, "masks", name))
+
+                elif os.path.exists(option2):
+                    mask = Image.open(option2)
+
+                elif os.path.exists(option3):
+                    mask = Image.open(option3)
+
+                elif os.path.exists(option4):
+                    mask = Image.open(option4)
+
+                else:
+                    assert (
+                        not self.config.has_hints
+                    ), "Hints not found despite claim that they exist!"
+                    mask = Image.new("RGB", img.size, (0, 0, 0))
 
             torch.set_rng_state(state)
             mask_tensor = self.transform(mask)
@@ -707,10 +753,18 @@ class Image2MixedDataset(ImageDataset):
             return_dict["hint"] = mask_tensor
 
         if self.groups_enabled:
-            has_confounder = targets[
-                self.attributes.index(self.config.confounding_factors[-1])
-            ]
-            return_dict["has_confounder"] = has_confounder
+            if len(self.config.confounding_factors) == 2:
+                has_confounder = targets[
+                    self.attributes.index(self.config.confounding_factors[-1])
+                ]
+                return_dict["has_confounder"] = has_confounder
+
+            else:
+                has_confounder = []
+                for factor in self.config.confounding_factors[1:]:
+                    has_confounder = targets[self.attributes.index(factor)]
+
+                return_dict["has_confounder"] = has_confounder
 
         if self.idx_enabled:
             return_dict["idx"] = idx
@@ -798,7 +852,13 @@ class Image2ClassDataset(ImageDataset):
         """
         self.config = config
         if root_dir is None:
-            root_dir = config.dataset_path
+            if data_dir is None:
+                root_dir = config.dataset_path
+
+            else:
+                root_dir = data_dir
+
+        self.config.dataset_path = root_dir
 
         self.root_dir = os.path.join(root_dir, self.config.x_selection)
 
@@ -809,6 +869,7 @@ class Image2ClassDataset(ImageDataset):
 
         self.hints_enabled = False
         self.idx_enabled = False
+        self.url_enabled = False
         self.task_config = task_config
         self.transform = transform
         self.return_dict = return_dict
@@ -818,6 +879,9 @@ class Image2ClassDataset(ImageDataset):
 
         self.idx_to_name.sort()
         for target_str in self.idx_to_name:
+            if not os.path.isdir(os.path.join(self.root_dir, target_str)):
+                continue
+
             files = os.listdir(os.path.join(self.root_dir, target_str))
             files.sort()
             for file in files:
@@ -863,6 +927,30 @@ class Image2ClassDataset(ImageDataset):
         self.class_restriction_enabled = False
         self.backup_urls = copy.deepcopy(self.urls)
 
+        if self.config.in_memory:
+            self.load_in_memory()
+
+    def load_in_memory(self):
+        self.in_memory_images = {}
+        for target_str, file in self.urls:
+            img = Image.open(os.path.join(self.root_dir, target_str, file))
+            self.in_memory_images[os.path.join(target_str, file)] = np.array(img)
+
+        if self.config.has_hints:
+            self.in_memory_masks = {}
+            for target_str, file in self.urls:
+                if os.path.exists(os.path.join(self.mask_dir, file)):
+                    mask_path = os.path.join(self.mask_dir, file)
+
+                elif os.path.exists(os.path.join(self.mask_dir, target_str, file)):
+                    mask_path = os.path.join(self.mask_dir, target_str, file)
+
+                else:
+                    raise Exception(os.path.join(self.mask_dir, target_str, file) + " not found!")
+
+                self.in_memory_masks[os.path.join(target_str, file)] = np.array(Image.open(mask_path))
+
+
     def class_idx_to_name(self, class_idx):
         return self.idx_to_name[class_idx]
 
@@ -894,6 +982,12 @@ class Image2ClassDataset(ImageDataset):
 
     def disable_idx(self):
         self.idx_enabled = False
+
+    def enable_url(self):
+        self.url_enabled = True
+
+    def disable_url(self):
+        self.url_enabled = False
 
     @property
     def output_size(self):
@@ -956,16 +1050,14 @@ class Image2ClassDataset(ImageDataset):
         ):
             self.set_task_specific_urls()
 
-        try:
-            target_str, file = self.urls[idx]
+        target_str, file = self.urls[idx]
 
-        except Exception:
-            print("in singleclass data class")
-            import pdb
+        if self.config.in_memory:
+            img = Image.fromarray(self.in_memory_images[os.path.join(target_str, file)])
 
-            pdb.set_trace()
+        else:
+            img = Image.open(os.path.join(self.root_dir, target_str, file))
 
-        img = Image.open(os.path.join(self.root_dir, target_str, file))
         state = torch.get_rng_state()
         img = self.transform(img)
 
@@ -979,22 +1071,30 @@ class Image2ClassDataset(ImageDataset):
         return_dict["target"] = target
 
         if self.hints_enabled:
-            if os.path.exists(os.path.join(self.mask_dir, file)):
-                mask_path = os.path.join(self.mask_dir, file)
-
-            elif os.path.exists(os.path.join(self.mask_dir, target_str, file)):
-                mask_path = os.path.join(self.mask_dir, target_str, file)
+            if self.config.in_memory:
+                mask = Image.fromarray(self.in_memory_masks[os.path.join(target_str, file)])
 
             else:
-                raise Exception(os.path.join(self.mask_dir, target_str, file) + " not found!")
+                if os.path.exists(os.path.join(self.mask_dir, file)):
+                    mask_path = os.path.join(self.mask_dir, file)
 
-            mask = Image.open(mask_path)
+                elif os.path.exists(os.path.join(self.mask_dir, target_str, file)):
+                    mask_path = os.path.join(self.mask_dir, target_str, file)
+
+                else:
+                    raise Exception(os.path.join(self.mask_dir, target_str, file) + " not found!")
+
+                mask = Image.open(mask_path)
+
             torch.set_rng_state(state)
             mask = self.transform(mask)
             return_dict["mask"] = mask
 
         if self.idx_enabled:
             return_dict["idx"] = idx
+
+        if self.url_enabled:
+            return_dict["url"] = os.path.join(*self.urls[idx])
 
         if self.string_description_enabled:
             return_dict["description"] = target_str
