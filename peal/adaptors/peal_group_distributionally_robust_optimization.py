@@ -775,8 +775,6 @@ class PealGroupDRO(Adaptor):
         #
         # accuracy = self.logger.log_epoch(mode, pbar=pbar)
 
-        # TODO: Swap the overall accuracy with robust accuracy. loss_criterions is a dictionary.
-
         return loss.detach().item(), robust_acc
 
     def fit(self, continue_training=False, is_initialized=False):
