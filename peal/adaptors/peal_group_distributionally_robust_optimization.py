@@ -86,12 +86,17 @@ from peal.global_utils import (
     get_predictions,
     replace_relu_with_leakysoftplus,
     replace_relu_with_leakyrelu,
+    cprint
 )
 from peal.training.loggers import log_images_to_writer
 from peal.training.loggers import Logger
 from peal.training.criterions import get_criterions, available_criterions
-from peal.training.trainers import PredictorConfig
-from peal.data.dataloaders import create_dataloaders_from_datasource, DataloaderMixer
+from peal.training.trainers import PredictorConfig, get_predictor
+from peal.data.dataloaders import (
+    create_dataloaders_from_datasource,
+    DataloaderMixer,
+    WeightedDataloaderList
+)
 from peal.generators.interfaces import Generator
 from peal.architectures.interfaces import ArchitectureConfig, TaskConfig
 from peal.architectures.predictors import (
@@ -263,50 +268,15 @@ class PealGroupDRO(Adaptor):
         elif self.adaptor_config.model_path is not None:
             self.model_path = self.adaptor_config.model_path
         else:
-            self.model_path = Path(self.config.model_path)
-            name = "PEAL_DRO_" + str(self.model_path.name)
-            self.model_path = str(self.model_path.with_name(name))
+            self.model_path = os.path.join(self.config.model_path, "dro")
         ### END: DRO Alterations
 
-        if model is None:
-            if (
-                not self.config.task.x_selection is None
-                and not self.config.data.input_type == "image"
-            ):
-                input_channels = len(self.config.task.x_selection)
+        self.model = get_predictor(self.config, model)
 
-            else:
-                input_channels = self.config.data.input_size[0]
-
-            if not self.config.task.output_channels is None:
-                output_channels = self.config.task.output_channels
-
-            else:
-                output_channels = self.config.data.output_size[0]
-
-            if isinstance(self.config.architecture, ArchitectureConfig):
-                self.model = SequentialModel(
-                    self.config.architecture,
-                    input_channels,
-                    output_channels,
-                    self.config.training.dropout,
-                )
-
-            elif (
-                isinstance(self.config.architecture, str)
-                and self.config.architecture[:12] == "torchvision_"
-            ):
-                self.model = TorchvisionModel(
-                    self.config.architecture[12:], output_channels
-                )
-
-            else:
-                raise Exception("Architecture not available!")
-
-        else:
-            self.model = model
-
-        self.model.to(self.device)
+        try:
+            self.model.to(self.device)
+        except Exception:
+            import pdb; pdb.set_trace()
 
         ### BEGIN: DRO Alterations
         """
@@ -412,10 +382,12 @@ class PealGroupDRO(Adaptor):
         ### END: DRO Alterations
 
 
-
-
         if self.config.training.train_on_test:
             self.train_dataloader = test_dataloader
+
+        if isinstance(self.val_dataloaders, WeightedDataloaderList):
+            self.val_dataloader_weights = list(self.val_dataloaders.weights)
+            self.val_dataloaders = self.val_dataloaders.dataloaders
 
         if isinstance(self.val_dataloaders, tuple):
             self.val_dataloaders = list(self.val_dataloaders)
@@ -424,32 +396,32 @@ class PealGroupDRO(Adaptor):
             self.val_dataloaders = [self.val_dataloaders]
 
         if self.config.training.class_balanced:
-            new_train_dataloaders = []
-            new_val_dataloaders = []
-            for i in range(self.config.task.output_channels):
-                train_dataloader_copy = copy.deepcopy(self.train_dataloader)
-                val_dataloader_copy = copy.deepcopy(self.val_dataloaders[0])
-                train_dataloader_copy.dataset.enable_class_restriction(i)
-                val_dataloader_copy.dataset.enable_class_restriction(i)
-                new_train_dataloaders.append(train_dataloader_copy)
-                new_val_dataloaders.append(val_dataloader_copy)
-
-            new_config = copy.deepcopy(self.config.training)
-            new_config.steps_per_epoch = 200
-            new_config.concatenate_batches = True
-            self.train_dataloader = DataloaderMixer(
-                new_config, new_train_dataloaders[0]
-            )
-            for i in range(1, len(new_train_dataloaders)):
-                # TODO this only works for two classes!
-                self.train_dataloader.append(
-                    new_train_dataloaders[i], weight_added_dataloader=0.5
+            if not isinstance(self.train_dataloader, DataloaderMixer):
+                new_config = copy.deepcopy(self.config.training)
+                new_config.steps_per_epoch = 200
+                new_config.concatenate_batches = True
+                self.train_dataloader = DataloaderMixer(
+                    new_config, self.train_dataloader
                 )
 
+            self.train_dataloader.enable_class_balancing()
+
+            new_val_dataloaders = []
+            new_val_dataloader_weights = []
+            for j in range(len(self.val_dataloaders)):
+                for i in range(self.config.task.output_channels):
+                    val_dataloader_copy = copy.deepcopy(self.val_dataloaders[j])
+                    val_dataloader_copy.dataset.enable_class_restriction(i)
+                    new_val_dataloaders.append(val_dataloader_copy)
+                    new_val_dataloader_weights.append(
+                        0.5 * self.val_dataloader_weights[j]
+                    )
+                    new_val_dataloader_weights.append(
+                        0.5 * self.val_dataloader_weights[j]
+                    )
+
             self.val_dataloaders = new_val_dataloaders
-            self.val_dataloader_weights = [1.0 / len(self.val_dataloaders)] * len(
-                self.val_dataloaders
-            )
+            self.val_dataloader_weights = new_val_dataloader_weights
 
         #
         if optimizer is None:
@@ -470,23 +442,19 @@ class PealGroupDRO(Adaptor):
 
                 param_list = param_list_trained
 
-            print("trainable parameters: ", len(param_list))
+            cprint("trainable parameters: " + str(len(param_list)), self.config.tracking_level, 4)
             if self.config.training.optimizer == "sgd":
                 self.optimizer = torch.optim.SGD(
                     param_list,
                     lr=self.config.training.learning_rate,
                     momentum=0.9,
-                    ### Begin: DRO Alterations
-                    # weight_decay=0.0001,
-                    ### End: DRO Alterations
+                    weight_decay=0.0001,
                 )
-                # TODO: Remove this comment after validating that PealGroupDRO works
-                """
+
                 lambda1 = lambda epoch: 0.95**epoch
                 self.scheduler = torch.optim.lr_scheduler.LambdaLR(
                     self.optimizer, lr_lambda=lambda1
                 )
-                """
 
             elif self.config.training.optimizer == "adam":
                 self.optimizer = torch.optim.Adam(
@@ -717,11 +685,14 @@ class PealGroupDRO(Adaptor):
                 criterion_loss = self.config.task.criterions[
                     criterion
                 ] * self.regularization_criterions[criterion](self.model, pred, y.to(self.device))
+                criterion_loss *= self.regularization_level
 
                 loss_logs[criterion] = criterion_loss.detach().item()
                 loss += criterion_loss
 
-            for criterion in loss_criterions:
+            # eximport pdb; pdb.set_trace()
+
+            for criterion in loss_criterions.keys():
                 criterion_loss = self.config.task.criterions[
                     criterion
                 ] * loss_criterions[criterion].loss(pred, y.to(self.device), group_idx.to(self.device))
@@ -752,8 +723,17 @@ class PealGroupDRO(Adaptor):
 
             # Backpropagation
             loss.backward()
-            current_state = "Model Training: " + mode + "_it: " + str(batch_idx)
+            current_state = "MT: " + mode + "_it: " + str(batch_idx)
+            if "val_acc" in pbar.stored_values.keys():
+                current_state += ", val_acc: " + str(round(float(pbar.stored_values["val_acc"]), 3))
+
             current_state += ", loss: " + str(loss.detach().item())
+            current_state += ", ".join(
+                [
+                    key + ": " + str(pbar.stored_values[key])
+                    for key in pbar.stored_values
+                ]
+            )
             current_state += ", lr: " + str(
                 self.scheduler.get_last_lr()
                 if hasattr(self, "scheduler")
@@ -764,48 +744,54 @@ class PealGroupDRO(Adaptor):
                 if not source_distibution is None
                 else ""
             )
-            current_state += ", ".join(
-                [
-                    key + ": " + str(pbar.stored_values[key])
-                    for key in pbar.stored_values
-                ]
-            )
 
-            pbar.write(current_state)
-            pbar.update(1)
+            if self.config.tracking_level < 4:
+                current_state = current_state[:199]
+
+            if self.config.tracking_level >= 2:
+                pbar.set_postfix_str(current_state)
+                pbar.update(1)
 
             #
             if mode == "train":
                 self.optimizer.step()
 
+
             ### BEGIN: DRO Alterations
+            # Get average worst group accuracy among loss_criterions
+            avg_group_acc = torch.zeros(self.n_groups).to(self.device)
+            total_criterions = 0
+            for criterion in loss_criterions:
+                if hasattr(loss_criterions[criterion], "avg_group_acc"):
+                    avg_group_acc += loss_criterions[criterion].avg_group_acc
+                    total_criterions += 1
+            avg_group_acc /= total_criterions
+            robust_acc = torch.min(avg_group_acc).detach().item()
+
             for criterion in loss_criterions:
                 if hasattr(loss_criterions[criterion], "reset_stats"):
                     loss_criterions[criterion].reset_stats()
             ### END: DRO Alterations
         #
-        accuracy = self.logger.log_epoch(mode, pbar=pbar)
+        # accuracy = self.logger.log_epoch(mode, pbar=pbar)
 
-        return loss.detach().item(), accuracy
+        # TODO: Swap the overall accuracy with robust accuracy. loss_criterions is a dictionary.
+
+        return loss.detach().item(), robust_acc
 
     def fit(self, continue_training=False, is_initialized=False):
         """ """
-        print("Training Config: " + str(self.config))
-
-
+        cprint("Training Config: " + str(self.config), self.config.tracking_level, 4)
         ### BEGIN: DRO Alterations
         if (not continue_training) and self.reset_weights:
         ### END: DRO Alterations
             if "orthogonality" in self.config.task.criterions.keys():
-                print("Orthogonal intialization!!!")
-                print("Orthogonal intialization!!!")
-                print("Orthogonal intialization!!!")
+                cprint("Orthogonal initialization!!!", self.config.tracking_level, 4)
                 orthogonal_initialization(self.model)
 
             else:
-                print("reset weights!!!")
-                print("reset weights!!!")
-                print("reset weights!!!")
+                print("Training Config: " + str(self.config))
+                cprint("reset weights!!!", self.config.tracking_level, 4)
                 reset_weights(self.model)
 
         if not is_initialized:
@@ -820,25 +806,23 @@ class PealGroupDRO(Adaptor):
             Path(os.path.join(self.model_path, "logs")).mkdir(
                 parents=True, exist_ok=True
             )
-            print(os.path.join(self.model_path, "logs"))
-            print(os.path.join(self.model_path, "logs"))
-            print(os.path.join(self.model_path, "logs"))
+            cprint(os.path.join(self.model_path, "logs"), self.config.tracking_level, 4)
             writer = SummaryWriter(os.path.join(self.model_path, "logs"))
             self.logger.writer = writer
             os.makedirs(os.path.join(self.model_path, "outputs"))
             os.makedirs(os.path.join(self.model_path, "checkpoints"))
-            open(os.path.join(self.model_path, "platform.txt"), "w").write(
-                platform.node()
-            )
-
-            log_images_to_writer(self.train_dataloader, self.logger.writer, "train")
-            log_images_to_writer(
-                self.val_dataloaders[0], self.logger.writer, "validation0_"
-            )
-            if len(self.val_dataloaders) > 1:
-                log_images_to_writer(
-                    self.val_dataloaders[1], self.logger.writer, "validation1_"
+            if self.config.tracking_level >= 3:
+                open(os.path.join(self.model_path, "platform.txt"), "w").write(
+                    platform.node()
                 )
+
+                print("log train images!")
+                log_images_to_writer(self.train_dataloader, self.logger.writer, "train")
+                for i in range(len(self.val_dataloaders)):
+                    print("log validation" + str(i) + " images!")
+                    log_images_to_writer(
+                        self.val_dataloaders[i], self.logger.writer, "validation" + str(i) + "_"
+                    )
 
             self.config.is_loaded = True
             save_yaml_config(self.config, os.path.join(self.model_path, "config.yaml"))
@@ -847,26 +831,40 @@ class PealGroupDRO(Adaptor):
             writer = SummaryWriter(os.path.join(self.model_path, "logs"))
             self.logger.writer = writer
 
+
         pbar = tqdm(
             total=self.config.training.max_epochs
             * (
                 len(self.train_dataloader)
                 + int(np.sum(list(map(lambda dl: len(dl), self.val_dataloaders))))
-            )
+            ),
+            ncols=200
         )
         pbar.stored_values = {}
         val_accuracy_max = 0.0
         val_accuracy_previous = 0.0
         train_accuracy_previous = 0.0
         self.model.eval()
-        val_accuracy = 0.0
+        val_accuracy = None
         self.config.training.epoch = -1
         for idx, val_dataloader in enumerate(self.val_dataloaders):
             if len(val_dataloader) >= 1:
                 val_loss, val_accuracy_current = self.run_epoch(
                     val_dataloader, self.val_criterions[idx], mode="validation_" + str(idx), pbar=pbar
                 )
-                val_accuracy += self.val_dataloader_weights[idx] * val_accuracy_current
+                if self.config.training.early_stopping_goal == "average_accuracy":
+                    if val_accuracy is None:
+                        val_accuracy = 0.0
+
+                    val_accuracy += (
+                        self.val_dataloader_weights[idx] * val_accuracy_current
+                    )
+
+                elif self.config.training.early_stopping_goal == "worst_group_accuracy":
+                    if val_accuracy is None:
+                        val_accuracy = val_accuracy_current
+
+                    val_accuracy = min(val_accuracy, val_accuracy_current)
 
         self.logger.writer.add_scalar("epoch_validation_accuracy", val_accuracy, -1)
 
@@ -889,7 +887,7 @@ class PealGroupDRO(Adaptor):
                         self.model, self.train_dataloader.batch_size
                     )
                 )
-                print(train_generator_performance)
+                cprint(train_generator_performance, self.config.tracking_level, 4)
                 for key in train_generator_performance.keys():
                     self.logger.writer.add_scalar(
                         "epoch_train_" + key,
@@ -898,19 +896,33 @@ class PealGroupDRO(Adaptor):
                     )
             #
             self.model.eval()
-            val_accuracy = 0.0
+            val_accuracy = None
             for idx, val_dataloader in enumerate(self.val_dataloaders):
                 if len(val_dataloader) >= 1:
                     val_loss, val_accuracy_current = self.run_epoch(
                         val_dataloader, self.val_criterions[idx], mode="validation_" + str(idx), pbar=pbar
                     )
-                    val_accuracy += (
-                        self.val_dataloader_weights[idx] * val_accuracy_current
-                    )
+                    if self.config.training.early_stopping_goal == "average_accuracy":
+                        if val_accuracy is None:
+                            val_accuracy = 0.0
+
+                        val_accuracy += (
+                            self.val_dataloader_weights[idx] * val_accuracy_current
+                        )
+
+                    elif (
+                        self.config.training.early_stopping_goal
+                        == "worst_group_accuracy"
+                    ):
+                        if val_accuracy is None:
+                            val_accuracy = val_accuracy_current
+
+                        val_accuracy = min(val_accuracy, val_accuracy_current)
 
             self.logger.writer.add_scalar(
                 "epoch_validation_accuracy", val_accuracy, self.config.training.epoch
             )
+            pbar.stored_values["val_acc"] = val_accuracy
             if isinstance(self.model, Generator):
                 val_generator_performance = self.val_dataloaders[
                     0
@@ -966,7 +978,6 @@ class PealGroupDRO(Adaptor):
                 self.model.to(self.device)
 
             # increase regularization and reset checkpoint if overfitting occurs
-            """
             if (
                 train_accuracy >= train_accuracy_previous
                 and val_accuracy < val_accuracy_previous
@@ -992,7 +1003,6 @@ class PealGroupDRO(Adaptor):
                 val_accuracy_previous = val_accuracy
                 if hasattr(self, "scheduler"):
                     self.scheduler.step()
-            """
 
             save_yaml_config(self.config, os.path.join(self.model_path, "config.yaml"))
 
