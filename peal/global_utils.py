@@ -482,8 +482,16 @@ def get_predictions(args):
             elif len(y) == 3:
                 (lab, hint, img_file) = y
 
+            elif len(y) == 4:
+                (lab, hint, idx, img_file) = y
+
         img = img.to(device)
-        lab = lab.to(device)
+        try:
+            lab = lab.to(device)
+
+        except:
+            import pdb; pdb.set_trace()
+
         logits = classifier(img)
         if len(logits.shape) > 1:
             pred = logits.argmax(dim=1)
