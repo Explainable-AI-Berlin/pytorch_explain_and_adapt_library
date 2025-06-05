@@ -1285,25 +1285,29 @@ class CounterfactualExplainer(ExplainerInterface):
             n_clusters_kmeans = 2 ** (n_clusters + 1) - 2
             f_diff = torch.cat([e["feature_difference"] for e in explanations_list]).squeeze(-1).squeeze(-1)
             f_diff = f_diff / torch.norm(f_diff, dim=1, keepdim=True)
-            kmeans = KMeans(n_clusters=n_clusters_kmeans) #, distance=torch_kmeans.CosineSimilarity())
+            kmeans = kmeans = torch_kmeans.SoftKMeans(
+                n_clusters=n_clusters_kmeans, distance=torch_kmeans.CosineSimilarity
+            )
             predictions = kmeans.fit_predict(torch.stack([f_diff, torch.randn_like(f_diff)]))
             cluster_lists = [[] for i in range(n_clusters_kmeans)]
+            collage_path_ref = explanations_list[0]["collage_path_list"]
+            collage_path_elements = collage_path_ref.split(os.sep)[:-1]
+            collage_path_base = str(os.path.join(*([os.path.abspath(os.sep)] + collage_path_elements)))
             for idx, explanation in enumerate(explanations_list):
-                idx_cluster = predictions[idx]
+                idx_cluster = predictions[0][idx]
                 cluster_lists[idx_cluster].append(explanation)
-                if not collage_path_base is None:
-                    collage_path = explanation["collage_path_list"]
-                    cluster_collage_dir = collage_path_base + "_" + str(int(idx_cluster))
-                    if not os.path.exists(cluster_collage_dir):
-                        os.makedirs(cluster_collage_dir)
+                collage_path = explanation["collage_path_list"]
+                cluster_collage_dir = collage_path_base + "_" + str(int(idx_cluster))
+                if not os.path.exists(cluster_collage_dir):
+                    os.makedirs(cluster_collage_dir)
 
-                    collage_path_new = os.path.join(
-                        *[
-                            cluster_collage_dir,
-                            embed_numberstring(idx, 7) + ".png",
-                        ]
-                    )
-                    shutil.copy(collage_path, collage_path_new)
+                collage_path_new = os.path.join(
+                    *[
+                        cluster_collage_dir,
+                        embed_numberstring(idx, 7) + ".png",
+                    ]
+                )
+                shutil.copy(collage_path, collage_path_new)
 
             """
             activations = [extract_feature_difference([e[i] for e in explanations_list_by_source]) for i in range(len(explanations_list_by_source[0]))]
@@ -1312,18 +1316,30 @@ class CounterfactualExplainer(ExplainerInterface):
             kmeans = KMeans(n_clusters=4)
             kmeans.fit(torch.stack([activations_normalized,torch.randn(activations_normalized)]))
             import pdb; pdb.set_trace()
+            torch_kmeans.LpDistance(p=2).pairwise_distance(f_diff[0], f_diff[1])
             """
 
         else:
             if self.explainer_config.clustering_strategy == "activation_clusters":
                 all_over_decision_boundary = False
+                explanations_beginning = None
+                lowest_similarity = 1.0
                 current_idx = -1
-                while not all_over_decision_boundary:
+                for search_idx in range(len(explanations_list_by_source[0])):
                     all_over_decision_boundary = True
-                    current_idx += 1
-                    explanations_beginning = [e[current_idx] for e in explanations_list_by_source]
-                    for i in range(len(explanations_beginning)):
-                        all_over_decision_boundary &= explanations_beginning[i]["y_target_end_confidence_list"] > 0.5
+                    current_explanations = [e[search_idx] for e in explanations_list_by_source]
+                    for i in range(len(current_explanations)):
+                        all_over_decision_boundary &= current_explanations[i]["y_target_end_confidence_list"] > 0.5
+
+                    if not all_over_decision_boundary:
+                        continue
+
+                    _, cosine_similarity_list, _, _ = extract_feature_difference(current_explanations)
+
+                    if cosine_similarity_list[0] < lowest_similarity:
+                        explanations_beginning = current_explanations
+                        lowest_similarity = cosine_similarity_list[0]
+                        current_idx = search_idx
 
                 cluster_means, _, _, _ = extract_feature_difference(explanations_beginning)
                 cluster_lists[0] = [explanations_list_by_source[0][0]]
@@ -1440,13 +1456,19 @@ class CounterfactualExplainer(ExplainerInterface):
         cluster_scores = []
         for cluster_idx in range(len(cluster_dicts)):
             sample_scores = []
-            for sample_idx in range(len(cluster_dicts[cluster_idx]["x_list"])):
-                sample_scores.append(cluster_dicts[cluster_idx]["y_target_end_confidence_list"][sample_idx])
+            try:
+                for sample_idx in range(len(cluster_dicts[cluster_idx]["x_list"])):
+                    sample_scores.append(cluster_dicts[cluster_idx]["y_target_end_confidence_list"][sample_idx])
+
+            except Exception:
+                import pdb
+
+                pdb.set_trace()
 
             cluster_scores.append(torch.mean(torch.tensor(sample_scores)))
 
         sorted_cluster_idxs = torch.tensor(cluster_scores).argsort()
-        sorted_cluster_idxs = [int(sorted_cluster_idxs[-1 - i]) for i in range(self.explainer_config.num_attempts)]
+        sorted_cluster_idxs = [int(sorted_cluster_idxs[-1 - i]) for i in range(len(cluster_lists))]
 
         explanations_dict_out = cluster_dicts[sorted_cluster_idxs[0]]
 
