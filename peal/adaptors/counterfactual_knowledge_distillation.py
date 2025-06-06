@@ -930,19 +930,13 @@ class CFKD(Adaptor):
             os.path.join(self.base_dir, str(finetune_iteration), mode + "_feedback.txt")
         ):
             cprint("retrieve feedback!", self.adaptor_config.tracking_level, 2)
-            try:
-                feedback = self.teacher.get_feedback(
-                    base_dir=os.path.join(self.base_dir, str(finetune_iteration), mode + "_teacher"),
-                    student=self.student,
-                    num_clusters=self.adaptor_config.explainer.num_attempts,
-                    mode=mode,
-                    **tracked_values,
-                )
-
-            except Exception:
-                import pdb
-
-                pdb.set_trace()
+            feedback = self.teacher.get_feedback(
+                base_dir=os.path.join(self.base_dir, str(finetune_iteration), mode + "_teacher"),
+                student=self.student,
+                num_clusters=self.adaptor_config.explainer.num_attempts,
+                mode=mode,
+                **tracked_values,
+            )
 
             os.makedirs(os.path.join(self.base_dir, str(finetune_iteration)), exist_ok=True)
             with open(
