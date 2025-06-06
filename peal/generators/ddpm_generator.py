@@ -285,8 +285,6 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         dilation,
         t,
         stochastic,
-        old_mask=None,
-        mask_momentum=0.5,
         boolmask_in=None,
         max_avg_combination=0.5,
         exceptions=None,
