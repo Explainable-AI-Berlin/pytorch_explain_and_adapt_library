@@ -254,10 +254,19 @@ class PealGroupDRO(Adaptor):
         val_dataloader_weights=[1.0],
     ):
 
-        self.adaptor_config = load_yaml_config(adaptor_config, AdaptorConfig)
+
+        """
+        TODO: Weird error with PEAL archiecture configs
+        When using PealGroupDRO with a PEAL architecture config, the model is not loaded correctly. The architecture
+        config is instantiated correctly, however the layers in the architecture config are still dictionaries, or
+        rather are not properly instantiated. This is not the case when using ModelPredictor, which has almost
+        identical code as here.
+        """
+        self.adaptor_config = load_yaml_config(adaptor_config)
+        # import pdb; pdb.set_trace()
         self.reset_weights = self.adaptor_config.reset_weights
-        config = self.adaptor_config.predictor
-        self.config = load_yaml_config(config)
+        self.config = self.adaptor_config.predictor
+        # import pdb; pdb.set_trace()
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.val_dataloader_weights = val_dataloader_weights
 
@@ -314,6 +323,8 @@ class PealGroupDRO(Adaptor):
 
         shuffle = True
         sampler = None
+
+        self.n_groups = 2 ** dataset_train.output_size
 
         if self.adaptor_config.reweight_groups:
 
@@ -380,7 +391,6 @@ class PealGroupDRO(Adaptor):
             num_workers=0
         )
         ### END: DRO Alterations
-
 
         if self.config.training.train_on_test:
             self.train_dataloader = test_dataloader
@@ -815,12 +825,23 @@ class PealGroupDRO(Adaptor):
                 )
 
                 print("log train images!")
-                log_images_to_writer(self.train_dataloader, self.logger.writer, "train")
+                try:
+                    log_images_to_writer(self.train_dataloader, self.logger.writer, "train")
+                except StopIteration:
+                    print("Encountered StopIteration error in log_images_to_writer while logging the training "
+                          + "dataloader, when there are fewer than three batches in the dataloader")
                 for i in range(len(self.val_dataloaders)):
                     print("log validation" + str(i) + " images!")
-                    log_images_to_writer(
-                        self.val_dataloaders[i], self.logger.writer, "validation" + str(i) + "_"
-                    )
+                    # TODO: log_images_to_writer will raise a StopIteration error if there are fewer than three
+                    # batches in the dataloader. This is more prone to happen in the validation dataloader
+                    # with small datasets.
+                    try:
+                        log_images_to_writer(
+                            self.val_dataloaders[i], self.logger.writer, "validation" + str(i) + "_"
+                        )
+                    except StopIteration:
+                        print("Encountered StopIteration error in log_images_to_writer while logging the validation "
+                              + "dataloater, when there are fewer than three batches in the dataloader")
 
             self.config.is_loaded = True
             save_yaml_config(self.config, os.path.join(self.model_path, "config.yaml"))
