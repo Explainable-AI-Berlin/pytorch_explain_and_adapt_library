@@ -7,3 +7,4 @@ output_type             : multiclass
 output_size             : [41]
 confounder_probability  : 0.98
 confounding_factors     : [Smiling, Confounder]
+normalization           : [0.5, 0.5]

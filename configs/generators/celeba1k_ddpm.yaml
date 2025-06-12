@@ -1,0 +1,6 @@
+# python -W ignore train_generator.py --config "<PEAL_BASE>/configs/generators/celeba1k_ddpm.yaml"
+generator_type : DDPM
+category : generator
+base_path : $PEAL_RUNS/celeba1k/ddpm
+data: <PEAL_BASE>/configs/data/celeba1k_Blond_Hair_confounding_Male_poisoned098_generator.yaml
+batch_size: 49
