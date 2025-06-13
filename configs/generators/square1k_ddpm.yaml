@@ -2,8 +2,8 @@
 generator_type : DDPM
 category : generator
 base_path : $PEAL_RUNS/square1k/ddpm
-data: <PEAL_BASE>/configs/data/square1k_generator.yaml
+data: <PEAL_BASE>/configs/data/square1k_generator_poisoned098.yaml
 image_size: 64
-batch_size: 196
+batch_size: 100
 save_interval: 1000
 max_steps: 10000
