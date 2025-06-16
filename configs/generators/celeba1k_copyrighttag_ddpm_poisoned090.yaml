@@ -1,0 +1,7 @@
+# python -W ignore train_generator.py --config "<PEAL_BASE>/configs/generators/celeba1k_copyrighttag_ddpm_poisoned090.yaml"
+generator_type : DDPM
+category : generator
+base_path : $PEAL_RUNS/celeba1k_copyrighttag/ddpm_poisoned090
+data: <PEAL_BASE>/configs/data/celeba1k_copyrighttag_poisoned090_generator.yaml
+image_size: 128
+batch_size: 100
