@@ -1,4 +1,4 @@
-# python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x098_random_sce_cfkd.yaml"
+# python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x098_sce_random_cfkd.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  6

@@ -181,4 +181,5 @@ dependencies:
       - zennit-crp==0.6.0
       - zipp==3.16.2
       - onnxruntime_gpu==1.15
+      - torch-kmeans==0.2.0
 prefix: /opt/conda/envs/peal

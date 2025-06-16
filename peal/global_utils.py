@@ -56,6 +56,10 @@ def dict_to_bar_chart(input_dict, name):
 
 
 def find_subclasses(base_class, directory):
+    directory_name = os.path.split(directory)[-1]
+    if directory_name == "dependencies":
+        return []
+
     subclasses = []
 
     def check_module(module_name):

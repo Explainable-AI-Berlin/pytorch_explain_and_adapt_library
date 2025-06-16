@@ -28,7 +28,7 @@ class BaselineTeacher(TeacherInterface):
         teacher_counterfactual = []
         device = "cuda" if next(student.parameters()).is_cuda else "cpu"
         for idx, counterfactual in enumerate(x_counterfactual_list):
-            y_target_confidence_end = torch.nn.functional.softmax(
+            """y_target_confidence_end = torch.nn.functional.softmax(
                 student(counterfactual.unsqueeze(0).to(device))[0]
             )[y_target_list[idx]]
             if (
@@ -36,9 +36,9 @@ class BaselineTeacher(TeacherInterface):
                 < 0.01
             ):
                 print("End confidences are not matching!")
-                feedback.append("confidence missmatch!")
+                feedback.append("confidence missmatch!")"""
 
-            elif (
+            if (
                 self.counterfactual_type == "1sided"
                 and y_list[idx] != y_source_list[idx]
             ):
@@ -61,7 +61,7 @@ class BaselineTeacher(TeacherInterface):
             teacher_original.append(-1)
             teacher_counterfactual.append(-1)
 
-        if self.tracking_level > 1:
+        if self.tracking_level >= 5:
             self.dataset.generate_contrastive_collage(
                 y_counterfactual_teacher_list=teacher_counterfactual,
                 y_original_teacher_list=teacher_original,

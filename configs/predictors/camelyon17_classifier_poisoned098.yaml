@@ -1,4 +1,4 @@
-# python train_predictor.py --config "<PEAL_BASE>/configs/predictors/camelyon17_classifier_poisoned100.yaml"
+# python train_predictor.py --config "<PEAL_BASE>/configs/predictors/camelyon17_classifier_poisoned098.yaml"
 model_path        : $PEAL_RUNS/camelyon17/classifier_poisoned098
 data              : <PEAL_BASE>/configs/data/camelyon17_poisoned098.yaml
 training          : <PEAL_BASE>/configs/training/img_classifier.yaml

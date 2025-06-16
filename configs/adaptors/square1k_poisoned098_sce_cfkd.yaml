@@ -1,8 +1,8 @@
-# python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1000x098_sce_cfkd.yaml"
+# python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square1k_poisoned098_sce_cfkd.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  6
-tracking_level                       :  3
+tracking_level                       :  4
 min_train_samples                    :  800
 finetune_iterations                  :  1
 max_validation_samples               :  200
@@ -15,7 +15,7 @@ data                                 :  <PEAL_BASE>/configs/data/square1k_poison
 test_data                            :  <PEAL_BASE>/configs/data/square_unpoisoned.yaml
 student                              :  $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/classifier_poisoned098/model.cpl
 teacher                              :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_unpoisoned/model.cpl
-generator                            :  $PEAL_RUNS/square/ddpm/config.yaml
+generator                            :  $PEAL_RUNS/square1k/ddpm/config.yaml
 base_dir                             :  $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/classifier_poisoned098/sce_cfkd
 task:
   criterions:

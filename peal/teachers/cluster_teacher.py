@@ -20,7 +20,7 @@ class DataStore:
 class ClusterTeacher(TeacherInterface):
     """ """
 
-    def __init__(self, port, dataset, tracking_level=0):
+    def __init__(self, port, dataset, tracking_level=0, counterfactual_type="1sided"):
         """ """
         # TODO fix bug with reloading
         shutil.rmtree("static", ignore_errors=True)
@@ -44,6 +44,7 @@ class ClusterTeacher(TeacherInterface):
         self.data.feedback = []
 
         app.config.UPLOAD_FOLDER = "static"
+        self.counterfactual_type = counterfactual_type
 
         @app.route("/", methods=["GET", "POST"])
         def index():
@@ -57,10 +58,7 @@ class ClusterTeacher(TeacherInterface):
                 elif request.form["submit_button"] == "Out of Distribution":
                     self.data.feedback.append("ood")
 
-                if (
-                    len(self.data.collage_paths) > 0
-                    and len(self.data.collage_paths) > self.data.i
-                ):
+                if len(self.data.collage_paths) > 0 and len(self.data.collage_paths) > self.data.i:
                     collage_path = self.data.collage_paths[self.data.i]
                     self.data.i += 1
                     return render_template(
@@ -86,20 +84,18 @@ class ClusterTeacher(TeacherInterface):
                     return render_template("information.html")
 
         self.thread = threading.Thread(
-            target=lambda: app.run(
-                host=host_name, port=self.port, debug=True, use_reloader=False
-            )
+            target=lambda: app.run(host=host_name, port=self.port, debug=True, use_reloader=False)
         )
         self.thread.start()
         print("Feedback GUI is active on localhost:" + str(self.port))
 
     def get_feedback(self, num_clusters, **kwargs):
         """ """
-        print('start collecting feedback!!!')
+        print("start collecting feedback!!!")
         collage_path_clusters = []
-        l = len(kwargs['collage_path_list']) // num_clusters
+        l = len(kwargs["collage_path_list"]) // num_clusters
         for cluster_idx in range(num_clusters):
-            collage_path_clusters.append(kwargs['collage_path_list'][cluster_idx * l:(cluster_idx + 1) * l])
+            collage_path_clusters.append(kwargs["collage_path_list"][cluster_idx * l : (cluster_idx + 1) * l])
 
         collage_clusters_static = []
         for collage_path_list in collage_path_clusters:
@@ -138,19 +134,26 @@ class ClusterTeacher(TeacherInterface):
             for _ in range(l):
                 feedback_out.append(feedback[cluster_idx])
 
-        if self.tracking_level > 1:
+        for idx, counterfactual in enumerate(kwargs["x_counterfactual_list"]):
+            if self.counterfactual_type == "1sided" and kwargs["y_list"][idx] != kwargs["y_source_list"][idx]:
+                feedback_out[idx] = "student originally wrong!"
+
+            elif kwargs["y_target_end_confidence_list"][idx] < 0.5:
+                feedback_out[idx] = "student not swapped!"
+
+        if self.tracking_level >= 5:
             self.dataset.generate_contrastive_collage(
                 y_counterfactual_teacher_list=[-1] * len(feedback_out),
                 y_original_teacher_list=[-1] * len(feedback_out),
                 feedback_list=feedback_out,
-                x_counterfactual_list=kwargs['x_counterfactual_list'],
-                y_source_list=kwargs['y_source_list'],
-                y_target_list=kwargs['y_target_list'],
-                x_list=kwargs['x_list'],
-                y_list=kwargs['y_list'],
-                y_target_end_confidence_list=kwargs['y_target_end_confidence_list'],
-                y_target_start_confidence_list=kwargs['y_target_start_confidence_list'],
-                base_path=kwargs['base_dir'],
+                x_counterfactual_list=kwargs["x_counterfactual_list"],
+                y_source_list=kwargs["y_source_list"],
+                y_target_list=kwargs["y_target_list"],
+                x_list=kwargs["x_list"],
+                y_list=kwargs["y_list"],
+                y_target_end_confidence_list=kwargs["y_target_end_confidence_list"],
+                y_target_start_confidence_list=kwargs["y_target_start_confidence_list"],
+                base_path=kwargs["base_dir"],
             )
 
         return feedback_out
