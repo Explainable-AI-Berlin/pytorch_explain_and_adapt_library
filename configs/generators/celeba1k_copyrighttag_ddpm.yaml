@@ -2,6 +2,6 @@
 generator_type : DDPM
 category : generator
 base_path : $PEAL_RUNS/celeba1k_copyrighttag/ddpm
-data: <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba1k_poisoned098_generator.yaml
+data: <PEAL_BASE>/configs/data/celeba1k_copyrighttag.yaml
 image_size: 128
-batch_size: 49
+batch_size: 100
