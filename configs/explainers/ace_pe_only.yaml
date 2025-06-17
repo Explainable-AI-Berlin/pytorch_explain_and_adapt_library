@@ -6,6 +6,6 @@ sampling_time_fraction: 0.3
 sampling_inpaint: 0.0
 attack_step: 1
 dist_l1: 0.0
-y_target_goal_confidence: 1.1
+y_target_goal_confidence: 0.995
 num_attempts: 2
 allow_overlap: true

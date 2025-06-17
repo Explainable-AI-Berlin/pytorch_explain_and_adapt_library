@@ -62,6 +62,9 @@ def calculate_validation_statistics(
         pbar.stored_values = {}
 
         for it, (x, y) in enumerate(dataloader):
+            """if not it == 41:
+                continue"""
+
             if num_samples >= int(max_validation_samples / len(dataloaders)) or x.shape[0] != dataloader.batch_size:
                 break
 
@@ -123,6 +126,8 @@ def calculate_validation_statistics(
                 start_idx=it * dataloader.batch_size,
                 # dataloader=dataloader,
             )
+            #import pdb; pdb.set_trace()
+            # import torchvision; torchvision.utils.save_image(results['x_counterfactual_list'][0], "ace_066.png")
             # except TypeError:
             #    import pdb; pdb.set_trace()
             for key in set(results.keys()).intersection(set(tracked_values.keys())):

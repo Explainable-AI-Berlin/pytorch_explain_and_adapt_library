@@ -95,7 +95,7 @@ if __name__ == "__main__":
     ]
     # 23
     #sample_idxs = [[17, 43], [20, 23], [3, 2], [8, 4], [7, 9]]
-    o = 68
+    o = 58
     sample_idxs = [[98 - o, 99 - o], [98 - o, 99 - o], [3, 2], [8, 4], [7, 9]]
     imgs = torch.zeros([1 + 2 * len(methods), 2 * len(base_paths), 3, 128, 128])
     target_confidences = torch.zeros([1 + 2 * len(methods), 2 * len(base_paths)])
