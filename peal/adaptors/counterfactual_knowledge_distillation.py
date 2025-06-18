@@ -549,7 +549,7 @@ class CFKD(Adaptor):
             log_images_to_writer(self.test_dataloader, writer, "test")
             cprint("log sample batches done!", self.adaptor_config.tracking_level, 2)
 
-            if isinstance(self.val_dataloader.dataset, ImageDataset) and self.adaptor_config.tracking_level >= 5:
+            if isinstance(self.val_dataloader.dataset, ImageDataset) and self.adaptor_config.tracking_level >= 4:
                 cprint("visualizing sample!!!", self.adaptor_config.tracking_level, 2)
                 generator_sample = self.generator.sample_x()
                 if not generator_sample is None:
