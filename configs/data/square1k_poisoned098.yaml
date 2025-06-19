@@ -1,6 +1,6 @@
 dataset_class           : SquareDataset
 dataset_path            : $PEAL_DATA/square
-num_samples             : 8000
+num_samples             : 1000
 split                   : [0.8,1.0]
 input_type              : image
 input_size              : [3, 64, 64]

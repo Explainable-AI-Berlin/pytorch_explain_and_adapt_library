@@ -8,14 +8,15 @@ finetune_iterations                  :  1
 max_validation_samples               :  200
 continuous_learning                  :  "finetune"
 calculate_group_accuracies           :  True
+calculate_explainer_stats            :  False
 explainer                            :  <PEAL_BASE>/configs/explainers/sce_default128x128.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba_poisoned100.yaml
 test_data                            :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba.yaml
-base_dir                             :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned100/sce_cfkd
-student                              :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned100/model.cpl
+base_dir                             :  $PEAL_RUNS/celeba1k_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned100/sce_cfkd
+student                              :  $PEAL_RUNS/celeba1k_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned100/model.cpl
 teacher                              :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_unpoisoned/model.cpl
-generator                            :  $PEAL_RUNS/celeba_copyrighttag/ddpm/config.yaml
+generator                            :  $PEAL_RUNS/celeba1k_copyrighttag/ddpm_poisoned100/config.yaml
 task:
   criterions:
     ce     : 1.0
