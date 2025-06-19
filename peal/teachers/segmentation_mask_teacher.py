@@ -60,7 +60,7 @@ class SegmentationMaskTeacher(TeacherInterface):
                 else:
                     feedback.append("false")
 
-        if self.tracking_level > 1:
+        if self.tracking_level >= 5:
             self.dataset.generate_contrastive_collage(
                 y_counterfactual_teacher_list=y_list,
                 y_target_end_confidence_list=y_target_end_confidence_list,

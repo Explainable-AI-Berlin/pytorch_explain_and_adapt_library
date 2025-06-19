@@ -1,21 +1,21 @@
-# python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square250x100_pfc_cfkd.yaml"
+# python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square4kx098_pfc_cfkd.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
-batch_size                           :  6
+batch_size                           :  10
 tracking_level                       :  0
-min_train_samples                    :  150
+min_train_samples                    :  3200
 finetune_iterations                  :  1
-max_validation_samples               :  100
+max_validation_samples               :  800
 continuous_learning                  :  "finetune"
-use_visualization                    :  False
 calculate_group_accuracies           :  True
+calculate_explainer_stats            :  False
 explainer                            :  <PEAL_BASE>/configs/explainers/perfect_false_counterfactuals.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
-data                                 :  <PEAL_BASE>/configs/data/square_poisoned100.yaml
+data                                 :  <PEAL_BASE>/configs/data/square4k_poisoned098.yaml
 test_data                            :  <PEAL_BASE>/configs/data/square_unpoisoned.yaml
-student                              :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned100/model.cpl
+student                              :  $PEAL_RUNS/square4k/colora_confounding_colorb/torchvision/classifier_poisoned098/model.cpl
 teacher                              :  SegmentationMask
-base_dir                             :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned100/cfkd_perfect_counterfactuals250
+base_dir                             :  $PEAL_RUNS/square4k/colora_confounding_colorb/torchvision/classifier_poisoned098/pfc_cfkd
 task:
   criterions:
     ce     : 1.0

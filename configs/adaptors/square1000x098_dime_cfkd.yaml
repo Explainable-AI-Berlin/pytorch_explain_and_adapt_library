@@ -7,16 +7,16 @@ min_train_samples                    :  800
 finetune_iterations                  :  1
 max_validation_samples               :  200
 continuous_learning                  :  "finetune"
-use_visualization                    :  True
 calculate_group_accuracies           :  True
+calculate_explainer_stats            :  False
 explainer                            :  <PEAL_BASE>/configs/explainers/dime_default.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
-data                                 :  <PEAL_BASE>/configs/data/square_poisoned098.yaml
+data                                 :  <PEAL_BASE>/configs/data/square1k_poisoned098.yaml
 test_data                            :  <PEAL_BASE>/configs/data/square_unpoisoned.yaml
-student                              :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned098/model.cpl
+student                              :  $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/classifier_poisoned098/model.cpl
 teacher                              :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_unpoisoned/model.cpl
 generator                            :  $PEAL_RUNS/square/ddpm/config.yaml
-base_dir                             :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_poisoned098/dime_cfkd
+base_dir                             :  $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/classifier_poisoned098/dime_cfkd
 task:
   criterions:
     ce     : 1.0

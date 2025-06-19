@@ -1,19 +1,20 @@
-# python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba4000x100_pfc_cfkd.yaml"
+# python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba4kx098_pfc_cfkd.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  10
 finetune_iterations                  :  1
 tracking_level                       :  0
-min_train_samples                    :  3600
-max_validation_samples               :  400
+min_train_samples                    :  3200
+max_validation_samples               :  800
 continuous_learning                  :  "finetune"
 calculate_group_accuracies           :  True
+calculate_explainer_stats            :  False
 explainer                            :  <PEAL_BASE>/configs/explainers/perfect_false_counterfactuals.yaml
 training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
-data                                 :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba_poisoned100.yaml
+data                                 :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba4k_poisoned098.yaml
 test_data                            :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba.yaml
-base_dir                             :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned100/cfkd_perfect_false_counterfactuals4000
-student                              :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned100/model.cpl
+base_dir                             :  $PEAL_RUNS/celeba4k_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned098/pfc_cfkd
+student                              :  $PEAL_RUNS/celeba4k_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned098/model.cpl
 teacher                              :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_unpoisoned/model.cpl
 task:
   criterions:
