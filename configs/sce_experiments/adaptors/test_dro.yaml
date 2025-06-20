@@ -1,0 +1,9 @@
+adaptor_type  : "GroupDRO"
+category      : "adaptor"
+predictor     : <PEAL_BASE>/configs/sce_experiments/predictors/follicle_cut_classifier.yaml
+model_path    : $PEAL_RUNS/follicles/dro_classifier
+is_robust     : True
+alpha         : 0.01
+gamma         : 0.1
+reset_weights : False
+seed          : 0

@@ -209,7 +209,7 @@ The originals in this array can be found under the key "x_list" and the counterf
 
 
 
-**Installation Instructions:**
+**Planned Installation Instructions (Not Functional yet!!!):**
 
 pip install peal
 

@@ -1,0 +1,11 @@
+adaptor_type  : "GroupDRO"
+category      : "adaptor"
+predictor     : <PEAL_BASE>/configs/sce_experiments/predictors/dro_replication_celeba_Blond_Hair_confounding_Male_classifier.yaml
+model_path    : $PEAL_RUNS/celeba/Blond_Hair_confounding_Male/dro_classifier_natural_1
+is_robust     : True
+alpha         : 0.01
+gamma         : 0.1
+replication_dataset : "celeba"
+reweight_groups : True
+reset_weights : False
+seed          : 1

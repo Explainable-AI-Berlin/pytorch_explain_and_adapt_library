@@ -1,0 +1,12 @@
+# python train_predictor.py --config "<PEAL_BASE>/configs/sce_experiments/predictors/follicle_cut_classifier.yaml"
+model_path        : $PEAL_RUNS/follicles_cut/classifier_natural
+training          : <PEAL_BASE>/configs/sce_experiments/training/img_classifier_balanced.yaml
+architecture      : torchvision_resnet18
+data              : <PEAL_BASE>/configs/sce_experiments/data/follicles.yaml
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  y_selection             : [type]
+  output_channels         : 2

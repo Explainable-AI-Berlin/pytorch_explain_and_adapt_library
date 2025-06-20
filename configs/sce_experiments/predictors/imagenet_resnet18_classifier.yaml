@@ -1,0 +1,10 @@
+# python train_predictor.py --config "<PEAL_BASE>/configs/sce_experiments/predictors/imagenet_classifier.yaml"
+model_path        : $PEAL_RUNS/imagenet/natural_classifier
+training          : <PEAL_BASE>/configs/sce_experiments/training/img_classifier.yaml
+architecture      : torchvision_resnet18_imagenet
+data              : <PEAL_BASE>/configs/sce_experiments/data/imagenet.yaml
+task:
+  criterions:
+    ce     : 1.0
+  output_type             : singleclass
+  output_channels         : 1000

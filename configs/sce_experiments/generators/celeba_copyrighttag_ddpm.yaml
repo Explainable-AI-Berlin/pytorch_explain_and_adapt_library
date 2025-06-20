@@ -1,0 +1,7 @@
+# python -W ignore train_generator.py --config "<PEAL_BASE>/configs/sce_experiments/generators/celeba_copyrighttag_ddpm.yaml"
+generator_type : DDPM
+category : generator
+base_path : $PEAL_RUNS/celeba_copyrighttag/ddpm
+data: <PEAL_BASE>/configs/sce_experiments/data/celeba_copyrighttag.yaml
+image_size: 128
+batch_size: 100
