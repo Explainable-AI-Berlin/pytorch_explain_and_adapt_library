@@ -1,0 +1,25 @@
+# python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/Smiling_confounding_CopyrightTag_celeba8kx098_pfc_cfkd.yaml"
+adaptor_type                         :  "CFKD"
+category                             :  "adaptor"
+batch_size                           :  10
+finetune_iterations                  :  1
+tracking_level                       :  2
+min_train_samples                    :  6400
+max_validation_samples               :  1600
+continuous_learning                  :  "finetune"
+calculate_group_accuracies           :  True
+calculate_explainer_stats            :  False
+explainer                            :  <PEAL_BASE>/configs/cfkd_experiments/explainers/perfect_false_counterfactuals.yaml
+training                             :  <PEAL_BASE>/configs/cfkd_experiments/training/img_finetuning.yaml
+data                                 :  <PEAL_BASE>/configs/cfkd_experiments/data/Smiling_confounding_copyrighttag_celeba8k_poisoned098.yaml
+test_data                            :  <PEAL_BASE>/configs/cfkd_experiments/data/Smiling_confounding_copyrighttag_celeba.yaml
+base_dir                             :  $PEAL_RUNS/celeba8k_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned098/pfc_cfkd
+student                              :  $PEAL_RUNS/celeba8k_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned098/model.cpl
+teacher                              :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_unpoisoned/model.cpl
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [Smiling]

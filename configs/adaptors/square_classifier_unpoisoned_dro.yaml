@@ -1,8 +1,0 @@
-adaptor_type  : "PealGroupDRO"
-category      : "adaptor"
-predictor     : <PEAL_BASE>/configs/predictors/square_classifier_unpoisoned.yaml
-model_path    : $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_unpoisoned/dro
-is_robust     : True
-alpha         : 0.01
-gamma         : 0.1
-reset_weights : True

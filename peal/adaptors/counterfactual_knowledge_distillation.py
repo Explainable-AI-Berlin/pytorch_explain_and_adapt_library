@@ -880,7 +880,7 @@ class CFKD(Adaptor):
                 tracked_values = self.explainer.cluster_explanations(
                     tracked_values,
                     self.adaptor_config.batch_size,
-                    self.adaptor_config.explainer.num_attempts,
+                    self.adaptor_config.explainer.num_attempts * self.adaptor_config.parallel_attempts,
                 )
 
             if len(list(tracked_values.values())[0]) == 0:

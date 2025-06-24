@@ -1,0 +1,12 @@
+# python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/square_vit_b_16_poisoned100.yaml"
+model_path        : $PEAL_RUNS/square/colora_confounding_colorb/torchvision/vit_b_16_poisoned100
+data              : <PEAL_BASE>/configs/cfkd_experiments/data/square_poisoned100.yaml
+training          : <PEAL_BASE>/configs/cfkd_experiments/training/img_classifier.yaml
+architecture      : torchvision_vit_b_16
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [ClassA]

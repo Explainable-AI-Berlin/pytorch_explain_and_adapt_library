@@ -1,0 +1,12 @@
+# python train_predictor.py --config peal/configs/cfkd_experiments/predictors/celeba_Smiling_confounding_copyrighttag_classifier_poisoned050.yaml
+model_path        : $PEAL_RUNS/Smiling_confounding_copyrighttag_celeba/classifier_poisoned050
+data              : <PEAL_BASE>/configs/cfkd_experiments/data/Smiling_confounding_copyrighttag_celeba_poisoned050.yaml
+training          : <PEAL_BASE>/configs/cfkd_experiments/training/img_classifier.yaml
+architecture      : torchvision_resnet18
+task:
+  criterions:
+    ce     : 1.0
+    l1     : 1000.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [Smiling]

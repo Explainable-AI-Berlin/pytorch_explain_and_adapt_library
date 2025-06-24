@@ -1,0 +1,21 @@
+# python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/celeba_Smiling_natural_sce_cfkd.yaml"
+adaptor_type                         :  "CFKD"
+category                             :  "adaptor"
+batch_size                           :  4
+tracking_level                       :  5
+finetune_iterations                  :  0
+max_validation_samples               :  200
+calculate_group_accuracies           :  False
+explainer                            :  <PEAL_BASE>/configs/cfkd_experiments/explainers/sce_default128x128.yaml
+data                                 :  <PEAL_BASE>/configs/cfkd_experiments/data/celeba.yaml
+student                              :  $PEAL_RUNS/celeba/Smiling/classifier_natural/model.cpl
+teacher                              :  Baseline:true
+generator                            :  $PEAL_RUNS/celeba/ddpm/config.yaml
+base_dir                             :  $PEAL_RUNS/celeba/Smiling/classifier_natural/sce_cfkd
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [Smiling]

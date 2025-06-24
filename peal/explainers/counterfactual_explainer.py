@@ -166,6 +166,14 @@ class SCEConfig(ExplainerConfig):
     Whether to use a generative model to filter the gradients or not.
     """
     use_gradient_filtering: bool = True
+    """
+    The strength of the orthogonalization penalty for parallel counterfactuals.
+    """
+    orthogonalization_penatly: float = 0.0
+    """
+    How many counterfactuals are created for the same factual in parallel.
+    """
+    parallel_attempts: int = 1
 
 
 class ACEConfig(ExplainerConfig):
@@ -831,6 +839,18 @@ class CounterfactualExplainer(ExplainerInterface):
 
         logits_gradient = gradient_predictor(img_predictor) / self.explainer_config.temperature
         loss = self.loss(logits_gradient, y_target.to(self.device))
+
+        if self.explainer_config.orthogonalization_penatly > 0.0:
+            activations = extract_penultima_activation(img_predictor, self.predictor)
+            normalized_activations = torch.nn.functional.normalize(activations, p=2, dim=0)
+            gram_matrix = torch.matmul(normalized_activations.T, normalized_activations)
+            identity_matrix = torch.eye(activations.shape[-1], device=activations.device)
+            orthogonality_loss = (
+                self.explainer_config.orthogonalization_penatly
+                * torch.norm(gram_matrix - identity_matrix, p="fro") ** 2
+            )
+            loss += orthogonality_loss
+
         l1_losses = []
         for z_idx in range(len(z_original)):
             l1_losses.append(torch.mean(torch.abs(z[z_idx].to(self.device) - torch.clone(z_original[z_idx]).detach())))
@@ -1264,9 +1284,9 @@ class CounterfactualExplainer(ExplainerInterface):
                 )
                 for source_idx in range(len(explanations_list_by_source)):
                     explanations_list_by_source[source_idx][sample_idx]["feature_difference"] = feature_difference[0]
-                    explanations_list_by_source[source_idx][sample_idx]["cosine_similarities"] = (
-                        cosine_similarities_list[0]
-                    )
+                    explanations_list_by_source[source_idx][sample_idx][
+                        "cosine_similarities"
+                    ] = cosine_similarities_list[0]
                     explanations_list_by_source[source_idx][sample_idx]["norm_list"] = norm_list[0]
                     explanations_list_by_source[source_idx][sample_idx]["ratio_list"] = ratio_list[0]
 

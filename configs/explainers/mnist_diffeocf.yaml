@@ -1,9 +1,0 @@
-# python -W ignore run_explainer.py --config "<PEAL_BASE>/configs/explainers/mnist_diffeocf.yaml"
-explainer_type : DiffeoCF
-category : explainer
-predictor_path: $PEAL_RUNS/mnist/natural_classifier/model.cpl
-data_config: <PEAL_BASE>/configs/data/mnist.yaml
-generator: $PEAL_RUNS/mnist/glow/config.yaml
-validate_generator: True
-explanations_dir: $PEAL_RUNS/mnist/natural_classifier/diffeocf_explanations
-max_samples: 10
