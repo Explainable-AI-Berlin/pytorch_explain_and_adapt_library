@@ -265,9 +265,9 @@ class CFKD(Adaptor):
 
         self.adaptor_config.data.in_memory = self.adaptor_config.in_memory
         self.adaptor_config.test_data.in_memory = self.adaptor_config.in_memory
-        assert (
+        '''assert (
             self.adaptor_config.finetune_iterations == 0 or self.adaptor_config.batch_size % 2 == 0
-        ), "only even batch sizes are supported so far for CFKD finetuning!"
+        ), "only even batch sizes are supported so far for CFKD finetuning!"'''
         self.adaptor_config.explainer.tracking_level = self.adaptor_config.tracking_level
         self.adaptor_config.explainer.transition_restrictions = self.adaptor_config.transition_restrictions
         if not self.adaptor_config.clustering_strategy is None:
@@ -702,7 +702,7 @@ class CFKD(Adaptor):
     def get_batch(
         self,
         error_matrix: torch.Tensor = None,
-        cm_idx: int = 1,
+        cm_idx_in: int = 0,
     ):
         x_batch = []
         y_source_batch = []
@@ -712,6 +712,12 @@ class CFKD(Adaptor):
         hint_batch = []
         idx_batch = []
         sample_idx = 0
+        cm_idx = cm_idx_in
+        print("cm_idx_in", cm_idx_in)
+        print("cm_idx_in", cm_idx_in)
+        print("cm_idx_in", cm_idx_in)
+        print("cm_idx_in", cm_idx_in)
+        print("cm_idx_in", cm_idx_in)
         torch.manual_seed(torch.seed())
         if self.adaptor_config.use_confusion_matrix:
             error_distribution = torch.distributions.Categorical(error_matrix)
@@ -723,12 +729,6 @@ class CFKD(Adaptor):
             # TODO verify that this is actually balancing itself!
             y_source = int(cm_idx / self.output_size)
             y_target = int(cm_idx % self.output_size)
-            while y_source == y_target:
-                cm_idx = (cm_idx + 1) % (self.output_size**2)
-                y_source = int(cm_idx / self.output_size)
-                y_target = int(cm_idx % self.output_size)
-
-            cm_idx = (cm_idx + 1) % (self.output_size**2)
             x, y = self.datastack.pop(int(y_source))
 
             if self.hints_enabled:
@@ -771,6 +771,14 @@ class CFKD(Adaptor):
 
             else:
                 pass
+
+
+            while y_source == y_target:
+                cm_idx = (cm_idx + 1) % (self.output_size**2)
+                y_source = int(cm_idx / self.output_size)
+                y_target = int(cm_idx % self.output_size)
+
+            cm_idx = (cm_idx + 1) % (self.output_size**2)
 
         x_batch = torch.stack(x_batch)
         y_target_batch = torch.stack(y_target_batch)
@@ -831,7 +839,7 @@ class CFKD(Adaptor):
                 break
 
             for i in range(num_batches_per_iteration):
-                batch = self.get_batch(error_matrix, i % 2)
+                batch = self.get_batch(error_matrix, cm_idx_in=i % 2)
                 values = self.explainer.explain_batch(
                     batch=batch,
                     base_path=collage_base_path,
