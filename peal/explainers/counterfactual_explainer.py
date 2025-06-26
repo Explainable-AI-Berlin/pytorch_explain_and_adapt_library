@@ -673,6 +673,7 @@ class CounterfactualExplainer(ExplainerInterface):
         best_z = torch.clone(z[0])
         best_score = 0.5 * torch.ones_like(target_confidence_goal_current)
         best_mask = torch.ones_like(best_z)
+        start_activations = extract_penultima_activation(x_predictor.to(self.device), self.predictor).detach()
 
         for i in range(self.explainer_config.gradient_steps):
             (
@@ -707,6 +708,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 gradient_confidences_old=gradient_confidences_old,
                 to_generator=to_generator,
                 to_predictor=to_predictor,
+                start_activations=start_activations,
             )
 
             if is_break:
@@ -786,6 +788,7 @@ class CounterfactualExplainer(ExplainerInterface):
         gradient_confidences_old,
         to_generator,
         to_predictor,
+        start_activations,
     ):
         if self.explainer_config.iterationwise_encoding:
             # always in [0,1] with resolution of discriminator
@@ -842,14 +845,20 @@ class CounterfactualExplainer(ExplainerInterface):
 
         if self.explainer_config.orthogonalization_penatly > 0.0:
             activations = extract_penultima_activation(img_predictor, self.predictor)
-            normalized_activations = torch.nn.functional.normalize(activations, p=2, dim=0)
-            gram_matrix = torch.matmul(normalized_activations.T, normalized_activations)
-            identity_matrix = torch.eye(activations.shape[-1], device=activations.device)
+            activation_differences = activations - start_activations
+            normalized_activations = (
+                torch.nn.functional.normalize(activation_differences, p=2, dim=1).squeeze(-1).squeeze(-1)
+            )
+            gram_matrix = torch.matmul(normalized_activations, normalized_activations.T)
+            identity_matrix = torch.eye(gram_matrix.shape[0], device=normalized_activations.device)
             orthogonality_loss = (
                 self.explainer_config.orthogonalization_penatly
                 * torch.norm(gram_matrix - identity_matrix, p="fro") ** 2
             )
             loss += orthogonality_loss
+
+        else:
+            gram_matrix = None
 
         l1_losses = []
         for z_idx in range(len(z_original)):
@@ -871,6 +880,8 @@ class CounterfactualExplainer(ExplainerInterface):
                 description_str += f"/{self.explainer_config.gradient_steps}"
                 description_str += f", loss: {loss.detach().item():.2E}"
                 description_str += f", target_confidence: [{best_score[0]:.2E}, {best_score[-1]:.2E}]"
+                if not gram_matrix is None:
+                    description_str += f", orth: {gram_matrix[0][1:]}"
                 description_str += f", visual_difference: [{torch.mean(absolute_difference[0]).item():.2E}, "
                 description_str += f", gradient_confidence: [{gradient_confidences_old[0]:.2E},"
                 description_str += f"{gradient_confidences_old[-1]:.2E}]"
@@ -1104,14 +1115,16 @@ class CounterfactualExplainer(ExplainerInterface):
             )
 
         elif isinstance(self.generator, InvertibleGenerator) and isinstance(self.explainer_config, SCEConfig):
+            x_in = torch.tile(batch["x_list"], [self.explainer_config.parallel_attempts, 1, 1, 1])
+            y_target = torch.tile(batch["y_target_list"], [self.explainer_config.parallel_attempts])
             (
                 batch["x_counterfactual_list"],
                 batch["z_difference_list"],
                 batch["y_target_end_confidence_list"],
                 _,
             ) = self.predictor_distilled_counterfactual(
-                x_in=batch["x_list"],
-                y_target=batch["y_target_list"],
+                x_in=x_in,
+                y_target=y_target,
                 target_confidence_goal=target_confidence_goal,
                 pbar=pbar,
                 mode=mode,
@@ -1188,7 +1201,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 target_confidence_goal=target_confidence_goal,
                 base_path=base_path,
                 predictor=self.predictor,
-                start_idx=start_idx * self.explainer_config.num_attempts,
+                start_idx=start_idx * self.explainer_config.num_attempts * self.explainer_config.parallel_attempts,
                 **batch_out,
             )
 
