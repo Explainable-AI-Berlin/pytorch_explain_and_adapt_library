@@ -1,7 +1,7 @@
 # python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/camelyon17_1k_poisoned098_osce_cfkd.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
-batch_size                           :  4
+batch_size                           :  1
 tracking_level                       :  4
 min_train_samples                    :  800
 finetune_iterations                  :  1

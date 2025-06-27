@@ -941,7 +941,7 @@ class CFKD(Adaptor):
             feedback = self.teacher.get_feedback(
                 base_dir=os.path.join(self.base_dir, str(finetune_iteration), mode + "_teacher"),
                 student=self.student,
-                num_clusters=self.adaptor_config.explainer.num_attempts,
+                num_clusters=self.adaptor_config.explainer.num_attempts * self.adaptor_config.explainer.parallel_attempts,
                 mode=mode,
                 **tracked_values,
             )
@@ -1651,7 +1651,7 @@ class CFKD(Adaptor):
             validation_tracked_values = self.explainer.cluster_explanations(
                 validation_tracked_values,
                 self.adaptor_config.batch_size,
-                self.adaptor_config.explainer.num_attempts,
+                self.adaptor_config.explainer.num_attempts * self.adaptor_config.explainer.parallel_attempts,
             )
             if self.adaptor_config.tracking_level >= 3:
                 with open(
