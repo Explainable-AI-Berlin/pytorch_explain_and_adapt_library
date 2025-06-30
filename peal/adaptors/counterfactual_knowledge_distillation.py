@@ -884,16 +884,6 @@ class CFKD(Adaptor):
                 tracked_keys=self.tracked_keys,
             )
 
-            if self.adaptor_config.explainer.use_clustering and not hasattr(tracked_values, "cluster0"):
-                tracked_values = self.explainer.cluster_explanations(
-                    tracked_values,
-                    self.adaptor_config.batch_size,
-                    self.adaptor_config.explainer.num_attempts * self.adaptor_config.parallel_attempts,
-                )
-
-            if len(list(tracked_values.values())[0]) == 0:
-                return tracked_values
-
             if self.adaptor_config.tracking_level >= 3:
                 with open(
                     tracked_values_path,
@@ -930,6 +920,12 @@ class CFKD(Adaptor):
                 collage_path_list,
             )
         )
+        if self.adaptor_config.explainer.use_clustering and not hasattr(tracked_values, "cluster0"):
+            tracked_values = self.explainer.cluster_explanations(
+                tracked_values,
+                self.adaptor_config.batch_size,
+                self.adaptor_config.explainer.num_attempts * self.adaptor_config.explainer.parallel_attempts,
+            )
 
         return tracked_values
 

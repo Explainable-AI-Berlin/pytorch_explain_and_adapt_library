@@ -1,8 +1,0 @@
-adaptor_type  : "PealGroupDRO"
-category      : "adaptor"
-predictor     : <PEAL_BASE>/configs/sce_experiments/predictors/camelyon17_classifier_poisoned100.yaml
-model_path    : $PEAL_RUNS/camelyon17/classifier_poisoned100/dro
-is_robust     : True
-alpha         : 0.01
-gamma         : 0.1
-reset_weights : True

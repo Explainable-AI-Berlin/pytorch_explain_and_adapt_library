@@ -1,9 +1,0 @@
-# python train_generator.py --config "<PEAL_BASE>/configs/sce_experiments/generators/square_ddpm_unit_test.yaml"
-generator_type : DDPM
-category : generator
-base_path : $PEAL_RUNS/square40/ddpm_unit_test
-data: <PEAL_BASE>/configs/sce_experiments/data/square40_generator.yaml
-image_size: 64
-batch_size: 2
-save_interval: 1
-max_steps: 2

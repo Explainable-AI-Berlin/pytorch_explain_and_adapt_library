@@ -1,4 +1,4 @@
-# python generate_dataset.py --config "<PEAL_BASE>/configs/cfkd_experiments/data/celeba_copyrighttag.yaml"
+# python generate_dataset.py --config "<PEAL_BASE>/configs/cfkd_experiments/data/celeba_copyrighttag_generator.yaml"
 dataset_class           : celeba
 dataset_origin_path     : $PEAL_DATA/celeba
 dataset_path            : $PEAL_DATA/celeba_copyrighttag

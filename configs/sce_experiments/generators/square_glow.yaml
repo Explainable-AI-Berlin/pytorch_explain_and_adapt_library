@@ -1,5 +1,0 @@
-# python -W ignore train_generator.py --config "<PEAL_BASE>/configs/sce_experiments/generators/square_glow.yaml"
-generator_type: 'GlowGenerator'
-category: 'generator'
-data : '<PEAL_BASE>/configs/sce_experiments/data/square.yaml'
-base_path: '$PEAL_RUNS/square/glow'
