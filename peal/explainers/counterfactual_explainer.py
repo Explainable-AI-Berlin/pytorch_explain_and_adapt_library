@@ -1092,6 +1092,9 @@ class CounterfactualExplainer(ExplainerInterface):
             path_splitted += base_path.split(os.sep)[:-1]
             explainer_path = os.path.join(*path_splitted)
 
+        if mode == "validation":
+            start_idx = start_idx * self.explainer_config.num_attempts * self.explainer_config.parallel_attempts
+
         if y_target_goal_confidence_in is None:
             if hasattr(self.explainer_config, "y_target_goal_confidence"):
                 target_confidence_goal = self.explainer_config.y_target_goal_confidence
@@ -1201,7 +1204,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 target_confidence_goal=target_confidence_goal,
                 base_path=base_path,
                 predictor=self.predictor,
-                start_idx=start_idx * self.explainer_config.num_attempts * self.explainer_config.parallel_attempts,
+                start_idx=start_idx,
                 **batch_out,
             )
 

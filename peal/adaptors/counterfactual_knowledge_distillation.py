@@ -712,12 +712,7 @@ class CFKD(Adaptor):
         hint_batch = []
         idx_batch = []
         sample_idx = 0
-        cm_idx = cm_idx_in
-        print("cm_idx_in", cm_idx_in)
-        print("cm_idx_in", cm_idx_in)
-        print("cm_idx_in", cm_idx_in)
-        print("cm_idx_in", cm_idx_in)
-        print("cm_idx_in", cm_idx_in)
+        cm_idx = self.output_size * cm_idx_in
         torch.manual_seed(torch.seed())
         if self.adaptor_config.use_confusion_matrix:
             error_distribution = torch.distributions.Categorical(error_matrix)
@@ -729,6 +724,13 @@ class CFKD(Adaptor):
             # TODO verify that this is actually balancing itself!
             y_source = int(cm_idx / self.output_size)
             y_target = int(cm_idx % self.output_size)
+            while y_source == y_target:
+                cm_idx = (cm_idx + 1) % (self.output_size**2)
+                y_source = int(cm_idx / self.output_size)
+                y_target = int(cm_idx % self.output_size)
+
+            cm_idx = (cm_idx + 1) % (self.output_size**2)
+
             x, y = self.datastack.pop(int(y_source))
 
             if self.hints_enabled:
@@ -771,14 +773,6 @@ class CFKD(Adaptor):
 
             else:
                 pass
-
-
-            while y_source == y_target:
-                cm_idx = (cm_idx + 1) % (self.output_size**2)
-                y_source = int(cm_idx / self.output_size)
-                y_target = int(cm_idx % self.output_size)
-
-            cm_idx = (cm_idx + 1) % (self.output_size**2)
 
         x_batch = torch.stack(x_batch)
         y_target_batch = torch.stack(y_target_batch)

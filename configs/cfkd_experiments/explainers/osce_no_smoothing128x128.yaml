@@ -14,7 +14,7 @@ gradient_steps: 50
 greedy: false
 inpaint: 0.15
 iterationwise_encoding: true
-learning_rate: 100.0
+learning_rate: 10.0
 mask_momentum: 0.0
 max_samples: null
 merge_clusters: concatenate

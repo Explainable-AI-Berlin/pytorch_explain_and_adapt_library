@@ -186,6 +186,21 @@ class TorchvisionModel(torch.nn.Module):
             self.fc = torch.nn.Linear(1024, num_classes)
             self.processor = AutoImageProcessor.from_pretrained("facebook/dinov2-large")
 
+        elif model == "UNI":
+            import timm
+            from timm.data import resolve_data_config
+            from timm.data.transforms_factory import create_transform
+            from huggingface_hub import login
+
+            login()  # login with your User Access Token, found at https://huggingface.co/settings/tokens
+
+            # pretrained=True needed to load UNI weights (and download weights for the first time)
+            # init_values need to be passed in to successfully load LayerScale parameters (e.g. - block.0.ls1.gamma)
+            model = timm.create_model("hf-hub:MahmoodLab/uni", pretrained=True, init_values=1e-5, dynamic_img_size=True)
+            transform = create_transform(**resolve_data_config(model.pretrained_cfg, model=model))
+            model.eval()
+            import pdb; pdb.set_trace()
+
         elif model == "vit_b_16":
             self.model = torchvision.models.vit_b_16()
             # Modify the patch embedding layer
@@ -249,6 +264,17 @@ class TorchvisionModel(torch.nn.Module):
             feature_extractor = torch.nn.Sequential(*submodules[:-1])
             return feature_extractor(x)
 
+        elif self.model_type == "dino_v2":
+            cs = self.processor.crop_size
+            x_resized = torchvision.transforms.Resize([cs['height'],cs['width']])(x)
+            def pv(v):
+                v = torch.tensor(v).to(x_resized)[:, None, None]
+                return torch.tile(v, [1, cs['height'],cs['width']])
+
+            x_processed = (x_resized - pv(self.processor.image_mean)) / pv(self.processor.image_std)
+            latent_code = self.model(x_processed)['last_hidden_state'][:,0]
+            return latent_code
+
         else:
             # Reshape and permute the input tensor
             x = self._process_input(x)
@@ -271,14 +297,7 @@ class TorchvisionModel(torch.nn.Module):
 
         elif self.model_type == "dino_v2":
             # xt = self.processor(x)['pixel_values']
-            cs = self.processor.crop_size
-            x_resized = torchvision.transforms.Resize([cs['height'],cs['width']])(x)
-            def pv(v):
-                v = torch.tensor(v).to(x_resized)[:, None, None]
-                return torch.tile(v, [1, cs['height'],cs['width']])
-
-            x_processed = (x_resized - pv(self.processor.image_mean)) / pv(self.processor.image_std)
-            latent_code = self.model(x_processed)['last_hidden_state'][:,0]
+            latent_code = self.feature_extractor(x)
             x_out = self.fc(latent_code)
             return x_out
 
