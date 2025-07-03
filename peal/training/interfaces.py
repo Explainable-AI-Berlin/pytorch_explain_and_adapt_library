@@ -125,3 +125,4 @@ class PredictorConfig(BaseModel):
     weights_path: Union[str, type(None)] = None
     continue_training: bool = False
     tracking_level: int = 4
+    only_last_layer: bool = False

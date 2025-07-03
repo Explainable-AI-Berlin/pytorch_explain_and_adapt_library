@@ -204,6 +204,8 @@ class ModelTrainer:
         self.config = load_yaml_config(config)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.val_dataloader_weights = val_dataloader_weights
+        if only_last_layer is None:
+            only_last_layer = config.only_last_layer
 
         #
         if model_path is not None:

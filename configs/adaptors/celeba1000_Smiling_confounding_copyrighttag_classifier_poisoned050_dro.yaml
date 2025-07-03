@@ -1,8 +1,0 @@
-adaptor_type  : "PealGroupDRO"
-category      : "adaptor"
-predictor     : <PEAL_BASE>/configs/predictors/celeba1000_Smiling_confounding_copyrighttag_classifier_poisoned050.yaml
-model_path    : $PEAL_RUNS/celeba1000_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned050/dro
-is_robust     : True
-alpha         : 0.01
-gamma         : 0.1
-reset_weights : True

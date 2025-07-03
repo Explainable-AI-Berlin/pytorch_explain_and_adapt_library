@@ -3,6 +3,7 @@ import os
 
 import torchvision
 from pydantic import PositiveInt
+from transformers import AutoModel, AutoImageProcessor
 
 from peal.architectures.basic_modules import Mean
 from peal.architectures.interfaces import (
@@ -34,9 +35,7 @@ def get_predictor(predictor, device="cuda"):
             import onnxruntime as ort
 
             # Load the ONNX model
-            session = ort.InferenceSession(
-                predictor, providers=["CUDAExecutionProvider"]
-            )
+            session = ort.InferenceSession(predictor, providers=["CUDAExecutionProvider"])
 
             # Get input name for the model
             input_name = session.get_inputs()[0].name
@@ -46,7 +45,7 @@ def get_predictor(predictor, device="cuda"):
                 session_output = session.run(None, {input_name: input_data.cpu().numpy()})
                 return torch.from_numpy(session_output[0]).to(device)
 
-            #onnx_model = lambda input_data: torch.randint(0, 1, (input_data.shape[0])).to(device)
+            # onnx_model = lambda input_data: torch.randint(0, 1, (input_data.shape[0])).to(device)
             return onnx_model, None
 
     else:
@@ -128,20 +127,12 @@ class SequentialModel(torch.nn.Sequential):
         num_neurons_previous = input_channels
         for layer_config in architecture_config.layers:
             if isinstance(layer_config, ResnetConfig):
-                layers.append(
-                    create_cnn_layer(
-                        ResnetBlock, layer_config, num_neurons_previous, activation
-                    )
-                )
+                layers.append(create_cnn_layer(ResnetBlock, layer_config, num_neurons_previous, activation))
                 num_neurons_previous = layer_config.num_neurons
                 tensor_dim = layer_config.tensor_dim
 
             elif isinstance(layer_config, VGGConfig):
-                layers.append(
-                    create_cnn_layer(
-                        VGGBlock, layer_config, num_neurons_previous, activation
-                    )
-                )
+                layers.append(create_cnn_layer(VGGBlock, layer_config, num_neurons_previous, activation))
                 num_neurons_previous = layer_config.num_neurons
                 tensor_dim = layer_config.tensor_dim
 
@@ -151,9 +142,7 @@ class SequentialModel(torch.nn.Sequential):
                 tensor_dim = layer_config.tensor_dim
 
             elif isinstance(layer_config, TransformerConfig):
-                layers.append(
-                    TransformerBlock(layer_config, num_neurons_previous, activation)
-                )
+                layers.append(TransformerBlock(layer_config, num_neurons_previous, activation))
                 num_neurons_previous = layer_config.num_neurons
                 tensor_dim = layer_config.tensor_dim
 
@@ -171,12 +160,8 @@ class SequentialModel(torch.nn.Sequential):
             layers.append(torch.nn.Dropout(dropout))
 
         if not output_channels is None:
-            last_layer_config = FCConfig(
-                num_neurons=output_channels, tensor_dim=tensor_dim
-            )
-            layers.append(
-                FCBlock(last_layer_config, num_neurons_previous)
-            )  # , activation))
+            last_layer_config = FCConfig(num_neurons=output_channels, tensor_dim=tensor_dim)
+            layers.append(FCBlock(last_layer_config, num_neurons_previous))  # , activation))
             num_neurons_previous = output_channels
 
         self.output_channels = num_neurons_previous
@@ -196,6 +181,25 @@ class TorchvisionModel(torch.nn.Module):
             self.model = torchvision.models.resnet50(pretrained=True)
             self.model.fc = torch.nn.Linear(self.model.fc.in_features, num_classes)
 
+        elif model == "dino_v2":
+            self.model = AutoModel.from_pretrained("facebook/dinov2-large")
+            self.fc = torch.nn.Linear(1024, num_classes)
+            self.processor = AutoImageProcessor.from_pretrained("facebook/dinov2-large")
+
+        elif model == "UNI":
+            import timm
+            from timm.data import resolve_data_config
+            from timm.data.transforms_factory import create_transform
+            from huggingface_hub import login
+
+            login()  # login with your User Access Token, found at https://huggingface.co/settings/tokens
+
+            # pretrained=True needed to load UNI weights (and download weights for the first time)
+            # init_values need to be passed in to successfully load LayerScale parameters (e.g. - block.0.ls1.gamma)
+            self.model = timm.create_model("hf-hub:MahmoodLab/uni", pretrained=True, init_values=1e-5, dynamic_img_size=True)
+            self.transform = create_transform(**resolve_data_config(self.model.pretrained_cfg, model=self.model))
+            self.fc = torch.nn.Linear(1024, num_classes)
+
         elif model == "vit_b_16":
             self.model = torchvision.models.vit_b_16()
             # Modify the patch embedding layer
@@ -213,28 +217,20 @@ class TorchvisionModel(torch.nn.Module):
 
             if input_size and not input_size == 224:
                 # Modify the positional embedding
-                num_patches = (
-                    input_size // kernel_size
-                ) ** 2 + 1  # 64 patches + class token
+                num_patches = (input_size // kernel_size) ** 2 + 1  # 64 patches + class token
                 if num_patches < self.model.encoder.pos_embedding.shape[1]:
                     self.model.encoder.pos_embedding = torch.nn.Parameter(
                         self.model.encoder.pos_embedding[:, :num_patches]
                     )
                 else:
                     self.model.encoder.pos_embedding = torch.nn.Parameter(
-                        torch.zeros(
-                            1, num_patches, self.model.encoder.pos_embedding.shape[2]
-                        )
+                        torch.zeros(1, num_patches, self.model.encoder.pos_embedding.shape[2])
                     )
                     # reinitialize the positional embedding to random values.
-                    torch.nn.init.trunc_normal_(
-                        self.model.encoder.pos_embedding, std=0.02
-                    )
+                    torch.nn.init.trunc_normal_(self.model.encoder.pos_embedding, std=0.02)
 
             if num_classes != 1000:
-                self.model.heads.head = torch.nn.Linear(
-                    self.model.heads.head.in_features, num_classes
-                )
+                self.model.heads.head = torch.nn.Linear(self.model.heads.head.in_features, num_classes)
 
         else:
             raise ValueError("Unknown model: {}".format(model))
@@ -259,16 +255,29 @@ class TorchvisionModel(torch.nn.Module):
         return x
 
     def feature_extractor(self, x):
-        if (
-            not hasattr(self, "model_type")
-            or self.model_type[: len("resnet")] == "resnet"
-        ):
+        if not hasattr(self, "model_type") or self.model_type[: len("resnet")] == "resnet":
             submodules = list(self.children())
             while len(submodules) == 1:
                 submodules = list(submodules[0].children())
 
             feature_extractor = torch.nn.Sequential(*submodules[:-1])
             return feature_extractor(x)
+
+        elif self.model_type == "dino_v2":
+            cs = self.processor.crop_size
+            x_resized = torchvision.transforms.Resize([cs['height'],cs['width']])(x)
+            def pv(v):
+                v = torch.tensor(v).to(x_resized)[:, None, None]
+                return torch.tile(v, [1, cs['height'],cs['width']])
+
+            x_processed = (x_resized - pv(self.processor.image_mean)) / pv(self.processor.image_std)
+            latent_code = self.model(x_processed)['last_hidden_state'][:,0]
+            return latent_code
+
+        elif self.model_type == "UNI":
+            x_processed = self.transform(x)
+            latent_code = self.model(x_processed)
+            return latent_code
 
         else:
             # Reshape and permute the input tensor
@@ -287,11 +296,14 @@ class TorchvisionModel(torch.nn.Module):
             return x
 
     def forward(self, x: torch.Tensor):
-        if (
-            not hasattr(self, "model_type")
-            or self.model_type[: len("resnet")] == "resnet"
-        ):
+        if not hasattr(self, "model_type") or self.model_type[: len("resnet")] == "resnet":
             return self.model(x)
+
+        elif self.model_type in ["dino_v2", "UNI"]:
+            # xt = self.processor(x)['pixel_values']
+            latent_code = self.feature_extractor(x)
+            x_out = self.fc(latent_code)
+            return x_out
 
         else:
             # Reshape and permute the input tensor
