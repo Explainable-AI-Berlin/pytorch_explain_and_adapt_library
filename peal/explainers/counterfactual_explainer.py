@@ -41,7 +41,7 @@ from peal.visualization.visualize_counterfactual_gradients import visualize_step
 
 class SCEConfig(ExplainerConfig):
     """
-    This class defines the config of a DiffeoCF.
+    This class defines the config of the SCE explainer.
     """
 
     """
@@ -170,10 +170,6 @@ class SCEConfig(ExplainerConfig):
     The strength of the orthogonalization penalty for parallel counterfactuals.
     """
     orthogonalization_penatly: float = 0.0
-    """
-    How many counterfactuals are created for the same factual in parallel.
-    """
-    parallel_attempts: int = 1
 
 
 class ACEConfig(ExplainerConfig):

@@ -196,10 +196,9 @@ class TorchvisionModel(torch.nn.Module):
 
             # pretrained=True needed to load UNI weights (and download weights for the first time)
             # init_values need to be passed in to successfully load LayerScale parameters (e.g. - block.0.ls1.gamma)
-            model = timm.create_model("hf-hub:MahmoodLab/uni", pretrained=True, init_values=1e-5, dynamic_img_size=True)
-            transform = create_transform(**resolve_data_config(model.pretrained_cfg, model=model))
-            model.eval()
-            import pdb; pdb.set_trace()
+            self.model = timm.create_model("hf-hub:MahmoodLab/uni", pretrained=True, init_values=1e-5, dynamic_img_size=True)
+            self.transform = create_transform(**resolve_data_config(self.model.pretrained_cfg, model=self.model))
+            self.fc = torch.nn.Linear(1024, num_classes)
 
         elif model == "vit_b_16":
             self.model = torchvision.models.vit_b_16()
@@ -275,6 +274,11 @@ class TorchvisionModel(torch.nn.Module):
             latent_code = self.model(x_processed)['last_hidden_state'][:,0]
             return latent_code
 
+        elif self.model_type == "UNI":
+            x_processed = self.transform(x)
+            latent_code = self.model(x_processed)
+            return latent_code
+
         else:
             # Reshape and permute the input tensor
             x = self._process_input(x)
@@ -295,7 +299,7 @@ class TorchvisionModel(torch.nn.Module):
         if not hasattr(self, "model_type") or self.model_type[: len("resnet")] == "resnet":
             return self.model(x)
 
-        elif self.model_type == "dino_v2":
+        elif self.model_type in ["dino_v2", "UNI"]:
             # xt = self.processor(x)['pixel_values']
             latent_code = self.feature_extractor(x)
             x_out = self.fc(latent_code)

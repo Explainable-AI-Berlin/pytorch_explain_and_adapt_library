@@ -67,6 +67,10 @@ class ExplainerConfig(BaseModel):
     """
     transition_restrictions: Union[list, type(None)] = None
     clustering_strategy: str = "highest_activation"
+    """
+    How many counterfactuals are created for the same factual in parallel.
+    """
+    parallel_attempts: int = 1
 
 
 class ExplainerInterface:
