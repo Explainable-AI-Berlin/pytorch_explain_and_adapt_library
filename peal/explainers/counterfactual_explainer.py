@@ -1367,14 +1367,10 @@ class CounterfactualExplainer(ExplainerInterface):
                         continue
 
                     _, cosine_similarity_list, _, _ = extract_feature_difference(current_explanations)
-                    try:
-                        if cosine_similarity_list[0] < lowest_similarity:
-                            explanations_beginning = current_explanations
-                            lowest_similarity = cosine_similarity_list[0]
-                            current_idx = search_idx
-
-                    except Exception:
-                        import pdb; pdb.set_trace()
+                    if cosine_similarity_list[0][0] < lowest_similarity:
+                        explanations_beginning = current_explanations
+                        lowest_similarity = cosine_similarity_list[0][0]
+                        current_idx = search_idx
 
                 cluster_means, _, _, _ = extract_feature_difference(explanations_beginning)
                 cluster_lists[0] = [explanations_list_by_source[0][0]]
