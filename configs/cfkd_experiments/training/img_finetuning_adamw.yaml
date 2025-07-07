@@ -5,4 +5,4 @@ optimizer: adamw
 steps_per_epoch: 400
 test_batch_size: 32
 train_batch_size: 32
-val_batch_size: 2
+val_batch_size: 1

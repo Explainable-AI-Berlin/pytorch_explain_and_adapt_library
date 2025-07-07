@@ -1221,7 +1221,14 @@ class CounterfactualExplainer(ExplainerInterface):
         for idx in range(len(explanations_dict["x_list"])):
             current_dict = {}
             for key in explanations_dict.keys():
-                current_dict[key] = explanations_dict[key][idx]
+                if key in ['clusters0', 'cluster_confidence0', 'clusters1', 'cluster_confidence1']:
+                    continue
+
+                try:
+                    current_dict[key] = explanations_dict[key][idx]
+
+                except Exception:
+                    import pdb; pdb.set_trace()
 
             explanations_list.append(current_dict)
 

@@ -175,6 +175,12 @@ def get_predictor(config, model=None):
                 config.data.input_size[-1],
             )
 
+        elif (
+            isinstance(config.architecture, str)
+            and config.architecture[-4:] == ".cpl"
+        ):
+            model = torch.load(config.architecture)
+
         else:
             raise Exception("Architecture not available!")
 
@@ -193,7 +199,7 @@ class ModelTrainer:
         optimizer=None,
         criterions=None,
         logger=None,
-        only_last_layer=False,
+        only_last_layer=None,
         unit_test_train_loop=False,
         unit_test_single_sample=False,
         log_frequency=1000,
@@ -205,7 +211,7 @@ class ModelTrainer:
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.val_dataloader_weights = val_dataloader_weights
         if only_last_layer is None:
-            only_last_layer = config.only_last_layer
+            only_last_layer = self.config.only_last_layer
 
         #
         if model_path is not None:
@@ -216,11 +222,7 @@ class ModelTrainer:
 
         self.model = get_predictor(self.config, model)
 
-        try:
-            self.model.to(self.device)
-
-        except Exception:
-            import pdb; pdb.set_trace()
+        self.model.to(self.device)
 
         # either the dataloaders have to be given or the path to the dataset
         (
@@ -275,20 +277,24 @@ class ModelTrainer:
         if optimizer is None:
             param_list = [param for param in self.model.parameters()]
             if only_last_layer:
-                param_list_trained = []
-                if len(param_list[-1].shape) == 1:
-                    num_unfrozen = 2
+                if hasattr(self.model, "fc"):
+                    param_list = [self.model.fc.weight]
 
                 else:
-                    num_unfrozen = 1
+                    param_list_trained = []
+                    if len(param_list[-1].shape) == 1:
+                        num_unfrozen = 2
 
-                assert (
-                    len(param_list[-num_unfrozen].shape) == 2
-                ), "Wrong layer was chosen!"
-                for param in param_list[-num_unfrozen:]:
-                    param_list_trained.append(param)
+                    else:
+                        num_unfrozen = 1
 
-                param_list = param_list_trained
+                    assert (
+                        len(param_list[-num_unfrozen].shape) == 2
+                    ), "Wrong layer was chosen!"
+                    for param in param_list[-num_unfrozen:]:
+                        param_list_trained.append(param)
+
+                    param_list = param_list_trained
 
             cprint("trainable parameters: " + str(len(param_list)), self.config.tracking_level, 4)
             if self.config.training.optimizer == "sgd":

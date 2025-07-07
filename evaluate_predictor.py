@@ -47,7 +47,6 @@ def main():
         model = ModelTrainer(predictor_config).model
         model.load_state_dict(model_weights)
 
-    set_random_seed(model_config.seed)
     model.eval()
     test_dataloader = create_dataloaders_from_datasource(model_config)[args.partition]
     correct, group_accuracies, group_distribution, groups, worst_group_accuracy = calculate_test_accuracy(
