@@ -3,6 +3,6 @@ learning_rate: 1.0e-05
 max_epochs: 50
 optimizer: adamw
 steps_per_epoch: 400
-test_batch_size: 32
+test_batch_size: 256
 train_batch_size: 32
-val_batch_size: 1
+val_batch_size: 4

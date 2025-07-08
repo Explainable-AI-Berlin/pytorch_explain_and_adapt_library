@@ -1,6 +1,7 @@
 import argparse
 import torch
 import os
+import numpy as np
 
 from peal.architectures.interfaces import TaskConfig
 from peal.data.interfaces import DataConfig
@@ -58,6 +59,7 @@ def main():
     print("Group distribution: " + str(group_distribution))
     print("Groups: " + str(groups))
     print("Worst group accuracy: " + str(worst_group_accuracy))
+    print("Average group accuracy: " + str(float(np.sum(np.array(group_accuracies))) / 4))
 
 if __name__ == '__main__':
     main()

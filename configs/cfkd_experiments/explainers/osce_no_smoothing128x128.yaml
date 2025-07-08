@@ -23,7 +23,7 @@ num_attempts: 1
 num_discretization_steps: 20
 optimizer: SGD
 orthogonalization_penatly: 0.3
-parallel_attempts: 3
+parallel_attempts: 2
 port: 8000
 predictor: null
 predictor_path: null
