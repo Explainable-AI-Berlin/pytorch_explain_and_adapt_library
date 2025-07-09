@@ -1,6 +1,6 @@
 dataset_class           : Camelyon17AugmentedDataset
 dataset_path            : $PEAL_DATA/camelyon17
-num_samples             : 80 #1000
+num_samples             : 40 #1000
 split                   : [0.8, 1.0]
 input_type              : image
 input_size              : [3, 128, 128]

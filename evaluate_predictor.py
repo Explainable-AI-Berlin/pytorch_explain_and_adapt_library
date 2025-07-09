@@ -57,7 +57,7 @@ def main():
     print(partitions[args.partition] + " accuracy: " + str(correct))
     print("Group accuracies: " + str(group_accuracies))
     print("Group distribution: " + str(group_distribution))
-    print("Groups: " + str(groups))
+    print("Samples per Group: " + str(groups))
     print("Worst group accuracy: " + str(worst_group_accuracy))
     print("Average group accuracy: " + str(float(np.sum(np.array(group_accuracies))) / 4))
 
