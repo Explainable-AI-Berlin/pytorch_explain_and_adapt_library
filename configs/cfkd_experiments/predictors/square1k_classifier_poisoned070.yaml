@@ -1,4 +1,4 @@
-# python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/square1k_classifier_poisoned070.yaml"
+# python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/square1k_classifier_poisoned070.yaml
 model_path        : $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/classifier_poisoned070
 data              : <PEAL_BASE>/configs/cfkd_experiments/data/square1k_poisoned070.yaml
 training          : <PEAL_BASE>/configs/cfkd_experiments/training/img_classifier.yaml
