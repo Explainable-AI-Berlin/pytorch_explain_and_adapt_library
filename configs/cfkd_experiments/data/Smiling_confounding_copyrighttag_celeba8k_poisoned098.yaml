@@ -1,0 +1,10 @@
+dataset_path            : $PEAL_DATA/celeba_copyrighttag
+num_samples             : 8000
+split                   : [0.8,0.9]
+input_type              : image
+input_size              : [3, 128, 128]
+output_type             : multiclass
+output_size             : [41]
+confounder_probability  : 0.98
+confounding_factors     : [Smiling, Confounder]
+has_hints               : true

@@ -1,0 +1,12 @@
+config_name: CrpConfig
+base_dir: $PEAL_RUNS/camelyon17/classifier_25-25-495-005/spray_analysis
+data: <PEAL_BASE>/configs/data/camelyon17_25-25-495-005.yaml
+model: $PEAL_RUNS/camelyon17/classifier_25-25-495-005/model.cpl
+conditioning_layer: 12
+target_class: 0
+task:
+  y_selection: [tumor]
+  output_type: 'singleclass'
+  output_channels: 2
+  criterions:
+    l2: 1.0

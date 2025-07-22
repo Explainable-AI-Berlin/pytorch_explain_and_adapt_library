@@ -29,7 +29,7 @@ Now one can utilize different top level scripts to use the library:
 ```python generate_dataset.py --config "<PATH_TO_CONFIG>"```
 Generates a synthetic dataset like the squares dataset based on a data config file.
 Another option is to augment a already downloaded dataset like CelebA with a controlled confounder.
-Existing data config files can be found in configs/data.
+Existing data config files can be found in configs/sce_experiments/data.
 The generated dataset will appear in $PEAL_DATA.
 For the replication of the experiments on synthetic / augmented datasets from the paper one first needs to generate the articial datasets.
 A full, documented overview over the parameters that can be set by datasets so far can be found in ```peal.data.datasets.DataConfig```.
@@ -40,14 +40,14 @@ Moreover, a lot of datasets like CelebA, Squares, Follicles or Regression datase
 
 ```python train_predictor.py --config "<PATH_TO_CONFIG>"```
 Trains a predictor (either a singleclass classifier, a multiclass classifier, a regressor or a mixed model) based on a predictor config file.
-Existing predictor config files can be found in configs/predictors.
+Existing predictor config files can be found in configs/sce_experiments/predictors.
 In order to replicate most experiments from the papers one needs to train a student predictor and a teacher predictor.
 Trained predictors will appear in $PEAL_RUNS.
 A full, documented overview over the parameters that can be set by predictors so far can be found in ```peal.training.trainers.PredictorConfig```.
 
 ```python train_generator.py --config "<PATH_TO_CONFIG>"```
 Trains a generative model based on a generator config file.
-Existing generator config files can be found in configs/models.
+Existing generator config files can be found in configs/sce_experiments/models.
 In order to e.g. use counterfactual explainations one needs to train a corresponding generator.
 Trained generators will appear in $PEAL_RUNS.
 A full, documented overview over the parameters that can be set by generators so far can be found in subclasses of ```peal.generators.interfaces.GeneratorConfig``` in ```peal.generators```.
@@ -58,7 +58,7 @@ Now ```MyGenerator``` will be used automatically and configured by ```MyGenerato
 
 ```python run_explainer.py --config "<PATH_TO_CONFIG>"```
 Explains the predictions of a predictor based on a explainer config file.
-Existing explainer config files can be found in configs/explainers.
+Existing explainer config files can be found in configs/sce_experiments/explainers.
 The results of the explanations will be visualized in a web interface.
 Furthermore, they are saved in a folder inside the folder where the predictor that was explained is saved.
 A full, documented overview over the parameters that can be set by explainers so far can be found in subclasses of ```peal.explainers.interfaces.ExplainerConfig``` in ```peal.explainers```.
@@ -70,7 +70,7 @@ Now ```MyExplainer``` will be used automatically and configured by ```MyExplaine
 
 ```python run_adaptor.py --config "<PATH_TO_CONFIG>"```
 Adapts a predictor based on a adaptor config file.
-Existing adaptor config files can be found in configs/adaptors.
+Existing adaptor config files can be found in configs/sce_experiments/adaptors.
 The results of the explanations will be saved in a folder inside the folder where the predictor that was adapted is saved.
 A full, documented overview over the parameters that can be set by adaptors so far can be found in subclasses of ```peal.adaptors.interfaces.AdaptorConfig``` in ```peal.adaptors```.
 To implement a new adaptor ```MyAdaptor``` create a subclass of ```peal.adaptors.interfaces.Adaptor``` inside ```peal.adaptors```.
@@ -93,31 +93,31 @@ It could also only have one label with "ImagePath,Label1" and we can only optimi
 All Images have to be placed in the folder "<PEAL_DATA>/my_data" in the correct relative path.
 
 Then, one can copy and adapt the config files for CelebA Smiling.
-First, one has to copy configs/data/celeba.yaml to configs/data/my_data.yaml.
-Then, one has to copy configs/data/celeba_generator.yaml to configs/data/my_data_generator.yaml.
+First, one has to copy configs/sce_experiments/data/celeba.yaml to configs/my_experiments/data/my_data.yaml.
+Then, one has to copy configs/sce_experiments/data/celeba_generator.yaml to configs/my_experiments/data/my_data_generator.yaml.
 Then, the dataset_class and confounding_factors have to be removed
 (because you do have neither for your new dataset yet).
 Then, num_samples, input_size and output_size should be adapted to your dataset.
-Now, one has to copy configs/generators/celeba_ddpm.yaml to configs/generators/my_data_ddpm.yaml.
-In this file one has to replace base_path with "$PEAL_RUNS/my_data/ddpm" and data with "<PEAL_BASE>/configs/data/my_data_generator.yaml".
+Now, one has to copy configs/sce_experiments/generators/celeba_ddpm.yaml to configs/my_experiments/generators/my_data_ddpm.yaml.
+In this file one has to replace base_path with "$PEAL_RUNS/my_data/ddpm" and data with "<PEAL_BASE>/configs/my_experiments/data/my_data_generator.yaml".
 Now you can train your DDPM generator with:
 
-```python train_generator.py --config "<PEAL_BASE>/configs/generators/my_data_ddpm.yaml"```
+```python train_generator.py --config "<PEAL_BASE>/configs/my_experiments/generators/my_data_ddpm.yaml"```
 
-In parallel you can copy "configs/predictors/celeba_classifier_smiling.yaml" to "configs/predictors/my_data_classifier.yaml".
-Here, you have to replace model_path with "$PEAL_RUNS/my_data/classifier", data with "<PEAL_BASE>/configs/data/my_data.yaml" and y_selection with "[Label1]".
+In parallel you can copy "configs/sce_experiments/predictors/celeba_classifier_smiling.yaml" to "configs/my_experiments/predictors/my_data_classifier.yaml".
+Here, you have to replace model_path with "$PEAL_RUNS/my_data/classifier", data with "<PEAL_BASE>/configs/my_experiments/data/my_data.yaml" and y_selection with "[Label1]".
 Now you can train your predictor with:
 
-```python train_predictor.py --config "<PEAL_BASE>/configs/predictors/my_data_classifier.yaml"```
+```python train_predictor.py --config "<PEAL_BASE>/configs/my_experiments/predictors/my_data_classifier.yaml"```
 
-After finishing generator and predictor training you can copy "configs/adaptors/celeba_Smiling_natural_sce_cfkd.yaml" 
-to "configs/adaptors/my_data_sce_cfkd.yaml".
-Overwrite data with "<PEAL_BASE>/configs/data/my_data.yaml", student with "$PEAL_RUNS/my_data/classifier/model.cpl",
+After finishing generator and predictor training you can copy "configs/sce_experiments/adaptors/celeba_Smiling_natural_sce_cfkd.yaml" 
+to "configs/my_experiments/adaptors/my_data_sce_cfkd.yaml".
+Overwrite data with "<PEAL_BASE>/my_experiments/configs/data/my_data.yaml", student with "$PEAL_RUNS/my_data/classifier/model.cpl",
 generator with "$PEAL_RUNS/my_data/ddpm/config.yaml", base_dir with "$PEAL_RUNS/my_data/classifier/sce_cfkd" and
 y_selection with "[Label1]".
 Now you can run SCE with:
 
-```python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/my_data_sce_cfkd.yaml"```
+```python run_cfkd.py --config "<PEAL_BASE>/configs/my_experiments/adaptors/my_data_sce_cfkd.yaml"```
 
 Now you can find your counterfactuals under "$PEAL_RUNS/my_data/classifier/sce_cfkd/validation_collages".
 If you further want to process them you can load the .npz array "$PEAL_RUNS/my_data/classifier/sce_cfkd/validation_tracked_values.npz".
@@ -127,17 +127,17 @@ The originals in this array can be found under the key "x_list" and the counterf
 **How to use a custom image dataset and a custom predictor**
 
 
-First, you can copy "configs/adaptors/imagenet_husky_vs_wulf_sce_cfkd.yaml" to "configs/adaptors/my_data_sce_cfkd.yaml".
+First, you can copy "configs/sce_experiments/adaptors/imagenet_husky_vs_wulf_sce_cfkd.yaml" to "configs/my_experiments/adaptors/my_data_sce_cfkd.yaml".
 
-If you do not wish to use the ImageNet DDPM as generative model one has to copy "configs/data/imagenet_generator.yaml" to "configs/data/my_data_generator.yaml".
-Then, the dataset_class in "configs/data/my_data_generator.yaml" has to be removed.
+If you do not wish to use the ImageNet DDPM as generative model one has to copy "configs/sce_experiments/data/imagenet_generator.yaml" to "configs/data/my_data_generator.yaml".
+Then, the dataset_class in "configs/my_experiments/data/my_data_generator.yaml" has to be removed.
 Then, num_samples, input_size and output_size should be adapted to your dataset.
 If you do not want to bootstrap your DDPM with Imagenet 256x256 weights you have to remove download_weights.
-Now, one has to copy configs/generators/imagenet_ddpm.yaml to configs/generators/my_data_ddpm.yaml.
-In this file one has to replace base_path with "$PEAL_RUNS/my_data/ddpm" and data with "<PEAL_BASE>/configs/data/my_data_generator.yaml".
+Now, one has to copy configs/sce_experiments/generators/imagenet_ddpm.yaml to configs/my_experiments/generators/my_data_ddpm.yaml.
+In this file one has to replace base_path with "$PEAL_RUNS/my_data/ddpm" and data with "<PEAL_BASE>/configs/my_experiments/data/my_data_generator.yaml".
 Now you can train your DDPM generator with:
-```python train_generator.py --config "<PEAL_BASE>/configs/generators/my_data_ddpm.yaml"```
-Then, in "configs/adaptors/my_data_sce_cfkd.yaml" one has to overwrite generator with "$PEAL_RUNS/my_data_ddpm.yaml".
+```python train_generator.py --config "<PEAL_BASE>/configs/my_experiments/generators/my_data_ddpm.yaml"```
+Then, in "configs/my_experiments/adaptors/my_data_sce_cfkd.yaml" one has to overwrite generator with "$PEAL_RUNS/my_data_ddpm.yaml".
 
 Next, you have to convert your predictor into an ONNX model with binary output.
 An example for an ImageNet classifier would be the following:
@@ -176,7 +176,7 @@ torch.onnx.export(
 )
 ```
 You have to create an equivalent code snippet for your model and save it under OUTPUT_PATH="$PEAL_RUNS/my_data/classifier/model.onnx".
-Now in "configs/adaptors/my_data_sce_cfkd.yaml" one has to overwrite student with "$PEAL_RUNS/my_data/classifier/model.onnx"
+Now in "configs/my_experiments/adaptors/my_data_sce_cfkd.yaml" one has to overwrite student with "$PEAL_RUNS/my_data/classifier/model.onnx"
 and base_dir with "$PEAL_RUNS/my_data/classifier/sce_cfkd".
 
 Now you have to reformat your dataset to a ```peal.data.datasets.Image2MixedDataset```.
@@ -196,20 +196,20 @@ images of huskies and wulfs to get a csv in the format:
 | ...                 | ...    |
 | path_to_wulf_N.png  | 1      |
 
-Next, one has to copy "configs/data/imagenet.yaml" to "configs/data/my_data.yaml".
+Next, one has to copy "configs/sce_experiments/data/imagenet.yaml" to "configs/my_experiments/data/my_data.yaml".
 In the new file you have to change input_size and normalization to the values your classifier was trained with.
-Then, in "configs/adaptors/my_data_sce_cfkd.yaml" one has to overwrite data with "<PEAL_BASE>/configs/data/my_data.yaml", and
+Then, in "configs/my_experiments/adaptors/my_data_sce_cfkd.yaml" one has to overwrite data with "<PEAL_BASE>/configs/my_experiments/data/my_data.yaml", and
 y_selection with "[Label1]".
 
 Next, you can run SCE with:
-```python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/my_data_sce_cfkd.yaml"```
+```python run_cfkd.py --config "<PEAL_BASE>/configs/my_experiments/adaptors/my_data_sce_cfkd.yaml"```
 Now you can find your counterfactuals under "$PEAL_RUNS/my_data/classifier/sce_cfkd/validation_collages".
 If you further want to process them you can load the .npz array "$PEAL_RUNS/my_data/classifier/sce_cfkd/validation_tracked_values.npz".
 The originals in this array can be found under the key "x_list" and the counterfactuals under "x_counterfactual_list".
 
 
 
-**Installation Instructions:**
+**Planned Installation Instructions (Not Functional yet!!!):**
 
 pip install peal
 

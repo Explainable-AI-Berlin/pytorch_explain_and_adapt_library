@@ -265,9 +265,9 @@ class CFKD(Adaptor):
 
         self.adaptor_config.data.in_memory = self.adaptor_config.in_memory
         self.adaptor_config.test_data.in_memory = self.adaptor_config.in_memory
-        assert (
+        '''assert (
             self.adaptor_config.finetune_iterations == 0 or self.adaptor_config.batch_size % 2 == 0
-        ), "only even batch sizes are supported so far for CFKD finetuning!"
+        ), "only even batch sizes are supported so far for CFKD finetuning!"'''
         self.adaptor_config.explainer.tracking_level = self.adaptor_config.tracking_level
         self.adaptor_config.explainer.transition_restrictions = self.adaptor_config.transition_restrictions
         if not self.adaptor_config.clustering_strategy is None:
@@ -702,7 +702,7 @@ class CFKD(Adaptor):
     def get_batch(
         self,
         error_matrix: torch.Tensor = None,
-        cm_idx: int = 1,
+        cm_idx_in: int = 0,
     ):
         x_batch = []
         y_source_batch = []
@@ -712,6 +712,7 @@ class CFKD(Adaptor):
         hint_batch = []
         idx_batch = []
         sample_idx = 0
+        cm_idx = self.output_size * cm_idx_in
         torch.manual_seed(torch.seed())
         if self.adaptor_config.use_confusion_matrix:
             error_distribution = torch.distributions.Categorical(error_matrix)
@@ -729,6 +730,7 @@ class CFKD(Adaptor):
                 y_target = int(cm_idx % self.output_size)
 
             cm_idx = (cm_idx + 1) % (self.output_size**2)
+
             x, y = self.datastack.pop(int(y_source))
 
             if self.hints_enabled:
@@ -831,7 +833,7 @@ class CFKD(Adaptor):
                 break
 
             for i in range(num_batches_per_iteration):
-                batch = self.get_batch(error_matrix, i % 2)
+                batch = self.get_batch(error_matrix, cm_idx_in=i % 2)
                 values = self.explainer.explain_batch(
                     batch=batch,
                     base_path=collage_base_path,
@@ -876,16 +878,6 @@ class CFKD(Adaptor):
                 tracked_keys=self.tracked_keys,
             )
 
-            if self.adaptor_config.explainer.use_clustering and not hasattr(tracked_values, "cluster0"):
-                tracked_values = self.explainer.cluster_explanations(
-                    tracked_values,
-                    self.adaptor_config.batch_size,
-                    self.adaptor_config.explainer.num_attempts,
-                )
-
-            if len(list(tracked_values.values())[0]) == 0:
-                return tracked_values
-
             if self.adaptor_config.tracking_level >= 3:
                 with open(
                     tracked_values_path,
@@ -922,6 +914,12 @@ class CFKD(Adaptor):
                 collage_path_list,
             )
         )
+        if self.adaptor_config.explainer.use_clustering and not hasattr(tracked_values, "cluster0"):
+            tracked_values = self.explainer.cluster_explanations(
+                tracked_values,
+                self.adaptor_config.batch_size,
+                self.adaptor_config.explainer.num_attempts * self.adaptor_config.explainer.parallel_attempts,
+            )
 
         return tracked_values
 
@@ -933,7 +931,7 @@ class CFKD(Adaptor):
             feedback = self.teacher.get_feedback(
                 base_dir=os.path.join(self.base_dir, str(finetune_iteration), mode + "_teacher"),
                 student=self.student,
-                num_clusters=self.adaptor_config.explainer.num_attempts,
+                num_clusters=self.adaptor_config.explainer.num_attempts * self.adaptor_config.explainer.parallel_attempts,
                 mode=mode,
                 **tracked_values,
             )
@@ -1643,7 +1641,7 @@ class CFKD(Adaptor):
             validation_tracked_values = self.explainer.cluster_explanations(
                 validation_tracked_values,
                 self.adaptor_config.batch_size,
-                self.adaptor_config.explainer.num_attempts,
+                self.adaptor_config.explainer.num_attempts * self.adaptor_config.explainer.parallel_attempts,
             )
             if self.adaptor_config.tracking_level >= 3:
                 with open(

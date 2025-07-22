@@ -41,7 +41,7 @@ from peal.visualization.visualize_counterfactual_gradients import visualize_step
 
 class SCEConfig(ExplainerConfig):
     """
-    This class defines the config of a DiffeoCF.
+    This class defines the config of the SCE explainer.
     """
 
     """
@@ -166,6 +166,10 @@ class SCEConfig(ExplainerConfig):
     Whether to use a generative model to filter the gradients or not.
     """
     use_gradient_filtering: bool = True
+    """
+    The strength of the orthogonalization penalty for parallel counterfactuals.
+    """
+    orthogonalization_penatly: float = 0.0
 
 
 class ACEConfig(ExplainerConfig):
@@ -665,6 +669,7 @@ class CounterfactualExplainer(ExplainerInterface):
         best_z = torch.clone(z[0])
         best_score = 0.5 * torch.ones_like(target_confidence_goal_current)
         best_mask = torch.ones_like(best_z)
+        start_activations = extract_penultima_activation(x_predictor.to(self.device), self.predictor).detach()
 
         for i in range(self.explainer_config.gradient_steps):
             (
@@ -699,6 +704,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 gradient_confidences_old=gradient_confidences_old,
                 to_generator=to_generator,
                 to_predictor=to_predictor,
+                start_activations=start_activations,
             )
 
             if is_break:
@@ -778,6 +784,7 @@ class CounterfactualExplainer(ExplainerInterface):
         gradient_confidences_old,
         to_generator,
         to_predictor,
+        start_activations,
     ):
         if self.explainer_config.iterationwise_encoding:
             # always in [0,1] with resolution of discriminator
@@ -831,6 +838,24 @@ class CounterfactualExplainer(ExplainerInterface):
 
         logits_gradient = gradient_predictor(img_predictor) / self.explainer_config.temperature
         loss = self.loss(logits_gradient, y_target.to(self.device))
+
+        if self.explainer_config.orthogonalization_penatly > 0.0:
+            activations = extract_penultima_activation(img_predictor, self.predictor)
+            activation_differences = activations - start_activations
+            normalized_activations = (
+                torch.nn.functional.normalize(activation_differences, p=2, dim=1).squeeze(-1).squeeze(-1)
+            )
+            gram_matrix = torch.matmul(normalized_activations, normalized_activations.T)
+            identity_matrix = torch.eye(gram_matrix.shape[0], device=normalized_activations.device)
+            orthogonality_loss = (
+                self.explainer_config.orthogonalization_penatly
+                * torch.norm(gram_matrix - identity_matrix, p="fro") ** 2
+            )
+            loss += orthogonality_loss
+
+        else:
+            gram_matrix = None
+
         l1_losses = []
         for z_idx in range(len(z_original)):
             l1_losses.append(torch.mean(torch.abs(z[z_idx].to(self.device) - torch.clone(z_original[z_idx]).detach())))
@@ -851,6 +876,8 @@ class CounterfactualExplainer(ExplainerInterface):
                 description_str += f"/{self.explainer_config.gradient_steps}"
                 description_str += f", loss: {loss.detach().item():.2E}"
                 description_str += f", target_confidence: [{best_score[0]:.2E}, {best_score[-1]:.2E}]"
+                if not gram_matrix is None:
+                    description_str += f", orth: {gram_matrix[0][1:]}"
                 description_str += f", visual_difference: [{torch.mean(absolute_difference[0]).item():.2E}, "
                 description_str += f", gradient_confidence: [{gradient_confidences_old[0]:.2E},"
                 description_str += f"{gradient_confidences_old[-1]:.2E}]"
@@ -1061,6 +1088,9 @@ class CounterfactualExplainer(ExplainerInterface):
             path_splitted += base_path.split(os.sep)[:-1]
             explainer_path = os.path.join(*path_splitted)
 
+        if mode == "validation":
+            start_idx = start_idx * self.explainer_config.num_attempts * self.explainer_config.parallel_attempts
+
         if y_target_goal_confidence_in is None:
             if hasattr(self.explainer_config, "y_target_goal_confidence"):
                 target_confidence_goal = self.explainer_config.y_target_goal_confidence
@@ -1084,14 +1114,16 @@ class CounterfactualExplainer(ExplainerInterface):
             )
 
         elif isinstance(self.generator, InvertibleGenerator) and isinstance(self.explainer_config, SCEConfig):
+            x_in = torch.tile(batch["x_list"], [self.explainer_config.parallel_attempts, 1, 1, 1])
+            y_target = torch.tile(batch["y_target_list"], [self.explainer_config.parallel_attempts])
             (
                 batch["x_counterfactual_list"],
                 batch["z_difference_list"],
                 batch["y_target_end_confidence_list"],
                 _,
             ) = self.predictor_distilled_counterfactual(
-                x_in=batch["x_list"],
-                y_target=batch["y_target_list"],
+                x_in=x_in,
+                y_target=y_target,
                 target_confidence_goal=target_confidence_goal,
                 pbar=pbar,
                 mode=mode,
@@ -1168,7 +1200,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 target_confidence_goal=target_confidence_goal,
                 base_path=base_path,
                 predictor=self.predictor,
-                start_idx=start_idx * self.explainer_config.num_attempts,
+                start_idx=start_idx,
                 **batch_out,
             )
 
@@ -1189,7 +1221,14 @@ class CounterfactualExplainer(ExplainerInterface):
         for idx in range(len(explanations_dict["x_list"])):
             current_dict = {}
             for key in explanations_dict.keys():
-                current_dict[key] = explanations_dict[key][idx]
+                if key in ['clusters0', 'cluster_confidence0', 'clusters1', 'cluster_confidence1']:
+                    continue
+
+                try:
+                    current_dict[key] = explanations_dict[key][idx]
+
+                except Exception:
+                    import pdb; pdb.set_trace()
 
             explanations_list.append(current_dict)
 
@@ -1264,9 +1303,9 @@ class CounterfactualExplainer(ExplainerInterface):
                 )
                 for source_idx in range(len(explanations_list_by_source)):
                     explanations_list_by_source[source_idx][sample_idx]["feature_difference"] = feature_difference[0]
-                    explanations_list_by_source[source_idx][sample_idx]["cosine_similarities"] = (
-                        cosine_similarities_list[0]
-                    )
+                    explanations_list_by_source[source_idx][sample_idx][
+                        "cosine_similarities"
+                    ] = cosine_similarities_list[0]
                     explanations_list_by_source[source_idx][sample_idx]["norm_list"] = norm_list[0]
                     explanations_list_by_source[source_idx][sample_idx]["ratio_list"] = ratio_list[0]
 
@@ -1335,10 +1374,9 @@ class CounterfactualExplainer(ExplainerInterface):
                         continue
 
                     _, cosine_similarity_list, _, _ = extract_feature_difference(current_explanations)
-
-                    if cosine_similarity_list[0] < lowest_similarity:
+                    if cosine_similarity_list[0][0] < lowest_similarity:
                         explanations_beginning = current_explanations
-                        lowest_similarity = cosine_similarity_list[0]
+                        lowest_similarity = cosine_similarity_list[0][0]
                         current_idx = search_idx
 
                 cluster_means, _, _, _ = extract_feature_difference(explanations_beginning)

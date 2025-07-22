@@ -1,0 +1,12 @@
+config_name: CrpConfig
+base_dir: $PEAL_RUNS/celeba/Male_confounding_Blond_Hair/classifier_natural/spray_analysis
+data: <PEAL_BASE>/configs/data/celeba_Male_confounding_Blond_Hair_natural.yaml
+model: $PEAL_RUNS/celeba/Male_confounding_Blond_Hair/classifier_natural/model.cpl
+conditioning_layer: 12
+target_class: 1
+task:
+  y_selection: [Male]
+  output_type: 'singleclass'
+  output_channels: 2
+  criterions:
+    l2: 1.0

@@ -297,6 +297,7 @@ class DataloaderMixer(DataLoader):
                     else:
                         try:
                             item[i] = torch.cat([item[i], subitem[i]], dim=0)
+
                         except Exception:
                             import pdb; pdb.set_trace()
 

@@ -1,8 +1,0 @@
-generator_type : DDPM
-category : generator
-base_path : $PEAL_RUNS/mnist-colored/ddpm
-data: <PEAL_BASE>/configs/data/mnist-colored/mnist_colored_generative.yaml
-image_size: 28
-batch_size: 64
-save_interval: 1000
-max_steps: 10000

@@ -1,7 +1,0 @@
-# python -W ignore train_generator.py --config "<PEAL_BASE>/configs/generators/mnist_ddpm.yaml"
-generator_type : DDPM
-category : generator
-base_path : $PEAL_RUNS/mnist/ddpm
-data: <PEAL_BASE>/configs/data/mnist_generative.yaml
-image_size: 32
-batch_size: 20
