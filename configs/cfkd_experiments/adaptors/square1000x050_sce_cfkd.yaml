@@ -1,4 +1,4 @@
-# python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/square1000x100_sce_cfkd.yaml"
+# python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/square1000x050_sce_cfkd.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  6
@@ -9,14 +9,14 @@ max_validation_samples               :  200
 continuous_learning                  :  "finetune"
 calculate_group_accuracies           :  True
 calculate_explainer_stats            :  False
-explainer                            :  <PEAL_BASE>/configs/cfkd_experiments/explainers/sce_default64x64.yaml
+explainer                            :  <PEAL_BASE>/configs/cfkd_experiments/explainers/sce_latent_convexity64x64.yaml
 training                             :  <PEAL_BASE>/configs/cfkd_experiments/training/img_finetuning.yaml
-data                                 :  <PEAL_BASE>/configs/cfkd_experiments/data/square1k_poisoned100.yaml
+data                                 :  <PEAL_BASE>/configs/cfkd_experiments/data/square1k_poisoned050.yaml
 test_data                            :  <PEAL_BASE>/configs/cfkd_experiments/data/square_unpoisoned.yaml
-student                              :  $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/classifier_poisoned100/model.cpl
+student                              :  $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/classifier_poisoned050/model.cpl
 teacher                              :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_unpoisoned/model.cpl
 generator                            :  $PEAL_RUNS/square1k/ddpm/config.yaml
-base_dir                             :  $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/classifier_poisoned100/sce_cfkd
+base_dir                             :  $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/classifier_poisoned050/sce_cfkd
 task:
   criterions:
     ce     : 1.0

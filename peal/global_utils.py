@@ -24,6 +24,11 @@ from tqdm import tqdm
 from pathlib import Path
 
 
+def onehot(label, n_classes):
+    one_hots = torch.zeros(label.size(0), n_classes).to(label.device)
+    return one_hots.scatter_(1, label.to(torch.int64).view(-1, 1), 1)
+
+
 def cprint(s, a, b):
     if a >= b:
         print(s)

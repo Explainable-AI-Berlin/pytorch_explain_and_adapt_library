@@ -5,7 +5,10 @@ import torch.nn.functional as F
 
 from torch import nn
 
-def cross_entropy_loss(input, target, size_average=True):
+from peal.global_utils import onehot
+
+
+def cross_entropy_loss(input, target, size_average=True, latent_code=None):
     input = F.log_softmax(input, dim=1)
     loss = -torch.sum(input * target)
     if size_average:
@@ -22,7 +25,7 @@ class OnehotCrossEntropyLoss(object):
         return cross_entropy_loss(input, target, self.size_average)
 
 
-def orthogonality_criterion(model, pred, y):
+def orthogonality_criterion(model, pred, y, latent_code=None):
     """ """
     loss = torch.tensor(0.0).to(next(model.parameters()).device)
     for parameter_idx, parameter in enumerate(model.parameters()):
@@ -38,6 +41,7 @@ def orthogonality_criterion(model, pred, y):
             )
         else:
             parameter_reshaped = parameter
+
         loss += torch.linalg.matrix_norm(
             torch.matmul(parameter_reshaped, parameter_reshaped.t())
             - torch.eye(parameter_reshaped.shape[0]).to(next(model.parameters()).device)
@@ -45,7 +49,7 @@ def orthogonality_criterion(model, pred, y):
     return loss
 
 
-def l1_criterion(model, pred, y):
+def l1_criterion(model, pred, y, latent_code=None):
     """ """
     loss = torch.tensor(0.0).to(next(model.parameters()).device)
     num_weights = 0
@@ -56,7 +60,7 @@ def l1_criterion(model, pred, y):
     return loss / num_weights
 
 
-def l2_criterion(model, pred, y):
+def l2_criterion(model, pred, y, latent_code=None):
     """ """
     loss = torch.tensor(0.0).to(next(model.parameters()).device)
     num_weights = 0
@@ -67,15 +71,14 @@ def l2_criterion(model, pred, y):
     return loss / num_weights
 
 
-#
-def mixed_bce_mse_criterion(model, y_pred, y_target):
+def mixed_bce_mse_criterion(model, y_pred, y_target, latent_code=None):
     loss_discrete = torch.nn.BCEWithLogitsLoss()(
-        y_pred[: config.data.output_split],
-        y_target[: config.data.output_split],
+        y_pred[: model.config.data.output_split],
+        y_target[: model.config.data.output_split],
     )
     loss_continuous = torch.nn.MSELoss()(
-        y_pred[config.data.output_split :],
-        y_target[config.data.output_split :],
+        y_pred[model.config.data.output_split :],
+        y_target[model.config.data.output_split :],
     )
     return loss_discrete + loss_continuous
 
@@ -88,7 +91,7 @@ class LogDiscriminantJacobianCriterion(nn.Module):
         self.writer = writer
         self.device = device
 
-    def forward(self, model, y_pred, y_target):
+    def forward(self, model, y_pred, y_target, latent_code=None):
         n_pixel = np.prod(self.config.data.input_size)
         # return torch.mean(torch.norm(y_pred[2])) / (math.log(2) * n_pixel)
         loss = y_pred[2]
@@ -200,7 +203,7 @@ class AdversarialCriterion(nn.Module):
         return self.discriminator.calc_gen_loss(y_pred[0])
 
 
-def cross_entropy_criterion(model, y_pred, y_target):
+def cross_entropy_criterion(model, y_pred, y_target, latent_code=None):
     if y_pred.shape == y_target.shape:
         return OnehotCrossEntropyLoss()(y_pred, y_target)
 
@@ -210,6 +213,22 @@ def cross_entropy_criterion(model, y_pred, y_target):
     y_pred = y_pred.reshape([int(np.prod(y_pred.shape[:-1])), y_pred.shape[-1]])
     y_target = y_target.flatten().to(torch.int64)
     return nn.CrossEntropyLoss()(y_pred, y_target)
+
+
+def latent_convexity_criterion(model, y_pred, y_target, latent_code=None):
+    indices = torch.randperm(latent_code.size(0))
+    data2 = latent_code[indices].to(latent_code)
+    targets2 = y_target[indices].to(latent_code)
+
+    targets_onehot = onehot(y_target.to(latent_code), model.config.task.output_channels)
+    targets2_onehot = onehot(targets2,model.config.task.output_channels)
+
+    #lam = torch.FloatTensor([np.random.beta(model.config.training.alpha, model.config.training.alpha)]).to(latent_code)
+    lam = torch.rand(y_target.shape).to(latent_code)[:,None]
+    data = latent_code * lam + data2 * (1 - lam)
+    targets_new = targets_onehot * lam + targets2_onehot * (1 - lam)
+    logits = model.get_last_layer()(data)
+    return cross_entropy_criterion(model, logits, targets_new)
 
 
 available_criterions = {
@@ -228,6 +247,7 @@ available_criterions = {
     "reconstruction": reconstruction_criterion,
     # 'adversarial'    : AdversarialCriterion,
     "supervised": supervised_criterion,
+    "lc": latent_convexity_criterion,
 }
 
 
