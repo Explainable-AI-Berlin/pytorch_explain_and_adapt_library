@@ -11,6 +11,7 @@ from peal.teachers.model2model_teacher import Model2ModelTeacher
 from peal.teachers.human2model_teacher import Human2ModelTeacher
 from peal.teachers.segmentation_mask_teacher import SegmentationMaskTeacher
 from peal.data.interfaces import PealDataset
+from peal.teachers.virelay_teacher import VirelayTeacher
 
 
 def get_teacher(
@@ -56,6 +57,19 @@ def get_teacher(
 
         teacher = ClusterTeacher(
             port,
+            dataset=dataset,
+            tracking_level=tracking_level,
+        )
+
+    elif teacher[:7] == "virelay":
+        if len(teacher) == 12:
+            port = int(teacher[-4:])
+
+        else:
+            port = 8000
+
+        teacher = VirelayTeacher(
+            port=port,
             dataset=dataset,
             tracking_level=tracking_level,
         )
