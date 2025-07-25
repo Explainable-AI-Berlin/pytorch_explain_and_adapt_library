@@ -74,36 +74,36 @@ python train_predictor.py --config "<PEAL_BASE>/configs/sce_experiments/predicto
 python train_predictor.py --config "<PEAL_BASE>/configs/sce_experiments/predictors/square_classifier_unpoisoned.yaml"
 
 # Run the different counterfactual explainers
+python run_cfkd.py --config "<PEAL_BASE>/configs/sce_experiments/adaptors/square1000x100_sce_cfkd.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/sce_experiments/adaptors/square1000x100_ace_cfkd.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/sce_experiments/adaptors/square1000x100_dime_cfkd.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/sce_experiments/adaptors/square1000x100_fastdime_cfkd.yaml"
-python run_cfkd.py --config "<PEAL_BASE>/configs/sce_experiments/adaptors/square1000x100_sce_cfkd.yaml"
 
 # For Smiling confounding Copyrighttag
 python train_generator.py --config "<PEAL_BASE>/configs/sce_experiments/generators/celeba_copyrighttag_ddpm.yaml"
 python train_predictor.py --config "<PEAL_BASE>/configs/sce_experiments/predictors/celeba_Smiling_confounding_copyrighttag_classifier_poisoned100.yaml"
 python train_predictor.py --config "<PEAL_BASE>/configs/sce_experiments/predictors/celeba_copyrighttag_unpoisoned.yaml"
-python run_cfkd.py --config "<PEAL_BASE>/configs/sce_experiments/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_ace_cfkd.yaml"
-python run_cfkd.py --config "<PEAL_BASE>/configs/sce_experiments/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_dime_cfkd.yaml"
-python run_cfkd.py --config "<PEAL_BASE>/configs/sce_experiments/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_fastdime_cfkd.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/sce_experiments/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_sce_cfkd.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/sce_experiments/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_sce_no_sparsity_cfkd.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/sce_experiments/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_sce_no_smoothing_cfkd.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/sce_experiments/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_sce_no_gradient_filtering_cfkd.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/sce_experiments/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_sce_no_exploration_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/sce_experiments/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_ace_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/sce_experiments/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_dime_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/sce_experiments/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_fastdime_cfkd.yaml"
 
 # vit-b-16 experiments
+python run_cfkd.py --config "<PEAL_BASE>/configs/sce_experiments/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_vit_b_16_sce_cfkd.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/sce_experiments/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_vit_b_16_ace_cfkd.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/sce_experiments/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_vit_b_16_dime_cfkd.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/sce_experiments/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_vit_b_16_fastdime_cfkd.yaml"
-python run_cfkd.py --config "<PEAL_BASE>/configs/sce_experiments/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_vit_b_16_sce_cfkd.yaml"
 
 # For the Camelyon17 dataset
 python train_generator.py --config "<PEAL_BASE>/configs/sce_experiments/generators/camelyon17_ddpm.yaml"
 python train_predictor.py --config "<PEAL_BASE>/configs/sce_experiments/predictors/camelyon17_classifier_poisoned100.yaml"
 python train_predictor.py --config "<PEAL_BASE>/configs/sce_experiments/predictors/camelyon17_classifier_unpoisoned.yaml"
 python train_predictor.py --config "<PEAL_BASE>/configs/sce_experiments/predictors/camelyon17_latent_oracle.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/sce_experiments/adaptors/camelyon17_sce_cfkd.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/sce_experiments/adaptors/camelyon17_ace_cfkd.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/sce_experiments/adaptors/camelyon17_dime_cfkd.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/sce_experiments/adaptors/camelyon17_fastdime_cfkd.yaml"
-python run_cfkd.py --config "<PEAL_BASE>/configs/sce_experiments/adaptors/camelyon17_sce_cfkd.yaml"
