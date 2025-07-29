@@ -1,5 +1,5 @@
 base_dir: $PEAL_RUNS/follicles_cut/classifier_natural/spray_analysis
-data: <PEAL_BASE>/configs/data/follicles.yaml
+data: <PEAL_BASE>/configs/cfkd_experiments/data/follicles.yaml
 dataset_name: Follicles
 model: $PEAL_RUNS/follicles_cut/classifier_natural/model.cpl
 port: 8080

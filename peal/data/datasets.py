@@ -993,6 +993,8 @@ class Image2ClassDataset(ImageDataset):
 
     @property
     def output_size(self):
+        if isinstance(self.config.output_size, int):
+            return self.config.output_size
         if len(self.config.output_size) == 1:
             return self.config.output_size[0]
         return self.config.output_size

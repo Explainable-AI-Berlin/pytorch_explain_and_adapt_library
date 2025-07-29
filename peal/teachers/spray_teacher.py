@@ -8,6 +8,7 @@ from typing import Union
 import h5py
 import torch
 import numpy as np
+import csv
 import yaml
 from corelay.pipeline.spectral import SpectralClustering
 from corelay.processor.base import Processor
@@ -21,7 +22,9 @@ from torch.utils.data import ConcatDataset, DataLoader, Subset
 from tqdm import tqdm
 from virelay.model import Workspace
 from virelay.server import Server
-from zennit.composites import EpsilonPlusFlat
+from zennit.attribution import Gradient, IntegratedGradients, SmoothGrad
+from zennit.composites import EpsilonPlusFlat, EpsilonGammaBox
+from zennit.image import imgify, imsave
 from zennit.torchvision import ResNetCanonizer
 
 from peal.adaptors.clarc import get_layer_name
@@ -46,11 +49,23 @@ class SprayConfig(BaseModel):
     classes_total: int
     num_clusters_max: int = 8
     num_eigval: int = 32
-    tsne_perplexity: float = 64.
-    umap_neighbors: int = 32
+    tsne_perplexity: Union[float, list[float]] = 64.
+    umap_neighbors: Union[int, list[int]] = 32
     task: TaskConfig
     skip_wrongly_classified_samples: bool = False
     max_samples: int = 10000
+    split_dataset: bool = False
+    conditioning_layer: int = None
+    conditioning_channels: list[int] = None
+    include_testsplit: bool = False
+
+
+class LogitDifference(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, y):
+        return y[0] - y[1]
 
 
 class Spray(TeacherInterface):
@@ -59,6 +74,10 @@ class Spray(TeacherInterface):
         if not isinstance(config, SprayConfig):
             config = SprayConfig(**config)
         self.config = config
+        if isinstance(self.config.tsne_perplexity, float):
+            self.config.tsne_perplexity = [self.config.tsne_perplexity]
+        if isinstance(self.config.umap_neighbors, int):
+            self.config.umap_neighbors = [self.config.umap_neighbors]
 
         self.base_dir = config.base_dir
         pathlib.Path(self.base_dir).mkdir(exist_ok=True)
@@ -66,6 +85,7 @@ class Spray(TeacherInterface):
         if device is None:
             device = "cuda" if torch.cuda.is_available() else "cpu"
         self.device = device
+        print("running on device: ", self.device)
 
         self.model = torch.load(config.model, map_location=self.device)
         if hasattr(self.model, 'model'):
@@ -91,10 +111,13 @@ class Spray(TeacherInterface):
         self.train_data.disable_class_restriction()
         self.val_data.disable_class_restriction()
         self.test_data.disable_class_restriction()
+        self.train_data.enable_groups()
+        self.val_data.enable_groups()
+        self.test_data.enable_groups()
 
     def get_feedback(self, **args) -> dict[str, int]:
 
-        layer_name = get_layer_name(self.model, self.attribution_layer)
+        layer_name = "input" if self.attribution_layer == 0 else get_layer_name(self.model, self.attribution_layer)
         self.analysis_dir = os.path.join(self.base_dir, f"attrbs-layer-{self.attribution_layer}_analysis")
         pathlib.Path(self.analysis_dir).mkdir(exist_ok=True)
         save_yaml_config(self.config, os.path.join(self.analysis_dir, "config.yaml"))
@@ -114,24 +137,42 @@ class Spray(TeacherInterface):
         for id in non_confounder_ids:
             group_label_map[filenames[id]] = 0
 
-        labels = np.array(list(group_label_map.values()))
-        print(f"found {len(labels[labels == 1])} confounders and {len(labels[labels == 0])} non-confounders")
+        true_labels = np.array(list(group_label_map.values()))
+        print(f"found {len(true_labels[true_labels == 1])} confounders and {len(true_labels[true_labels == 0])} non-confounders")
 
-        group_label_file = os.path.join(self.base_dir, f"group_labels_attrbs-layer-{self.attribution_layer}.json")
-        with open(group_label_file, 'w', encoding='utf-8') as file:
-            json.dump(group_label_map, file)
+        new_data_file = []
+        with open(os.path.join(self.config.data.dataset_path, "data.csv"), "r") as f:
+            data_file = csv.reader(f, delimiter=",")
+            header = next(data_file)
+            header.append("SprayLabel")
+            new_data_file.append(header)
+            for line in data_file:
+                line.append(group_label_map.get(line[0], -1))
+                new_data_file.append(line)
 
-        self.train_data.enable_groups()
-        self.val_data.enable_groups()
-        self.test_data.enable_groups()
-        dataloader = DataLoader(ConcatDataset([self.train_data, self.val_data, self.test_data]), batch_size=64, shuffle=False)
-        label_acc = []
+        with open(os.path.join(self.analysis_dir, "data_spray_labels.csv"), "w", newline="") as f:
+            csv.writer(f).writerows(new_data_file)
+
+        if self.config.include_testsplit:
+            dataloader = DataLoader(ConcatDataset([self.train_data, self.val_data, self.test_data]), batch_size=64, shuffle=False)
+        else:
+            dataloader = DataLoader(ConcatDataset([self.train_data, self.val_data]), batch_size=64, shuffle=False)
+
+        label_acc = [[[], []], [[], []]]
         for batch in dataloader:
-            labels = batch["has_confounder"]
+            true_labels = batch["has_confounder"]
+            targets = batch["y"].squeeze().int()
             for i, filename in enumerate(batch['url']):
                 if filename in group_label_map:
-                    label_acc.append(labels[i].item() == group_label_map[filename])
-        print(f"{np.mean(label_acc) * 100}% of {len(label_acc)} labels correct!")
+                    spray_label = group_label_map[filename]
+                    label_acc[targets[i].item()][spray_label].append(true_labels[i].item() == spray_label)
+
+        result_summary = ""
+        for class_idx in range(len(label_acc)):
+            for confounder_idx in range(len(label_acc[class_idx])):
+                result_summary += f"class {class_idx} and {'confounder' if confounder_idx == 1 else 'non-confounder'}: n={len(label_acc[class_idx][confounder_idx])}, label_acc={np.mean(label_acc[class_idx][confounder_idx])}\n"
+        with open(os.path.join(self.analysis_dir, "result_summary.txt"), "w") as f:
+            f.write(result_summary)
 
         return group_label_map
 
@@ -151,57 +192,102 @@ class Spray(TeacherInterface):
         heatmaps_db_file = None
         concept_importance_db_file = None
 
-        attribution = CondAttribution(self.model)
-        canonizer = ResNetCanonizer()
-        composite = EpsilonPlusFlat([canonizer])
+        attributor = CondAttribution(self.model, no_param_grad=True)
+        # composite = EpsilonPlusFlat([ResNetCanonizer()])
+        composite = EpsilonGammaBox(
+            low = -3.0, high = 3.0,
+            epsilon=1e-5,
+            gamma = .1,
+            stabilizer = .15,
+            canonizers=[ResNetCanonizer()]
+        )
+        heatmap_generator = SmoothGrad(self.model, composite)
+        # heatmap_generator = Gradient(self.model, composite)
         cc = ChannelConcept()
+
+        concept_layer = None
+        if self.config.conditioning_layer is not None:
+            concept_layer = get_layer_name(self.model, self.config.conditioning_layer)
 
         train_data = self.train_data
         if len(self.train_data) > self.config.max_samples:
             idxs = np.random.choice(np.arange(len(self.train_data)), size=self.config.max_samples, replace=False)
             train_data = Subset(self.train_data, idxs)
-        dataloader = DataLoader(ConcatDataset([train_data, self.val_data, self.test_data]), batch_size=64, shuffle=False)
+
+        if self.config.include_testsplit:
+            len_data = len(train_data) + len(self.val_data) + len(self.test_data)
+            datasplits = [train_data, self.val_data, self.test_data]
+        else:
+            len_data = len(train_data) + len(self.val_data)
+            datasplits = [train_data, self.val_data]
+
+        if self.config.split_dataset:
+            data = [(i, DataLoader(split, batch_size=64, shuffle=False)) for i, split in enumerate(datasplits)]
+        else:
+            data = [(-1, DataLoader(ConcatDataset(datasplits), batch_size=64, shuffle=False))]
 
         number_samples_processed = 0
-        with tqdm(dataloader) as pbar:
-            pbar.set_description(f"computing relevances at layer {attribution_layer}...")
-            for batch in pbar:
-                x = batch["x"].to(self.device).requires_grad_()
-                y = batch["y"].squeeze().int()
-                out = self.model(x).detach().cpu()
+        for split, dataloader in data:
 
-                condition = [{"y": target} for target in y]
-                # condition = [{"y": c_id} for c_id in out.argmax(1)]
-                attr = attribution(x, condition, composite, record_layer=[attribution_layer], init_rel=1)
-                if self.config.skip_wrongly_classified_samples:
-                    non_zero = ((attr.heatmap.sum((1, 2)).abs().detach().cpu() > 0) * (out.argmax(1) == y)).numpy()
-                else:
-                    non_zero = (attr.heatmap.sum((1, 2)).abs().detach().cpu() > 0).numpy()
+            with tqdm(dataloader) as pbar:
+                pbar.set_description(f"computing relevances in dataset split {split} at layer {attribution_layer}...")
+                for batch in pbar:
+                    x = batch["x"].to(self.device).requires_grad_()
+                    y = batch["y"].squeeze().to(torch.int64)
+                    # out = self.model(x)
 
-                if len(non_zero) == 0:
-                    continue
+                    def one_hot_max(output):
+                        # return torch.eye(output.shape[1], device=self.device)[y]
+                        logits = output[torch.arange(output.shape[0]), y]
+                        return logits[:, None] * torch.eye(output.shape[1], device=self.device)[y]
 
-                attributions = attr.relevances[attribution_layer][non_zero]
-                concept_importance = cc.attribute(attributions, abs_norm=True)[:, None]
-                heatmaps = attr.heatmap[non_zero][:, None]
-                y = y[non_zero]
-                x = x[non_zero]
+                    out, heatmaps = heatmap_generator(x, one_hot_max)
+                    heatmaps = heatmaps.sum(1)
 
-                if number_samples_processed == 0:
-                    print("attribution shape:", attributions.shape)
-                    number_samples = len(dataloader.dataset)
-                    attribution_db_file = create_attribution_database(self.attribution_db_path, attributions[0].shape, self.config.classes_total, number_samples)
-                    heatmaps_db_file = create_attribution_database(self.heatmaps_db_path, heatmaps[0].shape, self.config.classes_total, number_samples)
-                    concept_importance_db_file = create_attribution_database(self.concept_importance_db_path, concept_importance[0].shape, self.config.classes_total, number_samples)
-                    input_db_file = create_input_database(self.input_db_path, x[0].shape, len(dataloader.dataset))
+                    if concept_layer is None:
+                        # condition = [{"y": [c_id]} for c_id in out.argmax(1)]
+                        condition = [{"y": [target]} for target in y]
+                    else:
+                        # condition = [{"y": [c_id], concept_layer: self.config.conditioning_channels} for c_id in out.argmax(1)]
+                        condition = [{"y": [target], concept_layer: self.config.conditioning_channels} for target in y]
 
-                append_attributions(attribution_db_file, number_samples_processed, attributions, attr.prediction[non_zero], y)
-                append_attributions(heatmaps_db_file, number_samples_processed, heatmaps, attr.prediction[non_zero], y)
-                append_attributions(concept_importance_db_file, number_samples_processed, concept_importance, attr.prediction[non_zero], y)
-                append_inputs(input_db_file, number_samples_processed, x.detach().cpu(), y, np.asarray(batch["url"])[non_zero])
-                number_samples_processed += len(y)
+                    record_layers = [] if attribution_layer == "input" else [attribution_layer]
+                    attr = attributor(x, condition, composite, record_layer=record_layers)
+                    if self.config.skip_wrongly_classified_samples:
+                        non_zero = ((attr.heatmap.sum((1, 2)).abs().detach().cpu() > 0) * (out.argmax(1).detach().cpu() == y)).numpy()
+                    else:
+                        non_zero = (attr.heatmap.sum((1, 2)).abs().detach().cpu() > 0).numpy()
 
-        print(f"{number_samples_processed} of {len(dataloader.dataset)} processed")
+                    non_zero = non_zero * (batch["has_confounder"].squeeze().int() == y).numpy()
+                    print("num non-zero elements =", non_zero.sum())
+                    if non_zero.sum() == 0:
+                        continue
+
+                    heatmaps = heatmaps[non_zero]
+                    attributions = heatmaps if attribution_layer == "input" else attr.relevances[attribution_layer][non_zero]
+                    # heatmaps = attributions.mean(dim=1)
+                    heatmaps = heatmaps[:, None]
+                    concept_importance = cc.attribute(attributions, abs_norm=True)[:, None]
+                    y = y[non_zero]
+                    x = x[non_zero]
+
+                    if number_samples_processed == 0:
+                        print("attributions shape: ", attributions.shape)
+                        print("heatmaps shape: ", heatmaps.shape)
+                        attribution_db_file = create_attribution_database(self.attribution_db_path, attributions[0].shape, self.config.classes_total, len_data)
+                        heatmaps_db_file = create_attribution_database(self.heatmaps_db_path, heatmaps[0].shape, self.config.classes_total, len_data)
+                        concept_importance_db_file = create_attribution_database(self.concept_importance_db_path, concept_importance[0].shape, self.config.classes_total, len_data)
+                        input_db_file = create_input_database(self.input_db_path, x[0].shape, len_data)
+
+                    dataset_split = (np.ones(len(y), dtype=np.uint16) * split)
+                    append_attributions(attribution_db_file, number_samples_processed, attributions, attr.prediction[non_zero], y, dataset_split)
+                    append_attributions(heatmaps_db_file, number_samples_processed, heatmaps, attr.prediction[non_zero], y, dataset_split)
+                    append_attributions(concept_importance_db_file, number_samples_processed, concept_importance, attr.prediction[non_zero], y, dataset_split)
+                    append_inputs(input_db_file, number_samples_processed, x, y, np.asarray(batch["url"])[non_zero])
+                    number_samples_processed += len(y)
+                    pbar.set_description(f"computing relevances ({number_samples_processed}/{len_data}) in dataset split {split} at layer {attribution_layer}...")
+
+        print(f"{number_samples_processed} of {len_data} processed")
         resize_input_db(input_db_file, number_samples_processed)
         resize_attribution_db(attribution_db_file, number_samples_processed)
         resize_attribution_db(heatmaps_db_file, number_samples_processed)
@@ -230,72 +316,96 @@ class Spray(TeacherInterface):
                 ], broadcast=True),
                 DBSCAN(),
                 HDBSCAN(),
-                TSNEEmbedding(perplexity=self.config.tsne_perplexity, kwargs={"learning_rate": "auto", "init": "pca"}),
-                UMAPEmbedding(n_neighbors=self.config.umap_neighbors)
+                Parallel([
+                    TSNEEmbedding(perplexity=perplexity, kwargs={"learning_rate": "auto", "init": "pca"}) for perplexity in self.config.tsne_perplexity
+                ], broadcast=True),
+                Parallel([
+                    UMAPEmbedding(n_neighbors=n_neighbors) for n_neighbors in self.config.umap_neighbors
+                ], broadcast=True)
             ], broadcast=True, is_output=True)
         )
 
         attribution_path = self.concept_importance_db_path if self.config.use_relative_concept_importance else self.attribution_db_path
         with h5py.File(attribution_path, 'r') as attributions_file:
             labels = attributions_file['label'][:]
+            splits = attributions_file['dataset_split'][:]
+            assert len(labels) == len(splits)
+            print("total number of samples to be processed:", len(labels))
 
-        for class_idx in range(self.config.classes_total):
+        if self.config.split_dataset:
+            split_names = [(0, 'train'), (1, 'val')]
+            if self.config.include_testsplit:
+                split_names += [(2, 'test')]
+        else:
+            split_names = [(-1, 'full')]
 
-            with h5py.File(attribution_path, 'r') as attributions_file:
-                indices_of_samples_in_class, = np.nonzero(labels == class_idx)
-                attribution_data = attributions_file['attribution'][indices_of_samples_in_class, :]
-                print(f"len attribution data for class {class_idx}: {len(attribution_data)}")
+        for split, split_name in split_names:
+            for class_idx in range(self.config.classes_total):
 
-            (eigenvalues, embedding), (kmeans, ac, dbscan, hdbscan, tsne, umap) = pipeline(attribution_data)
+                with h5py.File(attribution_path, 'r') as attributions_file:
+                    indices_of_samples, = np.nonzero((labels == class_idx) & (splits == split))
+                    print(f"number of samples in class {class_idx}: {(labels == class_idx).sum()}")
+                    print(f"number of samples in split {split}: {(splits == split).sum()}")
+                    print(f"process {len(indices_of_samples)} samples (class {class_idx}, split {split})")
+                    attribution_data = attributions_file['attribution'][indices_of_samples, :]
+                    print("attribution data shape:", attribution_data.shape)
 
-            with h5py.File(analysis_db_path, 'a') as analysis_file:
+                print("running spray pipeline...")
+                (eigenvalues, embedding), (kmeans, ac, dbscan, hdbscan, tsne, umap) = pipeline(attribution_data)
 
-                analysis_name = CLASS_NAMES[self.dataset_class][class_idx]
+                with h5py.File(analysis_db_path, 'a') as analysis_file:
 
-                analysis_group = analysis_file.require_group(analysis_name)
-                analysis_group['index'] = indices_of_samples_in_class.astype('uint32')
+                    analysis_name = CLASS_NAMES[self.dataset_class][class_idx] + f' ({split_name})'
 
-                embedding_group = analysis_group.require_group('embedding')
-                embedding_group['spectral'] = embedding.astype(np.float32)
-                embedding_group['spectral'].attrs['eigenvalue'] = eigenvalues.astype(np.float32)
+                    analysis_group = analysis_file.require_group(analysis_name)
+                    analysis_group['index'] = indices_of_samples.astype('uint32')
 
-                embedding_group['tsne'] = tsne.astype(np.float32)
-                embedding_group['tsne'].attrs['embedding'] = 'spectral'
-                embedding_group['tsne'].attrs['index'] = np.array([0, 1])
+                    embedding_group = analysis_group.require_group('embedding')
+                    embedding_group['spectral'] = embedding.astype(np.float32)
+                    embedding_group['spectral'].attrs['eigenvalue'] = eigenvalues.astype(np.float32)
 
-                embedding_group['umap'] = umap.astype(np.float32)
-                embedding_group['umap'].attrs['embedding'] = 'spectral'
-                embedding_group['umap'].attrs['index'] = np.array([0, 1])
+                    for perplexity, tsne_embedding in zip(self.config.tsne_perplexity, tsne):
+                        embedding_name = f'tsne-{perplexity:0>5.1f}'
+                        embedding_group[embedding_name] = tsne_embedding.astype(np.float32)
+                        embedding_group[embedding_name].attrs['embedding'] = 'spectral'
+                        embedding_group[embedding_name].attrs['index'] = np.array([0, 1])
 
-                cluster_group = analysis_group.require_group('cluster')
-                for number_of_clusters, clustering in zip(number_of_clusters_list, kmeans):
-                    clustering_dataset_name = f'kmeans-{number_of_clusters:02d}'
-                    cluster_group[clustering_dataset_name] = clustering
-                    cluster_group[clustering_dataset_name].attrs['embedding'] = 'spectral'
-                    cluster_group[clustering_dataset_name].attrs['k'] = number_of_clusters
-                    cluster_group[clustering_dataset_name].attrs['index'] = np.arange(
-                        embedding.shape[1],
-                        dtype=np.uint32
-                    )
+                    for n_neighbors, umap_embedding in zip(self.config.umap_neighbors, umap):
+                        embedding_name = f'umap-{n_neighbors:0>3d}'
+                        embedding_group[embedding_name] = umap_embedding.astype(np.float32)
+                        embedding_group[embedding_name].attrs['embedding'] = 'spectral'
+                        embedding_group[embedding_name].attrs['index'] = np.array([0, 1])
 
-                for number_of_clusters, clustering in zip(number_of_clusters_list, ac):
-                    clustering_dataset_name = f'AgglomerativeClustering-{number_of_clusters:02d}'
-                    cluster_group[clustering_dataset_name] = clustering
-                    cluster_group[clustering_dataset_name].attrs['embedding'] = 'spectral'
-                    cluster_group[clustering_dataset_name].attrs['k'] = number_of_clusters
-                    cluster_group[clustering_dataset_name].attrs['index'] = np.arange(
-                        embedding.shape[1],
-                        dtype=np.uint32
-                    )
+                    cluster_group = analysis_group.require_group('cluster')
+                    for number_of_clusters, clustering in zip(number_of_clusters_list, kmeans):
+                        clustering_dataset_name = f'kmeans-{number_of_clusters:02d}'
+                        cluster_group[clustering_dataset_name] = clustering
+                        cluster_group[clustering_dataset_name].attrs['embedding'] = 'spectral'
+                        cluster_group[clustering_dataset_name].attrs['k'] = number_of_clusters
+                        cluster_group[clustering_dataset_name].attrs['index'] = np.arange(
+                            embedding.shape[1],
+                            dtype=np.uint32
+                        )
 
-                cluster_group['DBSCAN'] = dbscan
-                cluster_group['DBSCAN'].attrs['embedding'] = 'spectral'
-                cluster_group['DBSCAN'].attrs['index'] = np.arange(embedding.shape[1], dtype=np.uint32)
+                    for number_of_clusters, clustering in zip(number_of_clusters_list, ac):
+                        clustering_dataset_name = f'AgglomerativeClustering-{number_of_clusters:02d}'
+                        cluster_group[clustering_dataset_name] = clustering
+                        cluster_group[clustering_dataset_name].attrs['embedding'] = 'spectral'
+                        cluster_group[clustering_dataset_name].attrs['k'] = number_of_clusters
+                        cluster_group[clustering_dataset_name].attrs['index'] = np.arange(
+                            embedding.shape[1],
+                            dtype=np.uint32
+                        )
 
-                cluster_group['HDBSCAN'] = hdbscan
-                cluster_group['HDBSCAN'].attrs['embedding'] = 'spectral'
-                cluster_group['HDBSCAN'].attrs['index'] = np.arange(embedding.shape[1], dtype=np.uint32)
+                    cluster_group['DBSCAN'] = dbscan
+                    cluster_group['DBSCAN'].attrs['embedding'] = 'spectral'
+                    cluster_group['DBSCAN'].attrs['index'] = np.arange(embedding.shape[1], dtype=np.uint32)
 
+                    cluster_group['HDBSCAN'] = hdbscan
+                    cluster_group['HDBSCAN'].attrs['embedding'] = 'spectral'
+                    cluster_group['HDBSCAN'].attrs['index'] = np.arange(embedding.shape[1], dtype=np.uint32)
+
+        print("spray analysis finished!")
         return analysis_db_path
 
     def _create_label_map(self) -> str:
@@ -357,7 +467,6 @@ class Spray(TeacherInterface):
         group_label_dir = os.path.join(self.analysis_dir, "group-labels")
 
         if not os.path.exists(group_label_dir):
-            # exit()
             host_name = "0.0.0.0"
             workspace = Workspace()
             workspace.add_project(self.virelay_project_path)
@@ -365,7 +474,7 @@ class Spray(TeacherInterface):
             proc = multiprocessing.Process(
                 target=lambda: app.run(host=host_name, port=self.config.port), args=())
             proc.start()
-            print('ViReLay GUI is active on localhost:' + str(self.config.port))
+            print(f'ViReLay GUI is active on {host_name}:{self.config.port}')
 
             print(f'For each class, select the samples containing the confounding feature and export, '
                   f'then do the same for the samples without the confounding feature. Rename the files to '
@@ -425,8 +534,8 @@ def create_input_database(dataset_file_path, samples_shape, number_of_samples):
     return dataset_file
 
 def append_inputs(dataset_file, index, sample, label, filenames):
-    dataset_file['data'][index:sample.shape[0] + index] = sample
-    dataset_file['label'][index:label.shape[0] + index] = label
+    dataset_file['data'][index:sample.shape[0] + index] = sample.detach().cpu().numpy()
+    dataset_file['label'][index:label.shape[0] + index] = label.detach().cpu().numpy()
     dataset_file['filenames'][index:len(filenames) + index] = filenames
 
 def resize_input_db(database_file, new_size):
@@ -458,22 +567,31 @@ def create_attribution_database(attribution_database_file_path,
         maxshape=(None,),
         dtype='uint16'
     )
+    attribution_database_file.create_dataset(
+        'dataset_split',
+        shape=(number_of_samples,),
+        maxshape=(None,),
+        dtype='int16'
+    )
     return attribution_database_file
 
 def append_attributions(attribution_database_file,
-                        index,
-                        attributions,
-                        predictions,
-                        labels):
+                        index: int,
+                        attributions: torch.Tensor,
+                        predictions: torch.Tensor,
+                        labels: torch.Tensor,
+                        dataset_split: np.ndarray):
 
     attribution_database_file['attribution'][index:attributions.shape[0] + index] = attributions.detach().cpu().numpy()
     attribution_database_file['prediction'][index:predictions.shape[0] + index] = predictions.detach().cpu().numpy()
     attribution_database_file['label'][index:labels.shape[0] + index] = labels.detach().cpu().numpy()
+    attribution_database_file['dataset_split'][index:dataset_split.shape[0] + index] = dataset_split
 
 def resize_attribution_db(database_file, new_size):
     database_file['attribution'].resize(new_size, axis=0)
     database_file['prediction'].resize(new_size, axis=0)
     database_file['label'].resize(new_size, axis=0)
+    database_file['dataset_split'].resize(new_size, axis=0)
 
 CLASS_NAMES = {
     "SquareDataset": ['0 - Dark Foreground', '1 - Bright Foreground'],

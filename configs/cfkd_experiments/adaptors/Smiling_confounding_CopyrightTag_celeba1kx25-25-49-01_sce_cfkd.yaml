@@ -9,10 +9,10 @@ max_validation_samples               :  200
 continuous_learning                  :  "finetune"
 calculate_group_accuracies           :  True
 calculate_explainer_stats            :  False
-explainer                            :  <PEAL_BASE>/configs/explainers/sce_default128x128.yaml
-training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
-data                                 :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba1000_25-25-49-01.yaml
-test_data                            :  <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba.yaml
+explainer                            :  <PEAL_BASE>/configs/cfkd_experiments/explainers/sce_default128x128.yaml
+training                             :  <PEAL_BASE>/configs/cfkd_experiments/training/img_finetuning.yaml
+data                                 :  <PEAL_BASE>/configs/cfkd_experiments/data/Smiling_confounding_copyrighttag_celeba1000_25-25-49-01.yaml
+test_data                            :  <PEAL_BASE>/configs/cfkd_experiments/data/Smiling_confounding_copyrighttag_celeba.yaml
 student                              :  $PEAL_RUNS/celeba1k_copyrighttag/classifier_25-25-49-01/model.cpl
 teacher                              :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_unpoisoned/model.cpl
 generator                            :  $PEAL_RUNS/celeba1k_copyrighttag/ddpm_25-25-49-01/config.yaml

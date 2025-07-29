@@ -1,5 +1,5 @@
 base_dir: $PEAL_RUNS/camelyon17_1k/classifier_25-25-49-01/spray_analysis
-data: <PEAL_BASE>/configs/data/camelyon17_25-25-49-01.yaml
+data: <PEAL_BASE>/configs/cfkd_experiments/data/camelyon17_25-25-49-01.yaml
 model: $PEAL_RUNS/camelyon17_1k/classifier_25-25-49-01/model.cpl
 port: 8080
 use_relative_concept_importance: True

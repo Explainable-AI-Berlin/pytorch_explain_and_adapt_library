@@ -9,9 +9,9 @@ def main():
     parser.add_argument("--config", type=str, required=True)
     args = parser.parse_args()
 
-    virelay_config = load_yaml_config(args.config, config_model=SprayConfig)
-    virelay_teacher = Spray(virelay_config)
-    virelay_teacher.get_feedback()
+    spray_config = load_yaml_config(args.config, config_model=SprayConfig)
+    spray_teacher = Spray(spray_config)
+    spray_teacher.get_feedback()
 
 if __name__ == "__main__":
     main()

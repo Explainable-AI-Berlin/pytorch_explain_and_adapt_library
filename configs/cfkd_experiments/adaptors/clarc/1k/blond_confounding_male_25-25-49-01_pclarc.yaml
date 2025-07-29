@@ -2,7 +2,7 @@ category: "adaptor"
 adaptor_type: "PClArC"
 base_dir: $PEAL_RUNS/celeba1k/Blond_Hair/resnet18_25-25-49-01/pclarc
 model_path: $PEAL_RUNS/celeba1k/Blond_Hair/resnet18_25-25-49-01/model.cpl
-data: <PEAL_BASE>/configs/data/celeba_Blond_Hair_confounding_Male_25-25-49-01.yaml
+data: <PEAL_BASE>/configs/data/celeba1k_Blond_Hair_confounding_Male_25-25-49-01.yaml
 unpoisoned_data: <PEAL_BASE>/configs/data/celeba.yaml
 #group_labels: $PEAL_RUNS/celeba1k/Blond_Hair/resnet18_25-25-49-01/spray_analysis/
 projection_type: 'pcav' # 'pcav', 'svm', 'simple'

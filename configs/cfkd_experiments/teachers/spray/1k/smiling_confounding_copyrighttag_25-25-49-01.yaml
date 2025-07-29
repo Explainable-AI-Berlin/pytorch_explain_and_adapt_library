@@ -1,5 +1,5 @@
 base_dir: $PEAL_RUNS/celeba1k_copyrighttag/classifier_25-25-49-01/spray_analysis
-data: <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba1000_25-25-49-01.yaml
+data: <PEAL_BASE>/configs/cfkd_experiments/data/Smiling_confounding_copyrighttag_celeba1000_25-25-49-01.yaml
 dataset_name: CelebaSmiling
 model: $PEAL_RUNS/celeba1k_copyrighttag/classifier_25-25-49-01/model.cpl
 port: 8080

@@ -204,6 +204,10 @@ class DataConfig(BaseModel):
     """
     confounder_probability: Union[type(None), float] = None
     """
+    alternative to confounder_probability, specify individual group sizes, e.g. [0.25, 0.25, 0.25, 0.25]
+    """
+    full_confounder_config: Union[type(None), list[float]] = None
+    """
     The ratio of the classes in the dataset.
     """
     class_ratios: Union[type(None), list] = None
@@ -251,5 +255,14 @@ class DataConfig(BaseModel):
     Whether to load all datasets into the RAM or not. Careful with big datasets!
     """
     in_memory: bool = False
+    """
+    Path to spray label csv file. When set, use spray labels instead of true confounder labels.
+    Samples without a spray label will be dropped
+    """
+    spray_label_file: str = None
+    """
+    Whether to re-balance group sizes after dropping samples without a spray label
+    """
+    spray_groups_balanced: bool = False
+    spray_group_sizes: list[int] = None
 
-    full_confounder_config: Union[type(None), list[float]] = None

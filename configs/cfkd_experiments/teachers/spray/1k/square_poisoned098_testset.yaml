@@ -1,5 +1,5 @@
 base_dir: $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/classifier_poisoned098/spray_analysis
-data: <PEAL_BASE>/configs/data/square_unpoisoned.yaml
+data: <PEAL_BASE>/configs/cfkd_experiments/data/square_unpoisoned.yaml
 model: $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/classifier_poisoned098/model.cpl
 port: 8080
 use_relative_concept_importance: True
