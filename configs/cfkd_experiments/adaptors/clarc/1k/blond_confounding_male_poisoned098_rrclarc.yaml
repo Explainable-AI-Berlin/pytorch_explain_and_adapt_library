@@ -1,0 +1,32 @@
+category: "adaptor"
+adaptor_type: "RRClArC"
+base_dir: $PEAL_RUNS/celeba1k/Blond_Hair/resnet18_poisoned098/rrclarc
+model_path: $PEAL_RUNS/celeba1k/Blond_Hair/resnet18_poisoned098/model.cpl
+data: <PEAL_BASE>/configs/data/celeba_Blond_Hair_confounding_Male_poisoned098.yaml
+unpoisoned_data: <PEAL_BASE>/configs/data/celeba.yaml
+#group_labels: $PEAL_RUNS/celeba1k/Blond_Hair/resnet18_poisoned098/spray_analysis/
+projection_type: 'svm' # 'pcav', 'svm', 'simple'
+# cav_mode: "cavs_max" # 'cavs_max', 'cavs_mean'; only relevant when using projection_type 'pcav'
+layer_index: [3, 6]
+correction_strength: [100, 1000, 5000, 20000]
+attacked_class: 0
+mean_grad: False
+save_model: False
+use_perfect_annotations: True
+rrc_loss: "cosine" # 'l2', 'cosine'
+gradient_target: "all" # 'all', 'all_random', 'attacked_class', 'max'
+# max_samples: 2000
+reverse_cav_direction: False
+task:
+  y_selection: [Blond_Hair]
+  output_type: 'singleclass'
+  output_channels: 2
+  criterions:
+    l2: 1.0
+training:
+  train_batch_size: 128
+  val_batch_size: 128
+  test_batch_size: 128
+  learning_rate: 5.0e-05
+  optimizer: "sgd"
+  max_epochs: 250

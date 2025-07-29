@@ -1,0 +1,22 @@
+base_dir: $PEAL_RUNS/follicles_cut/classifier_natural/spray_analysis
+data: <PEAL_BASE>/configs/cfkd_experiments/data/follicles.yaml
+dataset_name: Follicles
+model: $PEAL_RUNS/follicles_cut/classifier_natural/model.cpl
+port: 8080
+use_relative_concept_importance: True
+sum_attribution_channels: False # no effect if use_relative_concept_importance=True
+normalize_attribtions: True
+attribution_layer: 13
+classes_total: 2
+num_clusters_max: 3
+num_eigval: 16
+tsne_perplexity: [16, 32, 64, 128, 256]
+umap_neighbors: [8, 16, 32, 64]
+split_dataset: False
+include_testsplit: True
+task:
+  y_selection: [type]
+  output_type: 'singleclass'
+  output_channels: 2
+  criterions:
+    l2: 1.0

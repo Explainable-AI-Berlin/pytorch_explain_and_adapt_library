@@ -1221,7 +1221,14 @@ class CounterfactualExplainer(ExplainerInterface):
         for idx in range(len(explanations_dict["x_list"])):
             current_dict = {}
             for key in explanations_dict.keys():
-                current_dict[key] = explanations_dict[key][idx]
+                if key in ['clusters0', 'cluster_confidence0', 'clusters1', 'cluster_confidence1']:
+                    continue
+
+                try:
+                    current_dict[key] = explanations_dict[key][idx]
+
+                except Exception:
+                    import pdb; pdb.set_trace()
 
             explanations_list.append(current_dict)
 
@@ -1367,14 +1374,10 @@ class CounterfactualExplainer(ExplainerInterface):
                         continue
 
                     _, cosine_similarity_list, _, _ = extract_feature_difference(current_explanations)
-                    try:
-                        if cosine_similarity_list[0] < lowest_similarity:
-                            explanations_beginning = current_explanations
-                            lowest_similarity = cosine_similarity_list[0]
-                            current_idx = search_idx
-
-                    except Exception:
-                        import pdb; pdb.set_trace()
+                    if cosine_similarity_list[0][0] < lowest_similarity:
+                        explanations_beginning = current_explanations
+                        lowest_similarity = cosine_similarity_list[0][0]
+                        current_idx = search_idx
 
                 cluster_means, _, _, _ = extract_feature_difference(explanations_beginning)
                 cluster_lists[0] = [explanations_list_by_source[0][0]]

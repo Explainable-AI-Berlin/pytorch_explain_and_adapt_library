@@ -6,12 +6,12 @@
 # Reproduce the results on CelebA
 
 # train the generator that is used for the counterfactual explainer (the dataset will be downloaded automatically)
-python train_generator.py --config "<PEAL_BASE>/configs/sce_experiments/generators/celeba_ddpm.yaml"
+#python train_generator.py --config "<PEAL_BASE>/configs/sce_experiments/generators/celeba_ddpm.yaml"
 
 # the Oracle for estimating the latent space
 # could be alternative downloaded from https://huggingface.co/guillaumejs2403/DiME
 # and place under "pretrained_models/oracle.pth"
-python train_predictor.py --config "<PEAL_BASE>/configs/sce_experiments/predictors/celeba_latent_oracle.yaml"
+#python train_predictor.py --config "<PEAL_BASE>/configs/sce_experiments/predictors/celeba_latent_oracle.yaml"
 
 # Smiling
 # Train the classifier that shall be analyzed

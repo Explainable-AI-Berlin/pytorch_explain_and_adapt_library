@@ -1,0 +1,15 @@
+# python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/square500_classifier_poisoned098_dfr.yaml"
+# python evaluate_predictor.py --model_path $PEAL_RUNS/square500/colora_confounding_colorb/torchvision/classifier_poisoned098/dfr/model.cpl --data_config configs/cfkd_experiments/data/square_unpoisoned.yaml --model_config configs/cfkd_experiments/predictors/square500_classifier_poisoned098_dfr.yaml
+model_path        : $PEAL_RUNS/square500/colora_confounding_colorb/torchvision/classifier_poisoned098/dfr
+data              : <PEAL_BASE>/configs/cfkd_experiments/data/square500_poisoned098_dfr.yaml
+training          : <PEAL_BASE>/configs/cfkd_experiments/training/img_finetuning.yaml
+architecture      : $PEAL_RUNS/square500/colora_confounding_colorb/torchvision/classifier_poisoned098/model.cpl
+continue_training : True
+only_last_layer   : True
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [ClassA]

@@ -1,6 +1,9 @@
 import argparse
+import types
+
 import torch
 import os
+import numpy as np
 
 from peal.architectures.interfaces import TaskConfig
 from peal.data.interfaces import DataConfig
@@ -21,8 +24,6 @@ def main():
 
     # TODO this can't be done properly before bug is fixed...
     model_config = load_yaml_config(args.model_config)
-    if not isinstance(model_config.data, DataConfig):
-        model_config.data = DataConfig(**model_config.data)
 
     if not isinstance(model_config.training, TrainingConfig):
         model_config.training = TrainingConfig(**model_config.training)
@@ -31,7 +32,12 @@ def main():
         model_config.task = TaskConfig(**model_config.task)
 
     if not args.data_config is None:
-        model_config.data = load_yaml_config(args.data_config, DataConfig)
+        model_config.data = load_yaml_config(args.data_config)
+
+    if not isinstance(model_config.data, DataConfig):
+        if type(model_config.data) == types.SimpleNamespace:
+            model_config.data = vars(model_config.data)
+        model_config.data = DataConfig(**model_config.data)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     if not args.model_path is None:
@@ -47,7 +53,6 @@ def main():
         model = ModelTrainer(predictor_config).model
         model.load_state_dict(model_weights)
 
-    set_random_seed(model_config.seed)
     model.eval()
     test_dataloader = create_dataloaders_from_datasource(model_config)[args.partition]
     correct, group_accuracies, group_distribution, groups, worst_group_accuracy = calculate_test_accuracy(
@@ -57,8 +62,9 @@ def main():
     print(partitions[args.partition] + " accuracy: " + str(correct))
     print("Group accuracies: " + str(group_accuracies))
     print("Group distribution: " + str(group_distribution))
-    print("Groups: " + str(groups))
+    print("Samples per Group: " + str(groups))
     print("Worst group accuracy: " + str(worst_group_accuracy))
+    print("Average group accuracy: " + str(float(np.sum(np.array(group_accuracies))) / 4))
 
 if __name__ == '__main__':
     main()

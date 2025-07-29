@@ -441,7 +441,11 @@ def get_dataloader(
     assert (
         not training_config is None or not batch_size is None
     ), "the batch size has to be given!"
+
     dataset.task_config = task_config
+    if task_config is not None and task_config.class_restriction is not None:
+        dataset.enable_class_restriction(task_config.class_restriction)
+
     if batch_size is None:
         dataloader = DataLoader(
             dataset,
