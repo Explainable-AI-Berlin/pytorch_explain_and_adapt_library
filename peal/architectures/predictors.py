@@ -187,6 +187,11 @@ class TorchvisionModel(torch.nn.Module):
             self.fc = torch.nn.Linear(1024, num_classes)
             self.processor = AutoImageProcessor.from_pretrained("facebook/dinov2-large")
 
+        elif model == "dino_v2_small":
+            self.model = AutoModel.from_pretrained("facebook/dinov2-small")
+            self.processor = AutoImageProcessor.from_pretrained("facebook/dinov2-small")
+            self.fc = torch.nn.Linear(384, num_classes)
+
         elif model == "UNI":
             import timm
             from timm.data import resolve_data_config

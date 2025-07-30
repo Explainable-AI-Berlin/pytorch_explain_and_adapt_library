@@ -1004,6 +1004,14 @@ def lora_finetune(args=None):
 
                 else:
                     encoder_hidden_states = text_encoder(empty_input_ids[:bsz], return_dict=False)[0]
+                    if hasattr(args, "img_semantic_encoder"):
+                        preprocessed_pixel_values = args.img_semantic_encoder(pixel_values)
+                        print('success')
+                        import pdb; pdb.set_trace()
+
+                    else:
+                        print('args not found')
+                        import pdb; pdb.set_trace()
 
                 # Get the target for loss depending on the prediction type
                 if args.prediction_type is not None:

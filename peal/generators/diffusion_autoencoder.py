@@ -15,6 +15,7 @@ from torch import nn
 from PIL import Image
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.transforms import ToTensor
+from transformers import AutoModel, AutoImageProcessor
 
 from peal.dependencies.ddpm_inversion.ddm_inversion.inversion_utils import inversion_forward_process, \
     inversion_reverse_process
@@ -70,7 +71,6 @@ class DiffusionAutoencoderConfig(GeneratorConfig):
     validation_epochs: int = 1
     max_train_samples: Union[int, type(None)] = None
     cache_dir: Union[str, type(None)] = None
-    seed: Union[int, type(None)] = None
     resolution: int = 512
     center_crop: bool = False
     random_flip: bool = False
@@ -107,22 +107,23 @@ class DiffusionAutoencoderConfig(GeneratorConfig):
     noise_offset: float = 0.0
     rank: int = 10
     task_config: Union[TaskConfig, type(None)] = None
+    encoder : str = "facebook/dinov2-small"
 
 
 
 
 class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
-    def __init__(self, config, classifier_dataset=None, model_dir=None, device="cpu"):
+    def __init__(self, config, predictor_dataset=None, model_dir=None, device="cpu"):
         super().__init__()
         self.config = load_yaml_config(config)
-        self.classifier_dataset = copy.deepcopy(classifier_dataset)
+        self.predictor_dataset = copy.deepcopy(predictor_dataset)
         # TODO something is wrong here!!!
         self.train_dataset = get_datasets(self.config.data)[0]
         if not self.config.task_config is None:
             self.train_dataset.task_config = self.config.task_config
 
-        elif not self.classifier_dataset is None:
-            self.train_dataset.task_config = self.classifier_dataset.task_config
+        elif not self.predictor_dataset is None:
+            self.train_dataset.task_config = self.predictor_dataset.task_config
 
         self.generator_dataset = None
 
@@ -140,9 +141,27 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         self.pipeline.to(device)
         #self.pipeline.run_safety_checker = lambda image, device, dtype: image, False
         self.pipeline.safety_checker = None
-        """lora_dir = os.path.join(self.model_dir, "pytorch_lora_weights.safetensors")
-        if os.path.exists(lora_dir):
-            self.pipeline.unet.load_attn_procs(lora_dir)"""
+        if self.config.encoder[:len("facebook/dinov2")] == "facebook/dinov2":
+            sem_encoder = AutoModel.from_pretrained(self.config.encoder).to("cuda")
+            sem_encoder_processor = AutoImageProcessor.from_pretrained(self.config.encoder)
+            cs = sem_encoder_processor.crop_size
+            def img_semantic_encoder(x):
+                try:
+                    x_resized = torchvision.transforms.Resize([cs['height'],cs['width']])(x)
+                    def pv(v):
+                        v = torch.tensor(v).to(x_resized)[:, None, None]
+                        return torch.tile(v, [1, cs['height'],cs['width']])
+
+                    x_processed = (x_resized - pv(sem_encoder_processor.image_mean)) / pv(sem_encoder_processor.image_std)
+                    latent_code = sem_encoder(x_processed.to(('cuda')))['last_hidden_state'][:,0]
+
+                except Exception as exp:
+                    print("crash")
+                    import pdb; pdb.set_trace()
+
+                return latent_code
+
+            self.img_semantic_encoder = img_semantic_encoder
 
     def sample_x(self, batch_size=1):
         images = self.pipeline(batch_size * [""]).images
@@ -257,6 +276,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         finetune_args.train_dataset = self.train_dataset
         finetune_args.pipeline = self.pipeline
         finetune_args.resume_from_checkpoint = 'latest'
+        finetune_args.img_semantic_encoder = self.img_semantic_encoder
 
         """train_dataloader = get_dataloader(
             self.train_dataset, mode="train", batch_size=self.config.batch_size
@@ -282,10 +302,10 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         class_predictions_path = os.path.join(base_path, "explainer", "predictions.csv")
         Path(os.path.join(base_path, "explainer")).mkdir(exist_ok=True, parents=True)
         if not os.path.exists(class_predictions_path):
-            self.classifier_dataset.enable_url()
+            self.predictor_dataset.enable_url()
             prediction_args = types.SimpleNamespace(
                 batch_size=32,
-                dataset=self.classifier_dataset,
+                dataset=self.predictor_dataset,
                 classifier=classifier,
                 label_path=class_predictions_path,
                 partition="train",
@@ -293,7 +313,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
                 max_samples=explainer_config.max_samples,
             )
             get_predictions(prediction_args)
-            self.classifier_dataset.disable_url()
+            self.predictor_dataset.disable_url()
 
         writer = SummaryWriter(os.path.join(base_path, "explainer", "logs"))
         generator_dataset_config = copy.deepcopy(self.config.data)
@@ -394,7 +414,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         target_classes: torch.Tensor,
         classifier: nn.Module,
         explainer_config,
-        classifier_dataset,
+        predictor_dataset,
         pbar=None,
         mode="",
         base_path="",
@@ -404,11 +424,11 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
 
         classifier_to_generator = (
             lambda x: self.generator_dataset.project_from_pytorch_default(
-                self.classifier_dataset.project_to_pytorch_default(x)
+                self.predictor_dataset.project_to_pytorch_default(x)
             )
         )
         generator_to_classifier = (
-            lambda x: self.classifier_dataset.project_from_pytorch_default(
+            lambda x: self.predictor_dataset.project_from_pytorch_default(
                 self.generator_dataset.project_to_pytorch_default(x)
             )
         )
