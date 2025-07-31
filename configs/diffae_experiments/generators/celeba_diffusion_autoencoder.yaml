@@ -3,7 +3,7 @@ category: generator
 generator_type: DiffusionAutoencoder
 data: "<PEAL_BASE>/configs/diffae_experiments/data/celeba_stable_diffusion.yaml"
 base_path : $PEAL_RUNS/celeba/diffusion_autoencoder
-encoder: "facebook/dinov2-small"
+encoder: "facebook/dinov2-base"
 task_config:
   criterions:
     bce     : 1.0

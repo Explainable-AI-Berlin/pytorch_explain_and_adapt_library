@@ -182,15 +182,20 @@ class TorchvisionModel(torch.nn.Module):
             self.model = torchvision.models.resnet50(pretrained=True)
             self.model.fc = torch.nn.Linear(self.model.fc.in_features, num_classes)
 
-        elif model == "dino_v2":
-            self.model = AutoModel.from_pretrained("facebook/dinov2-large")
-            self.fc = torch.nn.Linear(1024, num_classes)
-            self.processor = AutoImageProcessor.from_pretrained("facebook/dinov2-large")
-
         elif model == "dino_v2_small":
             self.model = AutoModel.from_pretrained("facebook/dinov2-small")
             self.processor = AutoImageProcessor.from_pretrained("facebook/dinov2-small")
             self.fc = torch.nn.Linear(384, num_classes)
+
+        elif model == "dino_v2_base":
+            self.model = AutoModel.from_pretrained("facebook/dinov2-base")
+            self.processor = AutoImageProcessor.from_pretrained("facebook/dinov2-base")
+            self.fc = torch.nn.Linear(768, num_classes)
+
+        elif model == "dino_v2":
+            self.model = AutoModel.from_pretrained("facebook/dinov2-large")
+            self.fc = torch.nn.Linear(1024, num_classes)
+            self.processor = AutoImageProcessor.from_pretrained("facebook/dinov2-large")
 
         elif model == "UNI":
             import timm

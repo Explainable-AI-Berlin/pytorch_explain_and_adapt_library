@@ -146,20 +146,15 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             sem_encoder_processor = AutoImageProcessor.from_pretrained(self.config.encoder)
             cs = sem_encoder_processor.crop_size
             def img_semantic_encoder(x):
-                try:
-                    x_resized = torchvision.transforms.Resize([cs['height'],cs['width']])(x)
-                    def pv(v):
-                        v = torch.tensor(v).to(x_resized)[:, None, None]
-                        return torch.tile(v, [1, cs['height'],cs['width']])
+                x_resized = torchvision.transforms.Resize([cs['height'],cs['width']])(x)
+                def pv(v):
+                    v = torch.tensor(v).to(x_resized)[:, None, None]
+                    return torch.tile(v, [1, cs['height'],cs['width']])
 
-                    x_processed = (x_resized - pv(sem_encoder_processor.image_mean)) / pv(sem_encoder_processor.image_std)
-                    latent_code = sem_encoder(x_processed.to(('cuda')))['last_hidden_state'][:,0]
+                x_processed = (x_resized - pv(sem_encoder_processor.image_mean)) / pv(sem_encoder_processor.image_std)
+                latent_code = sem_encoder(x_processed.to(('cuda')))['last_hidden_state'][:,0]
 
-                except Exception as exp:
-                    print("crash")
-                    import pdb; pdb.set_trace()
-
-                return latent_code
+                return latent_code[:,None]
 
             self.img_semantic_encoder = img_semantic_encoder
 
