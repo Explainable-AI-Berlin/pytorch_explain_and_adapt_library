@@ -27,7 +27,7 @@ from peal.global_utils import (
     requires_grad_,
     get_predictions,
     replace_relu_with_leakysoftplus,
-    replace_relu_with_leakyrelu, cprint,
+    replace_relu_with_leakyrelu, cprint, onehot,
 )
 from peal.training.interfaces import PredictorConfig
 from peal.training.loggers import log_images_to_writer
@@ -46,9 +46,6 @@ from peal.architectures.predictors import (
 from peal.architectures.interfaces import ArchitectureConfig
 
 
-def onehot(label, n_classes):
-    one_hots = torch.zeros(label.size(0), n_classes).to(label.device)
-    return one_hots.scatter_(1, label.to(torch.int64).view(-1, 1), 1)
 
 
 def mixup(data, targets, alpha, n_classes):
@@ -173,6 +170,7 @@ def get_predictor(config, model=None):
                 config.architecture[12:],
                 output_channels,
                 config.data.input_size[-1],
+                config=config
             )
 
         elif (
@@ -221,6 +219,7 @@ class ModelTrainer:
             self.model_path = self.config.model_path
 
         self.model = get_predictor(self.config, model)
+        self.model.config = self.config
 
         self.model.to(self.device)
 
@@ -459,13 +458,19 @@ class ModelTrainer:
 
             self.optimizer.zero_grad()
             # Compute prediction and loss
-            pred = self.model(X)
+            if "lc" in self.config.task.criterions.keys():
+                latent_code, pred = self.model(X, return_latents=True)
+
+            else:
+                pred = self.model(X)
+                latent_code = None
+
             loss = torch.tensor(0.0).to(self.device)
             loss_logs = {}
             for criterion in self.config.task.criterions.keys():
                 criterion_loss = self.config.task.criterions[
                     criterion
-                ] * self.criterions[criterion](self.model, pred, y.to(self.device))
+                ] * self.criterions[criterion](self.model, pred, y.to(self.device), latent_code)
 
                 if criterion in ["l1", "l2", "orthogonality"]:
                     criterion_loss *= self.regularization_level

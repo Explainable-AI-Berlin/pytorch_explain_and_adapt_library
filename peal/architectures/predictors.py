@@ -170,8 +170,9 @@ class SequentialModel(torch.nn.Sequential):
 
 
 class TorchvisionModel(torch.nn.Module):
-    def __init__(self, model, num_classes, input_size=None):
+    def __init__(self, model, num_classes, input_size=None, config=None):
         super(TorchvisionModel, self).__init__()
+        self.config = config
         self.model_type = model
         if model == "resnet18":
             self.model = torchvision.models.resnet18(pretrained=True)
@@ -295,15 +296,34 @@ class TorchvisionModel(torch.nn.Module):
 
             return x
 
-    def forward(self, x: torch.Tensor):
+    def get_last_layer(self):
         if not hasattr(self, "model_type") or self.model_type[: len("resnet")] == "resnet":
-            return self.model(x)
+            return self.model.fc
+
+        elif self.model_type in ["dino_v2", "UNI"]:
+            return self.fc
+
+
+    def forward(self, x: torch.Tensor, return_latents: bool = False):
+        if not hasattr(self, "model_type") or self.model_type[: len("resnet")] == "resnet":
+            if return_latents:
+                latent_code = self.feature_extractor(x)
+                latent_code = latent_code.squeeze(-1).squeeze(-1)
+                x_out = self.model.fc(latent_code)
+                return latent_code, x_out
+
+            else:
+                return self.model(x)
 
         elif self.model_type in ["dino_v2", "UNI"]:
             # xt = self.processor(x)['pixel_values']
             latent_code = self.feature_extractor(x)
             x_out = self.fc(latent_code)
-            return x_out
+            if return_latents:
+                return latent_code, x_out
+
+            else:
+                return x_out
 
         else:
             # Reshape and permute the input tensor

@@ -24,9 +24,9 @@ def plot_accuracy_line(data):
     )  # Increase horizontal spacing
 
     # Define color and label mappings
-    colors = ["red", "blue", "grey", "green", "purple", "black"]
-    labels = ["Human", "Mask", "Oracle", "Random", "Positive", "Negative"]
-    inner_labels = ["Empirical Accuracy", "Worst Group Accuracy", "Group Average Accuracy", "Feedback Accuracy"]
+    colors = ["red", "blue", "grey", "green"]
+    labels = ["Random", "Oracle", "Human", "Mask"]
+    inner_labels = ["Empirical Accuracy", "Average Group Accuracy", "Worst Group Accuracy", "Feedback Accuracy"]
 
     # Create a dictionary to map colors to labels for legend clarity
     color_label_map = dict(zip(colors, labels))
@@ -53,7 +53,7 @@ def plot_accuracy_line(data):
         *[(plt.Line2D([], [], color=c), color_label_map[c]) for c in colors]
     )
     fig.legend(
-        handles, labels=labels, loc="upper left", bbox_to_anchor=(0.05, 1.0), ncol=len(labels)
+        handles, labels=labels, loc="upper center", bbox_to_anchor=(0.5, 1.0), ncol=len(labels)
     )  # Adjust location
 
     # Add space above the subplots
@@ -68,40 +68,28 @@ if __name__ == "__main__":
     test_data = np.array(
         [
             [
-                [1.0, 0.98],
-                [0.675, 0.774],
-                [0.835, 0.873],
-                [0.405, 0.7],
-            ],
-            [
-                [1.0, 0.98],
-                [0.675, 0.799],
-                [0.835, 0.862],
-                [0.237, 0.425],
-            ],
-            [
-                [1.0, 0.98],
-                [0.675, 0.796],
-                [0.835, 0.876],
-                [0.679, 0.893],
-            ],
-            [
-                [1.0, 0.93],
-                [0.675, 0.697],
-                [0.835, 0.822],
-                [0.0, 0.0],
-            ],
-            [
-                [1.0, 1.0],
-                [0.675, 0.647],
-                [0.835, 0.828],
-                [1.0, 1.0],
-            ],
-            [
-                [1.0, 0.96],
-                [0.675, 0.708],
-                [0.835, 0.838],
+                [0.935, 0.795],
+                [0.836, 0.493],
+                [0.683, 0.028],
                 [0.5, 0.5],
+            ],
+            [
+                [0.935, 0.973],
+                [0.836, 0.963],
+                [0.683, 0.950],
+                [0.684, 0.923],
+            ],
+            [
+                [0.935, 0.973],
+                [0.836, 0.967],
+                [0.683, 0.952],
+                [0.584, 0.925],
+            ],
+            [
+                [0.935, 0.920],
+                [0.836, 0.924],
+                [0.683, 0.858],
+                [0.534, 0.856],
             ],
         ]
     )
