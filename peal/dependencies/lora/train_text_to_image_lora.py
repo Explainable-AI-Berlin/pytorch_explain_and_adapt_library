@@ -596,6 +596,11 @@ def lora_finetune(args=None):
 
     lora_layers = filter(lambda p: p.requires_grad, unet.parameters())
 
+    if hasattr(args, "img_semantic_encoder"):
+        linear_projection = torch.nn.Linear(784, 784)
+        args.img_semantic_encoder = lambda x: linear_projection(args.img_semantic_encoder(x))
+        lora_layers.append(linear_projection)
+
     if args.gradient_checkpointing:
         unet.enable_gradient_checkpointing()
 
@@ -966,15 +971,18 @@ def lora_finetune(args=None):
                 noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
 
                 # Get the text embedding for conditioning
-                is_unconditional = random.randint(0, 1)
+                is_unconditional = step % 2 #random.randint(0, 1)
                 if is_unconditional:
-                    encoder_hidden_states = text_encoder(input_ids, return_dict=False)[0]
+                    encoder_hidden_states = text_encoder(empty_input_ids[:bsz], return_dict=False)[0]
 
                 else:
-                    encoder_hidden_states = text_encoder(empty_input_ids[:bsz], return_dict=False)[0]
                     if hasattr(args, "img_semantic_encoder"):
+                        encoder_hidden_states = text_encoder(empty_input_ids[:bsz], return_dict=False)[0]
                         preprocessed_pixel_values = args.img_semantic_encoder(pixel_values)
                         encoder_hidden_states = encoder_hidden_states + preprocessed_pixel_values
+
+                    else:
+                        encoder_hidden_states = text_encoder(input_ids, return_dict=False)[0]
 
                 # Get the target for loss depending on the prediction type
                 if args.prediction_type is not None:
@@ -989,19 +997,11 @@ def lora_finetune(args=None):
                     raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
 
                 # Predict the noise residual and compute loss
-                try:
-                    model_pred = unet(noisy_latents, timesteps, encoder_hidden_states, return_dict=False)[0]
-                    noisy_latents_old = torch.clone(noisy_latents)
-                    timesteps_old = torch.clone(timesteps)
-                    encoder_hidden_states_old = torch.clone(encoder_hidden_states)
-
-                except Exception as e:
-                    import pdb
-
-                    pdb.set_trace()
+                model_pred = unet(noisy_latents, timesteps, encoder_hidden_states, return_dict=False)[0]
 
                 if args.snr_gamma is None:
                     loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
+
                 else:
                     # Compute loss-weights as per Section 3.4 of https://arxiv.org/abs/2303.09556.
                     # Since we predict the noise instead of x_0, the original formulation is slightly changed.
@@ -1023,11 +1023,16 @@ def lora_finetune(args=None):
                 avg_loss = accelerator.gather(loss.repeat(args.train_batch_size)).mean()
                 train_loss += avg_loss.item() / args.gradient_accumulation_steps
 
+                for tracker in accelerator.trackers:
+                    if tracker.name == "tensorboard":
+                        tracker.writer.add_scalar("train_loss_" + str(is_unconditional), train_loss, global_step)
+
                 # Backpropagate
                 accelerator.backward(loss)
                 if accelerator.sync_gradients:
                     params_to_clip = lora_layers
                     accelerator.clip_grad_norm_(params_to_clip, args.max_grad_norm)
+
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.zero_grad()
