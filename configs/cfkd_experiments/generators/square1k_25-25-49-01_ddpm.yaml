@@ -1,0 +1,9 @@
+# python train_generator.py --config "<PEAL_BASE>/configs/generators/square1k_25-25-49-01_ddpm.yaml"
+generator_type : DDPM
+category : generator
+base_path : $PEAL_RUNS/square1k/ddpm_25-25-49-01
+data: <PEAL_BASE>/configs/data/square1k_25x25x49x01_generator.yaml
+image_size: 64
+batch_size: 196
+save_interval: 1000
+max_steps: 10000

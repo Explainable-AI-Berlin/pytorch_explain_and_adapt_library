@@ -1,7 +1,8 @@
 train_batch_size        : 32
 val_batch_size          : 2
-test_batch_size         : 64 #256
+test_batch_size         : 100 #256
 max_epochs              : 20
 learning_rate           : 0.01
 optimizer               : sgd
-steps_per_epoch         : 200
+steps_per_epoch         : 1000
+class_balanced          : true

@@ -39,6 +39,10 @@ class TaskConfig(BaseModel):
     binary variables with single class classification.
     """
     y_selection: Union[list[str], type(None)] = None
+    """
+    Gives the option to only use samples from one or more specified classes
+    """
+    class_restriction: Union[int ,list[int], type(None)] = None
 
 
 class ArchitectureConfig(BaseModel):
