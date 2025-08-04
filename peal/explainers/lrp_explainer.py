@@ -50,7 +50,7 @@ class LRPExplainer:
         explainer_config,
         predictor=None,
         num_classes=None,
-        datasets=None,
+        datasets=None
     ):
         self.explainer_config = load_yaml_config(explainer_config)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"

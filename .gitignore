@@ -23,5 +23,8 @@ dime2/outputs
 peal/dependencies/ace/outputs
 environment.yaml
 $PEAL_DATA
+plots
 
 !peal/dependencies/dive/src/datasets
+peal/dependencies/rrclarc/data
+utils/.ipynb_checkpoints

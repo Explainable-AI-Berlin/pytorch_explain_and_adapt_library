@@ -1,0 +1,15 @@
+dataset_class           : SquareDataset
+dataset_path            : $PEAL_DATA/square
+num_samples             : 1000
+split                   : [0.8,1.0]
+input_type              : image
+input_size              : [3, 64, 64]
+output_type             : multiclass
+output_size             : [8]
+downsize                : Resize
+delimiter               : ","
+confounding_factors     : [ClassA, ClassB]
+full_confounder_config  : [0.25, 0.25, 0.49, 0.01] # [(prob A=B=0), (prob A=0,B=1), (prob A=1,B=0), (prob A=B=1)]
+has_hints               : True
+#spray_label_file: $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/classifier_25-25-49-01/spray_analysis/attrbs-layer-4_analysis/data_spray_labels.csv
+#spray_groups_balanced: True
