@@ -594,12 +594,12 @@ def lora_finetune(args=None):
         else:
             raise ValueError("xformers is not available. Make sure it is installed correctly")
 
-    lora_layers = filter(lambda p: p.requires_grad, unet.parameters())
+    lora_layers = list(filter(lambda p: p.requires_grad, unet.parameters()))
 
     if hasattr(args, "img_semantic_encoder"):
-        linear_projection = torch.nn.Linear(784, 784)
-        args.img_semantic_encoder = lambda x: linear_projection(args.img_semantic_encoder(x))
-        lora_layers.append(linear_projection)
+        linear_projection = torch.nn.Linear(768, 768).to('cuda')
+        args.img_semantic_encoder_projection = lambda x: linear_projection(args.img_semantic_encoder(x))[:,None]
+        lora_layers.extend(list(linear_projection.parameters()))
 
     if args.gradient_checkpointing:
         unet.enable_gradient_checkpointing()
@@ -909,7 +909,7 @@ def lora_finetune(args=None):
             tracker.writer.add_scalar("fid", fid_score, -1)
 
     if hasattr(args, "img_semantic_encoder"):
-        semantic_latents = args.img_semantic_encoder(real_images[:6])
+        semantic_latents = args.img_semantic_encoder_projection(real_images[:6])
         images = pipeline_semantic_conditioning(prompt=6 * [""], semantic_latents=semantic_latents).images
         images_torch = torch.stack([ToTensor()(image) for image in images])
         images_torch_resized = torchvision.transforms.Resize(real_images.shape[-2:])(images_torch)
@@ -978,7 +978,7 @@ def lora_finetune(args=None):
                 else:
                     if hasattr(args, "img_semantic_encoder"):
                         encoder_hidden_states = text_encoder(empty_input_ids[:bsz], return_dict=False)[0]
-                        preprocessed_pixel_values = args.img_semantic_encoder(pixel_values)
+                        preprocessed_pixel_values = args.img_semantic_encoder_projection(pixel_values)
                         encoder_hidden_states = encoder_hidden_states + preprocessed_pixel_values
 
                     else:
@@ -1105,7 +1105,7 @@ def lora_finetune(args=None):
                                 tracker.writer.add_scalar("fid", fid_score, global_step)
 
                         if hasattr(args, "img_semantic_encoder"):
-                            semantic_latents = args.img_semantic_encoder(real_images[:6])
+                            semantic_latents = args.img_semantic_encoder_projection(real_images[:6])
                             images = pipeline_semantic_conditioning(
                                 prompt=6 * [""], semantic_latents=semantic_latents
                             ).images

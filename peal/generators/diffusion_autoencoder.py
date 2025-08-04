@@ -154,7 +154,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
                 x_processed = (x_resized - pv(sem_encoder_processor.image_mean)) / pv(sem_encoder_processor.image_std)
                 latent_code = sem_encoder(x_processed.to(('cuda')))['last_hidden_state'][:,0]
 
-                return latent_code[:,None]
+                return latent_code
 
             self.img_semantic_encoder = img_semantic_encoder
 
