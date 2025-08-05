@@ -17,7 +17,7 @@ cd imdb-clean || exit
 bash run_all.sh
 # Create the crop
 cd $DCFIR_HOME || exit
-python diff_cf_ir/imdb_clean_dataset.py $DATASETS_PATH/imdb-clean/imdb-clean-1024 $DATASETS_PATH/imdb-clean/imdb-clean-1024-cropped
+python diff_cf_ir/imdb_clean_dataset.py $DATASETS_PATH/imdb-clean/ $DATASETS_PATH/imdb-clean/imdb-clean-1024-cropped
 
 # Download the CelebA-HQ dataset
 echo "Downloading the CelebA-HQ dataset..."

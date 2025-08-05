@@ -11,3 +11,11 @@ task_config:
   output_type             : multiclass
   y_selection             : []
   output_channels         : 40
+
+rank: 32
+learning_rate: 2e-4
+num_train_epochs: 200
+train_batch_size: 32
+snr_gamma: 5.0
+center_crop: True
+random_flip: True
