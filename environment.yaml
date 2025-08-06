@@ -61,6 +61,7 @@ dependencies:
       - grpcio==1.56.2
       - gunicorn==21.2.0
       - h5py==3.7.0
+      - hdbscan==0.8.39
       - httplib2==0.22.0
       - huggingface-hub==0.23.2
       - idna==3.4
@@ -173,7 +174,9 @@ dependencies:
       - wget==3.2
       - wilds
       - wrapt==1.15.0
-      - zennit==0.5.0
+      - xformers
+      - zennit==0.4.6
+      - zennit-crp==0.6.0
       - zipp==3.16.2
       - onnxruntime_gpu==1.15
       - torch-kmeans==0.2.0

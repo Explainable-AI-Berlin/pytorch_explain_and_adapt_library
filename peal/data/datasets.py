@@ -868,6 +868,7 @@ class Image2ClassDataset(ImageDataset):
             self.urls_with_hints = []
 
         self.hints_enabled = False
+        self.url_enabled = False
         self.idx_enabled = False
         self.url_enabled = False
         self.task_config = task_config
@@ -876,6 +877,7 @@ class Image2ClassDataset(ImageDataset):
         self.urls = []
         self.idx_to_name = os.listdir(self.root_dir)
         self.string_description_enabled = False
+        self.groups_enabled = False
 
         self.idx_to_name.sort()
         for target_str in self.idx_to_name:
@@ -991,6 +993,10 @@ class Image2ClassDataset(ImageDataset):
 
     @property
     def output_size(self):
+        if isinstance(self.config.output_size, int):
+            return self.config.output_size
+        if len(self.config.output_size) == 1:
+            return self.config.output_size[0]
         return self.config.output_size
 
     def set_task_specific_urls(self):
@@ -1028,19 +1034,35 @@ class Image2ClassDataset(ImageDataset):
 
         return len(self.urls)
 
-    def enable_class_restriction(self, class_idx):
+    def enable_class_restriction(self, class_idx: Union[int, list[int]]):
         self.backup_urls = copy.deepcopy(self.urls)
         self.urls = []
         self.class_restriction_enabled = True
+
+        if isinstance(class_idx, int):
+            allowed_classes = [self.idx_to_name[class_idx]]
+        else:
+            allowed_classes = [self.idx_to_name[idx] for idx in class_idx]
+
         for url in self.backup_urls:
-            if url[0] == self.idx_to_name[class_idx]:
+            if url[0] in allowed_classes:
                 self.urls.append(url)
+        print("enabled class restriction for target class(es):", str(class_idx))
 
     def disable_class_restriction(self):
-        if hasattr(self, "backup_urls"):
-            self.urls = copy.deepcopy(self.backup_urls)
-
+        self.urls = copy.deepcopy(self.backup_urls)
         self.class_restriction_enabled = False
+        print("disabled class restriction")
+
+    def enable_groups(self):
+        self.groups_enabled = True
+
+    def disable_groups(self):
+        self.groups_enabled = False
+
+    def has_confounder(self, filename: str) -> int:
+        print("'has_confounder' not implemented!!!")
+        return 0
 
     def __getitem__(self, idx):
         if (
@@ -1066,9 +1088,9 @@ class Image2ClassDataset(ImageDataset):
 
         # target = torch.zeros([len(self.idx_to_name)], dtype=torch.float32)
         # target[self.idx_to_name.index(target_str)] = 1.0
-        return_dict = {}
+        return_dict = {"x": img}
         target = torch.tensor(self.idx_to_name.index(target_str))
-        return_dict["target"] = target
+        return_dict["y"] = target
 
         if self.hints_enabled:
             if self.config.in_memory:
@@ -1110,11 +1132,17 @@ class Image2ClassDataset(ImageDataset):
                     ).input_ids
                 )
 
-        if self.return_dict:
-            return img, return_dict
+        if self.url_enabled:
+            return_dict["url"] = file
 
-        elif len(return_dict.values()) == 1:
-            return img, list(return_dict.values())[0]
+        if self.groups_enabled:
+            return_dict["has_confounder"] = self.has_confounder(file)
+
+        if self.return_dict:
+            return return_dict
+
+        elif len(return_dict.values()) == 2:
+            return img, list(return_dict.values())[1]
 
         else:
-            return img, tuple(return_dict.values())
+            return img, tuple(return_dict.values())[1:]

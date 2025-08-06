@@ -22,7 +22,7 @@ def parse_json(data_dir, config, mode, set_negative_to_zero=True):
     if (
         not config.confounding_factors is None
         and len(config.confounding_factors) == 2
-        and not config.confounder_probability is None
+        and not (config.confounder_probability is None and config.full_confounder_config is None)
     ):
 
         def extract_instances_tensor_confounder(idx, line):
@@ -122,7 +122,7 @@ def parse_csv(
     if (
         not config.confounding_factors is None
         and len(config.confounding_factors) == 2
-        and not config.confounder_probability is None
+        and not (config.confounder_probability is None and config.full_confounder_config is None)
     ):
 
         def extract_instances_tensor_confounder(idx, line):
@@ -216,18 +216,38 @@ def process_confounder_data_controlled(
     data = {}
     n_attribute_confounding = np.array([[0, 0], [0, 0]])
     max_attribute_confounding = np.array([[0, 0], [0, 0]])
-    max_attribute_confounding[0][0] = int(
-        config.num_samples * config.confounder_probability * 0.5
-    )
-    max_attribute_confounding[1][0] = int(
-        config.num_samples * round(1 - config.confounder_probability, 2) * 0.5
-    )
-    max_attribute_confounding[0][1] = int(
-        config.num_samples * round(1 - config.confounder_probability, 2) * 0.5
-    )
-    max_attribute_confounding[1][1] = int(
-        config.num_samples * config.confounder_probability * 0.5
-    )
+
+    if not config.full_confounder_config is None:
+        assert len(config.full_confounder_config) == 4, "confounder config must have 4 entries"
+        assert sum(config.full_confounder_config) == 1, "confounder config must sum to 100%"
+
+        max_attribute_confounding[0][0] = int(
+            config.num_samples * config.full_confounder_config[0]
+        )
+        max_attribute_confounding[0][1] = int(
+            config.num_samples * config.full_confounder_config[1]
+        )
+        max_attribute_confounding[1][0] = int(
+            config.num_samples * config.full_confounder_config[2]
+        )
+        max_attribute_confounding[1][1] = int(
+            config.num_samples * config.full_confounder_config[3]
+        )
+
+    else:
+        max_attribute_confounding[0][0] = int(
+            config.num_samples * config.confounder_probability * 0.5
+        )
+        max_attribute_confounding[1][0] = int(
+            config.num_samples * round(1 - config.confounder_probability, 3) * 0.5
+        )
+        max_attribute_confounding[0][1] = int(
+            config.num_samples * round(1 - config.confounder_probability, 3) * 0.5
+        )
+        max_attribute_confounding[1][1] = int(
+            config.num_samples * config.confounder_probability * 0.5
+        )
+
     keys = [[[], []], [[], []]]
 
     for idx, line in enumerate(raw_data):

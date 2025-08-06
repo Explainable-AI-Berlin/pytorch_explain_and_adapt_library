@@ -1,0 +1,8 @@
+# python train_generator.py --config "<PEAL_BASE>/configs/generators/camelyon17_25-25-49-01_ddpm.yaml"
+generator_type : DDPM
+category : generator
+base_path : $PEAL_RUNS/camelyon17_1k/ddpm_25-25-49-01
+data: <PEAL_BASE>/configs/data/camelyon17_25-25-49-01_generator.yaml
+image_size: 128
+batch_size: 100
+max_steps: 10000000

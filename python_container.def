@@ -10,6 +10,7 @@ From: continuumio/miniconda3
     apt-get update && apt-get -y install libgl1
     conda update -n base -c defaults conda -y
     conda env create -f environment.yaml -n peal
+    /opt/conda/envs/peal/bin/python -m pip install zennit==0.5.1
 
     # Source environment at runtime
     echo ". /opt/conda/etc/profile.d/conda.sh" >> $SINGULARITY_ENVIRONMENT
