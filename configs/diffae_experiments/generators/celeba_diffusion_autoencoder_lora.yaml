@@ -1,8 +1,8 @@
-# python train_generator.py --config "<PEAL_BASE>/configs/diffae_experiments/generators/celeba_diffusion_autoencoder.yaml"
+# python train_generator.py --config "<PEAL_BASE>/configs/diffae_experiments/generators/celeba_diffusion_autoencoder_lora.yaml"
 category: generator
 generator_type: DiffusionAutoencoder
 data: "<PEAL_BASE>/configs/diffae_experiments/data/celeba_stable_diffusion.yaml"
-base_path : $PEAL_RUNS/celeba/diffusion_autoencoder
+base_path : $PEAL_RUNS/celeba/diffusion_autoencoder_lora
 encoder: "facebook/dinov2-base"
 task_config:
   criterions:
@@ -12,10 +12,11 @@ task_config:
   y_selection             : []
   output_channels         : 40
 
-use_lora: False
+use_lora: True
+rank: 32
 learning_rate: 2e-4
 num_train_epochs: 200
-train_batch_size: 8
+train_batch_size: 32
 snr_gamma: 5.0
 center_crop: True
 random_flip: True

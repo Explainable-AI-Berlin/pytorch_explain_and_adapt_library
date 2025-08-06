@@ -561,24 +561,12 @@ def lora_finetune(args=None):
     elif accelerator.mixed_precision == "bf16":
         weight_dtype = torch.bfloat16
 
-    # Freeze the unet parameters before adding adapters
-    for param in unet.parameters():
-        param.requires_grad_(False)
-
-    unet_lora_config = LoraConfig(
-        r=args.rank,
-        lora_alpha=args.rank,
-        init_lora_weights="gaussian",
-        target_modules=["to_k", "to_q", "to_v", "to_out.0"],
-    )
-
     # Move unet, vae and text_encoder to device and cast to weight_dtype
     unet.to(accelerator.device, dtype=weight_dtype)
     vae.to(accelerator.device, dtype=weight_dtype)
     text_encoder.to(accelerator.device, dtype=weight_dtype)
 
     # Add adapter and make sure the trainable params are in float32.
-    unet.add_adapter(unet_lora_config)
     if args.mixed_precision == "fp16":
         # only upcast trainable parameters (LoRA) into fp32
         cast_training_params(unet, dtype=torch.float32)
@@ -594,7 +582,27 @@ def lora_finetune(args=None):
         else:
             raise ValueError("xformers is not available. Make sure it is installed correctly")
 
-    lora_layers = list(filter(lambda p: p.requires_grad, unet.parameters()))
+    # python
+    if args.use_lora:
+        # LoRA setup (existing code)
+        for param in unet.parameters():
+            param.requires_grad_(False)
+
+        unet_lora_config = LoraConfig(
+            r=args.rank,
+            lora_alpha=args.rank,
+            init_lora_weights="gaussian",
+            target_modules=["to_k", "to_q", "to_v", "to_out.0"],
+        )
+        unet.add_adapter(unet_lora_config)
+        lora_layers = list(filter(lambda p: p.requires_grad, unet.parameters()))
+
+    else:
+        # Full finetuning
+        for param in unet.parameters():
+            param.requires_grad_(True)
+
+        lora_layers = list(filter(lambda p: p.requires_grad, unet.parameters()))
 
     if hasattr(args, "img_semantic_encoder"):
         linear_projection = torch.nn.Linear(768, 768).to('cuda')
@@ -910,7 +918,7 @@ def lora_finetune(args=None):
 
     if hasattr(args, "img_semantic_encoder"):
         semantic_latents = args.img_semantic_encoder_projection(real_images[:6])
-        images = pipeline_semantic_conditioning(prompt=6 * [""], semantic_latents=semantic_latents).images
+        images = pipeline_semantic_conditioning(prompt=6 * [""], semantic_latents=semantic_latents, progress=0.0).images
         images_torch = torch.stack([ToTensor()(image) for image in images])
         images_torch_resized = torchvision.transforms.Resize(real_images.shape[-2:])(images_torch)
         concatenated_imgs = torch.cat([real_images[: len(prompt)].cpu(), images_torch_resized], dim=0)
@@ -979,7 +987,8 @@ def lora_finetune(args=None):
                     if hasattr(args, "img_semantic_encoder"):
                         encoder_hidden_states = text_encoder(empty_input_ids[:bsz], return_dict=False)[0]
                         preprocessed_pixel_values = args.img_semantic_encoder_projection(pixel_values)
-                        encoder_hidden_states = encoder_hidden_states + preprocessed_pixel_values
+                        progress = global_step / args.max_train_steps if args.max_train_steps else 0.0
+                        encoder_hidden_states = (1 - progress) * encoder_hidden_states + progress * preprocessed_pixel_values
 
                     else:
                         encoder_hidden_states = text_encoder(input_ids, return_dict=False)[0]
@@ -1071,15 +1080,18 @@ def lora_finetune(args=None):
                         accelerator.save_state(save_path)
 
                         unwrapped_unet = unwrap_model(unet)
-                        unet_lora_state_dict = convert_state_dict_to_diffusers(
-                            get_peft_model_state_dict(unwrapped_unet)
-                        )
+                        if args.use_lora:
+                            unet_lora_state_dict = convert_state_dict_to_diffusers(
+                                get_peft_model_state_dict(unwrapped_unet)
+                            )
+                            StableDiffusionPipeline.save_lora_weights(
+                                save_directory=save_path,
+                                unet_lora_layers=unet_lora_state_dict,
+                                safe_serialization=True,
+                            )
 
-                        StableDiffusionPipeline.save_lora_weights(
-                            save_directory=save_path,
-                            unet_lora_layers=unet_lora_state_dict,
-                            safe_serialization=True,
-                        )
+                        else:
+                            pipeline.save_pretrained(save_path)
 
                         logger.info(f"Saved state to {save_path}")
                         images = pipeline(prompt).images
@@ -1106,8 +1118,9 @@ def lora_finetune(args=None):
 
                         if hasattr(args, "img_semantic_encoder"):
                             semantic_latents = args.img_semantic_encoder_projection(real_images[:6])
+                            progress = global_step / args.max_train_steps if args.max_train_steps else 0.0
                             images = pipeline_semantic_conditioning(
-                                prompt=6 * [""], semantic_latents=semantic_latents
+                                prompt=6 * [""], semantic_latents=semantic_latents, progress=progress,
                             ).images
                             images_torch = torch.stack([ToTensor()(image) for image in images])
                             images_torch_resized = torchvision.transforms.Resize(real_images.shape[-2:])(images_torch)
@@ -1191,12 +1204,18 @@ def lora_finetune(args=None):
         unet = unet.to(torch.float32)
 
         unwrapped_unet = unwrap_model(unet)
-        unet_lora_state_dict = convert_state_dict_to_diffusers(get_peft_model_state_dict(unwrapped_unet))
-        StableDiffusionPipeline.save_lora_weights(
-            save_directory=args.base_path,
-            unet_lora_layers=unet_lora_state_dict,
-            safe_serialization=True,
-        )
+        if args.use_lora:
+            unet_lora_state_dict = convert_state_dict_to_diffusers(
+                get_peft_model_state_dict(unwrapped_unet)
+            )
+            StableDiffusionPipeline.save_lora_weights(
+                save_directory=save_path,
+                unet_lora_layers=unet_lora_state_dict,
+                safe_serialization=True,
+            )
+
+        else:
+            pipeline.save_pretrained(save_path)
 
         if args.push_to_hub:
             save_model_card(
@@ -1216,16 +1235,19 @@ def lora_finetune(args=None):
         # Final inference
         # Load previous pipeline
         if args.validation_prompt is not None:
-            pipeline = DiffusionPipeline.from_pretrained(
-                args.sd_model,
-                revision=args.revision,
-                variant=args.variant,
-                torch_dtype=weight_dtype,
-            )
-            pipeline = pipeline.to(accelerator.device)
+            if args.use_lora:
+                pipeline = DiffusionPipeline.from_pretrained(
+                    args.sd_model,
+                    revision=args.revision,
+                    variant=args.variant,
+                    torch_dtype=weight_dtype,
+                )
+                pipeline.load_lora_weights(args.base_path)
 
-            # load attention processors
-            pipeline.load_lora_weights(args.base_path)
+            else:
+                pipeline = DiffusionPipeline.from_pretrained(args.base_path)
+
+            pipeline = pipeline.to(accelerator.device)
 
             # run inference
             generator = torch.Generator(device=accelerator.device)
@@ -1296,6 +1318,7 @@ class StableDiffusionPipelineImgConditioned(StableDiffusionPipeline):
         ] = None,
         callback_on_step_end_tensor_inputs: List[str] = ["latents"],
         semantic_latents=None,
+        progress=1.0,
         **kwargs,
     ):
         r"""
@@ -1454,7 +1477,7 @@ class StableDiffusionPipelineImgConditioned(StableDiffusionPipeline):
         )
 
         if not semantic_latents is None:
-            prompt_embeds = prompt_embeds + semantic_latents.to(prompt_embeds)
+            prompt_embeds = (1 - progress) * prompt_embeds + progress * semantic_latents.to(prompt_embeds)
 
         # For classifier free guidance, we need to do two forward passes.
         # Here we concatenate the unconditional and text embeddings into a single batch

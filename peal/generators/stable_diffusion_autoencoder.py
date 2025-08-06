@@ -19,8 +19,6 @@ from transformers import AutoModel, AutoImageProcessor
 
 from peal.dependencies.ddpm_inversion.ddm_inversion.inversion_utils import inversion_forward_process, \
     inversion_reverse_process
-from peal.dependencies.diffusion_regression_counterfactuals.related_work.diffae.experiment import LitModel
-from peal.dependencies.diffusion_regression_counterfactuals.related_work.diffae.templates import square64_autoenc
 from peal.editors.ddpm_inversion import DDPMInversionConfig
 from peal.data.dataloaders import get_dataloader
 from peal.data.dataset_factory import get_datasets
@@ -43,7 +41,7 @@ from peal.data.interfaces import DataConfig
 from peal.architectures.interfaces import TaskConfig
 
 
-class DiffusionAutoencoderConfig(GeneratorConfig):
+class StableDiffusionAutoencoderConfig(GeneratorConfig):
     """
     TODO actually implement this class properly
     This class defines the config of a DDPM.
@@ -113,7 +111,7 @@ class DiffusionAutoencoderConfig(GeneratorConfig):
     use_lora: bool = False
 
 
-class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
+class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
     def __init__(self, config, predictor_dataset=None, model_dir=None, device="cpu"):
         super().__init__()
         self.config = load_yaml_config(config)
@@ -136,10 +134,12 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
 
         self.data_dir = os.path.join(self.model_dir, "data_test")
         self.counterfactual_path = os.path.join(self.model_dir, "counterfactuals_test")
-        conf = square64_autoenc()
-        self.model = LitModel.load_from_checkpoint(
-            checkpoint_path=checkpoint_path, conf=conf, map_location="cpu"
+        self.pipeline = StableDiffusionPipeline.from_pretrained(
+            self.config.sd_model,
         )
+        self.pipeline.to(device)
+        #self.pipeline.run_safety_checker = lambda image, device, dtype: image, False
+        self.pipeline.safety_checker = None
         if self.config.encoder[:len("facebook/dinov2")] == "facebook/dinov2":
             sem_encoder = AutoModel.from_pretrained(self.config.encoder).to("cuda")
             sem_encoder_processor = AutoImageProcessor.from_pretrained(self.config.encoder)
