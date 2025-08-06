@@ -1014,7 +1014,7 @@ class CFKD(Adaptor):
             # this is only for scientific experiments and could also be sourced out into another file!
             # distill into equivalent model
             predictor_distillation = load_yaml_config(
-                "<PEAL_BASE>/configs/predictors/simple_distillation.yaml",
+                "<PEAL_BASE>/configs/sce_experiments/predictors/simple_distillation.yaml",
                 PredictorConfig,
             )
             distillation_path = os.path.join(self.base_dir, str(finetune_iteration), "distilled_predictor")
