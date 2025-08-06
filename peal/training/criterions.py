@@ -21,7 +21,7 @@ class OnehotCrossEntropyLoss(object):
     def __init__(self, size_average=True):
         self.size_average = size_average
 
-    def __call__(self, input, target):
+    def __call__(self, input, target, latent_code=None):
         return cross_entropy_loss(input, target, self.size_average)
 
 
@@ -83,126 +83,6 @@ def mixed_bce_mse_criterion(model, y_pred, y_target, latent_code=None):
     return loss_discrete + loss_continuous
 
 
-#
-class LogDiscriminantJacobianCriterion(nn.Module):
-    def __init__(self, config, writer, device):
-        super().__init__()
-        self.config = config
-        self.writer = writer
-        self.device = device
-
-    def forward(self, model, y_pred, y_target, latent_code=None):
-        n_pixel = np.prod(self.config.data.input_size)
-        # return torch.mean(torch.norm(y_pred[2])) / (math.log(2) * n_pixel)
-        loss = y_pred[2]
-        return -torch.mean(loss / (math.log(2) * n_pixel))
-
-
-#
-class LogProbCriterion(nn.Module):
-    def __init__(self, config, writer, device):
-        super().__init__()
-        self.config = config
-        self.writer = writer
-        self.device = device
-
-    def forward(self, model, y_pred, y_target):
-        n_pixel = np.prod(self.config.data.input_size)
-        loss = y_pred[1]
-        return -torch.mean(loss / (math.log(2) * n_pixel))
-
-
-#
-class ConstantCriterion(nn.Module):
-    def __init__(self, config, writer, device):
-        super().__init__()
-        self.config = config
-        self.writer = writer
-        self.device = device
-
-    def forward(self, model, y_pred, y_target):
-        n_pixel = np.prod(self.config.data.input_size)
-        # just for sake that loss does not get negative
-        loss = -self.config.architecture.n_bits * n_pixel
-        return -torch.tensor(loss / (math.log(2) * n_pixel)).to(self.device)
-
-
-#
-def isotropic_likelihood_criterion(model, y_pred, y_target):
-    if isinstance(y_pred[1], list):
-        loss = torch.tensor(0.0).to(next(model.parameters()).device)
-        for y_pred_ in y_pred[1]:
-            loss += torch.mean(torch.square(y_pred_))
-
-        return loss
-
-    else:
-        return torch.mean(torch.square(y_pred[1]))
-
-
-#
-def reconstruction_criterion(model, y_pred, y_target):
-    return torch.nn.MSELoss()(y_pred[0], y_target)
-
-
-#
-def supervised_criterion(model, y_pred, y_target):
-    pass
-
-
-#
-class AdversarialCriterion(nn.Module):
-    """ """
-
-    def __init__(self, config, writer, device):
-        """ """
-        super().__init__()
-        self.config = config
-        self.writer = writer
-        self.device = device
-        params = {
-            "n_layer": 3,
-            "gan_type": "nsgan",
-            "dim": 32,
-            "norm": "bn",
-            "activ": "lrelu",
-            "num_scales": 3,
-            "pad_type": "zero",
-        }
-        self.discriminator = MsImageDis(
-            input_dim=self.config.data.input_size[0], params=params, device=device
-        ).to(self.device)
-
-        if self.config.training.optimizer == "sgd":
-            self.dis_optimizer = torch.optim.SGD(
-                self.discriminator.parameters(), lr=config.training.learning_rate
-            )
-
-        elif self.config.training.optimizer == "adam":
-            self.dis_optimizer = torch.optim.Adam(
-                self.discriminator.parameters(), lr=config.training.learning_rate
-            )
-
-    def forward(self, model, y_pred, y_target):
-        """ """
-        if model.training:
-            self.discriminator.train()
-            self.dis_optimizer.zero_grad()
-            dis_loss = self.discriminator.calc_dis_loss(
-                torch.clone(y_pred[0]).detach(), y_target.to(self.device)
-            )
-            self.writer.add_scalar(
-                "train_adversarial_dis",
-                dis_loss.detach().cpu().item(),
-                self.config.training.global_train_step,
-            )
-            dis_loss.backward()
-            self.dis_optimizer.step()
-            self.discriminator.eval()
-
-        return self.discriminator.calc_gen_loss(y_pred[0])
-
-
 def cross_entropy_criterion(model, y_pred, y_target, latent_code=None):
     if y_pred.shape == y_target.shape:
         return OnehotCrossEntropyLoss()(y_pred, y_target)
@@ -233,20 +113,13 @@ def latent_convexity_criterion(model, y_pred, y_target, latent_code=None):
 
 available_criterions = {
     "ce": cross_entropy_criterion,
-    "bce": lambda model, y_pred, y_target: nn.BCEWithLogitsLoss()(y_pred, y_target),
-    "mse": lambda model, y_pred, y_target: nn.MSELoss()(y_pred, y_target),
-    "mae": lambda model, y_pred, y_target: nn.L1Loss()(y_pred, y_target),
+    "bce": lambda model, y_pred, y_target, latent_code: nn.BCEWithLogitsLoss()(y_pred, y_target),
+    "mse": lambda model, y_pred, y_target, latent_code: nn.MSELoss()(y_pred, y_target),
+    "mae": lambda model, y_pred, y_target, latent_code: nn.L1Loss()(y_pred, y_target),
     "mixed": mixed_bce_mse_criterion,
     "orthogonality": orthogonality_criterion,
     "l1": l1_criterion,
     "l2": l2_criterion,
-    "ldj": LogDiscriminantJacobianCriterion,
-    "logprob": LogProbCriterion,
-    "constant": ConstantCriterion,
-    "likelihood": isotropic_likelihood_criterion,
-    "reconstruction": reconstruction_criterion,
-    # 'adversarial'    : AdversarialCriterion,
-    "supervised": supervised_criterion,
     "lc": latent_convexity_criterion,
 }
 
