@@ -1,8 +1,8 @@
-# python train_generator.py --config "<PEAL_BASE>/configs/diffae_experiments/generators/celeba_diffusion_autoencoder.yaml"
+# python train_generator.py --config "<PEAL_BASE>/configs/diffae_experiments/generators/celeba_stabel_diffusion_autoencoder.yaml"
 category: generator
-generator_type: DiffusionAutoencoder
+generator_type: StableDiffusionAutoencoder
 data: "<PEAL_BASE>/configs/diffae_experiments/data/celeba_stable_diffusion.yaml"
-base_path : $PEAL_RUNS/celeba/diffusion_autoencoder
+base_path : $PEAL_RUNS/celeba/stable_diffusion_autoencoder
 encoder: "facebook/dinov2-base"
 task_config:
   criterions:

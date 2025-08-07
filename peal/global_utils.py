@@ -69,6 +69,7 @@ def find_subclasses(base_class, directory):
 
     def check_module(module_name):
         module = importlib.import_module(module_name)
+
         for name, obj in inspect.getmembers(module):
             if inspect.isclass(obj):
                 if issubclass(obj, base_class):
@@ -76,6 +77,9 @@ def find_subclasses(base_class, directory):
 
     project_base_dir = get_project_resource_dir()
     for dirpath, dirnames, filenames in os.walk(directory):
+        if "dependencies" in dirpath:
+            continue
+
         for filename in filenames:
             current_path = os.path.join(dirpath, filename)
             if filename.endswith(".py"):
