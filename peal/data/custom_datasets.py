@@ -917,6 +917,10 @@ class CelebACopyrighttagDataset(Image2MixedDataset):
             download_celeba_to(config.dataset_origin_path)
 
         if not os.path.exists(config.dataset_path):
+            print("config.delimiter")
+            print(config.delimiter)
+            print(config.delimiter)
+            print(config.delimiter)
             cdg = ConfounderDatasetGenerator(**config.__dict__, data_config=config)
             cdg.generate_dataset()
 

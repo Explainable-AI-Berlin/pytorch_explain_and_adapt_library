@@ -1,3 +1,4 @@
+dataset_class           : CelebACopyrighttagDataset
 dataset_path            : $PEAL_DATA/celeba_copyrighttag
 dataset_origin_path     : $PEAL_DATA/celeba
 num_samples             : 194000

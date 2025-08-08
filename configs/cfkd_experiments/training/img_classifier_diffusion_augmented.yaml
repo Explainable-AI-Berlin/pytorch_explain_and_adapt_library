@@ -1,0 +1,9 @@
+train_batch_size        : 100
+val_batch_size          : 10
+test_batch_size         : 128
+max_epochs              : 300
+learning_rate           : 0.001
+optimizer               : sgd
+diffusion_augmented     : true
+sampling_time_fraction  : 0.3
+num_discretization_steps: 20

@@ -18,6 +18,7 @@ from tqdm import tqdm
 from peal.data.dataset_factory import get_datasets
 from peal.data.datasets import Image2MixedDataset, Image2ClassDataset
 from peal.dependencies.attacks.attacks import PGD_L2
+from peal.generators.generator_factory import get_generator
 from peal.global_utils import (
     orthogonal_initialization,
     move_to_device,
@@ -377,6 +378,9 @@ class ModelTrainer:
                 max_norm=self.config.training.attack_epsilon,
             )
 
+        if not self.config.generator is None:
+            self.generator = get_generator(self.config.generator)
+
     def run_epoch(self, dataloader, mode="train", pbar=None):
         """ """
         sources = {}
@@ -418,6 +422,9 @@ class ModelTrainer:
                 y = self.logger.test_y
 
             X = move_to_device(X, self.device)
+            if mode == "train" and self.config.training.diffusion_augmented:
+                pass
+
             y_original = y
             if self.config.training.label_smoothing > 0.0 and mode == "train":
                 y_dist = torch.ones(y.size(0), self.config.task.output_channels)

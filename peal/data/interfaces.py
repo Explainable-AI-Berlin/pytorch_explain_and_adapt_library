@@ -228,7 +228,7 @@ class DataConfig(BaseModel):
     """
     The delimiter used for the csv file.
     """
-    delimiter: Union[type(None), str] = None
+    delimiter: Union[type(None), str] = ","
     """
     The number of classes in the dataset.
     """
