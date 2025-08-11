@@ -313,7 +313,8 @@ def log_images_to_writer(dataloader, writer, tag="train"):
 
         else:
             print(
-                "Warning! If your dataloader uses another normalization than the PyTorch default [0,1] range data might be visualized incorrect!"
+                "Warning! If your dataloader uses another normalization than the PyTorch default [0,1]"
+                + "range data might be visualized incorrect!"
                 + "In that case add function project_to_pytorch_default() to your underlying dataset to correct visualization!"
             )
 

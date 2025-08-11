@@ -1,0 +1,13 @@
+dataset_path            : $PEAL_DATA/celeba
+split                   : [0.8,1.0]
+input_type              : image
+input_size              : [3, 128, 128]
+output_type             : multiclass
+output_size             : [40]
+confounding_factors     : [Blond_Hair, Male]
+num_samples             : 1000
+confounder_probability  : 0.02
+generator               : $PEAL_RUNS/celeba1k/ddpm/config.yaml
+diffusion_augmented     : true
+sampling_time_fraction  : 0.3
+num_discretization_steps: 10

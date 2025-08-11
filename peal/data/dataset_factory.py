@@ -136,6 +136,14 @@ def get_datasets(
         transform_list_validation.append(SetChannels(config.input_size[0]))
         transform_list_test.append(SetChannels(test_config.input_size[0]))
 
+        if config.diffusion_augmented:
+            from peal.data.transformations import DiffusionAugmentation
+            transform_list_train.append(DiffusionAugmentation(
+                config.generator,
+                config.sampling_time_fraction,
+                config.num_discretization_steps
+            ))
+
     #
     transform_train = transforms.Compose(transform_list_train)
     transform_validation = transforms.Compose(transform_list_validation)

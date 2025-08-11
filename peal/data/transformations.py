@@ -10,6 +10,8 @@ import numpy as np
 
 from PIL import Image
 
+from peal.generators.generator_factory import get_generator
+
 
 class CircularCut(object):
     """ """
@@ -152,3 +154,33 @@ class RandomResizeCropPad(object):
         img = transforms.functional.center_crop(img, output_size)
 
         return img
+
+
+class DiffusionAugmentation(object):
+    def __init__(self, generator, sampling_time_fraction, num_discretization_steps):
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.generator = get_generator(generator).to(self.device)
+        self.sampling_time_fraction = sampling_time_fraction
+        self.num_discretization_steps = num_discretization_steps
+
+    def __call__(self, img):
+        if len(img.shape) == 3:
+            img_in = img.unsqueeze(0)
+            was_unsqueezed = True
+
+        else:
+            img_in = img
+            was_unsqueezed = False
+
+        device_buffer = img_in.device
+        with torch.no_grad():
+            img = self.generator.dataset.project_from_pytorch_default(img_in).to(self.device)
+            z = self.generator.encode(img, self.sampling_time_fraction, self.num_discretization_steps)
+            img_reconstructed = self.generator.decode(z, self.sampling_time_fraction, self.num_discretization_steps)
+
+        img_reconstructed.to(device_buffer)
+        img_reconstructed = self.generator.dataset.project_to_pytorch_default(img_reconstructed)
+        if was_unsqueezed:
+            img_reconstructed = img_reconstructed.squeeze(0)
+
+        return img_reconstructed

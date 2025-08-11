@@ -378,9 +378,6 @@ class ModelTrainer:
                 max_norm=self.config.training.attack_epsilon,
             )
 
-        if not self.config.generator is None:
-            self.generator = get_generator(self.config.generator)
-
     def run_epoch(self, dataloader, mode="train", pbar=None):
         """ """
         sources = {}
@@ -422,8 +419,6 @@ class ModelTrainer:
                 y = self.logger.test_y
 
             X = move_to_device(X, self.device)
-            if mode == "train" and self.config.training.diffusion_augmented:
-                pass
 
             y_original = y
             if self.config.training.label_smoothing > 0.0 and mode == "train":
