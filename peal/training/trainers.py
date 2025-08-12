@@ -420,6 +420,9 @@ class ModelTrainer:
 
             X = move_to_device(X, self.device)
 
+            if mode == "train" and hasattr(self.train_dataloader.dataset, "diffusion_augmentation"):
+                X = self.train_dataloader.dataset.diffusion_augmentation(X)
+
             y_original = y
             if self.config.training.label_smoothing > 0.0 and mode == "train":
                 y_dist = torch.ones(y.size(0), self.config.task.output_channels)

@@ -306,6 +306,14 @@ def log_images_to_writer(dataloader, writer, tag="train"):
         if isinstance(sample_train_imgs, list):
             sample_train_imgs, sample_train_y = sample_train_imgs
 
+        if hasattr(dataloader.dataset, "diffusion_augmentation"):
+            # Apply diffusion augmentation if available
+            sample_train_imgs_augmented = dataloader.dataset.diffusion_augmentation(sample_train_imgs)
+            if hasattr(dataloader.dataset, "project_to_pytorch_default"):
+                sample_train_imgs_augmented = dataloader.dataset.project_to_pytorch_default(
+                    sample_train_imgs_augmented
+                )
+
         if hasattr(dataloader.dataset, "project_to_pytorch_default"):
             sample_train_imgs = dataloader.dataset.project_to_pytorch_default(
                 sample_train_imgs
@@ -333,3 +341,9 @@ def log_images_to_writer(dataloader, writer, tag="train"):
             sample_batch_label_str,
             torchvision.utils.make_grid(sample_train_imgs[:128], 128),
         )
+
+        if hasattr(dataloader.dataset, "diffusion_augmentation"):
+            writer.add_image(
+                sample_batch_label_str + "_augmented",
+                torchvision.utils.make_grid(sample_train_imgs_augmented[:128], 128),
+            )

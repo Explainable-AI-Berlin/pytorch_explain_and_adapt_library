@@ -15,3 +15,4 @@ generator               : $PEAL_RUNS/square1k/ddpm/config.yaml
 diffusion_augmented     : true
 sampling_time_fraction  : 0.3
 num_discretization_steps: 10
+batch_wise_augmentation : true

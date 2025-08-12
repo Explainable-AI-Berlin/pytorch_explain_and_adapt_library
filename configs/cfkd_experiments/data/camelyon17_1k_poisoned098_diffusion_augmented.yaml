@@ -12,5 +12,5 @@ confounder_probability  : 0.98
 confounding_factors     : [tumor, hospital]
 generator               : $PEAL_RUNS/camelyon17_1k/ddpm/config.yaml
 diffusion_augmented     : true
-sampling_time_fraction  : 0.2
+sampling_time_fraction  : 0.5
 num_discretization_steps: 10

@@ -12,5 +12,5 @@ has_hints               : True
 x_selection             : imgs_cut
 generator               : $PEAL_RUNS/follicles_cut/ddpm/config.yaml
 diffusion_augmented     : true
-sampling_time_fraction  : 0.3
+sampling_time_fraction  : 0.5
 num_discretization_steps: 10

@@ -10,5 +10,5 @@ confounding_factors     : [Smiling, Confounder]
 has_hints               : true
 generator               : $PEAL_RUNS/celeba1k_copyrighttag/ddpm/config.yaml
 diffusion_augmented     : true
-sampling_time_fraction  : 0.3
+sampling_time_fraction  : 0.5
 num_discretization_steps: 10
