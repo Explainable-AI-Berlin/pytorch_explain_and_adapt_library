@@ -585,7 +585,6 @@ class ModelTrainer:
             ncols=200
         )
         pbar.stored_values = {}
-        val_accuracy_max = 0.0
         val_accuracy_previous = 0.0
         train_accuracy_previous = 0.0
         self.model.eval()
@@ -610,6 +609,13 @@ class ModelTrainer:
 
                     val_accuracy = min(val_accuracy, val_accuracy_current)
 
+
+        torch.save(
+            self.model.to("cpu").state_dict(),
+            os.path.join(self.model_path, "checkpoints", "final.cpl"),
+        )
+        self.model.to(self.device)
+        val_accuracy_max = val_accuracy
         self.logger.writer.add_scalar("epoch_validation_accuracy", val_accuracy, -1)
         pbar.stored_values["val_acc"] = val_accuracy
 
