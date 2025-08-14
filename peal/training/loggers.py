@@ -301,7 +301,11 @@ def log_images_to_writer(dataloader, writer, tag="train"):
         if i == 2 and dataloader_mixer_treatment and len(dataloader.dataloaders) > 1:
             iterator = iter(dataloader.dataloaders[1])
 
-        sample_train_imgs, sample_train_y = next(iterator)
+        try:
+            sample_train_imgs, sample_train_y = next(iterator)
+
+        except Exception as exp:
+            import pdb; pdb.set_trace()
 
         if isinstance(sample_train_imgs, list):
             sample_train_imgs, sample_train_y = sample_train_imgs

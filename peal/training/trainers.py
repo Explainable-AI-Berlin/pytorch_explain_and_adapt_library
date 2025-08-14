@@ -782,6 +782,7 @@ def distill_binary_dataset(
                 label_path=class_predictions_path,
                 partition="train",
                 label_query=0,
+                is_image_to_class=isinstance(predictor_dataset, Image2ClassDataset),
             )
             get_predictions(prediction_args)
             predictor_dataset.disable_url()
@@ -792,9 +793,6 @@ def distill_binary_dataset(
         distilled_dataset_config.confounder_probability = None
         distilled_dataset_config.dataset_class = None
         distilled_dataset_config.output_type = "multiclass"
-        print(predictor_dataset)
-        print(distilled_dataset_config)
-        #import pdb; pdb.set_trace()
         distillation_datasource.append(
             get_datasets(
                 config=distilled_dataset_config, data_dir=class_predictions_path
@@ -809,6 +807,11 @@ def distill_binary_dataset(
         distillation_datasource[
             i
         ].task_config.x_selection = predictor_dataset.task_config.x_selection
+        try:
+            sample = distillation_datasource[-1][0]
+
+        except:
+            import pdb; pdb.set_trace()
 
     return distillation_datasource
 

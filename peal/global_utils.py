@@ -24,6 +24,7 @@ from tqdm import tqdm
 from pathlib import Path
 
 
+
 def onehot(label, n_classes):
     one_hots = torch.zeros(label.size(0), n_classes).to(label.device)
     return one_hots.scatter_(1, label.to(torch.int64).view(-1, 1), 1)
@@ -493,6 +494,13 @@ def get_predictions(args):
 
             elif len(y) == 4:
                 (lab, hint, idx, img_file) = y
+
+        if hasattr(args, "is_image_to_class") and args.is_image_to_class:
+            img_file = list(img_file)
+            for i in range(len(img_file)):
+                img_file[i] = os.path.join(str(int(lab[i])), img_file[i])
+
+            img_file = tuple(img_file)
 
         img = img.to(device)
         try:
