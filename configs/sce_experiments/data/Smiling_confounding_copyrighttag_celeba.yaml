@@ -1,7 +1,7 @@
 dataset_class           : CelebACopyrighttagDataset
 dataset_path            : $PEAL_DATA/celeba_copyrighttag
 dataset_origin_path     : $PEAL_DATA/celeba
-num_samples             : 194000
+num_samples             : 180000
 split                   : [0.8,0.9]
 input_type              : image
 input_size              : [3, 128, 128]

@@ -913,7 +913,7 @@ class CelebADataset(Image2MixedDataset):
 
 class CelebACopyrighttagDataset(Image2MixedDataset):
     def __init__(self, config, **kwargs):
-        if not os.path.exists(config.dataset_origin_path):
+        if not os.path.exists(config.dataset_path) and not os.path.exists(config.dataset_origin_path):
             download_celeba_to(config.dataset_origin_path)
 
         if not os.path.exists(config.dataset_path):

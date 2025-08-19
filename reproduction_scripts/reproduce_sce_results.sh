@@ -93,6 +93,7 @@ python run_cfkd.py --config "<PEAL_BASE>/configs/sce_experiments/adaptors/Smilin
 python run_cfkd.py --config "<PEAL_BASE>/configs/sce_experiments/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_fastdime_cfkd.yaml"
 
 # vit-b-16 experiments
+python train_predictor.py --config "<PEAL_BASE>/configs/sce_experiments/predictors/celeba_Smiling_confounding_copyrighttag_vit_b_16_poisoned100.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/sce_experiments/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_vit_b_16_sce_cfkd.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/sce_experiments/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_vit_b_16_ace_cfkd.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/sce_experiments/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_vit_b_16_dime_cfkd.yaml"
