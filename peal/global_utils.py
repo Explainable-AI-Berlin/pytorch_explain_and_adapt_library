@@ -587,7 +587,49 @@ def generate_smooth_mask(x1, x2, dilation, max_avg_combination=0.5):
     return mask, dil_mask
 
 
-def extract_penultima_activation(x, predictor):
+def get_intermediate_output(model: torch.nn.Module, x: torch.Tensor, distance_from_last_layer: int):
+    """
+    Runs the model on input x and returns the activation tensor
+    that is `distance_from_last_layer` layers away from the final layer.
+
+    Args:
+        model (nn.Module): The predictor model.
+        x (torch.Tensor): Input tensor (image).
+        distance_from_last_layer (int): Number of layers away from the final output layer.
+                                        (1 = last layer before logits, 2 = two layers back, etc.)
+    """
+    activations = {}
+    handles = []
+
+    # Get a flat list of all modules in order
+    layers = [m for m in model.modules() if not isinstance(m, torch.nn.Sequential) and not isinstance(m, torch.nn.ModuleList)]
+    layers = [m for m in layers if len(list(m.children())) == 0]  # keep only leaf modules
+
+    # Select the layer we want
+    target_layer_index = len(layers) - distance_from_last_layer
+    if target_layer_index < 0 or target_layer_index >= len(layers):
+        raise ValueError("distance_from_last_layer is out of range.")
+
+    target_layer = layers[target_layer_index]
+
+    # Hook to capture the output
+    def hook_fn(module, input, output):
+        activations['out'] = output.detach()
+
+    handle = target_layer.register_forward_hook(hook_fn)
+    handles.append(handle)
+
+    # Run forward pass
+    _ = model(x)
+
+    # Cleanup
+    for h in handles:
+        h.remove()
+
+    return activations['out']
+
+
+def extract_penultima_activation(x, predictor, distance_from_last_layer=1):
     # Function to traverse the computation graph
     """predictor.train()
     def find_activation(tensor, depth=2):
@@ -609,16 +651,21 @@ def extract_penultima_activation(x, predictor):
     import pdb; pdb.set_trace()
     second_last_activation = find_activation(output, depth=2)
     predictor.eval()"""
-    if hasattr(predictor, "feature_extractor"):
-        return predictor.feature_extractor(x)
+    if distance_from_last_layer == 1:
+        if hasattr(predictor, "feature_extractor"):
+            return predictor.feature_extractor(x)
+
+        else:
+            submodules = list(predictor.children())
+            while len(submodules) == 1:
+                submodules = list(submodules[0].children())
+
+            feature_extractor = torch.nn.Sequential(*submodules[:-1])
+            return feature_extractor(x)
 
     else:
-        submodules = list(predictor.children())
-        while len(submodules) == 1:
-            submodules = list(submodules[0].children())
+        return get_intermediate_output(predictor, x, distance_from_last_layer)
 
-        feature_extractor = torch.nn.Sequential(*submodules[:-1])
-        return feature_extractor(x)
 
 
 def set_random_seed(seed: int):

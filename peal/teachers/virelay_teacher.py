@@ -1,3 +1,5 @@
+import shutil
+
 import torch
 import json
 import h5py
@@ -26,7 +28,7 @@ from torchvision.transforms import ToTensor
 from itertools import product
 from pathlib import Path
 
-from peal.global_utils import load_yaml_config, is_port_in_use
+from peal.global_utils import load_yaml_config, is_port_in_use, get_intermediate_output
 from peal.teachers.interfaces import TeacherInterface
 
 
@@ -57,7 +59,10 @@ class ImageDataset(torch.utils.data.Dataset):
 
 
 def create_dataset(
-    dataset_file_path: str, samples_shape: tuple, number_of_samples: int, dataloader: torch.utils.data.DataLoader
+    dataset_file_path: str,
+    samples_shape: tuple,
+    number_of_samples: int,
+    dataloader: torch.utils.data.DataLoader,
 ) -> h5py.File:
     """Creates a new dataset HDF5 file.
     Parameters
@@ -75,7 +80,9 @@ def create_dataset(
     """
 
     dataset_file = h5py.File(dataset_file_path, "w")
-    dataset_file.create_dataset("data", shape=(number_of_samples,) + tuple(samples_shape), dtype="float32")
+    dataset_file.create_dataset(
+        "data", shape=(number_of_samples,) + tuple(samples_shape), dtype="float32"
+    )
     dataset_file.create_dataset("label", shape=(number_of_samples,), dtype="uint16")
     index = 0
     for X, y in dataloader:
@@ -86,26 +93,42 @@ def create_dataset(
     return dataset_file
 
 
-def create_attribution_database(attribution_database_file_path, attribution_shape, num_classes, number_of_samples):
+def create_attribution_database(
+    attribution_database_file_path, attribution_shape, num_classes, number_of_samples
+):
     """
     Creates an attribution database file
     """
     attribution_database_file = h5py.File(attribution_database_file_path, "w")
     attribution_database_file.create_dataset(
-        "attribution", shape=(number_of_samples,) + tuple(attribution_shape), dtype="float32"
+        "attribution",
+        shape=(number_of_samples,) + tuple(attribution_shape),
+        dtype="float32",
     )
-    attribution_database_file.create_dataset("prediction", shape=(number_of_samples, num_classes), dtype="float32")
-    attribution_database_file.create_dataset("label", shape=(number_of_samples,), dtype="uint16")
+    attribution_database_file.create_dataset(
+        "prediction", shape=(number_of_samples, num_classes), dtype="float32"
+    )
+    attribution_database_file.create_dataset(
+        "label", shape=(number_of_samples,), dtype="uint16"
+    )
     return attribution_database_file
 
 
-def append_attributions(attribution_database_file, index, attributions, predictions, labels):
+def append_attributions(
+    attribution_database_file, index, attributions, predictions, labels
+):
     """
     Appends attributions to the attribution database file
     """
-    attribution_database_file["attribution"][index : attributions.shape[0] + index] = attributions.detach().numpy()
-    attribution_database_file["prediction"][index : predictions.shape[0] + index] = predictions.detach().numpy()
-    attribution_database_file["label"][index : labels.shape[0] + index] = labels.detach().numpy()
+    attribution_database_file["attribution"][
+        index : attributions.shape[0] + index
+    ] = attributions.detach().numpy()
+    attribution_database_file["prediction"][
+        index : predictions.shape[0] + index
+    ] = predictions.detach().numpy()
+    attribution_database_file["label"][
+        index : labels.shape[0] + index
+    ] = labels.detach().numpy()
 
 
 def create_attribution_dataset(dataloader, attribution_database_file_path, num_classes):
@@ -237,7 +260,9 @@ class Histogram(Processor):
                 np.stack(
                     [
                         np.histogram(
-                            sample.reshape(sample.shape[0], np.prod(sample.shape[1:3])), bins=self.bins, density=True
+                            sample.reshape(sample.shape[0], np.prod(sample.shape[1:3])),
+                            bins=self.bins,
+                            density=True,
                         )
                         for sample in channel
                     ]
@@ -262,7 +287,9 @@ VARIANTS = {
         "distance": SciPyPDist(metric="euclidean"),
     },
     "histogram": {
-        "preprocessing": Sequential([Normalize(axes=(1, 2, 3)), Histogram(), Flatten()]),
+        "preprocessing": Sequential(
+            [Normalize(axes=(1, 2, 3)), Histogram(), Flatten()]
+        ),
         "distance": SciPyPDist(metric="euclidean"),
     },
 }
@@ -341,11 +368,17 @@ def meta_analysis(
         clustering=Parallel(
             [
                 Parallel(
-                    [KMeans(n_clusters=number_of_clusters) for number_of_clusters in number_of_clusters_list],
+                    [
+                        KMeans(n_clusters=number_of_clusters)
+                        for number_of_clusters in number_of_clusters_list
+                    ],
                     broadcast=True,
                 ),
                 Parallel(
-                    [DBSCAN(eps=number_of_clusters / 10.0) for number_of_clusters in number_of_clusters_list],
+                    [
+                        DBSCAN(eps=number_of_clusters / 10.0)
+                        for number_of_clusters in number_of_clusters_list
+                    ],
                     broadcast=True,
                 ),
                 Parallel(
@@ -360,8 +393,13 @@ def meta_analysis(
                         Parallel([UMAPEmbedding()], broadcast=True),
                         Parallel(
                             [
-                                TSNEEmbedding(perplexity=float(perp), early_exaggeration=float(exagg))
-                                for perp, exagg in product([5, 15, 30, 50, 100], [6, 12, 24])
+                                TSNEEmbedding(
+                                    perplexity=float(perp),
+                                    early_exaggeration=float(exagg),
+                                )
+                                for perp, exagg in product(
+                                    [5, 15, 30, 50, 100], [6, 12, 24]
+                                )
                             ],
                             broadcast=True,
                         ),
@@ -382,13 +420,23 @@ def meta_analysis(
         class_name_map = {label["index"]: label["name"] for label in label_map}
 
     else:
-        wordnet_id_map = {class_index: str(class_index) for class_index in class_indices}
-        class_name_map = {class_index: str(class_index) for class_index in class_indices}
+        wordnet_id_map = {
+            class_index: str(class_index) for class_index in class_indices
+        }
+        class_name_map = {
+            class_index: str(class_index) for class_index in class_indices
+        }
         label_map = [
-            {"index": class_index, "word_net_id": str(class_index), "name": str(class_index)}
+            {
+                "index": class_index,
+                "word_net_id": str(class_index),
+                "name": str(class_index),
+            }
             for class_index in class_indices
         ]
-        with open(os.path.join(base_dir, "label_map.json"), "w", encoding="utf-8") as label_map_file:
+        with open(
+            os.path.join(base_dir, "label_map.json"), "w", encoding="utf-8"
+        ) as label_map_file:
             json.dump(label_map, label_map_file, indent=4)
 
     # Retrieves the labels of the samples
@@ -410,16 +458,25 @@ def meta_analysis(
         print(f"Loading class {class_name_map[class_index]}")
         with h5py.File(attribution_database_file_path, "r") as attributions_file:
             (indices_of_samples_in_class,) = np.nonzero(labels == class_index)
-            attribution_data = attributions_file["attribution"][indices_of_samples_in_class, :]
+            attribution_data = attributions_file["attribution"][
+                indices_of_samples_in_class, :
+            ]
             print("Samples in class: " + str(attribution_data.shape[0]))
             if "train" in attributions_file:
-                train_flag = attributions_file["train"][indices_of_samples_in_class.tolist()]
+                train_flag = attributions_file["train"][
+                    indices_of_samples_in_class.tolist()
+                ]
             else:
                 train_flag = None
 
         # Performs the meta-analysis for the attributions of the current class
         print(f"Computing class {class_name_map[class_index]}")
-        (eigenvalues, embedding), (kmeans, dbscan, agglomerative, (umap, tsne)) = pipeline(attribution_data)
+        (eigenvalues, embedding), (
+            kmeans,
+            dbscan,
+            agglomerative,
+            (umap, tsne),
+        ) = pipeline(attribution_data)
 
         # Append the meta-analysis to the analysis database
         print(f"Saving class {class_name_map[class_index]}")
@@ -434,7 +491,9 @@ def meta_analysis(
             # Adds the spectral embedding to the analysis database
             embedding_group = analysis_group.require_group("embedding")
             embedding_group["spectral"] = embedding.astype(np.float32)
-            embedding_group["spectral"].attrs["eigenvalue"] = eigenvalues.astype(np.float32)
+            embedding_group["spectral"].attrs["eigenvalue"] = eigenvalues.astype(
+                np.float32
+            )
 
             # Adds the t-SNE embedding to the analysis database
             for tsne_idx, tsne_embedding in enumerate(tsne):
@@ -459,15 +518,21 @@ def meta_analysis(
                 cluster_group[clustering_dataset_name] = clustering
                 cluster_group[clustering_dataset_name].attrs["embedding"] = "spectral"
                 cluster_group[clustering_dataset_name].attrs["k"] = number_of_clusters
-                cluster_group[clustering_dataset_name].attrs["index"] = np.arange(embedding.shape[1], dtype=np.uint32)
+                cluster_group[clustering_dataset_name].attrs["index"] = np.arange(
+                    embedding.shape[1], dtype=np.uint32
+                )
 
             # Adds the Agglomerative clustering of the embeddings to the analysis database
-            for number_of_clusters, clustering in zip(number_of_clusters_list, agglomerative):
+            for number_of_clusters, clustering in zip(
+                number_of_clusters_list, agglomerative
+            ):
                 clustering_dataset_name = f"agglomerative-{number_of_clusters:02d}"
                 cluster_group[clustering_dataset_name] = clustering
                 cluster_group[clustering_dataset_name].attrs["embedding"] = "spectral"
                 cluster_group[clustering_dataset_name].attrs["k"] = number_of_clusters
-                cluster_group[clustering_dataset_name].attrs["index"] = np.arange(embedding.shape[1], dtype=np.uint32)
+                cluster_group[clustering_dataset_name].attrs["index"] = np.arange(
+                    embedding.shape[1], dtype=np.uint32
+                )
 
             # If the attributions were computed on the training split of the dataset, then the training flag is set
             if train_flag is not None:
@@ -552,10 +617,15 @@ def make_project(
             "attributions": {
                 "attribution_method": attribution_name,
                 "attribution_strategy": "true_label",
-                "sources": [relpath(attribution_database_file_path, start=project_root_path)],
+                "sources": [
+                    relpath(attribution_database_file_path, start=project_root_path)
+                ],
             },
             "analyses": [
-                {"analysis_method": analysis_name, "sources": [relpath(analysis_file_path, start=project_root_path)]}
+                {
+                    "analysis_method": analysis_name,
+                    "sources": [relpath(analysis_file_path, start=project_root_path)],
+                }
             ],
         }
     }
@@ -576,7 +646,9 @@ def run_virelay(project_path: str, output_path: str, port: int) -> None:
     app = Server(workspace)
     # thread = threading.Thread(target=lambda: app.run(host=host_name, port=port))
     # thread.start()
-    proc = multiprocessing.Process(target=lambda: app.run(host=host_name, port=port), args=())
+    proc = multiprocessing.Process(
+        target=lambda: app.run(host=host_name, port=port), args=()
+    )
     proc.start()
     print("ViReLay GUI is active on localhost:" + str(port))
 
@@ -589,7 +661,11 @@ def run_virelay(project_path: str, output_path: str, port: int) -> None:
 
             else:
                 pbar.set_description(
-                    "Give feedback at localhost:" + str(port) + " and save under " + output_path + " when done."
+                    "Give feedback at localhost:"
+                    + str(port)
+                    + " and save under "
+                    + output_path
+                    + " when done."
                 )
                 time.sleep(1.0)
 
@@ -606,23 +682,102 @@ class VirelayTeacher(TeacherInterface):
         tracking_level=5,
         num_classes=2,
         teacher_config="configs/cfkd_experiments/teachers/virelay_teacher.yaml",
+        distance_from_last_layer=50,
     ):
         self.port = port
         self.dataset = dataset
         self.tracking_level = tracking_level
         self.num_classes = num_classes
         self.teacher_config = load_yaml_config(teacher_config).__dict__
+        self.distance_from_last_layer = distance_from_last_layer
 
-    def get_feedback(self, collage_path_list, x_counterfactual_list, x_list, y_list, base_dir, student, y_source_list, **kwargs):
+    def get_feedback(
+        self,
+        collage_path_list,
+        x_counterfactual_list,
+        x_list,
+        y_list,
+        base_dir,
+        student,
+        y_source_list,
+        y_target_end_confidence_list,
+        **kwargs,
+    ):
+        # filter all lists to only contain only values where y_target_end_confidence_list is greater than 0.5
+        # first create a list of indices where y_target_end_confidence_list is greater than 0.5
+        y_target_confidence_greater_than_05_indices = [
+            i for i in range(len(y_target_end_confidence_list)) if y_target_end_confidence_list[i] > 0.5
+        ]
+        collage_path_greater_than_05_list = [
+            collage_path_list[i]
+            for i in range(len(y_target_end_confidence_list))
+            if y_target_end_confidence_list[i] > 0.5
+        ]
+        x_counterfactual_greater_than_05_list = [
+            x_counterfactual_list[i]
+            for i in range(len(y_target_end_confidence_list))
+            if y_target_end_confidence_list[i] > 0.5
+        ]
+        x_greater_than_05_list = [
+            x_list[i] for i in range(len(y_target_end_confidence_list)) if y_target_end_confidence_list[i] > 0.5
+        ]
+        y_greater_than_05_list = [
+            y_list[i] for i in range(len(y_target_end_confidence_list)) if y_target_end_confidence_list[i] > 0.5
+        ]
+        y_source_greater_than_05_list = [
+            y_source_list[i] for i in range(len(y_target_end_confidence_list)) if y_target_end_confidence_list[i] > 0.5
+        ]
         attributions = []
-        for i in range(len(x_list)):
-            x_latent = student.feature_extractor(x_list[i].unsqueeze(0).to("cuda")).detach().cpu()
-            cf_latent = student.feature_extractor(x_counterfactual_list[i].unsqueeze(0).to("cuda")).detach().cpu()
+        for i in range(1, 1000):
+            try:
+                x_latent = get_intermediate_output(
+                    student,
+                    x_greater_than_05_list[0].unsqueeze(0).to("cuda"),
+                    i,
+                )
+                print(str(i) + ": " + str(x_latent.shape))
+
+            except Exception:
+                break
+
+        for i in range(len(x_greater_than_05_list)):
+            x_latent = (
+                get_intermediate_output(
+                    student,
+                    x_greater_than_05_list[i].unsqueeze(0).to("cuda"),
+                    self.distance_from_last_layer,
+                )
+                .detach()
+                .cpu()
+            )
+            cf_latent = (
+                get_intermediate_output(
+                    student,
+                    x_counterfactual_greater_than_05_list[i].unsqueeze(0).to("cuda"),
+                    self.distance_from_last_layer,
+                )
+                .detach()
+                .cpu()
+            )
             attributions.append((cf_latent - x_latent).squeeze(0))
 
+        print("x_latent[0].shape")
+        print("x_latent[0].shape")
+        print("x_latent[0].shape")
+        print(x_latent[0].shape)
+        shutil.rmtree(base_dir, ignore_errors=True)
         Path(base_dir).mkdir(parents=True, exist_ok=True)
         if not os.path.exists(os.path.join(base_dir, "database.hdf5")):
-            collage_path_list_dataloader = torch.utils.data.DataLoader(ImageDataset(os.path.split(collage_path_list[0])[0]))
+            # write collage_path_greater_than_05_list in the os.path.join(base_dir, "collage_greater_than_05") folder
+            collage_path_greater_than_05_dir = os.path.join(base_dir, "collage_greater_than_05")
+            os.makedirs(collage_path_greater_than_05_dir, exist_ok=True)
+            for i, collage_path in enumerate(collage_path_greater_than_05_list):
+                # copy the collage_path to the collage_path_greater_than_05_dir
+                os.system(f"cp {collage_path} {collage_path_greater_than_05_dir}/{i}.jpg")
+
+            collage_path_list_dataloader = torch.utils.data.DataLoader(
+                ImageDataset(collage_path_greater_than_05_dir),
+            )
             create_dataset(
                 dataset_file_path=os.path.join(base_dir, "database.hdf5"),
                 samples_shape=collage_path_list_dataloader.dataset[0][0].shape,
@@ -632,9 +787,11 @@ class VirelayTeacher(TeacherInterface):
 
         # TODO get the actual prediction scores of the network
         if not os.path.exists(os.path.join(base_dir, "attribution_database.hdf5")):
-            attributions_dataloader = list(zip(attributions, y_source_list, y_list))
+            attributions_dataloader = list(zip(attributions, y_source_greater_than_05_list, y_greater_than_05_list))
             create_attribution_dataset(
-                attribution_database_file_path=os.path.join(base_dir, "attribution_database.hdf5"),
+                attribution_database_file_path=os.path.join(
+                    base_dir, "attribution_database.hdf5"
+                ),
                 dataloader=attributions_dataloader,
                 num_classes=self.num_classes,
             )
@@ -642,7 +799,9 @@ class VirelayTeacher(TeacherInterface):
         if not os.path.exists(os.path.join(base_dir, "analysis.hdf5")):
             meta_analysis(
                 base_dir=base_dir,
-                attribution_database_file_path=os.path.join(base_dir, "attribution_database.hdf5"),
+                attribution_database_file_path=os.path.join(
+                    base_dir, "attribution_database.hdf5"
+                ),
                 analysis_file_path=os.path.join(base_dir, "analysis.hdf5"),
                 variant=self.teacher_config["meta_analysis_variant"],
                 class_indices=range(self.num_classes),
@@ -655,13 +814,19 @@ class VirelayTeacher(TeacherInterface):
         if not os.path.exists(os.path.join(base_dir, "analysis.yaml")):
             make_project(
                 dataset_file_path=os.path.join(base_dir, "database.hdf5"),
-                attribution_database_file_path=os.path.join(base_dir, "attribution_database.hdf5"),
+                attribution_database_file_path=os.path.join(
+                    base_dir, "attribution_database.hdf5"
+                ),
                 analysis_file_path=os.path.join(base_dir, "analysis.hdf5"),
                 label_map_file_path=None,
                 project_name="analysis",
                 dataset_name="dataset",
-                dataset_down_sampling_method=self.teacher_config["dataset_down_sampling_method"],
-                dataset_up_sampling_method=self.teacher_config["dataset_up_sampling_method"],
+                dataset_down_sampling_method=self.teacher_config[
+                    "dataset_down_sampling_method"
+                ],
+                dataset_up_sampling_method=self.teacher_config[
+                    "dataset_up_sampling_method"
+                ],
                 model_name="model",
                 attribution_name="attribution",
                 analysis_name="analysis",
@@ -682,12 +847,13 @@ class VirelayTeacher(TeacherInterface):
 
         feedback = json.load(open(os.path.join(base_dir, "feedback.json"), "r"))
 
-        feedback_out = []
-        for i in range(len(collage_path_list)):
+        # set the default feedback out to "Student not flipped" for the full length collage list
+        feedback_out = ["Student not flipped" for _ in range(len(collage_path_list))]
+        for i in range(len(collage_path_greater_than_05_list)):
             if i in feedback["selectedDataPointIndices"]:
-                feedback_out.append("false")
+                feedback_out[y_target_confidence_greater_than_05_indices[i]] = "false"
 
             else:
-                feedback_out.append("true")
+                feedback_out[y_target_confidence_greater_than_05_indices[i]] = "true"
 
         return feedback_out
