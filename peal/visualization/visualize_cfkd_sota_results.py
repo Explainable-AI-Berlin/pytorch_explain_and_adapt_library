@@ -71,10 +71,10 @@ def plot_images_with_custom_padding(
 if __name__ == "__main__":
     base_path = os.environ.get("PEAL_RUNS", "peal_runs")
     base_paths = [
-        base_path + "/square/colora_confounding_colorb/torchvision/classifier_poisoned098",
-        base_path + "/celeba_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned098",
-        base_path + "/celeba/Blond_Hair/resnet18_poisoned098",
-        base_path + "/celeba/camelyon17/classifier_poisoned098",
+        base_path + "/square1k/colora_confounding_colorb/torchvision/classifier_poisoned098",
+        base_path + "/celeba1k_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned098",
+        base_path + "/celeba1k/Blond_Hair/resnet18_poisoned098",
+        base_path + "/camelyon17_1k/classifier_poisoned098",
         base_path + "/follicles_cut/classifier_natural"
     ]
     methods = [
