@@ -1,0 +1,6 @@
+'meta_analysis_variant'                 : 'spectral'
+'number_of_eigenvalues'                 : 1
+'number_of_clusters_list'               : [2]
+'number_of_neighbors'                   : 5
+'dataset_down_sampling_method'          : None
+'dataset_up_sampling_method'            : None

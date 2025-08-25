@@ -1,0 +1,9 @@
+# python train_generator.py --config "<PEAL_BASE>/configs/cfkd_experiments/generators/square_ddpm.yaml"
+generator_type : DDPM
+category : generator
+base_path : $PEAL_RUNS/square/ddpm
+data: <PEAL_BASE>/configs/cfkd_experiments/data/square_generator.yaml
+image_size: 64
+batch_size: 196
+save_interval: 1000
+max_steps: 10000

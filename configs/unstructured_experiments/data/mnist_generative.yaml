@@ -1,0 +1,9 @@
+dataset_class           : MnistDataset
+dataset_path            : $PEAL_DATA/mnist
+num_samples             : 10000
+input_type              : image
+input_size              : [3, 32, 32]
+output_type             : singleclass
+output_size             : [10]
+downsize                : Resize
+normalization           : [0.5,0.5]

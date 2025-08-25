@@ -1,0 +1,9 @@
+dataset_path            : $PEAL_DATA/waterbirds
+split                   : [1.0, 1.0]
+input_type              : image
+input_size              : [3, 128, 128]
+output_type             : multiclass
+output_size             : [2]
+confounding_factors     : [y, place]
+normalization           : [0.5,0.5]
+x_selection             : img_filename

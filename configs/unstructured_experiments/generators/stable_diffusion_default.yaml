@@ -1,0 +1,3 @@
+category: generator
+generator_type: StableDiffusion
+data: <PEAL_BASE>/configs/cfkd_experiments/data/celeba_generator.yaml

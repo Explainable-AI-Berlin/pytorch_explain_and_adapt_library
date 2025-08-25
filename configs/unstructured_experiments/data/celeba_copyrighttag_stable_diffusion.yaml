@@ -1,0 +1,10 @@
+dataset_origin_path     : $PEAL_DATA/celeba
+dataset_path            : $PEAL_DATA/celeba_copyrighttag
+num_samples             : 202599
+input_type              : image
+input_size              : [3, 512, 512]
+output_type             : multiclass
+output_size             : [41]
+confounding             : copyrighttag
+delimiter               : ","
+normalization           : [0.5, 0.5]

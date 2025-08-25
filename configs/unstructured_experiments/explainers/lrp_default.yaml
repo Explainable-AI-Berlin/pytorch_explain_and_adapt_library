@@ -1,0 +1,4 @@
+'composite_kwargs':
+  'low'                  : -3.0
+  'high'                 : 3.0
+'canonizers'             : ['sequential_merge_batch_norm'] #['resnet'] #['sequential_merge_batch_norm']

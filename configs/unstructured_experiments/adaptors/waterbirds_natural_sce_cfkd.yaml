@@ -1,0 +1,27 @@
+# python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/waterbirds_natural_sce_cfkd.yaml"
+adaptor_type                         :  "CFKD"
+category                             :  "adaptor"
+batch_size                           :  3
+tracking_level                       :  3
+min_train_samples                    :  400
+finetune_iterations                  :  1
+max_validation_samples               :  100
+continuous_learning                  :  "finetune"
+use_visualization                    :  True
+calculate_group_accuracies           :  True
+explainer                            :  <PEAL_BASE>/configs/cfkd_experiments/explainers/sce_default128x128.yaml
+training                             :  <PEAL_BASE>/configs/cfkd_experiments/training/img_finetuning.yaml
+data                                 :  <PEAL_BASE>/configs/cfkd_experiments/data/waterbirds.yaml
+test_data                            :  <PEAL_BASE>/configs/cfkd_experiments/data/waterbirds.yaml
+student                              :  $PEAL_RUNS/waterbirds/classifier_natural_new/model.cpl
+teacher                              :  SegmentationMask
+generator                            :  $PEAL_RUNS/waterbirds/ddpm/config.yaml
+base_dir                             :  $PEAL_RUNS/waterbirds/classifier_natural_new/sce_cfkd
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [y]
+  x_selection             : ["imgs_filename"]

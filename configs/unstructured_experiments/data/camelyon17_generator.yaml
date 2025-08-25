@@ -1,0 +1,8 @@
+dataset_class           : Camelyon17Dataset
+dataset_path            : $PEAL_DATA/camelyon17
+split                   : [1.0, 1.0]
+input_type              : image
+input_size              : [3, 128, 128]
+output_type             : multiclass
+output_size             : [2]
+normalization           : [0.5,0.5]

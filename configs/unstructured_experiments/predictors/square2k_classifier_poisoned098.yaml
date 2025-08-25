@@ -1,0 +1,12 @@
+# python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/square2k_classifier_poisoned098.yaml"
+model_path        : $PEAL_RUNS/square2k/colora_confounding_colorb/torchvision/classifier_poisoned098
+data              : <PEAL_BASE>/configs/cfkd_experiments/data/square2k_poisoned098.yaml
+training          : <PEAL_BASE>/configs/cfkd_experiments/training/img_classifier.yaml
+architecture      : torchvision_resnet18
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [ClassA]

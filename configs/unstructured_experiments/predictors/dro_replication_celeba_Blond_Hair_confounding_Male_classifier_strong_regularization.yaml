@@ -1,0 +1,11 @@
+model_path        : $PEAL_RUNS/celeba/Blond_Hair_confounding_Male/classifier_strong_regularization
+data              : <PEAL_BASE>/configs/cfkd_experiments/data/celeba_Blond_Hair_confounding_Male_standard.yaml
+training          : <PEAL_BASE>/configs/cfkd_experiments/training/dro_replication_celeba_strong_regularization.yaml
+architecture      : torchvision_resnet50
+task:
+  criterions:
+    ce     : 1.0
+    l2      : 0.1
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [Blond_Hair]

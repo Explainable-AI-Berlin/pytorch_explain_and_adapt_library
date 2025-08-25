@@ -1,0 +1,13 @@
+dataset_class           : SquareDataset
+dataset_path            : $PEAL_DATA/square
+num_samples             : 160 #4000
+split                   : [0.8,1.0]
+input_type              : image
+input_size              : [3, 64, 64]
+output_type             : multiclass
+output_size             : [8]
+downsize                : Resize
+delimiter               : ","
+confounder_probability  : 0.5 #0.02
+confounding_factors     : [ClassA, ClassB]
+has_hints               : true

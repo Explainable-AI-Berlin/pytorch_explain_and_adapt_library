@@ -1,0 +1,9 @@
+dataset_path            : $PEAL_DATA/waterbirds
+split                   : []
+input_type              : image
+input_size              : [3, 256, 256]
+output_type             : multiclass
+output_size             : [2]
+confounding_factors     : [y, place]
+label_rel_path          : "metadata.csv"
+img_name_idx            : 1

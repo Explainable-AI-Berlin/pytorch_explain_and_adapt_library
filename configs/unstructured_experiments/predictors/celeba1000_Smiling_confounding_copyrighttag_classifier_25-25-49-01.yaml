@@ -1,0 +1,12 @@
+# python train_predictor.py --config configs/predictors/celeba1000_Smiling_confounding_copyrighttag_classifier_25x25x49x01.yaml
+model_path        : $PEAL_RUNS/celeba1k_copyrighttag/classifier_25-25-49-01
+data              : <PEAL_BASE>/configs/data/Smiling_confounding_copyrighttag_celeba1000_25-25-49-01.yaml
+training          : <PEAL_BASE>/configs/training/img_classifier.yaml
+architecture      : torchvision_resnet18
+task:
+  criterions:
+    ce     : 1.0
+    l1     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [Smiling]

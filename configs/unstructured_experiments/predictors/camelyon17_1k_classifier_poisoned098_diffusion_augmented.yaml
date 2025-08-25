@@ -1,0 +1,14 @@
+# python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/camelyon17_1k_classifier_poisoned098_diffusion_augmented.yaml"
+# python evaluate_predictor.py --model_path $PEAL_RUNS/camelyon17_1k/classifier_poisoned098/diffusion_augmented/model.cpl --data_config configs/cfkd_experiments/data/camelyon17_unpoisoned.yaml --model_config "<PEAL_BASE>/configs/cfkd_experiments/predictors/camelyon17_1k_classifier_poisoned098_diffusion_augmented.yaml"
+model_path        : $PEAL_RUNS/camelyon17_1k/classifier_poisoned098/diffusion_augmented
+data              : <PEAL_BASE>/configs/cfkd_experiments/data/camelyon17_1k_poisoned098_diffusion_augmented.yaml
+training          : <PEAL_BASE>/configs/cfkd_experiments/training/img_finetuning.yaml
+architecture      : $PEAL_RUNS/camelyon17_1k/classifier_poisoned098/model.cpl
+continue_training : True
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [tumor]

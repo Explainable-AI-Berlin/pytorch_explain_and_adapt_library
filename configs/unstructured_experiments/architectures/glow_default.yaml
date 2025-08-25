@@ -1,0 +1,6 @@
+'n_block'                 : 'auto'
+'n_flow'                  : 32
+'affine'                  : False
+'conv_lu'                 : True
+'n_bits'                  : 5
+'temp'                    : 0.7

@@ -1,0 +1,4 @@
+'activation'              : 'ReLU'
+'num_blocks'              : 3
+'neuron_numbers_encoder'  : [128]
+'num_heads'               : 1 
