@@ -1643,14 +1643,17 @@ class CFKD(Adaptor):
                     str(finetune_iteration),
                     "validation_collages" + str(i),
                 )
+                used_dataloaders = (
+                    [self.joint_validation_dataloader.dataloaders[0]]
+                    if finetune_iteration == self.adaptor_config.finetune_iterations
+                    else self.joint_validation_dataloader.dataloaders
+                )
                 (
                     validation_tracked_values_current,
                     validation_stats_current,
                 ) = calculate_validation_statistics(
                     model=self.student,
-                    dataloaders=self.joint_validation_dataloader.dataloaders[0]
-                    if finetune_iteration == self.adaptor_config.current_iteration
-                    else self.joint_validation_dataloader.dataloaders,
+                    dataloaders=used_dataloaders,
                     tracked_keys=self.tracked_keys,
                     base_path=validation_collages_base_path,
                     output_size=self.output_size,

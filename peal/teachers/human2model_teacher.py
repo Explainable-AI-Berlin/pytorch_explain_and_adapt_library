@@ -16,6 +16,7 @@ class DataStore:
     collage_paths = None
     feedback = None
     y_target_end_confidence_list = None
+    student_correct_list = None
 
 
 class Human2ModelTeacher(TeacherInterface):
@@ -56,9 +57,14 @@ class Human2ModelTeacher(TeacherInterface):
                 elif request.form["submit_button"] == "Out of Distribution":
                     self.data.feedback.append("ood")
 
-                while self.data.y_target_end_confidence_list[self.data.i] < 0.5:
+                while self.data.y_target_end_confidence_list[self.data.i] < 0.5 or not self.data.student_correct_list[self.data.i]:
+                    if not self.data.student_correct_list[self.data.i]:
+                        self.data.feedback.append("student incorrect!")
+
+                    if self.data.y_target_end_confidence_list[self.data.i] < 0.5:
+                        self.data.feedback.append("student not swapped!")
+
                     self.data.i += 1
-                    self.data.feedback.append("student not swapped!")
                     if self.data.i >= len(self.data.collage_paths):
                         break
 
@@ -98,7 +104,7 @@ class Human2ModelTeacher(TeacherInterface):
         self.thread.start()
         print("Feedback GUI is active on localhost:" + str(self.port))
 
-    def get_feedback(self, collage_path_list, y_target_end_confidence_list, **kwargs):
+    def get_feedback(self, collage_path_list, y_target_end_confidence_list, y_source_list, y_list, **kwargs):
         """ """
         print('start collecting feedback!!!')
         collage_paths_static = []
@@ -109,6 +115,7 @@ class Human2ModelTeacher(TeacherInterface):
 
         self.data.collage_paths = collage_paths_static
         self.data.y_target_end_confidence_list = y_target_end_confidence_list
+        self.data.student_correct_list = [y_source_list[i] == y_list[i] for i in range(len(y_list))]
 
         with tqdm(range(100000)) as pbar:
             for it in pbar:

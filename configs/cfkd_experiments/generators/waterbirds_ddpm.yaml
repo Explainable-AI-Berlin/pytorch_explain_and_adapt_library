@@ -1,8 +1,0 @@
-# python train_generator.py --config "<PEAL_BASE>/configs/cfkd_experiments/generators/waterbirds_ddpm.yaml"
-generator_type : DDPM
-category : generator
-base_path : $PEAL_RUNS/waterbirds/ddpm
-data: "<PEAL_BASE>/configs/cfkd_experiments/data/waterbirds_generator.yaml"
-image_size: 128
-batch_size: 100
-max_steps: 10000000

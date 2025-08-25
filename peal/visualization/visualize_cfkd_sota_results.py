@@ -98,7 +98,7 @@ if __name__ == "__main__":
         "SCE (ours) (before)",
         "SCE (ours) (after)",
     ]
-    sample_idxs = [[16, 0], [-1, -2], [-1, -2], [-1, -2], [-1, -2]]
+    sample_idxs = [[16, 0], [5, -2], [-1, -2], [-1, -2], [-1, -2]]
     imgs = torch.zeros([1 + len(methods), 2 * len(base_paths), 3, 128, 128])
     target_confidences = torch.zeros([1 + len(methods), 2 * len(base_paths)])
 
@@ -107,7 +107,7 @@ if __name__ == "__main__":
             tracked_values_path = os.path.join(
                 base_paths[dataset_idx],
                 methods[method_idx],
-                "validation_tracked_cluster_values.npz",
+                "validation_tracked_values.npz",
             )
             if not os.path.exists(tracked_values_path):
                 continue
@@ -125,21 +125,20 @@ if __name__ == "__main__":
                             tracked_values["y_target_start_confidence_list"][sample_idx]
                         )
 
-                    cluster_idx = 0
-                    imgs[1 + method_idx + cluster_idx][2 * dataset_idx + i] = (
+                    imgs[1 + method_idx][2 * dataset_idx + i] = (
                         resize(
                             torch.from_numpy(
-                                tracked_values["clusters" + str(cluster_idx)][
+                                tracked_values["x_counterfactual_list"][
                                     sample_idx
                                 ]
                             ),
                             [128, 128],
                         )
                     )
-                    target_confidences[1 + method_idx + cluster_idx][
+                    target_confidences[1 + method_idx][
                         2 * dataset_idx + i
                     ] = float(
-                        tracked_values["cluster_confidence" + str(cluster_idx)][
+                        tracked_values["y_target_end_confidence_list"][
                             sample_idx
                         ]
                     )
