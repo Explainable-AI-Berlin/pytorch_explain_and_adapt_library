@@ -19,7 +19,7 @@ def plot_images_with_custom_padding(
 
     # Create GridSpec for precise control over spacings
     fig = plt.figure(figsize=(2 * num_tasks, 2 * num_methods))
-    grid = GridSpec(num_methods, num_tasks, figure=fig, hspace=0, wspace=0.1)
+    grid = GridSpec(num_methods, num_tasks, figure=fig, hspace=0.2, wspace=0.1)
 
     for i in range(num_methods):
         for j in range(num_tasks):
@@ -74,8 +74,8 @@ if __name__ == "__main__":
         base_path + "/square1k/colora_confounding_colorb/torchvision/classifier_poisoned098",
         base_path + "/celeba1k_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned098",
         base_path + "/celeba1k/Blond_Hair/resnet18_poisoned098",
-        base_path + "/camelyon17_1k/classifier_poisoned098",
-        base_path + "/follicles_cut/classifier_natural"
+        base_path + "/follicles_cut/classifier_natural",
+        #base_path + "/camelyon17_1k/classifier_poisoned098",
     ]
     methods = [
         "sce_cfkd/0",
@@ -88,17 +88,18 @@ if __name__ == "__main__":
         "Smiling to Serious",
         "Non-Blond to Blond",
         "Blond to Non-Blond",
-        "Healthy to Cancer",
-        "Cancer to Healthy",
         "Growing to Primordial",
         "Primordial to Growing",
+        #"Healthy to Cancer",
+        #"Cancer to Healthy",
     ]
     method_names = [
         "Original",
         "SCE (ours) (before)",
         "SCE (ours) (after)",
     ]
-    sample_idxs = [[16, 0], [5, -2], [-1, -2], [-1, -2], [-1, -2]]
+    # sample_idxs = [[11, 12], [5, 12, 40, 36, 103, 125], [36, 93, 140, 157], [3, 52, 150, 314, 80], [0, 1]]
+    sample_idxs = [[11, 12], [125, 103], [140, 157], [80, 150]]
     imgs = torch.zeros([1 + len(methods), 2 * len(base_paths), 3, 128, 128])
     target_confidences = torch.zeros([1 + len(methods), 2 * len(base_paths)])
 
