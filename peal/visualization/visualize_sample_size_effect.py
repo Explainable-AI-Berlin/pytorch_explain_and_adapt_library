@@ -37,6 +37,7 @@ for ax, (dataset, methods) in zip(axes, data.items()):
     # Force only custom ticks
     ax.xaxis.set_major_locator(FixedLocator(sample_sizes))
     ax.set_xticklabels(sample_sizes)
+    ax.set_xticks(sample_sizes)
     ax.legend()
     ax.grid(True, linestyle="--", alpha=0.6)
 

@@ -95,11 +95,11 @@ if __name__ == "__main__":
     ]
     method_names = [
         "Original",
-        "SCE (ours) (before)",
-        "SCE (ours) (after)",
+        "Counterfactual Before",
+        "Counterfactual After",
     ]
     # sample_idxs = [[11, 12], [5, 12, 40, 36, 103, 125], [36, 93, 140, 157], [3, 52, 150, 314, 80], [0, 1]]
-    sample_idxs = [[11, 12], [125, 103], [140, 157], [80, 150]]
+    sample_idxs = [[11, 12], [103, 125], [140, 157], [80, 150]]
     imgs = torch.zeros([1 + len(methods), 2 * len(base_paths), 3, 128, 128])
     target_confidences = torch.zeros([1 + len(methods), 2 * len(base_paths)])
 
