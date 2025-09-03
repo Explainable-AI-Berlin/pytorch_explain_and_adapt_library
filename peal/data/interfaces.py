@@ -8,8 +8,6 @@ from torchvision import transforms
 from peal.generators.interfaces import Generator
 
 
-
-
 class PealDataset(torch.utils.data.Dataset):
     """
     This is the base class for all datasets in PEAL. It is a wrapper around
@@ -117,6 +115,7 @@ class DataConfig(BaseModel):
     """
     This class defines the config of a dataset.
     """
+
     """
     The type of config. This is necessary to find config class from yaml config
     """
@@ -125,14 +124,14 @@ class DataConfig(BaseModel):
     The input type of the data:
     Options: ['image', 'sequence', 'symbolic']
     """
-    input_type: str = 'image'
+    input_type: str = "image"
     """
     The output type of the data.
     Options: ['singleclass', 'multiclass', 'continuous', 'mixed']
     'mixed' is a hybrid between binary multiclass classification and continuous and
     requires 'output_split' to be set
     """
-    output_type: str = 'singleclass'
+    output_type: str = "singleclass"
     """
     The input size of data.
     For images: [Channels, Height, Width]
@@ -228,7 +227,7 @@ class DataConfig(BaseModel):
     """
     The delimiter used for the csv file.
     """
-    delimiter: Union[type(None), str] = None
+    delimiter: Union[type(None), str] = ","
     """
     The number of classes in the dataset.
     """
@@ -259,10 +258,14 @@ class DataConfig(BaseModel):
     Path to spray label csv file. When set, use spray labels instead of true confounder labels.
     Samples without a spray label will be dropped
     """
-    spray_label_file: str = None
+    spray_label_file: Union[str, type(None)] = None
     """
     Whether to re-balance group sizes after dropping samples without a spray label
     """
     spray_groups_balanced: bool = False
-    spray_group_sizes: list[int] = None
-
+    spray_group_sizes: Union[list[int], type(None)] = None
+    generator: Union[type(None), str, object] = None
+    diffusion_augmented: bool = False
+    sampling_time_fraction: float = 0.3
+    num_discretization_steps: int = 20
+    batch_wise_augmentation : bool = True

@@ -301,6 +301,10 @@ class ConfounderDatasetGenerator:
             self.label_dir = label_dir
 
         self.delimiter = delimiter
+        print("self.delimiter")
+        print(self.delimiter)
+        print(self.delimiter)
+        print(self.delimiter)
         self.dataset_dir = data_config.dataset_path
         self.num_samples = num_samples
         self.attribute = attribute
@@ -345,7 +349,7 @@ class ConfounderDatasetGenerator:
             os.makedirs(os.path.join(self.dataset_dir, "masks"))
 
         raw_data = open(self.label_dir, "r").read().split("\n")
-        attributes = raw_data[1].split(self.delimiter)
+        attributes = raw_data[0].split(self.delimiter)
         while "" in attributes:
             attributes.remove("")
 
@@ -364,6 +368,7 @@ class ConfounderDatasetGenerator:
             data.append(instance_attributes_int)
 
         lines_out = [",".join(attributes)]
+        print(lines_out)
 
         if self.confounding == "copyrighttag":
             resource_dir = get_project_resource_dir()

@@ -4,11 +4,13 @@ import pygame
 import random
 import math
 
-#import imgaug.augmenters as iaa
+# import imgaug.augmenters as iaa
 import torchvision.transforms as transforms
 import numpy as np
 
 from PIL import Image
+
+from peal.generators.generator_factory import get_generator
 
 
 class CircularCut(object):
@@ -22,9 +24,7 @@ class CircularCut(object):
         screen = pygame.Surface((width, height))
         screen.fill(background_color)
         pygame.draw.ellipse(screen, (255, 255, 255), pygame.Rect(0, 0, width, height))
-        overlay = Image.frombytes(
-            "RGB", (width, height), pygame.image.tostring(screen, "RGB")
-        )
+        overlay = Image.frombytes("RGB", (width, height), pygame.image.tostring(screen, "RGB"))
         overlay_np = np.array(overlay)
         img_cut = np.minimum(overlay_np, sample_np)
         return Image.fromarray(img_cut)
@@ -67,10 +67,10 @@ class RandomRotation(object):
         theta = random.randint(self.min_rotation, self.max_rotation)
         self.last_theta = theta
         sample = torchvision.transforms.functional.rotate(sample, theta, fill=0.5)
-        #rotation = iaa.Rotate(theta)
-        #sample = rotation.augment_image(sample.numpy().transpose([1, 2, 0]))
-        #self.last_theta = theta / 180 * math.pi
-        #return torch.tensor(sample.transpose([2, 0, 1]))
+        # rotation = iaa.Rotate(theta)
+        # sample = rotation.augment_image(sample.numpy().transpose([1, 2, 0]))
+        # self.last_theta = theta / 180 * math.pi
+        # return torch.tensor(sample.transpose([2, 0, 1]))
         return sample
 
 
@@ -121,6 +121,7 @@ class IdentityNormalization(object):
         """ """
         return batch
 
+
 class RandomResizeCropPad(object):
     def __init__(self, scale_range=(0.8, 1.2)):
         self.scale_range = scale_range
@@ -152,3 +153,44 @@ class RandomResizeCropPad(object):
         img = transforms.functional.center_crop(img, output_size)
 
         return img
+
+
+class DiffusionAugmentation(object):
+    def __init__(self, generator, sampling_time_fraction, num_discretization_steps, dataset=None):
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.generator = get_generator(generator).to(self.device)
+        self.sampling_time_fraction = sampling_time_fraction
+        self.num_discretization_steps = num_discretization_steps
+        self.dataset = dataset
+
+    def __call__(self, img):
+        if len(img.shape) == 3:
+            img_in = img.unsqueeze(0)
+            was_unsqueezed = True
+
+        else:
+            img_in = img
+            was_unsqueezed = False
+
+        device_buffer = img_in.device
+        if not self.dataset is None:
+            img_in = self.dataset.project_to_pytorch_default(img_in)
+
+        with torch.no_grad():
+            img_in = self.generator.dataset.project_from_pytorch_default(img_in).to(self.device)
+            z = self.generator.encode(
+                img_in, self.sampling_time_fraction, num_steps=self.num_discretization_steps, stochastic="fully"
+            )
+            img_reconstructed = self.generator.decode(
+                z, self.sampling_time_fraction, num_steps=self.num_discretization_steps, stochastic=True
+            )
+
+        img_reconstructed.to(device_buffer)
+        img_reconstructed = self.generator.dataset.project_to_pytorch_default(img_reconstructed)
+        if not self.dataset is None:
+            img_reconstructed = self.dataset.project_from_pytorch_default(img_reconstructed)
+
+        if was_unsqueezed:
+            img_reconstructed = img_reconstructed.squeeze(0)
+
+        return img_reconstructed
