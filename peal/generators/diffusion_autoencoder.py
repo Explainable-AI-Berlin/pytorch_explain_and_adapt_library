@@ -19,8 +19,8 @@ from transformers import AutoModel, AutoImageProcessor
 
 from peal.dependencies.ddpm_inversion.ddm_inversion.inversion_utils import inversion_forward_process, \
     inversion_reverse_process
-from peal.dependencies.diffusion_regression_counterfactuals.related_work.diffae.experiment import LitModel
-from peal.dependencies.diffusion_regression_counterfactuals.related_work.diffae.templates import square64_autoenc
+#from peal.dependencies.diffusion_regression_counterfactuals.related_work.diffae.experiment import LitModel
+#from peal.dependencies.diffusion_regression_counterfactuals.related_work.diffae.templates import square64_autoenc
 from peal.editors.ddpm_inversion import DDPMInversionConfig
 from peal.data.dataloaders import get_dataloader
 from peal.data.dataset_factory import get_datasets
