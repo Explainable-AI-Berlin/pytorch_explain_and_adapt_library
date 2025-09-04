@@ -1,16 +1,14 @@
-import json
-import sys
 import os
 
-from diff_cf_ir.file_utils import dump_args
+from ....diff_cf_ir.file_utils import dump_args
 
 
 import torch
 import torchvision.transforms as T
 
-from diff_cf_ir.imdb_clean_dataset import ImdbCleanDataModule
-from diff_cf_ir.models import ResNetRegression
-from diff_cf_ir.train import setup_trainer
+from peal.dependencies.diffusion_regression_counterfactuals.imdb_clean_dataset import ImdbCleanDataModule
+from ....diff_cf_ir.models import ResNetRegression
+from ....diff_cf_ir.train import setup_trainer
 import argparse
 
 

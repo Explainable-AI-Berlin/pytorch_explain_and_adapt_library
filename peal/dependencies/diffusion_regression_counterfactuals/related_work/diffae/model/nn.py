@@ -2,15 +2,10 @@
 Various utilities for neural networks.
 """
 
-from enum import Enum
 import math
-from typing import Optional
-
 import torch as th
 import torch.nn as nn
 import torch.utils.checkpoint
-
-import torch.nn.functional as F
 
 
 # PyTorch 1.7 has SiLU, but we support PyTorch 1.5.

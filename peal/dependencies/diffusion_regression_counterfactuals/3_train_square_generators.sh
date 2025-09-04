@@ -10,14 +10,10 @@ DATA_PATH=$DCFIR_OUTPATH/datasets/square
 OUT_PATH_ACE=$DCFIR_OUTPATH/models/square_ace_ddpm
 OUT_PATH_DIFFAE=$DCFIR_OUTPATH/models/square_diffae/square64_ddim
 
-# Train square DDPM for ACE
-python related_work/ACE/square-train-diffusion.py $DATA_PATH $OUT_PATH_ACE
-# checkpoint in $DCFIR_OUTPATH/models/square_ace_ddpm/last.pt
-
 # Train square DiffAE - DDIM
-python related_work/diffae/run_square64_ddim.py $OUT_PATH_DIFFAE
+python run_square64_ddim.py $OUT_PATH_DIFFAE
 # Results in $DCFIR_OUTPATH/models/square_diffae/square64_ddim/last.ckpt
 
 # Train square DiffAE - DDIM
-python related_work/diffae/run_square64_latent.py $OUT_PATH_DIFFAE
+python run_square64_latent.py $OUT_PATH_DIFFAE
 # Results in $DCFIR_OUTPATH/models/square_diffae/square64_ddim/square64_autoenc_latent/last.ckpt

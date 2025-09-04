@@ -1,14 +1,11 @@
 import os
 from typing import Tuple
-from matplotlib import cm
 from torch.utils.data import DataLoader
 from torchvision.transforms import transforms
 from torchvision.datasets import VisionDataset
 import torch
 import csv
 from PIL import Image
-import matplotlib.pyplot as plt
-import numpy as np
 
 import lightning as L
 

@@ -2,9 +2,9 @@ import torch
 
 from torchvision import models
 
-from models.normalizer import Normalizer
-from models.dive.densenet import DiVEDenseNet121
-from models.steex.DecisionDensenetModel import DecisionDensenetModel
+from .normalizer import Normalizer
+from .dive.densenet import DiVEDenseNet121
+from .steex.DecisionDensenetModel import DecisionDensenetModel
 
 
 def get_classifier(args):

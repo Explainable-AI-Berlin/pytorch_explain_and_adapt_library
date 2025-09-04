@@ -1,8 +1,4 @@
-import argparse
-import multiprocessing
 import os
-from os.path import join, exists
-from functools import partial
 from io import BytesIO
 import shutil
 
@@ -10,9 +6,6 @@ import lmdb
 from PIL import Image
 from torchvision.datasets import LSUNClass
 from torchvision.transforms import functional as trans_fn
-from tqdm import tqdm
-
-from multiprocessing import Process, Queue
 
 
 def resize_and_convert(img, size, resample, quality=100):

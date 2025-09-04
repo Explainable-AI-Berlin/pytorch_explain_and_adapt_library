@@ -1,8 +1,4 @@
-import sys
-
-
-from templates import *
-from templates_latent import *
+from related_work.diffae.templates_latent import *
 import argparse
 
 if __name__ == "__main__":

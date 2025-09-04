@@ -1,15 +1,11 @@
-from config import *
-from dataset import *
-import pandas as pd
-import json
-import os
 import copy
-
 import numpy as np
 import lightning as L
 from lightning.pytorch.loggers import TensorBoardLogger
 from lightning.pytorch.callbacks import *
-import torch
+
+from .config import *
+from .dataset import *
 
 
 class ZipLoader:

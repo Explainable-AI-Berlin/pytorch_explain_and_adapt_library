@@ -1,15 +1,13 @@
-from io import BytesIO
-
 import lmdb
-from PIL import Image
-
 import torch
+import os
+import shutil
 
+from io import BytesIO
+from PIL import Image
 from contextlib import contextmanager
 from torch.utils.data import Dataset
 from multiprocessing import Process, Queue
-import os
-import shutil
 
 
 def convert(x, format, quality=100):

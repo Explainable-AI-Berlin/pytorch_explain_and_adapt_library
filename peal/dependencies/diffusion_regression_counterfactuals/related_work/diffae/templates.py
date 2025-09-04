@@ -1,4 +1,4 @@
-from experiment import *
+from .experiment import *
 
 
 def ddpm():

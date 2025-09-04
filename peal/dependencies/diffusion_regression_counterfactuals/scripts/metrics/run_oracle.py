@@ -1,17 +1,12 @@
-import sys
-import os
-
-from scripts.metrics.run_metrics import ImageFolderDataset
+from ..metrics.run_metrics import ImageFolderDataset
 
 
 import numpy as np
-from diff_cf_ir.models import load_resnet
-from diff_cf_ir.file_utils import rename_if_exists
+from ...diff_cf_ir.models import load_resnet
+from ...diff_cf_ir.file_utils import rename_if_exists
 import torch
 import argparse
 import os
-from PIL import Image
-from torchvision import transforms
 import json
 
 from tqdm import tqdm

@@ -1,6 +1,6 @@
 import shutil
 import os
-from dist_utils import *
+from .dist_utils import *
 
 
 def use_cached_dataset_path(source_path, cache_path):

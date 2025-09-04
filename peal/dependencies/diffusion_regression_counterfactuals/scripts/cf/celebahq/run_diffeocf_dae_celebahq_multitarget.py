@@ -1,10 +1,10 @@
 import os
 from tqdm import tqdm
-from diff_cf_ir.diffeocf import (
+from ....diff_cf_ir.diffeocf import (
     DiffeoCF,
 )
 
-from diff_cf_ir.counterfactuals import (
+from ....diff_cf_ir.counterfactuals import (
     CFResult,
     save_cf_results,
     update_results_oracle,
@@ -12,17 +12,17 @@ from diff_cf_ir.counterfactuals import (
 import torch
 import argparse
 
-from diff_cf_ir.file_utils import (
+from ....diff_cf_ir.file_utils import (
     assert_paths_exist,
     create_result_dir,
     deterministic_run,
     dump_args,
 )
-from diff_cf_ir.generators import DAE
-from diff_cf_ir.image_folder_dataset import default_transforms
-from diff_cf_ir.celebahq_dataset import CelebAHQDataset
-from diff_cf_ir.models import load_model
-from diff_cf_ir.debug import setup_usr1_signal_handler, usr1_signal_received
+from ....diff_cf_ir.generators import DAE
+from ....diff_cf_ir.image_folder_dataset import default_transforms
+from ....diff_cf_ir.celebahq_dataset import CelebAHQDataset
+from ....diff_cf_ir.models import load_model
+from ....diff_cf_ir.debug import setup_usr1_signal_handler, usr1_signal_received
 
 
 def init_args():

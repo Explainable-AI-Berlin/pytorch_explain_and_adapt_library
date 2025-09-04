@@ -1,8 +1,8 @@
 import argparse
-from typing import List, Set
+from typing import List
 import os
 
-from diff_cf_ir.counterfactuals import CFResult, generate_collage_multitarget
+from ...diff_cf_ir.counterfactuals import CFResult, generate_collage_multitarget
 import torch
 import matplotlib.pyplot as plt
 

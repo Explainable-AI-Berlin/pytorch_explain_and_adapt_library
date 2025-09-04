@@ -7,8 +7,8 @@ from torchvision.models.resnet import (
     ResNet50_Weights,
     ResNet152_Weights,
 )
-from models.normalizer import Normalizer
-from models.steex.DecisionDensenetModel import DecisionDensenetModel
+from ..related_work.ACE.models.normalizer import Normalizer
+from ..related_work.ACE.models.steex.DecisionDensenetModel import DecisionDensenetModel
 import lightning as L
 
 

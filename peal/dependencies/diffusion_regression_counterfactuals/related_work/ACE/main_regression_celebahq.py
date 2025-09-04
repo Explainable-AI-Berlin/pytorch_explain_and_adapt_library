@@ -9,8 +9,8 @@ from tqdm import tqdm
 
 
 # Diffusion Model imports
-from guided_diffusion import dist_util
-from guided_diffusion.script_util import (
+from .guided_diffusion import dist_util
+from .guided_diffusion.script_util import (
     model_and_diffusion_defaults,
     create_model_and_diffusion,
     args_to_dict,
@@ -18,28 +18,28 @@ from guided_diffusion.script_util import (
 )
 
 # core imports
-from core.utils import generate_mask
-from core.attacks_and_models import JointClassifierDDPM, get_attack
+from .core.utils import generate_mask
+from .core.attacks_and_models import JointClassifierDDPM, get_attack
 
 import matplotlib
 
 matplotlib.use("Agg")  # to disable display
 
-from diff_cf_ir.counterfactuals import (
+from ...diff_cf_ir.counterfactuals import (
     CFResult,
     save_cf_results,
     update_results_oracle,
 )
-from diff_cf_ir.file_utils import (
+from ...diff_cf_ir.file_utils import (
     assert_paths_exist,
     create_result_dir,
     deterministic_run,
     dump_args,
     save_img_threaded,
 )
-from diff_cf_ir.image_folder_dataset import default_transforms
-from diff_cf_ir.celebahq_dataset import CelebAHQDataset
-from diff_cf_ir.models import load_model as load_thesis_model
+from ...diff_cf_ir.image_folder_dataset import default_transforms
+from ...diff_cf_ir.celebahq_dataset import CelebAHQDataset
+from ...diff_cf_ir.models import load_model as load_thesis_model
 
 
 # =======================================================

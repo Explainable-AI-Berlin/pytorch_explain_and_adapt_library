@@ -1,12 +1,8 @@
-from enum import Enum
-
-import torch
 from torch import Tensor
-from torch.nn.functional import silu
 
 from .latentnet import *
 from .unet import *
-from choices import *
+from ..choices import *
 
 
 @dataclass

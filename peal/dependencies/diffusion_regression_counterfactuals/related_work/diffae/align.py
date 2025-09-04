@@ -1,7 +1,6 @@
 import bz2
 import os
 import os.path as osp
-import sys
 from multiprocessing import Pool
 
 import dlib

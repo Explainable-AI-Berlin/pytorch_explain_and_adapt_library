@@ -1,17 +1,17 @@
-from dataclasses import dataclass
 import json
 import os
-
 import matplotlib as mpl
-from matplotlib.cm import ScalarMappable
 import matplotlib.pyplot as plt
 import torch
-from tqdm import tqdm
-from diff_cf_ir.file_utils import save_image
-from diff_cf_ir.metrics import get_regr_confidence
 import numpy as np
 import csv
 
+from tqdm import tqdm
+from dataclasses import dataclass
+from matplotlib.cm import ScalarMappable
+
+from .file_utils import save_image
+from .metrics import get_regr_confidence
 
 @dataclass
 class CFResult:
@@ -39,9 +39,7 @@ class CFResult:
         self.y_final_confidence: float = get_regr_confidence(
             torch.tensor(self.y_final_pred), torch.tensor(self.y_target)
         ).item()
-        self.confidence_reduction: float = (
-            self.y_initial_confidence - self.y_final_confidence
-        )
+        self.confidence_reduction: float = self.y_initial_confidence - self.y_final_confidence
         self.image_name = os.path.basename(self.image_path)
         self.image_name_base = os.path.splitext(self.image_name)[0]
 
@@ -87,9 +85,7 @@ class CFResult:
             torch.tensor(y_oracle_final), torch.tensor(self.y_target)
         ).item()
         self.success_oracle = self.y_final_confidence_oracle <= confidence_threshold
-        self.confidence_reduction_oracle: float = (
-            self.y_initial_confidence_oracle - self.y_final_confidence_oracle
-        )
+        self.confidence_reduction_oracle: float = self.y_initial_confidence_oracle - self.y_final_confidence_oracle
 
     def update_fva(self, fva_score: float, fs_score: float):
         self.x_prime_fva = fva_score
@@ -288,11 +284,7 @@ def generate_contrastive_collage_regr(
         label_target_title = "(Label, Initial, Oracle Initial) → Target:"
         label = cf_result.y_initial_true
         y_initial_pred = cf_result.y_initial_pred
-        y_initial_pred_oracle = (
-            cf_result.y_initial_pred_oracle
-            if hasattr(cf_result, "y_initial_pred_oracle")
-            else -1
-        )
+        y_initial_pred_oracle = cf_result.y_initial_pred_oracle if hasattr(cf_result, "y_initial_pred_oracle") else -1
         y_target = cf_result.y_target
         label_target_line = f"{label_target_title:>38} ({label:.2f}, {y_initial_pred:.2f}, {y_initial_pred_oracle:.2f}) → {y_target:.2f}"
 
@@ -301,24 +293,14 @@ def generate_contrastive_collage_regr(
         oracle_str = "Latent" if latent_available else "Oracle"
         prediction_oracle_title = f"(Final Prediction, {oracle_str}):"
         y_final_pred = cf_result.y_final_pred
-        y_final_pred_oracle = (
-            cf_result.y_final_latent
-            if latent_available
-            else cf_result.y_final_pred_oracle
-        )
+        y_final_pred_oracle = cf_result.y_final_latent if latent_available else cf_result.y_final_pred_oracle
         prediction_oracle_line = f"{prediction_oracle_title:>38} ({y_final_pred:.2f}, {y_final_pred_oracle:.2f})"
 
         confidence_title = f"Confidence (Initial, Final, {oracle_str}):"
-        confidence_oracle = (
-            cf_result.y_final_latent_mae
-            if latent_available
-            else cf_result.y_final_pred_oracle_mae
-        )
+        confidence_oracle = cf_result.y_final_latent_mae if latent_available else cf_result.y_final_pred_oracle_mae
         confidence_line = f"{confidence_title:>38} ({cf_result.y_initial_confidence:.2f}, {cf_result.y_final_confidence:.2f}, {confidence_oracle:.2f})"
         success_title = f"(Success, Success {oracle_str}):"
-        success_oracle = (
-            cf_result.success_latent if latent_available else cf_result.success_oracle
-        )
+        success_oracle = cf_result.success_latent if latent_available else cf_result.success_oracle
         success_line = f"{success_title:>38} ({cf_result.success}, {success_oracle})"
         title_string = (
             "\n".join(
@@ -478,9 +460,7 @@ def generate_collage_multitarget(
             img_upper = result.x_prime[0]
 
             title_lower = ""  # TODO: maybe something else?
-            heatmap, sm = bwr_heatmap(
-                result.x_reconstructed.squeeze(0), result.x_prime.squeeze(0)
-            )
+            heatmap, sm = bwr_heatmap(result.x_reconstructed.squeeze(0), result.x_prime.squeeze(0))
             # Save the heatmap first
             heatmap_path = os.path.join(
                 heatmaps_folder,
@@ -542,9 +522,7 @@ def save_only_colorbar(folder: str, sm: ScalarMappable):
     cb = (plt.colorbar(sm, cax=ax),)
 
     # Save the colorbar only
-    fig.savefig(
-        os.path.join(folder, "colorbar.svg"), dpi=300, bbox_inches="tight", pad_inches=0
-    )
+    fig.savefig(os.path.join(folder, "colorbar.svg"), dpi=300, bbox_inches="tight", pad_inches=0)
 
     # Close figure to free memory
     plt.close(fig)

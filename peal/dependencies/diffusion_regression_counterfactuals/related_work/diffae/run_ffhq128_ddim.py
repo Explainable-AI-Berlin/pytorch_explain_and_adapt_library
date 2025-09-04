@@ -1,5 +1,4 @@
-from templates import *
-from templates_latent import *
+from .templates_latent import *
 
 if __name__ == "__main__":
     gpus = [0, 1, 2, 3]

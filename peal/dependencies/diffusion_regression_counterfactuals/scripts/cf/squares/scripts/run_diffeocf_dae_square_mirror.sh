@@ -17,7 +17,7 @@ IMG_FOLDER="$DCFIR_OUTPATH/datasets/square_val/squares_lower/"
 RESULT_DIR="$DCFIR_OUTPATH/diffae-re/square_mirror_lower"
 mkdir -p logs
 
-python $DCFIR_HOME/scripts/cf/squares/run_diffeocf_dae_square.py \
+python run_diffeocf_dae_square.py \
     --gmodel_path $GMODEL_PATH \
     --rmodel_path $RMODEL_PATH \
     --backward_t $BACKWARD_T \
@@ -30,7 +30,7 @@ python $DCFIR_HOME/scripts/cf/squares/run_diffeocf_dae_square.py \
 
 IMG_FOLDER="$DCFIR_OUTPATH/datasets/square_val/squares_upper/"
 RESULT_DIR="$DCFIR_OUTPATH/diffae-re/square_mirror_upper"
-python $DCFIR_HOME/scripts/cf/squares/run_diffeocf_dae_square.py \
+python run_diffeocf_dae_square.py \
     --gmodel_path $GMODEL_PATH \
     --rmodel_path $RMODEL_PATH \
     --backward_t $BACKWARD_T \

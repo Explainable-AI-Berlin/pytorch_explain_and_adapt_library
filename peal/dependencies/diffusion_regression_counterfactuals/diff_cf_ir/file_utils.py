@@ -1,10 +1,10 @@
 import json
 import os
 import threading
-
-from lightning import seed_everything
 import torch
 import torchvision
+
+from lightning import seed_everything
 
 
 def create_result_dir(result_dir: str) -> str:

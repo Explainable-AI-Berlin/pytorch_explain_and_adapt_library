@@ -6,19 +6,16 @@ Docstrings have been added, as well as DDIM sampling and a new collection of bet
 """
 
 import contextlib
-from model.unet_autoenc import AutoencReturn
-from config_base import BaseConfig
-import enum
+from ..config_base import BaseConfig
 import math
 
 import numpy as np
 import torch as th
-from model import *
-from model.nn import mean_flat
+from ..model import *
+from ..model.nn import mean_flat
 from typing import NamedTuple, Tuple
-from choices import *
+from ..choices import *
 from torch.cuda.amp import autocast
-import torch.nn.functional as F
 
 from dataclasses import dataclass
 

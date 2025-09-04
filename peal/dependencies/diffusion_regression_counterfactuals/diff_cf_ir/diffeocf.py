@@ -1,16 +1,16 @@
 import os
-from typing import Union
+import matplotlib
 import torchvision
-from tqdm import tqdm
-
 import torch
 import torch.nn as nn
+
+from typing import Union
+from tqdm import tqdm
 from torch.optim.optimizer import Optimizer
 
-from diff_cf_ir.counterfactuals import CFResult
-from diff_cf_ir.metrics import get_regr_confidence
+from .counterfactuals import CFResult
+from .metrics import get_regr_confidence
 
-import matplotlib
 
 matplotlib.use("Agg")
 matplotlib.rc("text")

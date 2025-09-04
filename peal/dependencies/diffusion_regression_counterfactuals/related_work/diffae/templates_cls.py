@@ -1,4 +1,4 @@
-from templates import *
+from .templates import *
 
 
 def ffhq128_autoenc_cls():

@@ -5,8 +5,8 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from diff_cf_ir.file_utils import assert_paths_exist
-from diff_cf_ir.image_folder_dataset import ImageFolderDataset
+from ...diff_cf_ir.file_utils import assert_paths_exist
+from ...diff_cf_ir.image_folder_dataset import ImageFolderDataset
 
 
 def find_closest_images(

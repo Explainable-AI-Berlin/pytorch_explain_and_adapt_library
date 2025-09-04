@@ -1,10 +1,10 @@
 import os
 from tqdm import tqdm
-from diff_cf_ir.diffeocf import (
+from ....diff_cf_ir.diffeocf import (
     DiffeoCF,
 )
 
-from diff_cf_ir.counterfactuals import (
+from ....diff_cf_ir.counterfactuals import (
     CFResult,
     save_cf_results,
     update_results_oracle,
@@ -12,13 +12,13 @@ from diff_cf_ir.counterfactuals import (
 import torch
 import argparse
 
-from counterfactuals.generative_models import factory
-from counterfactuals.data import get_data_info
-from counterfactuals.utils import load_checkpoint
+from ....diff_cf_ir.counterfactuals.generative_models import factory
+from ....diff_cf_ir.counterfactuals.data import get_data_info
+from ....diff_cf_ir.counterfactuals.utils import load_checkpoint
 
-from diff_cf_ir.file_utils import assert_paths_exist, create_result_dir, dump_args
-from diff_cf_ir.image_folder_dataset import ImageFolderDataset
-from diff_cf_ir.models import load_resnet
+from ....diff_cf_ir.file_utils import assert_paths_exist, create_result_dir, dump_args
+from ....diff_cf_ir.image_folder_dataset import ImageFolderDataset
+from ....diff_cf_ir.models import load_resnet
 
 
 def init_args():

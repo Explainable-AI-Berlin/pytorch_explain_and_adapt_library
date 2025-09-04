@@ -1,4 +1,3 @@
-from templates import *
 from templates_latent import *
 
 if __name__ == "__main__":

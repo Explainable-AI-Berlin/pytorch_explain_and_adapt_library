@@ -4,7 +4,7 @@ import os
 
 from torchvision import transforms
 
-from diff_cf_ir.file_utils import is_image_file
+from .file_utils import is_image_file
 
 
 def default_transforms(size, ddpm=False):

@@ -3,7 +3,6 @@ Train a diffusion model on images.
 """
 
 import argparse
-import numpy as np
 
 from guided_diffusion import dist_util, logger
 from guided_diffusion.image_datasets import load_data_bdd100k

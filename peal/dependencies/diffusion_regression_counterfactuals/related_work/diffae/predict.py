@@ -2,11 +2,7 @@
 # wget http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2
 # bunzip2 shape_predictor_68_face_landmarks.dat.bz2
 
-import os
-import torch
-from torchvision.utils import save_image
 import tempfile
-from templates import *
 from templates_cls import *
 from experiment_classifier import ClsModel
 from align import LandmarksDetector, image_align

@@ -1,12 +1,10 @@
 import os
-from typing import Union
-from torch.utils.data import DataLoader
-from torchvision.transforms import transforms
-from torchvision.datasets import VisionDataset
 import torch
 import pandas as pd
 
-import lightning as L
+from typing import Union
+from torchvision.transforms import transforms
+from torchvision.datasets import VisionDataset
 from PIL import Image
 
 

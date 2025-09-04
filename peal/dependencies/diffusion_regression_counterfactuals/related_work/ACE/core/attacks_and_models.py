@@ -1,10 +1,7 @@
-import os
-
 from tqdm import tqdm
 import torch
 
-from diff_cf_ir.metrics import get_regr_confidence
-from diff_cf_ir.file_utils import save_img_threaded
+from ....diff_cf_ir.metrics import get_regr_confidence
 
 
 # =======================================================

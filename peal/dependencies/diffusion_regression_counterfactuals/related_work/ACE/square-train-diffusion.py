@@ -13,7 +13,7 @@ from guided_diffusion.script_util import (
     add_dict_to_argparser,
 )
 from guided_diffusion.train_util import TrainLoop
-from diff_cf_ir.squares_dataset import SquaresDataset
+from ...diff_cf_ir.squares_dataset import SquaresDataset
 from torch.utils.data import DataLoader
 
 

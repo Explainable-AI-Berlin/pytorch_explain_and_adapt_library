@@ -1,4 +1,4 @@
-from templates import *
+from .templates import *
 
 
 def latent_diffusion_config(conf: TrainConfig):

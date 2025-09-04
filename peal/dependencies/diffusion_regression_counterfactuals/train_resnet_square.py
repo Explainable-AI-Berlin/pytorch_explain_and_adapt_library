@@ -1,4 +1,3 @@
-import sys
 import os
 
 from diff_cf_ir.file_utils import deterministic_run, dump_args

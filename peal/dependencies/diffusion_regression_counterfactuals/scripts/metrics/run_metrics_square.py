@@ -1,12 +1,12 @@
 import os
 from typing import Union
 import numpy as np
-from diff_cf_ir.file_utils import rename_if_exists
-from diff_cf_ir.image_folder_dataset import (
+from ...diff_cf_ir.file_utils import rename_if_exists
+from ...diff_cf_ir.image_folder_dataset import (
     ImageFolderDataset,
     PairedImageFolderDataset,
 )
-from diff_cf_ir.metrics import (
+from ...diff_cf_ir.metrics import (
     FIDScorer,
     PeakSNR,
     LPIPS,
@@ -16,7 +16,7 @@ from diff_cf_ir.metrics import (
     AceFVA,
     AceMNAC,
 )
-from diff_cf_ir.squares_dataset import background_color
+from ...diff_cf_ir.squares_dataset import background_color
 import torch
 import argparse
 import os

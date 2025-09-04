@@ -76,7 +76,6 @@ dependencies:
       - keras-preprocessing==1.1.2
       - kiwisolver==1.4.4
       - libclang==16.0.6
-      - lightning-utilities==0.9.0
       - lit==16.0.6
       - llvmlite==0.40.1
       - lmdb==1.2.1
@@ -131,6 +130,7 @@ dependencies:
       - pytz==2023.3
       - pywavelets==1.4.1
       - pyyaml==6.0
+      - lightning==2.4.0
       - regex==2023.6.3
       - requests==2.31.0
       - requests-oauthlib==1.3.1
@@ -181,4 +181,5 @@ dependencies:
       - onnxruntime_gpu==1.15
       - torch-kmeans==0.2.0
       - timm
+      - pytorch_fid
 prefix: /opt/conda/envs/peal

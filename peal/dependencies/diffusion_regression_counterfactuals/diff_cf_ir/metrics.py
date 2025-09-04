@@ -8,7 +8,7 @@ from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity
 from torchmetrics.image import PeakSignalNoiseRatio
 from tqdm import tqdm
 from torchmetrics.image.ssim import StructuralSimilarityIndexMeasure
-from diff_cf_ir.image_folder_dataset import PairedImageFolderDataset
+from .image_folder_dataset import PairedImageFolderDataset
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

@@ -1,9 +1,8 @@
 from tqdm import tqdm
-import yaml
 import torch
 from torch import nn
-from experiment import LitModel
-from templates import (
+from ..related_work.diffae.experiment import LitModel
+from ..related_work.diffae.templates import (
     square64_autoenc,
     ffhq256_autoenc,
 )
