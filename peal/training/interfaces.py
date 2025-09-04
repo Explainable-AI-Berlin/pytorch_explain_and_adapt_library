@@ -5,6 +5,7 @@ from pydantic import BaseModel, PositiveInt
 
 from peal.architectures.interfaces import TaskConfig, ArchitectureConfig
 from peal.data.interfaces import DataConfig
+from peal.generators.interfaces import GeneratorConfig
 
 
 class TrainingConfig(BaseModel):
@@ -71,6 +72,9 @@ class TrainingConfig(BaseModel):
     mixup_alpha: float = 1.0
     label_smoothing: float = 0.0
     early_stopping_goal: str = "average_accuracy"
+    diffusion_augmented: bool = False
+    sampling_time_fraction: float = 0.3
+    num_discretization_steps: int = 20
 
 
 class PredictorConfig(BaseModel):
@@ -126,3 +130,4 @@ class PredictorConfig(BaseModel):
     continue_training: bool = False
     tracking_level: int = 4
     only_last_layer: bool = False
+    generator: Union[type(None), GeneratorConfig] = None

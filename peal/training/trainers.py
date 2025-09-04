@@ -18,6 +18,7 @@ from tqdm import tqdm
 from peal.data.dataset_factory import get_datasets
 from peal.data.datasets import Image2MixedDataset, Image2ClassDataset
 from peal.dependencies.attacks.attacks import PGD_L2
+from peal.generators.generator_factory import get_generator
 from peal.global_utils import (
     orthogonal_initialization,
     move_to_device,
@@ -418,6 +419,10 @@ class ModelTrainer:
                 y = self.logger.test_y
 
             X = move_to_device(X, self.device)
+
+            if mode == "train" and hasattr(self.train_dataloader.dataset, "diffusion_augmentation"):
+                X = self.train_dataloader.dataset.diffusion_augmentation(X)
+
             y_original = y
             if self.config.training.label_smoothing > 0.0 and mode == "train":
                 y_dist = torch.ones(y.size(0), self.config.task.output_channels)
@@ -580,7 +585,6 @@ class ModelTrainer:
             ncols=200
         )
         pbar.stored_values = {}
-        val_accuracy_max = 0.0
         val_accuracy_previous = 0.0
         train_accuracy_previous = 0.0
         self.model.eval()
@@ -605,6 +609,13 @@ class ModelTrainer:
 
                     val_accuracy = min(val_accuracy, val_accuracy_current)
 
+
+        torch.save(
+            self.model.to("cpu").state_dict(),
+            os.path.join(self.model_path, "checkpoints", "final.cpl"),
+        )
+        self.model.to(self.device)
+        val_accuracy_max = val_accuracy
         self.logger.writer.add_scalar("epoch_validation_accuracy", val_accuracy, -1)
         pbar.stored_values["val_acc"] = val_accuracy
 
@@ -771,6 +782,7 @@ def distill_binary_dataset(
                 label_path=class_predictions_path,
                 partition="train",
                 label_query=0,
+                is_image_to_class=isinstance(predictor_dataset, Image2ClassDataset),
             )
             get_predictions(prediction_args)
             predictor_dataset.disable_url()
@@ -781,9 +793,6 @@ def distill_binary_dataset(
         distilled_dataset_config.confounder_probability = None
         distilled_dataset_config.dataset_class = None
         distilled_dataset_config.output_type = "multiclass"
-        print(predictor_dataset)
-        print(distilled_dataset_config)
-        #import pdb; pdb.set_trace()
         distillation_datasource.append(
             get_datasets(
                 config=distilled_dataset_config, data_dir=class_predictions_path
@@ -798,6 +807,11 @@ def distill_binary_dataset(
         distillation_datasource[
             i
         ].task_config.x_selection = predictor_dataset.task_config.x_selection
+        try:
+            sample = distillation_datasource[-1][0]
+
+        except:
+            import pdb; pdb.set_trace()
 
     return distillation_datasource
 

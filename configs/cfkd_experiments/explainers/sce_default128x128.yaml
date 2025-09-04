@@ -27,7 +27,7 @@ seed: 0
 stochastic: fully
 temperature: 3.0
 transition_restrictions: null
-use_clustering: true
+use_clustering: false
 use_masking: true
 validate_generator: false
 visualize_gradients: true

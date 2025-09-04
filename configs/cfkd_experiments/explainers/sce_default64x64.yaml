@@ -23,7 +23,7 @@ replace_with_activation: leakysoftplus
 sampling_time_fraction: 0.3
 stochastic: fully
 temperature: 3.0
-use_clustering: true
+use_clustering: false
 use_masking: true
 visualize_gradients: true
 y_target_goal_confidence: null

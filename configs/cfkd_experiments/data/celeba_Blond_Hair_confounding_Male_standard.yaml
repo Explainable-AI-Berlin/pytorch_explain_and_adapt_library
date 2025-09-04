@@ -1,7 +1,0 @@
-dataset_path            : $PEAL_DATA/celeba
-split                   : []
-input_type              : image
-input_size              : [3, 128, 128]
-output_type             : multiclass
-output_size             : [40]
-confounding_factors     : [Blond_Hair, Male] #copyrighttag]
