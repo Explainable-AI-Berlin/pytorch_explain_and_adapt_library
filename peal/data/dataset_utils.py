@@ -188,6 +188,56 @@ def parse_csv(
                 filter(lambda key: data[key][mode_idx] == mode_to_int[mode], keys)
             )
 
+    if config.spray_label_file is not None:
+        spray_data = open(config.spray_label_file, "r").read().split("\n")
+        # in case there is e.g. the number of instances in the first line
+        if len(spray_data[0].split(delimiter)) < 2:
+            spray_data = spray_data[1:]
+
+        spray_label_idx = spray_data[0].split(delimiter).index("SprayLabel")
+        if key_type == "name":
+            spray_label_idx -= key_idx + 1
+        true_feature_index = attributes.index(config.confounding_factors[0])
+        confounder_index = attributes.index(config.confounding_factors[1])
+
+        spray_data = spray_data[1:]
+        while "" in spray_data:
+            spray_data.remove("")
+
+        for idx, line in enumerate(spray_data):
+            if line == "":
+                continue
+            key, instances_tensor = extract_instances_tensor(idx=idx, line=line)
+            if instances_tensor[spray_label_idx] != 0 and instances_tensor[spray_label_idx] != 1:
+                try:
+                    keys_out.remove(key)
+                    del data[key]
+                except ValueError:
+                    pass
+            elif key in data:
+                data[key][confounder_index] = int(instances_tensor[spray_label_idx])
+
+        if config.spray_groups_balanced:
+            print("re-balancing data group sizes!")
+            data_groups = [[], [], [], []]
+            data_group_sizes = np.array([0, 0, 0, 0])
+            for key in keys_out:
+                attribute_tensor = data[key]
+                data_group_idx = (attribute_tensor[true_feature_index] + 2*attribute_tensor[confounder_index]).int()
+                data_groups[data_group_idx].append(key)
+                data_group_sizes[data_group_idx] += 1
+
+            print("group sizes before re-balancing:", data_group_sizes)
+            min_len = np.min(data_group_sizes)
+            assert min_len > 0, "need at least one spray label per data group"
+            for data_group_idx in {0,1,2,3} - {np.argmin(data_group_sizes).item()}:
+                while len(data_groups[data_group_idx]) > min_len:
+                    key = data_groups[data_group_idx].pop()
+                    del data[key]
+
+            print(f"final group sizes: [{len(data_groups[0])}, {len(data_groups[1])}, {len(data_groups[2])}, {len(data_groups[3])}]")
+            keys_out = data_groups[0] + data_groups[1] + data_groups[2] + data_groups[3]
+
     keys_out.sort()
     random.seed(0)
     random.shuffle(keys_out)
