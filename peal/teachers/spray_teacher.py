@@ -144,9 +144,15 @@ class Spray(TeacherInterface):
         with open(os.path.join(self.config.data.dataset_path, "data.csv"), "r") as f:
             data_file = csv.reader(f, delimiter=",")
             header = next(data_file)
+            drop_last = header[len(header) - 1] == ""
+            if drop_last:
+                header.pop()
             header.append("SprayLabel")
             new_data_file.append(header)
+
             for line in data_file:
+                if drop_last:
+                    line.pop()
                 line.append(group_label_map.get(line[0], -1))
                 new_data_file.append(line)
 
@@ -258,8 +264,6 @@ class Spray(TeacherInterface):
                     else:
                         non_zero = (attr.heatmap.sum((1, 2)).abs().detach().cpu() > 0).numpy()
 
-                    non_zero = non_zero * (batch["has_confounder"].squeeze().int() == y).numpy()
-                    print("num non-zero elements =", non_zero.sum())
                     if non_zero.sum() == 0:
                         continue
 

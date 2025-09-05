@@ -259,10 +259,9 @@ class DataConfig(BaseModel):
     Path to spray label csv file. When set, use spray labels instead of true confounder labels.
     Samples without a spray label will be dropped
     """
-    spray_label_file: str = None
+    spray_label_file: Union[None, str] = None
     """
     Whether to re-balance group sizes after dropping samples without a spray label
     """
     spray_groups_balanced: bool = False
-    spray_group_sizes: list[int] = None
 

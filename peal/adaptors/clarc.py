@@ -4,6 +4,7 @@ import math
 import os
 import pathlib
 import sys
+import traceback
 from collections import defaultdict, namedtuple
 
 from sklearn.svm import LinearSVC
@@ -29,12 +30,10 @@ class ClArCConfig(AdaptorConfig):
 
     __name__: str = "peal.AdaptorConfig"
     category: str = "adaptor"
-    seed: int = 0
     model_path: str
     base_dir: str
     data: DataConfig
     unpoisoned_data: DataConfig = None
-    group_labels: str = None
     training: TrainingConfig
     task: TaskConfig
     projection_type: str = "pcav"
@@ -43,7 +42,6 @@ class ClArCConfig(AdaptorConfig):
     attacked_class: int = 0
     cav_mode: str = None
     save_model: bool = True
-    use_perfect_annotations: bool = False
     max_samples: int = 999999
     reverse_cav_direction: bool = False
 
@@ -75,9 +73,7 @@ class ClArC(Adaptor):
             self.original_model = self.original_model.model
         self.model = copy.deepcopy(self.original_model)
         self.attacked_class = adaptor_config.attacked_class
-
-        if not adaptor_config.use_perfect_annotations:
-            self.group_label_map = json.load(open(self.config.group_labels, 'r'))
+        self.use_perfect_annotations = True if self.config.data.spray_label_file is not None else False
 
         self.cav_cache = CavCache("", "", "", "")
 
@@ -86,24 +82,22 @@ class ClArC(Adaptor):
         train_dataloader, val_dataloader, test_dataloader = create_dataloaders_from_datasource(self.config)
         train_dataloader.dataset.return_dict = True
         train_dataloader.dataset.url_enabled = True
+        train_dataloader.dataset.enable_groups()
         val_dataloader.dataset.return_dict = True
         val_dataloader.dataset.url_enabled = True
-        test_dataloader.dataset.return_dict = True
-        test_dataloader.dataset.url_enabled = True
+        val_dataloader.dataset.enable_groups()
+        # test_dataloader.dataset.return_dict = True
+        # test_dataloader.dataset.url_enabled = True
+        # test_dataloader.dataset.enable_groups()
         train_dataloader.dataset.disable_class_restriction()
         val_dataloader.dataset.disable_class_restriction()
-        test_dataloader.dataset.disable_class_restriction()
+        # test_dataloader.dataset.disable_class_restriction()
         if self.config.attacked_class is not None:
             train_dataloader.dataset.enable_class_restriction(self.config.attacked_class)
-        if self.config.use_perfect_annotations:
-            train_dataloader.dataset.enable_groups()
-            val_dataloader.dataset.enable_groups()
-            test_dataloader.dataset.enable_groups()
 
-        eval_dataloaders = [("original-val", val_dataloader, self.config.use_perfect_annotations)]
-        # eval_dataloaders.append(("original-test", test_dataloader, self.config.use_perfect_annotations))
-        evaluation = {"original-val": defaultdict(list)}
-        # evaluation["original-test"] = defaultdict(list)
+        eval_dataloaders = [("original-val", val_dataloader, self.use_perfect_annotations)]
+        # eval_dataloaders.append(("original-test", test_dataloader, self.use_perfect_annotations))
+        evaluation = {"original-val": defaultdict(list), "original-test": defaultdict(list)}
 
         if self.config.unpoisoned_data is not None:
             test_data_unpoisoned = get_datasets(self.config.unpoisoned_data, return_dict=True)[-1]
@@ -117,7 +111,7 @@ class ClArC(Adaptor):
             evaluation[description]["projection_location"].append("uncorrected")
             evaluation[description]["correction_strength"].append("uncorrected")
             evaluation[description]["epochs_finetuned"].append("uncorrected")
-            for k, v in self.get_accuracies(dataloader, self.model, perfect_annotations).items():
+            for k, v in self.get_accuracies(dataloader, self.model).items():
                 evaluation[description][k].append(v)
 
         for layer in self.config.layer_index:
@@ -128,7 +122,7 @@ class ClArC(Adaptor):
                     evaluation[description]["projection_location"].append(layer)
                     evaluation[description]["correction_strength"].append(cs)
                     evaluation[description]["epochs_finetuned"].append(number_epochs_finetuned)
-                    for k, v in self.get_accuracies(dataloader, model, perfect_annotations).items():
+                    for k, v in self.get_accuracies(dataloader, model).items():
                         if k == "accuracy":
                             print("accuracy: ", v)
                         evaluation[description][k].append(v)
@@ -163,10 +157,7 @@ class ClArC(Adaptor):
             else:
                 activation = activation.flatten(start_dim=1)
 
-            if self.config.use_perfect_annotations:
-                group_labels = batch["has_confounder"].squeeze()
-            else:
-                group_labels = torch.as_tensor([self.group_label_map.get(filename, -1) for filename in batch["url"]])
+            group_labels = batch["has_confounder"].squeeze()
 
             if self.config.reverse_cav_direction:
                 group_labels = group_labels * -1 + 1
@@ -186,7 +177,7 @@ class ClArC(Adaptor):
         return activations, annotations
 
     @torch.no_grad()
-    def get_accuracies(self, dataloader: DataLoader, model: Module, use_perfect_annotations: bool) -> dict:
+    def get_accuracies(self, dataloader: DataLoader, model: Module) -> dict:
         model.eval()
         annotations = []
         targets = []
@@ -197,10 +188,7 @@ class ClArC(Adaptor):
                 x = batch["x"].to(self.device)
                 y = batch["y"].to(self.device).squeeze()
                 targets.append(y)
-                if use_perfect_annotations:
-                    annotations.append(batch["has_confounder"].squeeze())
-                else:
-                    annotations.append(torch.as_tensor([self.group_label_map.get(filename, -1) for filename in batch["url"]]))
+                annotations.append(batch["has_confounder"].squeeze())
 
                 prediction = model(x)
                 acc.append((prediction.argmax(dim=1) == y).to(torch.int))
@@ -230,7 +218,7 @@ class ClArC(Adaptor):
             group_accuracies.append(results[f"c{y.item()}_non-artifact_accuracy"])
             # print(f"class {y}: {results[f'c{y.item()}_n']} items, artfiact freq: {results[f'c{y.item()}_artifact_freq']}")
 
-        print(f"group accuracies (perfect={use_perfect_annotations}):", group_accuracies)
+        print(f"group accuracies:", group_accuracies)
         group_accuracies = [num for num in group_accuracies if not math.isnan(num)]
         results["avg_group_acc"] = np.mean(group_accuracies).item()
         results["worst_group_acc"] = np.min(group_accuracies).item()
@@ -245,7 +233,7 @@ class PClArC(ClArC):
 
     def get_evaluation_filename(self, dataset_name: str) -> str:
         attacked_class = f"_attacked-c{self.adaptor_config.attacked_class}" if self.adaptor_config.attacked_class is not None else ""
-        label_type = ("true" if self.adaptor_config.use_perfect_annotations else "spray") + "-group-labels"
+        label_type = ("true" if self.config.data.spray_label_file is None else "spray") + "-group-labels"
         finetune = f"_{self.config.training.max_epochs}epochs-finetune" if self.adaptor_config.finetune else ""
         return f"correction_{dataset_name}-dataset_{label_type}_{self.adaptor_config.projection_type}-projection_mode-{self.adaptor_config.cav_mode}{attacked_class}{finetune}.csv"
 
@@ -302,12 +290,13 @@ class PClArC(ClArC):
         loss = CrossEntropyLoss()
 
         composite = Sequential(feature_extractor, projection_layer, downstream_head) if feature_extractor is not None else Sequential(projection_layer, downstream_head)
-        val_accuracies = self.get_accuracies(data_val, composite, self.config.use_perfect_annotations)
+        val_accuracies = self.get_accuracies(data_val, composite)
         print(f"Epoch 0: avg_group_acc={val_accuracies['avg_group_acc']}, worst_group_acc={val_accuracies['worst_group_acc']}")
         best_model = copy.deepcopy(downstream_head)
         best_val_group_acc = val_accuracies['avg_group_acc']
         number_epochs_trained = 0
 
+        torch.autograd.set_detect_anomaly(True)
         for epoch in range(self.adaptor_config.training.max_epochs):
             losses = []
             accuracies = []
@@ -324,7 +313,14 @@ class PClArC(ClArC):
                         prediction = downstream_head(projection_layer(feature_extractor(x)))
 
                     ce_loss = loss(prediction, y)
-                    ce_loss.backward()
+                    try:
+                        ce_loss.backward()
+                    except:
+                        print(traceback.format_exc())
+                        if self.config.attacked_class is not None:
+                            data_train.dataset.enable_class_restriction(self.attacked_class)
+                        return best_model, number_epochs_trained
+
                     optimizer.step()
 
                     accuracy = (prediction.argmax(1) == y).float().detach()
@@ -336,7 +332,7 @@ class PClArC(ClArC):
             epoch_accuracy = torch.cat(accuracies).mean().item()
             epoch_ce_loss = torch.tensor(losses).mean().item()
             composite = Sequential(feature_extractor, projection_layer, downstream_head) if feature_extractor is not None else Sequential(projection_layer, downstream_head)
-            val_accuracies = self.get_accuracies(data_val, composite, self.config.use_perfect_annotations)
+            val_accuracies = self.get_accuracies(data_val, composite)
 
             if val_accuracies['avg_group_acc'] > best_val_group_acc:
                 best_val_group_acc = val_accuracies['avg_group_acc']
@@ -362,7 +358,7 @@ class RRClArC(ClArC):
     def get_evaluation_filename(self, dataset_name: str) -> str:
         attacked_class = f"_attacked-c{self.adaptor_config.attacked_class}" if self.adaptor_config.attacked_class is not None else ""
         mean_grad = f"_mean-grad" if self.adaptor_config.mean_grad else ""
-        label_type = ("true" if self.adaptor_config.use_perfect_annotations else "spray") + "-group-labels"
+        label_type = ("true" if self.config.data.spray_label_file is None else "spray") + "-group-labels"
         return f"correction_{dataset_name}-dataset_{label_type}_{self.adaptor_config.projection_type}-projection_mode-{self.adaptor_config.cav_mode}{attacked_class}_{self.adaptor_config.rrc_loss}-loss_target-{self.adaptor_config.gradient_target}{mean_grad}_{self.adaptor_config.training.max_epochs}-epochs.csv"
 
     def run(self):
@@ -422,10 +418,10 @@ class RRClArC(ClArC):
         best_model = copy.deepcopy(downstream_head)
         best_rrc_loss = sys.maxsize
         if feature_extractor is None:
-            val_accuracies = self.get_accuracies(data_val, downstream_head, self.config.use_perfect_annotations)
+            val_accuracies = self.get_accuracies(data_val, downstream_head)
         else:
             feature_extractor.eval()
-            val_accuracies = self.get_accuracies(data_val, Sequential(feature_extractor, downstream_head), self.config.use_perfect_annotations)
+            val_accuracies = self.get_accuracies(data_val, Sequential(feature_extractor, downstream_head))
         best_val_group_acc = val_accuracies["avg_group_acc"]
         number_epochs_finetuned = 0
 
@@ -486,9 +482,9 @@ class RRClArC(ClArC):
             epoch_ce_loss = torch.tensor(ce_losses).mean().item()
             epoch_rrc_loss = torch.tensor(rrc_losses).mean().item()
             if feature_extractor is None:
-                val_accuracies = self.get_accuracies(data_val, downstream_head, self.config.use_perfect_annotations)
+                val_accuracies = self.get_accuracies(data_val, downstream_head)
             else:
-                val_accuracies = self.get_accuracies(data_val, Sequential(feature_extractor, downstream_head), self.config.use_perfect_annotations)
+                val_accuracies = self.get_accuracies(data_val, Sequential(feature_extractor, downstream_head))
 
             if val_accuracies["avg_group_acc"] > best_val_group_acc or (epoch_rrc_loss < best_rrc_loss and val_accuracies["avg_group_acc"] == best_val_group_acc):
                 best_val_group_acc = val_accuracies["avg_group_acc"]
@@ -528,6 +524,10 @@ class RRClArC(ClArC):
 def split_model(model: Module, split_at: int, device) -> (Module, Module):
     children_list = extract_all_children(model)[0]
     print(f"splitting model into {len(children_list)} children")
+
+    # for i, node in enumerate(children_list):
+    #     print(f"layer {i+1}: {node}")
+    # exit()
 
     feature_extractor = torch.nn.Sequential(*children_list[:split_at])
     if isinstance(model, ResNet):

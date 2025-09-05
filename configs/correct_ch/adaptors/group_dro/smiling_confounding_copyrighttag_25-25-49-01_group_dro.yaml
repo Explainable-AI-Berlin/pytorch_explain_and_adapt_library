@@ -1,0 +1,30 @@
+category: "adaptor"
+adaptor_type: "GroupDROv2"
+base_dir: $PEAL_RUNS/celeba1k_copyrighttag/classifier_25-25-49-01/group_dro
+model_path: $PEAL_RUNS/celeba1k_copyrighttag/classifier_25-25-49-01/model.cpl
+data: <PEAL_BASE>/configs/correct_ch/data/Smiling_confounding_copyrighttag_celeba1000_25-25-49-01.yaml
+unpoisoned_data: <PEAL_BASE>/configs/correct_ch/data/Smiling_confounding_copyrighttag_celeba.yaml
+alpha: 0.2
+generalization_adjustment: 1
+automatic_adjustment: True
+robust_step_size: 0.01
+use_normalized_loss: False
+btl: False
+weight_decay: 0.1
+gamma: 0.1
+minimum_variational_weight: 0
+track_test_acc: 30
+save_intermediate: False
+training:
+  train_batch_size: 128
+  val_batch_size: 256
+  test_batch_size: 256
+  learning_rate: 1e-4
+  max_epochs: 2000
+  early_stopping_goal: "average_group_accuracy"
+task:
+  y_selection: [ Smiling ]
+  output_type: 'singleclass'
+  output_channels: 2
+  criterions:
+    l2: 1.0
