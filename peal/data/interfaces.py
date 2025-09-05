@@ -263,7 +263,7 @@ class DataConfig(BaseModel):
     Whether to re-balance group sizes after dropping samples without a spray label
     """
     spray_groups_balanced: bool = False
-    spray_group_sizes: Union[list[int], type(None)] = None
+
     generator: Union[type(None), str, object] = None
     diffusion_augmented: bool = False
     sampling_time_fraction: float = 0.3
