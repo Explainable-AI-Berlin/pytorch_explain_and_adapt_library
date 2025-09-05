@@ -1,8 +1,8 @@
 category: "adaptor"
 adaptor_type: "GroupDROv2"
-base_dir: $PEAL_RUNS/camelyon17_1k/classifier_25-25-49-01/group_dro_spray
+base_dir: $PEAL_RUNS/camelyon17_1k/classifier_25-25-49-01/group_dro
 model_path: $PEAL_RUNS/camelyon17_1k/classifier_25-25-49-01/model.cpl
-data: <PEAL_BASE>/configs/correct_ch/data/camelyon17_1k_25-25-49-01_spray.yaml
+data: <PEAL_BASE>/configs/correct_ch/data/camelyon17_1k_25-25-49-01.yaml
 unpoisoned_data: <PEAL_BASE>/configs/correct_ch/data/camelyon17_unpoisoned.yaml
 alpha: 0.2
 generalization_adjustment: 1

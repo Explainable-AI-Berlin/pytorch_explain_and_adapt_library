@@ -13,7 +13,6 @@ from peal.global_utils import (
     find_subclasses,
     get_project_resource_dir,
 )
-from peal.training.trainers import ModelTrainer
 
 
 def get_generator(

@@ -3,8 +3,8 @@ explainer_type: SCE
 # parameters analyzed in ablation study
 use_gradient_filtering: true
 distilled_predictor: <PEAL_BASE>/configs/cfkd_experiments/predictors/latent_convexity_distillation.yaml
-dist_l1: 0.000
-inpaint: 0
+dist_l1: 0.00005
+inpaint: 0.05
 allow_overlap: false
 # parameters constant in ablation study
 dilation: 13
@@ -16,7 +16,7 @@ iterationwise_encoding: true
 learning_rate: 300.0
 mask_momentum: 0.0
 max_samples: null
-merge_clusters: concatenate
+merge_clusters: select_best
 momentum: 0.9
 num_attempts: 2
 num_discretization_steps: 20
@@ -31,4 +31,5 @@ use_clustering: false
 use_masking: true
 validate_generator: false
 visualize_gradients: true
-y_target_goal_confidence: 1.1
+y_target_goal_confidence: null
+batch_size: 3

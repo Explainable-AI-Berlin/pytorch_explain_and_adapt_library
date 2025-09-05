@@ -1,5 +1,0 @@
-training          : <PEAL_BASE>/configs/cfkd_experiments/training/sensitive_distillation_1ofn.yaml
-task:
-  criterions:
-    ce     : 1.0
-  output_type             : mutliclass

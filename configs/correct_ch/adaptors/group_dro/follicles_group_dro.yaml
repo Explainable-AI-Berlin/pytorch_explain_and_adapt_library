@@ -1,8 +1,8 @@
 category: "adaptor"
 adaptor_type: "GroupDROv2"
-base_dir: $PEAL_RUNS/follicles_cut/classifier_natural/group_dro_spray
+base_dir: $PEAL_RUNS/follicles_cut/classifier_natural/group_dro
 model_path: $PEAL_RUNS/follicles_cut/classifier_natural/model.cpl
-data: <PEAL_BASE>/configs/correct_ch/data/follicles_spray.yaml
+data: <PEAL_BASE>/configs/correct_ch/data/follicles.yaml
 unpoisoned_data: <PEAL_BASE>/configs/correct_ch/data/follicles.yaml
 alpha: 0.2
 generalization_adjustment: 1

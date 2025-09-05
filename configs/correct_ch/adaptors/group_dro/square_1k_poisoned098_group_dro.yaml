@@ -1,8 +1,8 @@
 category: "adaptor"
 adaptor_type: "GroupDROv2"
-base_dir: $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/classifier_poisoned098/group_dro_spray
+base_dir: $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/classifier_poisoned098/group_dro
 model_path: $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/classifier_poisoned098/model.cpl
-data: <PEAL_BASE>/configs/correct_ch/data/square1k_poisoned098_spray.yaml
+data: <PEAL_BASE>/configs/correct_ch/data/square1k_poisoned098.yaml
 unpoisoned_data: <PEAL_BASE>/configs/correct_ch/data/square_unpoisoned.yaml
 alpha: 0.2
 generalization_adjustment: 1

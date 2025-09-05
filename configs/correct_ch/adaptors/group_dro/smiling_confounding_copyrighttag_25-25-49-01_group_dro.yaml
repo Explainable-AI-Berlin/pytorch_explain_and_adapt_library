@@ -1,7 +1,7 @@
 category: "adaptor"
 adaptor_type: "GroupDROv2"
-base_dir: $PEAL_RUNS/celeba1k_copyrighttag/classifier_25-25-49-01/group_dro
-model_path: $PEAL_RUNS/celeba1k_copyrighttag/classifier_25-25-49-01/model.cpl
+base_dir: $PEAL_RUNS/celeba1k_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_25-25-49-01/group_dro
+model_path: $PEAL_RUNS/celeba1k_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_25-25-49-01/model.cpl
 data: <PEAL_BASE>/configs/correct_ch/data/Smiling_confounding_copyrighttag_celeba1000_25-25-49-01.yaml
 unpoisoned_data: <PEAL_BASE>/configs/correct_ch/data/Smiling_confounding_copyrighttag_celeba.yaml
 alpha: 0.2
