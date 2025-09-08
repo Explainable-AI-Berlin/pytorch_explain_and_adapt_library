@@ -1,13 +1,13 @@
 import os
 
-from diff_cf_ir.file_utils import deterministic_run, dump_args
-from diff_cf_ir.train import setup_trainer
+from src.diff_cf_ir.file_utils import deterministic_run, dump_args
+from src.diff_cf_ir.train import setup_trainer
 
 import torch
 import torchvision.transforms as transforms
 
-from diff_cf_ir.squares_dataset import SquaresDataModule
-from diff_cf_ir.models import ResNetRegression
+from src.diff_cf_ir.squares_dataset import SquaresDataModule
+from src.diff_cf_ir.models import ResNetRegression
 import argparse
 
 

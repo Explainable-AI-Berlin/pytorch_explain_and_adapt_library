@@ -2,7 +2,7 @@ import argparse
 from typing import List, Set
 import os
 
-from ...diff_cf_ir.counterfactuals import CFResult, generate_contrastive_collage_regr
+from peal.dependencies.diffusion_regression_counterfactuals.src.diff_cf_ir import CFResult, generate_contrastive_collage_regr
 import torch
 import matplotlib.pyplot as plt
 

@@ -4,7 +4,7 @@ import torch
 from torchvision import transforms
 from PIL import Image
 
-from ...diff_cf_ir.models import load_resnet
+from peal.dependencies.diffusion_regression_counterfactuals.src.diff_cf_ir import load_resnet
 from tqdm import tqdm
 from pathlib import Path
 import threading

@@ -1,10 +1,10 @@
 import os
 from tqdm import tqdm
-from ....diff_cf_ir.diffeocf import (
+from peal.dependencies.diffusion_regression_counterfactuals.src.diff_cf_ir import (
     DiffeoCF,
 )
 
-from ....diff_cf_ir.counterfactuals import (
+from peal.dependencies.diffusion_regression_counterfactuals.src.diff_cf_ir import (
     CFResult,
     save_cf_results,
     update_results_oracle,
@@ -12,15 +12,15 @@ from ....diff_cf_ir.counterfactuals import (
 import torch
 import argparse
 
-from ....diff_cf_ir.file_utils import (
+from peal.dependencies.diffusion_regression_counterfactuals.src.diff_cf_ir import (
     assert_paths_exist,
     create_result_dir,
     deterministic_run,
     dump_args,
 )
-from ....diff_cf_ir.generators import DAE
-from ....diff_cf_ir.image_folder_dataset import ImageFolderDataset, default_transforms
-from ....diff_cf_ir.models import load_model, load_resnet
+from peal.dependencies.diffusion_regression_counterfactuals.src.diff_cf_ir import DAE
+from peal.dependencies.diffusion_regression_counterfactuals.src.diff_cf_ir import ImageFolderDataset, default_transforms
+from peal.dependencies.diffusion_regression_counterfactuals.src.diff_cf_ir import load_model, load_resnet
 
 
 def init_args():

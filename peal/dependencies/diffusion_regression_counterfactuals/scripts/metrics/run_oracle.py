@@ -2,8 +2,8 @@ from ..metrics.run_metrics import ImageFolderDataset
 
 
 import numpy as np
-from ...diff_cf_ir.models import load_resnet
-from ...diff_cf_ir.file_utils import rename_if_exists
+from peal.dependencies.diffusion_regression_counterfactuals.src.diff_cf_ir import load_resnet
+from peal.dependencies.diffusion_regression_counterfactuals.src.diff_cf_ir import rename_if_exists
 import torch
 import argparse
 import os

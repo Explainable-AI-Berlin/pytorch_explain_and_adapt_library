@@ -1,13 +1,13 @@
 import os
 
-from ...diff_cf_ir.file_utils import dump_args
+from peal.dependencies.diffusion_regression_counterfactuals.src.diff_cf_ir import dump_args
 
 import torch
 import torchvision.transforms as T
 
 from peal.dependencies.diffusion_regression_counterfactuals.imdb_clean_dataset import ImdbCleanDataModule
-from ...diff_cf_ir.models import ResNetRegression, DenseNetRegression
-from ...diff_cf_ir.train import setup_trainer
+from peal.dependencies.diffusion_regression_counterfactuals.src.diff_cf_ir import ResNetRegression, DenseNetRegression
+from peal.dependencies.diffusion_regression_counterfactuals.src.diff_cf_ir import setup_trainer
 import argparse
 
 

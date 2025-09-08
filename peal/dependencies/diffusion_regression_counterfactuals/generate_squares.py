@@ -1,5 +1,3 @@
-import sys
-
 from matplotlib.colors import Normalize
 
 import argparse
@@ -10,7 +8,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 from datetime import datetime
 import shutil
-from diff_cf_ir.file_utils import deterministic_run
+from src.diff_cf_ir.file_utils import deterministic_run
 
 
 def embed_numberstring(number_str, num_digits=7):

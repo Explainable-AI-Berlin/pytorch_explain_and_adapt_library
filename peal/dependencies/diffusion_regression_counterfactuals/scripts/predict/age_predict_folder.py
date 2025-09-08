@@ -1,9 +1,9 @@
 import os
 from matplotlib import pyplot as plt
 from tqdm import tqdm
-from ...diff_cf_ir.image_folder_dataset import ImageFolderDataset
-from ...diff_cf_ir.models import load_model
-from ...diff_cf_ir.file_utils import assert_paths_exist
+from peal.dependencies.diffusion_regression_counterfactuals.src.diff_cf_ir import ImageFolderDataset
+from peal.dependencies.diffusion_regression_counterfactuals.src.diff_cf_ir import load_model
+from peal.dependencies.diffusion_regression_counterfactuals.src.diff_cf_ir import assert_paths_exist
 import argparse
 import torch
 import pandas as pd

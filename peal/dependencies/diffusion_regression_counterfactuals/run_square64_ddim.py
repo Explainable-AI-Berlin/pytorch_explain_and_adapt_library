@@ -1,4 +1,4 @@
-from related_work.diffae.templates_latent import *
+from src.related_work.diffae.templates_latent import *
 import argparse
 
 if __name__ == "__main__":
