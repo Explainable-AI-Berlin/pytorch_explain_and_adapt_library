@@ -1,0 +1,13 @@
+model_path        : $PEAL_RUNS/celeba1k_copyrighttag/classifier_25-25-49-01/dfr
+data              : <PEAL_BASE>/configs/correct_ch/data/Smiling_confounding_copyrighttag_celeba1000_dfr.yaml
+training          : <PEAL_BASE>/configs/cfkd_experiments/training/img_finetuning.yaml
+architecture      : $PEAL_RUNS/celeba1k_copyrighttag/classifier_25-25-49-01/model.cpl
+continue_training : True
+only_last_layer   : True
+task:
+  criterions:
+    ce     : 1.0
+    l1     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [Smiling]

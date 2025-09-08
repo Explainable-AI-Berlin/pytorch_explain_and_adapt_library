@@ -1,0 +1,20 @@
+base_dir: $PEAL_RUNS/camelyon17_1k/classifier_25-25-49-01/spray_analysis
+data: <PEAL_BASE>/configs/cfkd_experiments/data/camelyon17_25-25-49-01.yaml
+model: $PEAL_RUNS/camelyon17_1k/classifier_25-25-49-01/model.cpl
+port: 8080
+use_relative_concept_importance: True
+sum_attribution_channels: False # no effect if use_relative_concept_importance=True
+normalize_attribtions: True
+attribution_layer: 12
+classes_total: 2
+num_clusters_max: 3
+num_eigval: 32
+tsne_perplexity: [16, 32, 64, 128, 256]
+umap_neighbors: [8, 16, 32, 64]
+split_dataset: False
+task:
+  y_selection: [tumor]
+  output_type: 'singleclass'
+  output_channels: 2
+  criterions:
+    l2: 1.0

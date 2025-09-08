@@ -1,0 +1,30 @@
+category: "adaptor"
+adaptor_type: "GroupDROv2"
+base_dir: $PEAL_RUNS/follicles_cut/classifier_natural/group_dro
+model_path: $PEAL_RUNS/follicles_cut/classifier_natural/model.cpl
+data: <PEAL_BASE>/configs/correct_ch/data/follicles.yaml
+unpoisoned_data: <PEAL_BASE>/configs/correct_ch/data/follicles.yaml
+alpha: 0.2
+generalization_adjustment: 1
+automatic_adjustment: True
+robust_step_size: 0.01
+use_normalized_loss: False
+btl: False
+weight_decay: 1
+gamma: 0.1
+minimum_variational_weight: 0
+track_test_acc: 20
+save_intermediate: False
+training:
+  train_batch_size: 128
+  val_batch_size: 256
+  test_batch_size: 256 #256
+  learning_rate: 1e-4
+  max_epochs: 1000
+  early_stopping_goal: "average_group_accuracy"
+task:
+  y_selection: [ type ]
+  output_type: 'singleclass'
+  output_channels: 2
+  criterions:
+    l2: 1.0
