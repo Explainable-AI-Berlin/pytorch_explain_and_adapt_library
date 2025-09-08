@@ -121,7 +121,7 @@ python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predict
 # run CFKD
 python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/square1000x050_sce_cfkd.yaml"
 python evaluate_predictor.py --model_path $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/classifier_poisoned050/sce_cfkd/model.cpl --data_config configs/cfkd_experiments/data/square_unpoisoned.yaml --model_config configs/cfkd_experiments/predictors/square1k_classifier_poisoned050.yaml
-# running DFR makes no sense for 0.0 correlation, so we just use the unfixed model results
+# running DFR and RR-ClarC makes no sense for 0.0 correlation, so we just use the unfixed model results
 
 # for 60% poisoning (corresponds to 0.2 correlation)
 python train_generator.py --config "<PEAL_BASE>/configs/cfkd_experiments/generators/square1k_ddpm_poisoned060.yaml"
@@ -132,6 +132,8 @@ python evaluate_predictor.py --model_path $PEAL_RUNS/square1k/colora_confounding
 # run DFR
 python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/square1k_classifier_poisoned060_dfr.yaml"
 python evaluate_predictor.py --model_path $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/classifier_poisoned060/dfr/model.cpl --data_config configs/cfkd_experiments/data/square_unpoisoned.yaml --model_config configs/cfkd_experiments/predictors/square1k_classifier_poisoned060.yaml
+# run RR-ClarC
+python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/clarc/square1000_poisoned060_rrclarc.yaml"
 
 # for 70% poisoning (corresponds to 0.4 correlation)
 python train_generator.py --config "<PEAL_BASE>/configs/cfkd_experiments/generators/square1k_ddpm_poisoned070.yaml"
@@ -142,6 +144,8 @@ python evaluate_predictor.py --model_path $PEAL_RUNS/square1k/colora_confounding
 # run DFR
 python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/square1k_classifier_poisoned070_dfr.yaml"
 python evaluate_predictor.py --model_path $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/classifier_poisoned070/dfr/model.cpl --data_config configs/cfkd_experiments/data/square_unpoisoned.yaml --model_config configs/cfkd_experiments/predictors/square1k_classifier_poisoned070.yaml
+# run RR-ClarC
+python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/clarc/square1000_poisoned070_rrclarc.yaml"
 
 # for 80% poisoning (corresponds to 0.6 correlation)
 python train_generator.py --config "<PEAL_BASE>/configs/cfkd_experiments/generators/square1k_ddpm_poisoned080.yaml"
@@ -152,6 +156,8 @@ python evaluate_predictor.py --model_path $PEAL_RUNS/square1k/colora_confounding
 # run DFR
 python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/square1k_classifier_poisoned080_dfr.yaml"
 python evaluate_predictor.py --model_path $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/classifier_poisoned080/dfr/model.cpl --data_config configs/cfkd_experiments/data/square_unpoisoned.yaml --model_config configs/cfkd_experiments/predictors/square1k_classifier_poisoned080.yaml
+# run RR-ClarC
+python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/clarc/square1000_poisoned080_rrclarc.yaml"
 
 # for 90% poisoning (corresponds to 0.8 correlation)
 python train_generator.py --config "<PEAL_BASE>/configs/cfkd_experiments/generators/square1k_ddpm_poisoned090.yaml"
@@ -162,6 +168,8 @@ python evaluate_predictor.py --model_path $PEAL_RUNS/square1k/colora_confounding
 # run DFR
 python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/square1k_classifier_poisoned090_dfr.yaml"
 python evaluate_predictor.py --model_path $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/classifier_poisoned090/dfr/model.cpl --data_config configs/cfkd_experiments/data/square_unpoisoned.yaml --model_config configs/cfkd_experiments/predictors/square1k_classifier_poisoned090.yaml
+# run RR-ClarC
+python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/clarc/square1000_poisoned090_rrclarc.yaml"
 
 # for 100% poisoning (corresponds to 1.0 correlation)
 python train_generator.py --config "<PEAL_BASE>/configs/cfkd_experiments/generators/square1k_ddpm_poisoned100.yaml"
@@ -169,7 +177,7 @@ python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predict
 # run CFKD
 python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/square1000x100_sce_cfkd.yaml"
 python evaluate_predictor.py --model_path $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/classifier_poisoned100/sce_cfkd/model.cpl --data_config configs/cfkd_experiments/data/square_unpoisoned.yaml --model_config configs/cfkd_experiments/predictors/square1k_classifier_poisoned100.yaml
-# running DFR for correlation 1.0 is impossible, so we just use the unfixed model results
+# running DFR and RR-ClarC for correlation 1.0 is impossible, so we just use the unfixed model results
 
 # on CelebA copyrighttag dataset
 # for 50% poisoning (corresponds to 0.0 correlation)
