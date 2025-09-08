@@ -22,8 +22,10 @@ python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/gr
 python evaluate_predictor.py --model_path $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/classifier_poisoned098/group_dro/model.cpl --data_config configs/cfkd_experiments/data/square_unpoisoned.yaml --model_config configs/cfkd_experiments/predictors/square1k_classifier_poisoned098.yaml
 # run P-ClarC
 python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/clarc/square1000_poisoned098_pclarc.yaml"
+cat ${PEAL_RUNS}/square1k/colora_confounding_colorb/torchvision/classifier_poisoned098/pclarc/best_model_result.txt
 # run RR-ClarC
 python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/clarc/square1000_poisoned098_rrclarc.yaml"
+cat ${PEAL_RUNS}/square1k/colora_confounding_colorb/torchvision/classifier_poisoned098/rrclarc/best_model_result.txt
 
 
 # Reproduce SOTA results on CelebA copyrighttag dataset (the results over different poisoning levels will be averaged)
@@ -44,8 +46,10 @@ python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/gr
 python evaluate_predictor.py --model_path $PEAL_RUNS/celeba1k_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned098/group_dro/model.cpl --data_config configs/cfkd_experiments/data/Smiling_confounding_copyrighttag_celeba.yaml --model_config configs/cfkd_experiments/predictors/celeba1k_Blond_Hair_confounding_Male_poisoned098.yaml
 # run P-ClarC
 python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/clarc/smiling_confounding_copyrighttag_098_pclarc.yaml"
+cat ${PEAL_RUNS}/celeba1k_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned098/pclarc/best_model_result.txt
 # run RR-ClarC
 python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/clarc/smiling_confounding_copyrighttag_098_rrclarc.yaml"
+cat ${PEAL_RUNS}/celeba1k_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned098/rrclarc/best_model_result.txt
 
 
 # Reproduce SOTA results on CelebA Blond_Hair confounding Male task
@@ -66,8 +70,10 @@ python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/gr
 python evaluate_predictor.py --model_path $PEAL_RUNS/celeba1k/Blond_Hair/resnet18_poisoned098/group_dro/model.cpl --data_config configs/cfkd_experiments/data/celeba.yaml --model_config configs/cfkd_experiments/predictors/celeba1k_Blond_Hair_classifier_poisoned098.yaml
 # run P-ClarC
 python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/clarc/blond_confounding_male_poisoned098_pclarc.yaml"
+cat ${PEAL_RUNS}/celeba1k/Blond_Hair/resnet18_poisoned098/pclarc/best_model_result.txt
 # run RR-ClarC
 python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/clarc/blond_confounding_male_poisoned098_rrclarc.yaml"
+cat ${PEAL_RUNS}/celeba1k/Blond_Hair/resnet18_poisoned098/rrclarc/best_model_result.txt
 
 
 # Reproduce SOTA results on Camelyon17 task
@@ -88,8 +94,10 @@ python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/gr
 python evaluate_predictor.py --model_path $PEAL_RUNS/camelyon17_1k/classifier_poisoned098/group_dro/model.cpl --data_config configs/cfkd_experiments/data/camelyon17_unpoisoned.yaml --model_config configs/cfkd_experiments/predictors/camelyon17_1k_classifier_poisoned098.yaml
 # run P-ClarC
 python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/clarc/camelyon17_poisoned098_pclarc.yaml"
+cat ${PEAL_RUNS}/camelyon17_1k/classifier_poisoned098/pclarc/best_model_result.txt
 # run RR-ClarC
 python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/clarc/camelyon17_poisoned098_rrclarc.yaml"
+cat ${PEAL_RUNS}/camelyon17_1k/classifier_poisoned098/rrclarc/best_model_result.txt
 
 
 # Reproduce SOTA results on follicle dataset
@@ -109,8 +117,10 @@ python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/gr
 python evaluate_predictor.py --model_path $PEAL_RUNS/follicles_cut/classifier_natural/group_dro/model.cpl --data_config configs/cfkd_experiments/data/follicles_hints.yaml --model_config configs/cfkd_experiments/predictors/follicle_cut_classifier.yaml
 # run P-ClarC
 python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/clarc/follicles_pclarc.yaml"
+cat ${PEAL_RUNS}/follicles_cut/classifier_natural/pclarc/best_model_result.txt
 # run RR-ClarC
 python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/clarc/follicles_rrclarc.yaml"
+cat ${PEAL_RUNS}/follicles_cut/classifier_natural/rrclarc/best_model_result.txt
 
 
 # Experiments over different poisoning levels
