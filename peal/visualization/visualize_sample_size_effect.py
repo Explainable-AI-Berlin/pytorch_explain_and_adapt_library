@@ -6,11 +6,13 @@ data = {
     "Square": {
         "Original": [51.1, 58.0, 74.1, 84.4],
         "DFR": [52.1, 63.5, 84.2, 91.5],
+        "RR-ClarC": [78.6, 40.9, 40.9, 40.9],
         "CFKD": [96.5, 96.6, 97.3, 97.9],
     },
     "CelebA Smiling vs Copyrighttag": {
         "Original": [51.4, 52.4, 52.0, 52.2],
         "DFR": [53.0, 51.8, 51.9, 61.1],
+        "RR-ClarC": [68.7, 40.9, 40.9, 40.9],
         "CFKD": [86.7, 88.6, 89.7, 89.8],
     }
 }
@@ -22,6 +24,7 @@ sample_sizes = [1000, 2000, 4000, 8000]
 colors = {
     "Original": "tab:blue",
     "DFR": "tab:orange",
+    "RR-ClarC": "tab:purple",
     "CFKD": "tab:green",
 }
 
