@@ -4,7 +4,7 @@ if [ -z "$DCFIR_OUTPATH" ] || [ -z "$DCFIR_HOME" ]; then
     exit 1
 fi
 
-GMODEL_PATH="$DCFIR_OUTPATH/models/square_diffae/square64_ddim/last.ckpt"
+GMODEL_PATH="$DCFIR_OUTPATH/models/square_diffae/square64_ddim/square64_ddim/last.ckpt"
 RMODEL_PATH="$DCFIR_OUTPATH/regressors/square/version_0/checkpoints/last.ckpt"
 NUM_STEPS=200
 BATCH_SIZE=38

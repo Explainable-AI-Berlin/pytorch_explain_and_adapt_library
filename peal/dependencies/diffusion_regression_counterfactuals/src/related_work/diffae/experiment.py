@@ -11,9 +11,10 @@ from lightning.pytorch.plugins.precision import amp
 from torch.optim.optimizer import Optimizer
 from torch.utils.data.dataset import TensorDataset
 from torchvision.utils import make_grid, save_image
+from tqdm import tqdm
 
 from .lmdb_writer import *
-from .metrics import *
+#from .metrics import evaluate_fid, evaluate_lpips
 from .renderer import *
 
 
@@ -422,7 +423,7 @@ class LitModel(L.LightningModule):
             else:
                 imgs = batch["img"]
             self.log_sample(x_start=imgs)
-            self.evaluate_scores()
+            #self.evaluate_scores()
 
     def on_before_optimizer_step(self, optimizer: Optimizer) -> None:
         # fix the fp16 + clip grad norm problem with pytorch lightinng
@@ -789,7 +790,8 @@ class LitModel(L.LightningModule):
 
                 conf = self.conf.clone()
                 conf.eval_num_images = 50_000
-                score = evaluate_fid(
+                score = 0.0
+                """score = evaluate_fid(
                     sampler,
                     self.ema_model,
                     conf,
@@ -801,7 +803,7 @@ class LitModel(L.LightningModule):
                     conds_std=self.conds_std,
                     remove_cache=False,
                     clip_latent_noise=clip_latent_noise,
-                )
+                )"""
                 if T_latent is None:
                     self.log(f"fid_ema_T{T}", score)
                 else:
@@ -826,14 +828,15 @@ class LitModel(L.LightningModule):
                 # eval whole val dataset
                 conf.eval_num_images = len(self.val_data)
                 # {'lpips', 'mse', 'ssim'}
-                score = evaluate_lpips(
+                score = 0.0
+                """score = evaluate_lpips(
                     sampler,
                     self.ema_model,
                     conf,
                     device=self.device,
                     val_data=self.val_data,
                     latent_sampler=None,
-                )
+                )"""
                 for k, v in score.items():
                     self.log(f"{k}_ema_T{T}", v)
         """
@@ -852,7 +855,8 @@ class LitModel(L.LightningModule):
                 # eval whole val dataset
                 conf.eval_num_images = len(self.val_data)
                 # {'lpips', 'mse', 'ssim'}
-                score = evaluate_lpips(
+                score = 0.0
+                """score = evaluate_lpips(
                     sampler,
                     self.ema_model,
                     conf,
@@ -860,7 +864,7 @@ class LitModel(L.LightningModule):
                     val_data=self.val_data,
                     latent_sampler=None,
                     use_inverted_noise=True,
-                )
+                )"""
                 for k, v in score.items():
                     self.log(f"{k}_inv_ema_T{T}", v)
 

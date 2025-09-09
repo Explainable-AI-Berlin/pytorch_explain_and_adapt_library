@@ -12,7 +12,9 @@ echo "Running metrics for Squares"
 bash $DCFIR_HOME/scripts/metrics/scripts/run_metrics_squares_mirror.sh
 # Result in $DCFIR_OUTPATH/metrics/square
 
+:'
 echo "Running metrics CelebaHQ..."
 bash $DCFIR_HOME/scripts/metrics/scripts/run_folders.sh $ACRE_CELEBAHQ_RESULTS
 bash scripts/metrics/scripts/run_folders.sh $DIFFAERE_CELEBAHQ_RESULTS
 # Result in $DCFIR_OUTPATH/metrics/celebahq
+'

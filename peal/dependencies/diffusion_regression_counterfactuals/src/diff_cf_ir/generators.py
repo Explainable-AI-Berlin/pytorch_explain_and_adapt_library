@@ -1,8 +1,8 @@
 from tqdm import tqdm
 import torch
 from torch import nn
-from peal.dependencies.diffusion_regression_counterfactuals.src.related_work.diffae.experiment import LitModel
-from peal.dependencies.diffusion_regression_counterfactuals.src.related_work.diffae.templates import (
+from ..related_work.diffae.experiment import LitModel
+from ..related_work.diffae.templates import (
     square64_autoenc,
     ffhq256_autoenc,
 )

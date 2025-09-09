@@ -1,4 +1,6 @@
 #!/bin/bash
+export DCFIR_HOME="$PWD"
+export DCFIR_OUTPATH="$PWD/diff_cf_ir_results"
 set -e
 if [ -z "$DCFIR_OUTPATH" ] || [ -z "$DCFIR_HOME" ]; then
     echo "DCFIR_OUTPATH or DCFIR_HOME is not defined. Please set it manually before running this script."
@@ -11,6 +13,7 @@ echo "Running Diff-AE-RE experiments..."
 echo "Running Square experiments..."
 bash $DCFIR_HOME/scripts/cf/squares/scripts/run_diffeocf_dae_square_mirror.sh
 
+: '
 echo "Running CelebAHQ experiments..."
 bash $DCFIR_HOME/scripts/cf/celebahq/scripts/run_diffeocf_dae_celebahq.sh
 
@@ -29,3 +32,4 @@ bash $DCFIR_HOME/related_work/ACE/scripts/regression/run_age_celebahq_allval.sh
 
 echo "Running fine-grained reference values..."
 bash $DCFIR_HOME/related_work/ACE/scripts/regression/run_age_imdbwiki_multitarget.sh
+'
