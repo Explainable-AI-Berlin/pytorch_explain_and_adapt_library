@@ -131,7 +131,9 @@ python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predict
 # run CFKD
 python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/square1000x050_sce_cfkd.yaml"
 python evaluate_predictor.py --model_path $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/classifier_poisoned050/sce_cfkd/model.cpl --data_config configs/cfkd_experiments/data/square_unpoisoned.yaml --model_config configs/cfkd_experiments/predictors/square1k_classifier_poisoned050.yaml
-# running DFR and RR-ClarC makes no sense for 0.0 correlation, so we just use the unfixed model results
+# run RR-ClarC
+python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/clarc/square1000_poisoned050_rrclarc.yaml"
+# running DFR makes no sense for 0.0 correlation, so we just use the unfixed model results
 
 # for 60% poisoning (corresponds to 0.2 correlation)
 python train_generator.py --config "<PEAL_BASE>/configs/cfkd_experiments/generators/square1k_ddpm_poisoned060.yaml"
@@ -196,7 +198,9 @@ python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predict
 # run CFKD
 python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/Smiling_confounding_CopyrightTag_celeba1000x050_sce_cfkd.yaml"
 python evaluate_predictor.py --model_path $PEAL_RUNS/celeba1k_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned050/sce_cfkd/model.cpl --data_config configs/cfkd_experiments/data/Smiling_confounding_copyrighttag_celeba.yaml --model_config configs/cfkd_experiments/predictors/celeba1k_copyrighttag_poisoned050.yaml
-# running DFR or RR-ClarC makes no sense for 0.0 correlation, so we just use the unfixed model results
+# run RR-ClarC
+python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/clarc/smiling_confounding_copyrighttag_050_rrclarc.yaml"
+# running DFR makes no sense for 0.0 correlation, so we just use the unfixed model results
 
 # for 60% poisoning (corresponds to 0.2 correlation)
 python train_generator.py --config "<PEAL_BASE>/configs/cfkd_experiments/generators/celeba1k_copyrighttag_ddpm_poisoned060.yaml"
