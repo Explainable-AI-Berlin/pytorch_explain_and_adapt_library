@@ -19,8 +19,8 @@ from transformers import AutoModel, AutoImageProcessor
 
 from peal.dependencies.ddpm_inversion.ddm_inversion.inversion_utils import inversion_forward_process, \
     inversion_reverse_process
-#from peal.dependencies.diffusion_regression_counterfactuals.related_work.diffae.experiment import LitModel
-#from peal.dependencies.diffusion_regression_counterfactuals.related_work.diffae.templates import square64_autoenc
+from peal.dependencies.diffusion_regression_counterfactuals.src.related_work.diffae.experiment import LitModel
+from peal.dependencies.diffusion_regression_counterfactuals.src.related_work.diffae.templates import square64_autoenc
 from peal.editors.ddpm_inversion import DDPMInversionConfig
 from peal.data.dataloaders import get_dataloader
 from peal.data.dataset_factory import get_datasets
@@ -137,9 +137,14 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         self.data_dir = os.path.join(self.model_dir, "data_test")
         self.counterfactual_path = os.path.join(self.model_dir, "counterfactuals_test")
         conf = square64_autoenc()
-        self.model = LitModel.load_from_checkpoint(
-            checkpoint_path=checkpoint_path, conf=conf, map_location="cpu"
-        )
+        if os.path.exists(self.config.checkpoint_path):
+            self.model = LitModel.load_from_checkpoint(
+                checkpoint_path=self.config.checkpoint_path, conf=conf, map_location="cpu"
+            )
+
+        else:
+            self.model = LitModel(conf)
+
         if self.config.encoder[:len("facebook/dinov2")] == "facebook/dinov2":
             sem_encoder = AutoModel.from_pretrained(self.config.encoder).to("cuda")
             sem_encoder_processor = AutoImageProcessor.from_pretrained(self.config.encoder)
@@ -163,99 +168,13 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         return images_torch
 
     def encode(self, x, t=1.0):
-        """
-        respaced_steps = int(t * int(self.config.timestep_respacing))
-        timesteps = list(range(respaced_steps))[::-1]
-        def local_forward(x, t, idx, noise, steps, diffusion, model):
-            out = diffusion.p_mean_variance(model, x, t, clip_denoised=True)
-
-            x = out["mean"]
-
-            if idx != (steps - 1):
-                x += torch.exp(0.5 * out["log_variance"]) * noise
-
-            return x
-
-        for idx, t in enumerate(timesteps):
-            t = torch.tensor([t] * x.size(0), device=x.device)
-
-            if idx == 0:
-                x = self.diffusion.q_sample(x, t, noise=self.noise_fn(x))
-
-            if hasattr(self, "fix_noise") and self.fix_noise:
-                noise = self.noise[idx + 1, ...].unsqueeze(dim=0)
-
-            elif self.config.stochastic:
-                noise = torch.randn_like(x)
-
-            else:
-                noise = torch.zeros_like(x)
-
-            x = local_forward(x, t, idx, noise, respaced_steps, self.diffusion, self.model)
-        """
-
-        # TODO why are gradients in ACE scaled???
-        #t = torch.tensor([self.steps - 1] * x.size(0), device=x.device)
-        x0 = torchvision.transforms.Resize([512, 512])(
-            torch.clone(x).to(self.device)
-        )  # load_512(image_path, *offsets, device)
-
-        # vae encode image
-        w0 = (self.pipe.vae.encode(x0).latent_dist.mode() * 0.18215).float()
-
-        # find Zs and wts - forward process
-        wt, zs, wts = inversion_forward_process(
-            self.pipe,
-            w0,
-            etas=self.config.eta,
-            prompt=x.shape[0]*[""],
-            cfg_scale=self.config.cfg_scale_src,
-            prog_bar=True,
-            num_inference_steps=self.config.num_diffusion_steps,
-        )
-        x = wt, zs, wts
-        return x
+        z = None
+        # TODO implement encoding properly
+        return z
 
     def decode(self, z, t=1.0):
-        # TODO test decode function via sampling function
-        from peal.dependencies.ddpm_inversion.prompt_to_prompt.ptp_classes import AttentionStore
-        controller = AttentionStore()
-        from peal.dependencies.ddpm_inversion.prompt_to_prompt.ptp_utils import (
-            register_attention_control,
-        )
-        register_attention_control(self.pipe, controller)
-        wt, zs, wts = z
-        w0, _ = inversion_reverse_process(
-            self.pipe,
-            xT=wts[self.config.num_diffusion_steps - self.config.skip],
-            etas=self.config.eta,
-            prompts=z.shape[0] * [""],
-            cfg_scales=[self.config.cfg_scale_tar],
-            prog_bar=True,
-            zs=zs[: (self.config.num_diffusion_steps - self.config.skip)],
-            controller=controller,
-            #classifier=classifier_loss,
-        )
-
-        # vae decode image
-        x = self.pipe.vae.decode(1 / 0.18215 * w0).sample
-        """
-        respaced_steps = int(t * int(self.config.timestep_respacing))
-        timesteps = list(range(respaced_steps))[::-1]
-        for idx, t in enumerate(timesteps):
-            t = torch.tensor([t] * x.size(0), device=x.device)
-
-            if idx == 0:
-                x = self.diffusion.q_sample(x, t, noise=self.noise_fn(x))
-
-            out = self.diffusion.p_mean_variance(self.model, x, t, clip_denoised=True)
-
-            x = out["mean"]
-
-            if idx != (respaced_steps - 1):
-                if self.config.stochastic:
-                    x += torch.exp(0.5 * out["log_variance"]) * self.noise_fn(x)"""
-
+        x = None
+        # TODO implement decoding properly
         return x
 
     def train_model(
@@ -271,134 +190,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         finetune_args.pipeline = self.pipeline
         finetune_args.resume_from_checkpoint = 'latest'
         finetune_args.img_semantic_encoder = self.img_semantic_encoder
-
-        """train_dataloader = get_dataloader(
-            self.train_dataset, mode="train", batch_size=self.config.batch_size
-        )
-
-        val_dataloader = get_dataloader(
-            self.val_dataset, mode="train", batch_size=self.config.batch_size
-        )
-        finetune_args.train_dataloader = train_dataloader
-        finetune_args.val_dataloader = val_dataloader"""
-        print("Start LORA finetuning")
-        print("Start LORA finetuning")
-        print("Start LORA finetuning")
-        self.pipeline = lora_finetune(finetune_args)
-        print("Finished LORA finetuning")
-        print("Finished LORA finetuning")
-        print("Finished LORA finetuning")
-
-    def initialize(self, classifier, base_path, explainer_config):
-        if explainer_config.use_lora:
-            self.train_model()
-
-        class_predictions_path = os.path.join(base_path, "explainer", "predictions.csv")
-        Path(os.path.join(base_path, "explainer")).mkdir(exist_ok=True, parents=True)
-        if not os.path.exists(class_predictions_path):
-            self.predictor_dataset.enable_url()
-            prediction_args = types.SimpleNamespace(
-                batch_size=32,
-                dataset=self.predictor_dataset,
-                classifier=classifier,
-                label_path=class_predictions_path,
-                partition="train",
-                label_query=0,
-                max_samples=explainer_config.max_samples,
-            )
-            get_predictions(prediction_args)
-            self.predictor_dataset.disable_url()
-
-        writer = SummaryWriter(os.path.join(base_path, "explainer", "logs"))
-        generator_dataset_config = copy.deepcopy(self.config.data)
-        generator_dataset_config.split = [0.9, 1.0]
-        self.generator_dataset, self.generator_dataset_val, _ = get_datasets(
-            config=generator_dataset_config, data_dir=class_predictions_path
-        )
-        if self.generator_dataset.task_config is None:
-            self.generator_dataset.task_config = TaskConfig()
-            self.generator_dataset.task_config.y_selection = ['prediction']
-
-        else:
-            self.generator_dataset.task_config.y_selection = ['prediction']
-
-        self.generator_dataset_val.task_config = self.generator_dataset.task_config
-        if explainer_config.learn_dataset_embedding:
-            context_embedding_path = os.path.join(
-                base_path, "explainer", "context", "context_embedding"
-            )
-            if not os.path.exists(context_embedding_path):
-                os.makedirs(os.path.join(base_path, "explainer", "context"), exist_ok=True)
-                train_context_embedding_args = types.SimpleNamespace(
-                    embedding_files=[],
-                    output_path=context_embedding_path,
-                    dataset=self.generator_dataset,
-                    partition="train",
-                    phase="context",
-                    batch_size=explainer_config.train_batch_size,
-                    training_label=-1,
-                    custom_tokens=explainer_config.custom_tokens_context,
-                    prompt=explainer_config.base_prompt,
-                    pipeline=self.pipeline,
-                    generator_dataset_val=self.generator_dataset_val,
-                    writer=writer,
-                    **explainer_config.__dict__
-                )
-                textual_inversion_training(train_context_embedding_args)
-
-            embedding_files = [context_embedding_path]
-
-        else:
-            embedding_files = []
-
-        # TODO how to extend this for multiclass??
-        for class_idx in range(self.generator_dataset.config.output_size[0]):
-            class_token_path = os.path.join(
-                base_path, "explainer", "class" + str(class_idx), "class_token" + str(class_idx)
-            )
-            if not os.path.exists(class_token_path):
-                os.makedirs(os.path.join(base_path, "explainer", "class" + str(class_idx)), exist_ok=True)
-                class_related_bias_embedding_args = types.SimpleNamespace(
-                    embedding_files=embedding_files,
-                    output_path=class_token_path,
-                    dataset=self.generator_dataset,
-                    custom_tokens=explainer_config.class_custom_token[class_idx].split(
-                        " "
-                    ),
-                    training_label=class_idx,
-                    phase="class",
-                    batch_size=explainer_config.train_batch_size,
-                    generator_dataset_val=self.generator_dataset_val,
-                    writer=writer,
-                    pipeline=self.pipeline,
-                    prompt=explainer_config.base_prompt
-                    + explainer_config.prompt_connector
-                    + explainer_config.class_custom_token[class_idx],
-                    **explainer_config.__dict__
-                )
-                textual_inversion_training(class_related_bias_embedding_args)
-
-        if explainer_config.editing_type == "ddpm_inversion":
-            # TODO somehow the config should be possible to influence
-            ddpm_inversion_config = DDPMInversionConfig()
-            ddpm_inversion_config.cfg_scale_src = (
-                explainer_config.guidance_scale_invertion[0]
-            )
-            ddpm_inversion_config.cfg_scale_tar = (
-                explainer_config.guidance_scale_denoising[0]
-            )
-            self.editor = DDPMInversion(ddpm_inversion_config)
-            embedding_files = []
-            for class_idx in range(self.generator_dataset.config.output_size[0]):
-                embedding_files.append(os.path.join(base_path, "explainer", "class0", "class_token" + str(class_idx)))
-
-            if explainer_config.learn_dataset_embedding:
-                embedding_files = [os.path.join(base_path, "explainer", "context", "context_embedding")] + embedding_files
-
-            load_tokens_and_embeddings(sd_model=self.editor.pipe, files=embedding_files)
-
-        else:
-            self.editor = None
+        # TODO add actual training here
 
     def edit(
         self,
@@ -457,24 +249,6 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             **explainer_config.__dict__
         )
         x_counterfactuals = generate_time_counterfactuals(ce_generation_args)
-
-        """dataset = [
-            (
-                torch.zeros([len(x_in)], dtype=torch.long),
-                x_in,
-                [source_classes, target_classes],
-            )
-        ]
-        args = copy.deepcopy(self.config)
-        args.dataset = dataset
-        args.model_path = os.path.join(self.model_dir, "final.pt")
-        args.classifier = classifier
-        args.diffusion = self.diffusion
-        args.model = self.model
-        args.output_path = self.counterfactual_path
-        args.batch_size = x_in.shape[0]
-        x_counterfactuals = time_main(args=args)"""
-
         x_counterfactuals = generator_to_classifier(torch.cat(x_counterfactuals, dim=0))
         print("[x_counterfactuals.min(), x_counterfactuals.max()]")
         print([x_counterfactuals.min(), x_counterfactuals.max()])
