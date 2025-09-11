@@ -31,7 +31,7 @@ cat ${PEAL_RUNS}/square1k/colora_confounding_colorb/torchvision/classifier_poiso
 # Reproduce SOTA results on CelebA copyrighttag dataset (the results over different poisoning levels will be averaged)
 python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/celeba_copyrighttag_unpoisoned.yaml"
 python train_generator.py --config "<PEAL_BASE>/configs/cfkd_experiments/generators/celeba1k_copyrighttag_ddpm_poisoned098.yaml"
-python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/celeba1k_copyrighttag_poisoned098.yaml"
+python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/celeba1k_Smiling_confounding_copyrighttag_classifier_poisoned098.yaml"
 # run CFKD
 python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/Smiling_confounding_CopyrightTag_celeba1000x098_sce_cfkd.yaml"
 python evaluate_predictor.py --model_path $PEAL_RUNS/celeba1k_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned098/sce_cfkd/model.cpl --data_config configs/cfkd_experiments/data/Smiling_confounding_copyrighttag_celeba.yaml --model_config configs/cfkd_experiments/predictors/celeba1k_copyrighttag_poisoned098.yaml
@@ -194,7 +194,7 @@ python evaluate_predictor.py --model_path $PEAL_RUNS/square1k/colora_confounding
 # on CelebA copyrighttag dataset
 # for 50% poisoning (corresponds to 0.0 correlation)
 python train_generator.py --config "<PEAL_BASE>/configs/cfkd_experiments/generators/celeba1k_copyrighttag_ddpm_poisoned050.yaml"
-python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/celeba1k_copyrighttag_poisoned050.yaml"
+python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/celeba1k_Smiling_confounding_copyrighttag_classifier_poisoned050.yaml"
 # run CFKD
 python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/Smiling_confounding_CopyrightTag_celeba1000x050_sce_cfkd.yaml"
 python evaluate_predictor.py --model_path $PEAL_RUNS/celeba1k_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned050/sce_cfkd/model.cpl --data_config configs/cfkd_experiments/data/Smiling_confounding_copyrighttag_celeba.yaml --model_config configs/cfkd_experiments/predictors/celeba1k_copyrighttag_poisoned050.yaml
@@ -204,7 +204,7 @@ python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/cl
 
 # for 60% poisoning (corresponds to 0.2 correlation)
 python train_generator.py --config "<PEAL_BASE>/configs/cfkd_experiments/generators/celeba1k_copyrighttag_ddpm_poisoned060.yaml"
-python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/celeba1k_copyrighttag_poisoned060.yaml"
+python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/celeba1k_Smiling_confounding_copyrighttag_classifier_poisoned060.yaml"
 # run CFKD
 python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/Smiling_confounding_CopyrightTag_celeba1000x060_sce_cfkd.yaml"
 python evaluate_predictor.py --model_path $PEAL_RUNS/celeba1k_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned060/sce_cfkd/model.cpl --data_config configs/cfkd_experiments/data/Smiling_confounding_copyrighttag_celeba.yaml --model_config configs/cfkd_experiments/predictors/celeba1k_copyrighttag_poisoned060.yaml
@@ -216,7 +216,7 @@ python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/cl
 
 # for 70% poisoning (corresponds to 0.4 correlation)
 python train_generator.py --config "<PEAL_BASE>/configs/cfkd_experiments/generators/celeba1k_copyrighttag_ddpm_poisoned070.yaml"
-python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/celeba1k_copyrighttag_poisoned070.yaml"
+python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/celeba1k_Smiling_confounding_copyrighttag_classifier_poisoned070.yaml"
 # run CFKD
 python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/Smiling_confounding_CopyrightTag_celeba1000x070_sce_cfkd.yaml"
 python evaluate_predictor.py --model_path $PEAL_RUNS/celeba1k_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned070/sce_cfkd/model.cpl --data_config configs/cfkd_experiments/data/Smiling_confounding_copyrighttag_celeba.yaml --model_config configs/cfkd_experiments/predictors/celeba1k_copyrighttag_poisoned070.yaml
@@ -228,7 +228,7 @@ python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/cl
 
 # for 80% poisoning (corresponds to 0.6 correlation)
 python train_generator.py --config "<PEAL_BASE>/configs/cfkd_experiments/generators/celeba1k_copyrighttag_ddpm_poisoned080.yaml"
-python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/celeba1k_copyrighttag_poisoned080.yaml"
+python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/celeba1k_Smiling_confounding_copyrighttag_classifier_poisoned080.yaml"
 # run CFKD
 python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/Smiling_confounding_CopyrightTag_celeba1000x080_sce_cfkd.yaml"
 python evaluate_predictor.py --model_path $PEAL_RUNS/celeba1k_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned080/sce_cfkd/model.cpl --data_config configs/cfkd_experiments/data/Smiling_confounding_copyrighttag_celeba.yaml --model_config configs/cfkd_experiments/predictors/celeba1k_copyrighttag_poisoned080.yaml
@@ -240,7 +240,7 @@ python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/cl
 
 # for 90% poisoning (corresponds to 0.8 correlation)
 python train_generator.py --config "<PEAL_BASE>/configs/cfkd_experiments/generators/celeba1k_copyrighttag_ddpm_poisoned090.yaml"
-python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/celeba1k_copyrighttag_poisoned090.yaml"
+python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/celeba1k_Smiling_confounding_copyrighttag_classifier_poisoned090.yaml"
 # run CFKD
 python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/Smiling_confounding_CopyrightTag_celeba1000x090_sce_cfkd.yaml"
 python evaluate_predictor.py --model_path $PEAL_RUNS/celeba1k_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned090/sce_cfkd/model.cpl --data_config configs/cfkd_experiments/data/Smiling_confounding_copyrighttag_celeba.yaml --model_config configs/cfkd_experiments/predictors/celeba1k_copyrighttag_poisoned090.yaml
@@ -252,7 +252,7 @@ python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/cl
 
 # for 100% poisoning (corresponds to 1.0 correlation)
 python train_generator.py --config "<PEAL_BASE>/configs/cfkd_experiments/generators/celeba1k_copyrighttag_ddpm_poisoned100.yaml"
-python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/celeba1k_copyrighttag_poisoned100.yaml"
+python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/celeba1k_Smiling_confounding_copyrighttag_classifier_poisoned100.yaml"
 # run CFKD
 python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_sce_cfkd.yaml"
 python evaluate_predictor.py --model_path $PEAL_RUNS/celeba1k_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned100/sce_cfkd/model.cpl --data_config configs/cfkd_experiments/data/Smiling_confounding_copyrighttag_celeba.yaml --model_config configs/cfkd_experiments/predictors/celeba1k_copyrighttag_poisoned100.yaml
