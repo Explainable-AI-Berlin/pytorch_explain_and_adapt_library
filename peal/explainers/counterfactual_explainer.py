@@ -39,6 +39,32 @@ from peal.training.trainers import distill_predictor
 from peal.visualization.visualize_counterfactual_gradients import visualize_step
 
 
+class DAEdistillConfig(ExplainerConfig):
+    """
+    This class defines the config of the SCE explainer.
+    """
+
+    """
+    The type of explanation that shall be used.
+    """
+    explainer_type: str = "DAEdistillConfig"
+    """
+    The path to the predictor that shall be explained.
+    """
+    predictor_path: Union[str, type(None)] = None
+    """
+    The generator that shall be used for the counterfactual search
+    """
+    generator: Union[type(None), GeneratorConfig] = None
+    """
+    The data config used for the counterfactual search
+    """
+    data_config: Union[type(None), DataConfig] = None
+    """
+    The config for the predictor distillation.
+    """
+    distilled_predictor: Union[type(None), str, dict] = None
+
 class SCEConfig(ExplainerConfig):
     """
     This class defines the config of the SCE explainer.

@@ -77,7 +77,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
 
     def decode(self, z, t=1.0):
         z_sem, xT = z
-        #return self.model.render(xT, z_sem, T=self.backward_t, grads=True)
+        # return self.model.render(xT, z_sem, T=self.backward_t, grads=True)
         return self.model.render(xT, z_sem, T=t, grads=True)
 
     def train_model(
@@ -91,7 +91,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         finetune_args = types.SimpleNamespace(**self.config.__dict__)
         finetune_args.train_dataset = self.train_dataset
         finetune_args.pipeline = self.pipeline
-        finetune_args.resume_from_checkpoint = 'latest'
+        finetune_args.resume_from_checkpoint = "latest"
         finetune_args.img_semantic_encoder = self.img_semantic_encoder
         # TODO add actual training here
 
@@ -108,36 +108,35 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         base_path: str = "",
         mode: str = "",
     ):
-
         if not explainer_config.distilled_predictor is None:
-            distilled_path = os.path.join(
-                base_path, "explainer", "distilled_predictor", "model.cpl"
-            )
+            distilled_path = os.path.join(base_path, "explainer", "distilled_predictor", "model.cpl")
             if not os.path.exists(distilled_path):
                 self.gradient_predictor = distill_predictor(
                     explainer_config.distilled_predictor,
                     base_path,
                     predictor,
                     predictor_datasets,
+                    predictor_distilled=nn.Sequential(
+                        [
+                            self.model.encoder,
+                            nn.Linear(self.model.encoder.output_dimensions, self.predictor_dataset.output_size),
+                        ]
+                    ),  # TODO fix this!
+                    only_last_layer=True,
+                    continue_training=True,
                 )
 
             else:
-                self.gradient_predictor = torch.load(
-                    distilled_path, map_location=self.device
-                )
+                self.gradient_predictor = torch.load(distilled_path, map_location=self.device)
 
         else:
             self.gradient_predictor = predictor
 
-        classifier_to_generator = (
-            lambda x: self.generator_dataset.project_from_pytorch_default(
-                self.predictor_dataset.project_to_pytorch_default(x)
-            )
+        classifier_to_generator = lambda x: self.generator_dataset.project_from_pytorch_default(
+            self.predictor_dataset.project_to_pytorch_default(x)
         )
-        generator_to_classifier = (
-            lambda x: self.predictor_dataset.project_from_pytorch_default(
-                self.generator_dataset.project_to_pytorch_default(x)
-            )
+        generator_to_classifier = lambda x: self.predictor_dataset.project_from_pytorch_default(
+            self.generator_dataset.project_to_pytorch_default(x)
         )
         dataset = [
             (
@@ -158,9 +157,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         print([x_counterfactuals.min(), x_counterfactuals.max()])
         print([x_counterfactuals.min(), x_counterfactuals.max()])
         device = [p for p in predictor.parameters()][0].device
-        preds = torch.nn.Softmax(dim=-1)(
-            predictor(x_counterfactuals.to(device)).detach().cpu()
-        )
+        preds = torch.nn.Softmax(dim=-1)(predictor(x_counterfactuals.to(device)).detach().cpu())
 
         y_target_end_confidence = torch.zeros([x_in.shape[0]])
         for i in range(x_in.shape[0]):
