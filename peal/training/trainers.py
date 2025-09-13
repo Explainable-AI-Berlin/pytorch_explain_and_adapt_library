@@ -788,6 +788,7 @@ def distill_binary_dataset(
             predictor_dataset.disable_url()
 
         distilled_dataset_config = copy.deepcopy(predictor_dataset.config)
+        distilled_dataset_config.delimiter = ","  # update delimeter to ',' in case of different delimiter in orginal dataset.
         distilled_dataset_config.split = [1.0, 1.0] if i == 0 else [0.0, 1.0]
         distilled_dataset_config.confounding_factors = None
         distilled_dataset_config.confounder_probability = None
