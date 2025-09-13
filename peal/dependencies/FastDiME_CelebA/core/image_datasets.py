@@ -9,6 +9,7 @@ import itertools
 
 from os import path as osp
 from PIL import Image
+
 # from mpi4py import MPI
 from torchvision import transforms
 from torch.utils.data import DataLoader, Dataset
@@ -183,11 +184,11 @@ def load_data_celeba(
     data_dir,
     batch_size,
     image_size,
-    partition='train',
+    partition="train",
     class_cond=False,
     deterministic=False,
     random_crop=False,
-    random_flip=True
+    random_flip=True,
 ):
     """
     For a dataset, create a generator over (images, kwargs) pairs.
@@ -246,33 +247,42 @@ class CelebADataset(Dataset):
         query_label=-1,
         normalize=True,
     ):
-        partition_df = pd.read_csv(osp.join(data_dir, 'list_eval_partition.csv'))
+        partition_df = pd.read_csv(osp.join(data_dir, "list_eval_partition.csv"))
         self.data_dir = data_dir
-        data = pd.read_csv(osp.join(data_dir, 'list_attr_celeba.csv'))
+        data = pd.read_csv(osp.join(data_dir, "list_attr_celeba.csv"))
 
-        if partition == 'train':
+        if partition == "train":
             partition = 0
-        elif partition == 'val':
+        elif partition == "val":
             partition = 1
-        elif partition == 'test':
+        elif partition == "test":
             partition = 2
         else:
-            raise ValueError(f'Unkown partition {partition}')
+            raise ValueError(f"Unkown partition {partition}")
 
-        self.data = data[partition_df['partition'] == partition]
+        self.data = data[partition_df["partition"] == partition]
         self.data = self.data[shard::num_shards]
         self.data.reset_index(inplace=True)
         self.data.replace(-1, 0, inplace=True)
 
-        self.transform = transforms.Compose([
-            transforms.Resize(image_size),
-            transforms.RandomHorizontalFlip() if random_flip else lambda x: x,
-            transforms.CenterCrop(image_size),
-            transforms.RandomResizedCrop(image_size, (0.95, 1.0)) if random_crop else lambda x: x,
-            transforms.ToTensor(),
-            transforms.Normalize([0.5, 0.5, 0.5],
-                                 [0.5, 0.5, 0.5]) if normalize else lambda x: x
-        ])
+        self.transform = transforms.Compose(
+            [
+                transforms.Resize(image_size),
+                transforms.RandomHorizontalFlip() if random_flip else lambda x: x,
+                transforms.CenterCrop(image_size),
+                (
+                    transforms.RandomResizedCrop(image_size, (0.95, 1.0))
+                    if random_crop
+                    else lambda x: x
+                ),
+                transforms.ToTensor(),
+                (
+                    transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
+                    if normalize
+                    else lambda x: x
+                ),
+            ]
+        )
 
         self.query = query_label
         self.class_cond = class_cond
@@ -286,12 +296,12 @@ class CelebADataset(Dataset):
         if self.query != -1:
             labels = int(labels[self.query])
         else:
-            labels = torch.from_numpy(labels.astype('float32'))
-        img_file = sample['image_id']
+            labels = torch.from_numpy(labels.astype("float32"))
+        img_file = sample["image_id"]
 
-        with open(osp.join(self.data_dir, 'img_align_celeba', img_file), "rb") as f:
+        with open(osp.join(self.data_dir, "img_align_celeba", img_file), "rb") as f:
             img = Image.open(f)
-            img = img.convert('RGB')
+            img = img.convert("RGB")
 
         img = self.transform(img)
 
@@ -299,7 +309,7 @@ class CelebADataset(Dataset):
             return img, labels, labels
 
         if self.class_cond:
-            return img, {'y': labels}
+            return img, {"y": labels}
         else:
             return img, {}
 
@@ -309,7 +319,7 @@ class CelebAMiniVal(CelebADataset):
         self,
         image_size,
         data_dir,
-        csv_file='utils/minival.csv',
+        csv_file="utils/minival.csv",
         partition=None,
         shard=0,
         num_shards=1,
@@ -322,15 +332,24 @@ class CelebAMiniVal(CelebADataset):
         self.data = pd.read_csv(csv_file).iloc[:, 1:]
         self.data = self.data[shard::num_shards]
         self.image_size = image_size
-        self.transform = transforms.Compose([
-            transforms.Resize(image_size),
-            transforms.RandomHorizontalFlip() if random_flip else lambda x: x,
-            transforms.CenterCrop(image_size),
-            transforms.RandomResizedCrop(image_size, (0.95, 1.0)) if random_crop else lambda x: x,
-            transforms.ToTensor(),
-            transforms.Normalize([0.5, 0.5, 0.5],
-                                 [0.5, 0.5, 0.5]) if normalize else lambda x: x,
-        ])
+        self.transform = transforms.Compose(
+            [
+                transforms.Resize(image_size),
+                transforms.RandomHorizontalFlip() if random_flip else lambda x: x,
+                transforms.CenterCrop(image_size),
+                (
+                    transforms.RandomResizedCrop(image_size, (0.95, 1.0))
+                    if random_crop
+                    else lambda x: x
+                ),
+                transforms.ToTensor(),
+                (
+                    transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
+                    if normalize
+                    else lambda x: x
+                ),
+            ]
+        )
         self.data_dir = data_dir
         self.class_cond = class_cond
         self.query = query_label
@@ -350,62 +369,95 @@ class ShortcutCelebADataset(Dataset):
         normalize=True,
         query_label=31,
         task_label=39,
-        shortcut_label_name='Smiling',
-        task_label_name='Young',
+        shortcut_label_name="Smiling",
+        task_label_name="Young",
         percentage=0.5,
         n_samples=1000,
         seed=4,
     ):
-        partition_df = pd.read_csv(osp.join(data_dir, 'list_eval_partition.csv'))
+        partition_df = pd.read_csv(osp.join(data_dir, "list_eval_partition.csv"))
         self.data_dir = data_dir
-        data = pd.read_csv(osp.join(data_dir, 'list_attr_celeba.csv'))
-        if partition == 'train':
+        data = pd.read_csv(osp.join(data_dir, "list_attr_celeba.csv"))
+        if partition == "train":
             partition = 0
-        elif partition == 'val':
+        elif partition == "val":
             partition = 1
-        elif partition == 'test':
+        elif partition == "test":
             partition = 2
         else:
-            raise ValueError(f'Unkown partition {partition}')
-        self.data = data[partition_df['partition'] == partition]
+            raise ValueError(f"Unkown partition {partition}")
+        self.data = data[partition_df["partition"] == partition]
         self.data = self.data[shard::num_shards]
         self.data.reset_index(inplace=True)
         self.data.replace(-1, 0, inplace=True)
         shortcut_samples = int(n_samples * percentage)
         noshortcut_samples = n_samples - shortcut_samples
 
-
-        shortcut_positive = self.data[(self.data[shortcut_label_name] == 1) & (self.data[task_label_name] == 1)].sample(n=shortcut_samples, random_state=seed, replace=False)
-        shortcut_negative = self.data[(self.data[shortcut_label_name] == 1) & (self.data[task_label_name] == 0)].sample(n=noshortcut_samples, random_state=seed, replace=False)
-        noshortcut_positive = self.data[(self.data[shortcut_label_name] == 0) & (self.data[task_label_name] == 1)].sample(n=noshortcut_samples, random_state=seed, replace=False)
-        noshortcut_negative = self.data[(self.data[shortcut_label_name] == 0) & (self.data[task_label_name] == 0)].sample(n=shortcut_samples, random_state=seed, replace=False)
-        subset_dataset = pd.concat([shortcut_positive, shortcut_negative, noshortcut_positive, noshortcut_negative])
+        shortcut_positive = self.data[
+            (self.data[shortcut_label_name] == 1) & (self.data[task_label_name] == 1)
+        ].sample(n=shortcut_samples, random_state=seed, replace=False)
+        shortcut_negative = self.data[
+            (self.data[shortcut_label_name] == 1) & (self.data[task_label_name] == 0)
+        ].sample(n=noshortcut_samples, random_state=seed, replace=False)
+        noshortcut_positive = self.data[
+            (self.data[shortcut_label_name] == 0) & (self.data[task_label_name] == 1)
+        ].sample(n=noshortcut_samples, random_state=seed, replace=False)
+        noshortcut_negative = self.data[
+            (self.data[shortcut_label_name] == 0) & (self.data[task_label_name] == 0)
+        ].sample(n=shortcut_samples, random_state=seed, replace=False)
+        subset_dataset = pd.concat(
+            [
+                shortcut_positive,
+                shortcut_negative,
+                noshortcut_positive,
+                noshortcut_negative,
+            ]
+        )
         print()
-        print('Shortcut CelebA dataset')
-        print(f'Query label ID {query_label}')
-        print(f'Shortcut label {shortcut_label_name}')
-        print(f'Task label {task_label_name}')
-        print(f'Number of shortcut/positive task label samples: {len(shortcut_positive)}')
-        print(f'Number of shortcut/negative task label samples: {len(shortcut_negative)}')
-        print(f'Number of nonshortcut/positive task label samples: {len(noshortcut_positive)}')
-        print(f'Number of nonshortcut/negative task label samples: {len(noshortcut_negative)}')
+        print("Shortcut CelebA dataset")
+        print(f"Query label ID {query_label}")
+        print(f"Shortcut label {shortcut_label_name}")
+        print(f"Task label {task_label_name}")
+        print(
+            f"Number of shortcut/positive task label samples: {len(shortcut_positive)}"
+        )
+        print(
+            f"Number of shortcut/negative task label samples: {len(shortcut_negative)}"
+        )
+        print(
+            f"Number of nonshortcut/positive task label samples: {len(noshortcut_positive)}"
+        )
+        print(
+            f"Number of nonshortcut/negative task label samples: {len(noshortcut_negative)}"
+        )
         print()
         self.data = subset_dataset
         self.data = self.data.sort_index()
-        self.transform = transforms.Compose([
-            transforms.Resize(image_size),
-            transforms.RandomHorizontalFlip() if random_flip else lambda x: x,
-            transforms.CenterCrop(image_size),
-            transforms.RandomResizedCrop(image_size, (0.95, 1.0)) if random_crop else lambda x: x,
-            transforms.ToTensor(),
-            transforms.Normalize([0.5, 0.5, 0.5],
-                                 [0.5, 0.5, 0.5]) if normalize else lambda x: x
-        ])
+        self.transform = transforms.Compose(
+            [
+                transforms.Resize(image_size),
+                transforms.RandomHorizontalFlip() if random_flip else lambda x: x,
+                transforms.CenterCrop(image_size),
+                (
+                    transforms.RandomResizedCrop(image_size, (0.95, 1.0))
+                    if random_crop
+                    else lambda x: x
+                ),
+                transforms.ToTensor(),
+                (
+                    transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
+                    if normalize
+                    else lambda x: x
+                ),
+            ]
+        )
         self.query = query_label
         self.task = task_label
         self.class_cond = class_cond
+
     def __len__(self):
         return len(self.data)
+
     def __getitem__(self, idx):
         sample = self.data.iloc[idx, :]
         labels_ = sample[2:].to_numpy()
@@ -413,45 +465,60 @@ class ShortcutCelebADataset(Dataset):
             labels = int(labels_[self.query])
             task_labels = int(labels_[self.task])
         else:
-            labels = torch.from_numpy(labels.astype('float32'))
-        img_file = sample['image_id']
-        with open(osp.join(self.data_dir, 'img_align_celeba', img_file), "rb") as f:
+            labels = torch.from_numpy(labels.astype("float32"))
+        img_file = sample["image_id"]
+        with open(osp.join(self.data_dir, "img_align_celeba", img_file), "rb") as f:
             img = Image.open(f)
-            img = img.convert('RGB')
+            img = img.convert("RGB")
         img = self.transform(img)
         if self.query != -1:
             return img, labels, task_labels
         if self.class_cond:
-            return img, {'y': labels}
+            return img, {"y": labels}
         else:
             return img, {}
 
 
 class ShortcutCFDataset(CelebADataset):
-    def __init__(
-        self,
-        path='/scratch/ppar/output', 
-        exp_name='fastdime'):
+    def __init__(self, path="/scratch/ppar/output", exp_name="fastdime"):
 
         self.images = []
         self.path = path
         self.exp_name = exp_name
 
-        self.transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize([0.5, 0.5, 0.5],
-                                 [0.5, 0.5, 0.5])])
+        self.transform = transforms.Compose(
+            [
+                transforms.ToTensor(),
+                transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
+            ]
+        )
 
-        for CL, CF in itertools.product(['CC'], ['CCF', 'ICF']):
-            self.images += [(CL, CF, I) for I in os.listdir(osp.join(path, 'Results', self.exp_name, CL, CF, 'CF'))]
-        
+        for CL, CF in itertools.product(["CC"], ["CCF", "ICF"]):
+            self.images += [
+                (CL, CF, I)
+                for I in os.listdir(
+                    osp.join(path, "Results", self.exp_name, CL, CF, "CF")
+                )
+            ]
+
     def __len__(self):
         return len(self.images)
 
     def __getitem__(self, idx):
         CL, CF, I = self.images[idx]
 
-        with open(osp.join(self.path, 'Results', self.exp_name, CL, CF, 'Info', I.split('.')[0] + '.txt'), 'r') as f:
+        with open(
+            osp.join(
+                self.path,
+                "Results",
+                self.exp_name,
+                CL,
+                CF,
+                "Info",
+                I.split(".")[0] + ".txt",
+            ),
+            "r",
+        ) as f:
             for line in f:
                 if line.startswith("pred:"):
                     pred = int(line.split(":")[1].strip())
@@ -464,8 +531,10 @@ class ShortcutCFDataset(CelebADataset):
                 elif line.startswith("label:"):
                     shortcut_label = int(line.split(":")[1].strip())
 
-        cl_path = osp.join(self.path, 'Original', 'Correct' if CL == 'CC' else 'Incorrect', I)
-        cf_path = osp.join(self.path, 'Results', self.exp_name, CL, CF, 'CF', I)
+        cl_path = osp.join(
+            self.path, "Original", "Correct" if CL == "CC" else "Incorrect", I
+        )
+        cf_path = osp.join(self.path, "Results", self.exp_name, CL, CF, "CF", I)
         cf = self.load_img(cf_path)
         cl = self.load_img(cl_path)
 
@@ -477,21 +546,23 @@ class ShortcutCFDataset(CelebADataset):
         return self.transform(img)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     from matplotlib import pyplot as plt
 
-    dataset = ShortcutCelebADataset(image_size=128,
-        data_dir='/scratch/ppar/data/img_align_celeba/',
-        partition='val',
+    dataset = ShortcutCelebADataset(
+        image_size=128,
+        data_dir="/scratch/ppar/data/img_align_celeba/",
+        partition="val",
         shard=0,
         num_shards=1,
         class_cond=False,
         random_crop=True,
         random_flip=True,
         query_label=31,
-        normalize=True,)
+        normalize=True,
+    )
     print(len(dataset))
     img, labels, task_labels = next(iter(dataset))
     print(img.shape, img.min(), img.max())
-    plt.imshow((img.permute(1,2,0).numpy()+1)/2)
-    plt.imsave('assets/example_shortcut.png', (img.permute(1,2,0).numpy()+1)/2 )
+    plt.imshow((img.permute(1, 2, 0).numpy() + 1) / 2)
+    plt.imsave("assets/example_shortcut.png", (img.permute(1, 2, 0).numpy() + 1) / 2)

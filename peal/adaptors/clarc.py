@@ -68,16 +68,22 @@ class ClArC(Adaptor):
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         print("running on device: ", self.device)
-        self.original_model = torch.load(self.config.model_path, map_location=self.device)
-        if hasattr(self.original_model, 'model'):
+        self.original_model = torch.load(
+            self.config.model_path, map_location=self.device
+        )
+        if hasattr(self.original_model, "model"):
             self.original_model = self.original_model.model
         self.model = copy.deepcopy(self.original_model)
         self.attacked_class = adaptor_config.attacked_class
-        self.use_perfect_annotations = True if self.config.data.spray_label_file is not None else False
+        self.use_perfect_annotations = (
+            True if self.config.data.spray_label_file is not None else False
+        )
 
         self.cav_cache = CavCache("", "", "", "")
 
-        self.train_dataloader, self.val_dataloader, self.test_dataloader = create_dataloaders_from_datasource(self.config)
+        self.train_dataloader, self.val_dataloader, self.test_dataloader = (
+            create_dataloaders_from_datasource(self.config)
+        )
         self.train_dataloader.dataset.return_dict = True
         self.train_dataloader.dataset.url_enabled = True
         self.train_dataloader.dataset.enable_groups()
@@ -91,15 +97,22 @@ class ClArC(Adaptor):
         self.val_dataloader.dataset.disable_class_restriction()
         # self.test_dataloader.dataset.disable_class_restriction()
         if self.config.attacked_class is not None:
-            self.train_dataloader.dataset.enable_class_restriction(self.config.attacked_class)
+            self.train_dataloader.dataset.enable_class_restriction(
+                self.config.attacked_class
+            )
 
         self.test_data_unpoisoned = None
         if self.config.unpoisoned_data is not None:
-            self.test_data_unpoisoned = get_datasets(self.config.unpoisoned_data, return_dict=True)[-1]
+            self.test_data_unpoisoned = get_datasets(
+                self.config.unpoisoned_data, return_dict=True
+            )[-1]
             self.test_data_unpoisoned.enable_groups()
-            self.test_data_unpoisoned = get_dataloader(self.test_data_unpoisoned, mode="test", batch_size=self.config.training.test_batch_size, task_config=self.config.task)
-
-
+            self.test_data_unpoisoned = get_dataloader(
+                self.test_data_unpoisoned,
+                mode="test",
+                batch_size=self.config.training.test_batch_size,
+                task_config=self.config.task,
+            )
 
     def run(self):
 
@@ -123,12 +136,16 @@ class ClArC(Adaptor):
         best_model = (self.model, 0, "uncorrected", "uncorrected")
         for layer in self.config.layer_index:
             for cs in self.config.correction_strength:
-                model, number_epochs_finetuned = self._run(layer_index=layer, correction_strength=cs)
+                model, number_epochs_finetuned = self._run(
+                    layer_index=layer, correction_strength=cs
+                )
                 model.eval()
                 for description, dataloader in eval_dataloaders:
                     evaluation[description]["projection_location"].append(layer)
                     evaluation[description]["correction_strength"].append(cs)
-                    evaluation[description]["epochs_finetuned"].append(number_epochs_finetuned)
+                    evaluation[description]["epochs_finetuned"].append(
+                        number_epochs_finetuned
+                    )
 
                     for k, v in self.get_stats(dataloader, model).items():
                         if k == "accuracy":
@@ -155,13 +172,18 @@ class ClArC(Adaptor):
             result += f"c0-confounder accuracy: {model_stats.get('c0_artifact_accuracy', '---')}\n"
             result += f"c1-nonconfounder accuracy: {model_stats.get('c1_non-artifact_accuracy', '---')}\n"
             result += f"c1-confounder accuracy: {model_stats.get('c1_artifact_accuracy', '---')}\n"
-            result += f"average group accuracy: {model_stats.get('avg_group_acc', '---')}\n"
-            result += f"worst group accuracy: {model_stats.get('worst_group_acc', '---')}"
+            result += (
+                f"average group accuracy: {model_stats.get('avg_group_acc', '---')}\n"
+            )
+            result += (
+                f"worst group accuracy: {model_stats.get('worst_group_acc', '---')}"
+            )
 
         print(result)
-        with open(os.path.join(self.config.base_dir, "best_model_result.txt"), "w") as result_file:
+        with open(
+            os.path.join(self.config.base_dir, "best_model_result.txt"), "w"
+        ) as result_file:
             result_file.write(result)
-
 
     def _run(self, *args, **kwargs) -> (Module, int):
         pass
@@ -169,13 +191,17 @@ class ClArC(Adaptor):
     def get_evaluation_filename(self, dataset_name: str) -> str:
         pass
 
-    def get_annotations_and_activations(self, feature_extractor: Module = None) -> tuple[torch.Tensor, torch.Tensor]:
+    def get_annotations_and_activations(
+        self, feature_extractor: Module = None
+    ) -> tuple[torch.Tensor, torch.Tensor]:
 
         confounders = []
         non_confounders = []
         for it, batch in enumerate(self.train_dataloader):
             x = batch["x"].to(self.device)
-            activation = x if feature_extractor is None else feature_extractor(x).detach()
+            activation = (
+                x if feature_extractor is None else feature_extractor(x).detach()
+            )
 
             if self.config.cav_mode == "cavs_max":
                 activation = activation.flatten(start_dim=2).max(2).values
@@ -197,10 +223,14 @@ class ClArC(Adaptor):
         confounders = torch.stack(confounders)
         non_confounders = torch.stack(non_confounders)
         activations = torch.cat((non_confounders, confounders))
-        annotations = torch.cat((torch.zeros(len(non_confounders)), torch.ones(len(confounders)))).to(self.device)
+        annotations = torch.cat(
+            (torch.zeros(len(non_confounders)), torch.ones(len(confounders)))
+        ).to(self.device)
 
         num_artifact_samples = torch.sum(annotations == 1).item()
-        print(f"Number of artifact samples: {num_artifact_samples}; Number of non-artifact samples: {len(annotations) - num_artifact_samples}")
+        print(
+            f"Number of artifact samples: {num_artifact_samples}; Number of non-artifact samples: {len(annotations) - num_artifact_samples}"
+        )
         return activations, annotations
 
     @torch.no_grad()
@@ -210,7 +240,7 @@ class ClArC(Adaptor):
         targets = []
         acc = []
         with tqdm(dataloader) as pbar:
-            pbar.set_description(f'evaluation')
+            pbar.set_description(f"evaluation")
             for batch in pbar:
                 x = batch["x"].to(self.device)
                 y = batch["y"].to(self.device).squeeze()
@@ -224,24 +254,37 @@ class ClArC(Adaptor):
         targets = torch.cat(targets, dim=0).to(self.device).int()
         acc = torch.cat(acc, dim=0).to(self.device).float()
 
-        results = {"n": len(targets),
-                   "artifact_freq": annotations.sum().item()/len(annotations) if len(targets) == len(annotations) else "---",
-                   "accuracy": acc.mean().item(),
-                   "avg_group_acc": "empty",
-                   "worst_group_acc": "empty",
-                   "artifact_accuracy": acc[annotations == 1].mean().item(),
-                   "non-artifact_accuracy": acc[annotations == 0].mean().item()
-                   }
+        results = {
+            "n": len(targets),
+            "artifact_freq": (
+                annotations.sum().item() / len(annotations)
+                if len(targets) == len(annotations)
+                else "---"
+            ),
+            "accuracy": acc.mean().item(),
+            "avg_group_acc": "empty",
+            "worst_group_acc": "empty",
+            "artifact_accuracy": acc[annotations == 1].mean().item(),
+            "non-artifact_accuracy": acc[annotations == 0].mean().item(),
+        }
 
         group_accuracies = []
         for y in torch.unique(targets):
             idx = targets == y
             results[f"c{y.item()}_n"] = len(targets[idx])
-            results[f"c{y.item()}_artifact_freq"] = annotations[idx].sum().item()/len(annotations[idx]) if len(targets) == len(annotations) else "---"
+            results[f"c{y.item()}_artifact_freq"] = (
+                annotations[idx].sum().item() / len(annotations[idx])
+                if len(targets) == len(annotations)
+                else "---"
+            )
             results[f"c{y.item()}_accuracy"] = acc[idx].mean().item()
-            results[f"c{y.item()}_artifact_accuracy"] = acc[(annotations == 1) * idx].mean().item()
+            results[f"c{y.item()}_artifact_accuracy"] = (
+                acc[(annotations == 1) * idx].mean().item()
+            )
             group_accuracies.append(results[f"c{y.item()}_artifact_accuracy"])
-            results[f"c{y.item()}_non-artifact_accuracy"] = acc[(annotations == 0) * idx].mean().item()
+            results[f"c{y.item()}_non-artifact_accuracy"] = (
+                acc[(annotations == 0) * idx].mean().item()
+            )
             group_accuracies.append(results[f"c{y.item()}_non-artifact_accuracy"])
             # print(f"class {y}: {results[f'c{y.item()}_n']} items, artfiact freq: {results[f'c{y.item()}_artifact_freq']}")
 
@@ -259,44 +302,89 @@ class PClArC(ClArC):
         self.adaptor_config = adaptor_config
 
     def get_evaluation_filename(self, dataset_name: str) -> str:
-        attacked_class = f"_attacked-c{self.adaptor_config.attacked_class}" if self.adaptor_config.attacked_class is not None else ""
-        label_type = ("true" if self.config.data.spray_label_file is None else "spray") + "-group-labels"
-        finetune = f"_{self.config.training.max_epochs}epochs-finetune" if self.adaptor_config.finetune else ""
+        attacked_class = (
+            f"_attacked-c{self.adaptor_config.attacked_class}"
+            if self.adaptor_config.attacked_class is not None
+            else ""
+        )
+        label_type = (
+            "true" if self.config.data.spray_label_file is None else "spray"
+        ) + "-group-labels"
+        finetune = (
+            f"_{self.config.training.max_epochs}epochs-finetune"
+            if self.adaptor_config.finetune
+            else ""
+        )
         return f"correction_{dataset_name}-dataset_{label_type}_{self.adaptor_config.projection_type}-projection_mode-{self.adaptor_config.cav_mode}{attacked_class}{finetune}.csv"
 
     def run(self, *args, **kwargs):
         super().run()
 
-    def _run(self, layer_index: int = -1, correction_strength: float = 1.0, **kwargs) -> (Module, int):
+    def _run(
+        self, layer_index: int = -1, correction_strength: float = 1.0, **kwargs
+    ) -> (Module, int):
         torch.manual_seed(self.config.seed)
 
-        print(f"\n\nperforming p-clarc in layer {layer_index} with correction strength {correction_strength} and projection type {self.adaptor_config.projection_type}")
+        print(
+            f"\n\nperforming p-clarc in layer {layer_index} with correction strength {correction_strength} and projection type {self.adaptor_config.projection_type}"
+        )
         self.model.eval()
 
         feature_extractor, downstream_head = None, None
         if layer_index != 0:
-            feature_extractor, downstream_head = split_model(self.model, layer_index, self.device)
+            feature_extractor, downstream_head = split_model(
+                self.model, layer_index, self.device
+            )
 
         if layer_index != self.cav_cache.layer:
-            activations, annotations = self.get_annotations_and_activations(feature_extractor=feature_extractor)
-            cav = calculate_cav(activations, annotations.clone(), self.adaptor_config.projection_type).to(self.device, dtype=activations.dtype)
-            self.cav_cache = CavCache(layer=layer_index, cav=cav, annotations=annotations, activations=activations)
+            activations, annotations = self.get_annotations_and_activations(
+                feature_extractor=feature_extractor
+            )
+            cav = calculate_cav(
+                activations, annotations.clone(), self.adaptor_config.projection_type
+            ).to(self.device, dtype=activations.dtype)
+            self.cav_cache = CavCache(
+                layer=layer_index,
+                cav=cav,
+                annotations=annotations,
+                activations=activations,
+            )
 
-        projection = SimpleProjection if self.adaptor_config.projection_type == "simple" else CavProjection
-        projection = projection(self.cav_cache.activations, self.cav_cache.annotations, cav=self.cav_cache.cav, cav_mode=self.adaptor_config.cav_mode, correction_strength=correction_strength)
+        projection = (
+            SimpleProjection
+            if self.adaptor_config.projection_type == "simple"
+            else CavProjection
+        )
+        projection = projection(
+            self.cav_cache.activations,
+            self.cav_cache.annotations,
+            cav=self.cav_cache.cav,
+            cav_mode=self.adaptor_config.cav_mode,
+            correction_strength=correction_strength,
+        )
 
         number_epochs_finetuned = 0
         if layer_index != 0:
             if self.adaptor_config.finetune:
-                downstream_head, number_epochs_finetuned = self.finetune(projection, downstream_head, feature_extractor=feature_extractor)
-            self.model = torch.nn.Sequential(feature_extractor, projection, downstream_head)
+                downstream_head, number_epochs_finetuned = self.finetune(
+                    projection, downstream_head, feature_extractor=feature_extractor
+                )
+            self.model = torch.nn.Sequential(
+                feature_extractor, projection, downstream_head
+            )
         else:
             if self.adaptor_config.finetune:
-                self.model, number_epochs_finetuned = self.finetune(projection, self.model)
+                self.model, number_epochs_finetuned = self.finetune(
+                    projection, self.model
+                )
             self.model = torch.nn.Sequential(projection, self.model)
 
         if self.adaptor_config.save_model:
-            attacked_class = f"_attacked-c{self.adaptor_config.attacked_class}" if self.adaptor_config.attacked_class is not None else ""
+            attacked_class = (
+                f"_attacked-c{self.adaptor_config.attacked_class}"
+                if self.adaptor_config.attacked_class is not None
+                else ""
+            )
             filename = f"corrected_model{attacked_class}_{self.adaptor_config.projection_type}{layer_index}_mode-{self.adaptor_config.cav_mode}_cs{correction_strength}_epoch{number_epochs_finetuned}.cpl"
             corrected_model_path = os.path.join(self.adaptor_config.base_dir, filename)
             print("saving corrected model to: " + corrected_model_path)
@@ -305,7 +393,12 @@ class PClArC(ClArC):
 
         return self.model, number_epochs_finetuned
 
-    def finetune(self, projection_layer: Module, downstream_head: Module, feature_extractor: Module = None) -> (Module, int):
+    def finetune(
+        self,
+        projection_layer: Module,
+        downstream_head: Module,
+        feature_extractor: Module = None,
+    ) -> (Module, int):
 
         if feature_extractor is not None:
             feature_extractor.eval()
@@ -313,14 +406,25 @@ class PClArC(ClArC):
         downstream_head.train()
         self.train_dataloader.dataset.disable_class_restriction()
 
-        optimizer = torch.optim.SGD(downstream_head.parameters(), lr=self.adaptor_config.training.learning_rate, momentum=0.9, weight_decay=0.0001)
+        optimizer = torch.optim.SGD(
+            downstream_head.parameters(),
+            lr=self.adaptor_config.training.learning_rate,
+            momentum=0.9,
+            weight_decay=0.0001,
+        )
         loss = CrossEntropyLoss()
 
-        composite = Sequential(feature_extractor, projection_layer, downstream_head) if feature_extractor is not None else Sequential(projection_layer, downstream_head)
+        composite = (
+            Sequential(feature_extractor, projection_layer, downstream_head)
+            if feature_extractor is not None
+            else Sequential(projection_layer, downstream_head)
+        )
         val_accuracies = self.get_stats(self.val_dataloader, composite)
-        print(f"Epoch 0: avg_group_acc={val_accuracies['avg_group_acc']}, worst_group_acc={val_accuracies['worst_group_acc']}")
+        print(
+            f"Epoch 0: avg_group_acc={val_accuracies['avg_group_acc']}, worst_group_acc={val_accuracies['worst_group_acc']}"
+        )
         best_model = copy.deepcopy(downstream_head)
-        best_val_group_acc = val_accuracies['avg_group_acc']
+        best_val_group_acc = val_accuracies["avg_group_acc"]
         number_epochs_trained = 0
 
         torch.autograd.set_detect_anomaly(True)
@@ -337,7 +441,9 @@ class PClArC(ClArC):
                     if feature_extractor is None:
                         prediction = downstream_head(projection_layer(x))
                     else:
-                        prediction = downstream_head(projection_layer(feature_extractor(x)))
+                        prediction = downstream_head(
+                            projection_layer(feature_extractor(x))
+                        )
 
                     ce_loss = loss(prediction, y)
                     try:
@@ -345,7 +451,9 @@ class PClArC(ClArC):
                     except:
                         print(traceback.format_exc())
                         if self.config.attacked_class is not None:
-                            self.train_dataloader.dataset.enable_class_restriction(self.attacked_class)
+                            self.train_dataloader.dataset.enable_class_restriction(
+                                self.attacked_class
+                            )
                         return best_model, number_epochs_trained
 
                     optimizer.step()
@@ -354,19 +462,27 @@ class PClArC(ClArC):
                     losses.append(ce_loss.item())
                     accuracies.append(accuracy)
 
-                    pbar.set_description(f'fine tuning epoch {epoch+1}/{self.adaptor_config.training.max_epochs}: accuracy={accuracy.mean()}, loss={ce_loss}')
+                    pbar.set_description(
+                        f"fine tuning epoch {epoch+1}/{self.adaptor_config.training.max_epochs}: accuracy={accuracy.mean()}, loss={ce_loss}"
+                    )
 
             epoch_accuracy = torch.cat(accuracies).mean().item()
             epoch_ce_loss = torch.tensor(losses).mean().item()
-            composite = Sequential(feature_extractor, projection_layer, downstream_head) if feature_extractor is not None else Sequential(projection_layer, downstream_head)
+            composite = (
+                Sequential(feature_extractor, projection_layer, downstream_head)
+                if feature_extractor is not None
+                else Sequential(projection_layer, downstream_head)
+            )
             val_accuracies = self.get_stats(self.val_dataloader, composite)
 
-            if val_accuracies['avg_group_acc'] > best_val_group_acc:
-                best_val_group_acc = val_accuracies['avg_group_acc']
+            if val_accuracies["avg_group_acc"] > best_val_group_acc:
+                best_val_group_acc = val_accuracies["avg_group_acc"]
                 best_model = copy.deepcopy(downstream_head)
                 number_epochs_trained = epoch + 1
 
-            print(f"Epoch {epoch+1}: train_acc={epoch_accuracy}, avg_group_acc={val_accuracies['avg_group_acc']}, worst_group_acc={val_accuracies['worst_group_acc']}, ce_loss={epoch_ce_loss}")
+            print(
+                f"Epoch {epoch+1}: train_acc={epoch_accuracy}, avg_group_acc={val_accuracies['avg_group_acc']}, worst_group_acc={val_accuracies['worst_group_acc']}, ce_loss={epoch_ce_loss}"
+            )
 
         if self.config.attacked_class is not None:
             self.train_dataloader.dataset.enable_class_restriction(self.attacked_class)
@@ -374,30 +490,45 @@ class PClArC(ClArC):
         return best_model, number_epochs_trained
 
 
-
 class RRClArC(ClArC):
 
     def __init__(self, adaptor_config: RRClArCConfig):
         super().__init__(adaptor_config)
         self.adaptor_config = adaptor_config
-        self.log_writer = SummaryWriter(log_dir=self.adaptor_config.base_dir + "/finetuning-logs")
+        self.log_writer = SummaryWriter(
+            log_dir=self.adaptor_config.base_dir + "/finetuning-logs"
+        )
 
     def get_evaluation_filename(self, dataset_name: str) -> str:
-        attacked_class = f"_attacked-c{self.adaptor_config.attacked_class}" if self.adaptor_config.attacked_class is not None else ""
+        attacked_class = (
+            f"_attacked-c{self.adaptor_config.attacked_class}"
+            if self.adaptor_config.attacked_class is not None
+            else ""
+        )
         mean_grad = f"_mean-grad" if self.adaptor_config.mean_grad else ""
-        label_type = ("true" if self.config.data.spray_label_file is None else "spray") + "-group-labels"
+        label_type = (
+            "true" if self.config.data.spray_label_file is None else "spray"
+        ) + "-group-labels"
         return f"correction_{dataset_name}-dataset_{label_type}_{self.adaptor_config.projection_type}-projection_mode-{self.adaptor_config.cav_mode}{attacked_class}_{self.adaptor_config.rrc_loss}-loss_target-{self.adaptor_config.gradient_target}{mean_grad}_{self.adaptor_config.training.max_epochs}-epochs.csv"
 
     def run(self):
         super().run()
         self.log_writer.close()
 
-    def _run(self, layer_index: int = -2, correction_strength: float = 1.0) -> (Module, int):
+    def _run(
+        self, layer_index: int = -2, correction_strength: float = 1.0
+    ) -> (Module, int):
 
         torch.manual_seed(self.config.seed)
-        print(f"\n\nperforming rr-clarc in layer {layer_index} with cav_mode={self.adaptor_config.cav_mode} and correction_strength={correction_strength}")
+        print(
+            f"\n\nperforming rr-clarc in layer {layer_index} with cav_mode={self.adaptor_config.cav_mode} and correction_strength={correction_strength}"
+        )
 
-        attacked_class = f"_attacked-c{self.adaptor_config.attacked_class}" if self.adaptor_config.attacked_class is not None else ""
+        attacked_class = (
+            f"_attacked-c{self.adaptor_config.attacked_class}"
+            if self.adaptor_config.attacked_class is not None
+            else ""
+        )
         mean_grad = f"_mean-grad" if self.adaptor_config.mean_grad else ""
         model_name = f"corrected_model_layer-{layer_index}_mode-{self.adaptor_config.cav_mode}_lamb{correction_strength}_{self.adaptor_config.rrc_loss}-loss{mean_grad}{attacked_class}_{self.adaptor_config.training.max_epochs}-epochs"
 
@@ -406,15 +537,32 @@ class RRClArC(ClArC):
         if layer_index == 0:
             downstream_head = self.model
         else:
-            feature_extractor, downstream_head = split_model(self.model, layer_index, self.device)
+            feature_extractor, downstream_head = split_model(
+                self.model, layer_index, self.device
+            )
 
         if layer_index != self.cav_cache.layer:
-            activations, annotations = self.get_annotations_and_activations(feature_extractor=feature_extractor)
-            cav = calculate_cav(activations, annotations, self.adaptor_config.projection_type)
+            activations, annotations = self.get_annotations_and_activations(
+                feature_extractor=feature_extractor
+            )
+            cav = calculate_cav(
+                activations, annotations, self.adaptor_config.projection_type
+            )
             cav = cav.to(self.device, activations.dtype)
-            self.cav_cache = CavCache(layer=layer_index, cav=cav, annotations=annotations, activations=activations)
+            self.cav_cache = CavCache(
+                layer=layer_index,
+                cav=cav,
+                annotations=annotations,
+                activations=activations,
+            )
 
-        downstream_head, number_epochs_finetuned = self.finetune(self.cav_cache.cav, downstream_head, correction_strength, feature_extractor=feature_extractor, model_name=model_name)
+        downstream_head, number_epochs_finetuned = self.finetune(
+            self.cav_cache.cav,
+            downstream_head,
+            correction_strength,
+            feature_extractor=feature_extractor,
+            model_name=model_name,
+        )
         if layer_index == 0:
             self.model = downstream_head
         else:
@@ -422,19 +570,23 @@ class RRClArC(ClArC):
         self.model.eval()
 
         if self.adaptor_config.save_model:
-            corrected_model_path = os.path.join(self.adaptor_config.base_dir, model_name + ".cpl")
+            corrected_model_path = os.path.join(
+                self.adaptor_config.base_dir, model_name + ".cpl"
+            )
             print("saving corrected model to: " + corrected_model_path)
             torch.save(self.model.to("cpu"), corrected_model_path)
             self.model.to(self.device)
 
         return self.model, number_epochs_finetuned
 
-    def finetune(self,
-                 cav: torch.Tensor,
-                 downstream_head: Module,
-                 lamb: float,
-                 feature_extractor: Module = None,
-                 model_name: str = "corrected_model"):
+    def finetune(
+        self,
+        cav: torch.Tensor,
+        downstream_head: Module,
+        lamb: float,
+        feature_extractor: Module = None,
+        model_name: str = "corrected_model",
+    ):
 
         best_model = copy.deepcopy(downstream_head)
         best_rrc_loss = sys.maxsize
@@ -442,14 +594,20 @@ class RRClArC(ClArC):
             val_accuracies = self.get_stats(self.val_dataloader, downstream_head)
         else:
             feature_extractor.eval()
-            val_accuracies = self.get_stats(self.val_dataloader, Sequential(feature_extractor, downstream_head))
+            val_accuracies = self.get_stats(
+                self.val_dataloader, Sequential(feature_extractor, downstream_head)
+            )
         best_val_group_acc = val_accuracies["avg_group_acc"]
         number_epochs_finetuned = 0
 
         downstream_head.train()
         self.train_dataloader.dataset.disable_class_restriction()
 
-        optimizer = torch.optim.SGD(downstream_head.parameters(), lr=self.adaptor_config.training.learning_rate, momentum=0.95)
+        optimizer = torch.optim.SGD(
+            downstream_head.parameters(),
+            lr=self.adaptor_config.training.learning_rate,
+            momentum=0.95,
+        )
         for epoch in range(self.adaptor_config.training.max_epochs):
             ce_losses = []
             rrc_losses = []
@@ -463,28 +621,40 @@ class RRClArC(ClArC):
                     x = batch["x"].to(self.device)
                     y = batch["y"].to(self.device).squeeze()
 
-                    representation = (x if feature_extractor is None else feature_extractor(x)).requires_grad_()
+                    representation = (
+                        x if feature_extractor is None else feature_extractor(x)
+                    ).requires_grad_()
                     prediction = downstream_head(representation)
                     prediction_filtered = self.get_gradient_target(prediction)
 
-                    grad = torch.autograd.grad(outputs=prediction_filtered,
-                                               inputs=representation,
-                                               create_graph=True,
-                                               retain_graph=True,
-                                               grad_outputs=torch.ones_like(prediction_filtered))[0]
+                    grad = torch.autograd.grad(
+                        outputs=prediction_filtered,
+                        inputs=representation,
+                        create_graph=True,
+                        retain_graph=True,
+                        grad_outputs=torch.ones_like(prediction_filtered),
+                    )[0]
                     if self.adaptor_config.mean_grad:
                         grad = grad.mean((2, 3), keepdim=True).expand_as(grad)
 
                     if self.adaptor_config.cav_mode is not None:
-                        grad = grad.permute(1, 0, 2, 3).flatten(start_dim=1).permute(1, 0)
+                        grad = (
+                            grad.permute(1, 0, 2, 3).flatten(start_dim=1).permute(1, 0)
+                        )
                     else:
                         grad = grad.flatten(start_dim=1)
 
                     if self.adaptor_config.rrc_loss == "l2":
                         rrc_loss = ((grad * cav).sum(1) ** 2).mean(0)
                     elif self.adaptor_config.rrc_loss == "cosine":
-                        rrc_loss = torch.nn.functional.cosine_similarity(grad, cav).abs().mean(0)
-                    ce_loss = torch.nn.functional.cross_entropy(prediction, y.to(torch.long))
+                        rrc_loss = (
+                            torch.nn.functional.cosine_similarity(grad, cav)
+                            .abs()
+                            .mean(0)
+                        )
+                    ce_loss = torch.nn.functional.cross_entropy(
+                        prediction, y.to(torch.long)
+                    )
                     accuracy = (prediction.argmax(1) == y).float()
                     rrc_losses.append(rrc_loss.item())
                     ce_losses.append(ce_loss.item())
@@ -497,7 +667,9 @@ class RRClArC(ClArC):
                     loss.backward()
                     optimizer.step()
 
-                    pbar.set_description(f'fine tuning epoch {epoch+1}/{self.adaptor_config.training.max_epochs}: accuracy={accuracy.mean()}, rrc_loss={rrc_loss}, ce_loss={ce_loss}')
+                    pbar.set_description(
+                        f"fine tuning epoch {epoch+1}/{self.adaptor_config.training.max_epochs}: accuracy={accuracy.mean()}, rrc_loss={rrc_loss}, ce_loss={ce_loss}"
+                    )
 
             epoch_accuracy = torch.cat(accuracies).mean().item()
             epoch_ce_loss = torch.tensor(ce_losses).mean().item()
@@ -505,38 +677,62 @@ class RRClArC(ClArC):
             if feature_extractor is None:
                 val_accuracies = self.get_stats(self.val_dataloader, downstream_head)
             else:
-                val_accuracies = self.get_stats(self.val_dataloader, Sequential(feature_extractor, downstream_head))
+                val_accuracies = self.get_stats(
+                    self.val_dataloader, Sequential(feature_extractor, downstream_head)
+                )
 
-            if val_accuracies["avg_group_acc"] > best_val_group_acc or (epoch_rrc_loss < best_rrc_loss and val_accuracies["avg_group_acc"] == best_val_group_acc):
+            if val_accuracies["avg_group_acc"] > best_val_group_acc or (
+                epoch_rrc_loss < best_rrc_loss
+                and val_accuracies["avg_group_acc"] == best_val_group_acc
+            ):
                 best_val_group_acc = val_accuracies["avg_group_acc"]
                 best_rrc_loss = epoch_rrc_loss
                 best_model = copy.deepcopy(downstream_head)
                 number_epochs_finetuned = epoch + 1
 
-            self.log_writer.add_scalar(model_name + "/val/emp_acc", val_accuracies["accuracy"], epoch)
-            self.log_writer.add_scalar(model_name + "/val/avg_group_acc", val_accuracies["avg_group_acc"], epoch)
-            self.log_writer.add_scalar(model_name + "/val/worst_group_acc", val_accuracies["worst_group_acc"], epoch)
-            self.log_writer.add_scalar(model_name + "/train/accuracy", epoch_accuracy, epoch)
-            self.log_writer.add_scalar(model_name + "/train/ce_loss", epoch_ce_loss, epoch)
-            self.log_writer.add_scalar(model_name + "/train/rrc_loss", epoch_rrc_loss, epoch)
+            self.log_writer.add_scalar(
+                model_name + "/val/emp_acc", val_accuracies["accuracy"], epoch
+            )
+            self.log_writer.add_scalar(
+                model_name + "/val/avg_group_acc",
+                val_accuracies["avg_group_acc"],
+                epoch,
+            )
+            self.log_writer.add_scalar(
+                model_name + "/val/worst_group_acc",
+                val_accuracies["worst_group_acc"],
+                epoch,
+            )
+            self.log_writer.add_scalar(
+                model_name + "/train/accuracy", epoch_accuracy, epoch
+            )
+            self.log_writer.add_scalar(
+                model_name + "/train/ce_loss", epoch_ce_loss, epoch
+            )
+            self.log_writer.add_scalar(
+                model_name + "/train/rrc_loss", epoch_rrc_loss, epoch
+            )
 
-            print(f"Epoch {epoch+1}: train_accuracy={epoch_accuracy}, val_accuracy={val_accuracies['accuracy']}, avg_group_acc={val_accuracies['avg_group_acc']}, worst_group_acc={val_accuracies['worst_group_acc']}, ce_loss={epoch_ce_loss}, rrc_loss={epoch_rrc_loss}")
-
+            print(
+                f"Epoch {epoch+1}: train_accuracy={epoch_accuracy}, val_accuracy={val_accuracies['accuracy']}, avg_group_acc={val_accuracies['avg_group_acc']}, worst_group_acc={val_accuracies['worst_group_acc']}, ce_loss={epoch_ce_loss}, rrc_loss={epoch_rrc_loss}"
+            )
 
         self.log_writer.flush()
         if self.adaptor_config.attacked_class is not None:
-            self.train_dataloader.dataset.enable_class_restriction(self.adaptor_config.attacked_class)
+            self.train_dataloader.dataset.enable_class_restriction(
+                self.adaptor_config.attacked_class
+            )
 
         return best_model, number_epochs_finetuned
 
     def get_gradient_target(self, prediction):
-        if self.adaptor_config.gradient_target == 'max':
+        if self.adaptor_config.gradient_target == "max":
             return prediction.max(1)[0]
-        elif self.adaptor_config.gradient_target == 'attacked_class':
+        elif self.adaptor_config.gradient_target == "attacked_class":
             return prediction[:, self.adaptor_config.attacked_class]
-        elif self.adaptor_config.gradient_target == 'all':
+        elif self.adaptor_config.gradient_target == "all":
             return prediction.sum(1)
-        elif self.adaptor_config.gradient_target == 'all_random':
+        elif self.adaptor_config.gradient_target == "all_random":
             return (prediction * torch.sign(0.5 - torch.rand_like(prediction))).sum(1)
         else:
             raise NotImplementedError
@@ -552,11 +748,16 @@ def split_model(model: Module, split_at: int, device) -> (Module, Module):
 
     feature_extractor = torch.nn.Sequential(*children_list[:split_at])
     if isinstance(model, ResNet):
-        downstream_head = torch.nn.Sequential(*children_list[split_at:-1], torch.nn.Flatten(start_dim=1), children_list[-1])
+        downstream_head = torch.nn.Sequential(
+            *children_list[split_at:-1],
+            torch.nn.Flatten(start_dim=1),
+            children_list[-1],
+        )
     else:
         downstream_head = torch.nn.Sequential(*children_list[split_at:])
 
     return feature_extractor.to(device), downstream_head.to(device)
+
 
 def extract_all_children(model: Module, prefix: str = "") -> (list[Module], list[str]):
     children = []
@@ -565,7 +766,9 @@ def extract_all_children(model: Module, prefix: str = "") -> (list[Module], list
         if prefix:
             name = prefix + "." + name
         if isinstance(child, torch.nn.Sequential):
-            grandchildren, grandchildren_names = extract_all_children(child, prefix=name)
+            grandchildren, grandchildren_names = extract_all_children(
+                child, prefix=name
+            )
             children.extend(grandchildren)
             children_names.extend(grandchildren_names)
 
@@ -575,10 +778,14 @@ def extract_all_children(model: Module, prefix: str = "") -> (list[Module], list
 
     return children, children_names
 
-def get_layer_name(model: Module, layer_index: int) -> str:
-    return extract_all_children(model)[1][layer_index-1]
 
-def calculate_cav(activations: torch.Tensor, annotations: torch.Tensor, projection_type: str) -> torch.Tensor:
+def get_layer_name(model: Module, layer_index: int) -> str:
+    return extract_all_children(model)[1][layer_index - 1]
+
+
+def calculate_cav(
+    activations: torch.Tensor, annotations: torch.Tensor, projection_type: str
+) -> torch.Tensor:
     if projection_type == "pcav":
         return calculate_pcav(activations, annotations)
     elif projection_type == "svm":
@@ -586,7 +793,10 @@ def calculate_cav(activations: torch.Tensor, annotations: torch.Tensor, projecti
     else:
         raise NotImplementedError
 
-def calculate_pcav(activations: torch.Tensor, annotations: torch.Tensor) -> torch.Tensor:
+
+def calculate_pcav(
+    activations: torch.Tensor, annotations: torch.Tensor
+) -> torch.Tensor:
     actvs_centered = activations - activations.mean(dim=0)[None]
 
     annotations = annotations.clone()
@@ -594,38 +804,47 @@ def calculate_pcav(activations: torch.Tensor, annotations: torch.Tensor) -> torc
     annotations = annotations.to(activations.dtype)
     annotations_centered = annotations - annotations.mean()
 
-    covar = (actvs_centered * annotations_centered[:, None]).sum(dim=0) / (annotations.shape[0] - 1)
-    vary = torch.sum(annotations_centered ** 2, dim=0) / (annotations.shape[0] - 1)
+    covar = (actvs_centered * annotations_centered[:, None]).sum(dim=0) / (
+        annotations.shape[0] - 1
+    )
+    vary = torch.sum(annotations_centered**2, dim=0) / (annotations.shape[0] - 1)
     w = (covar / vary)[None]
 
-    cav = w / torch.sqrt((w ** 2).sum())
+    cav = w / torch.sqrt((w**2).sum())
     print("cav shape:", cav.shape)
     return cav
+
 
 def calculate_svm_cav(activations, annotations) -> torch.Tensor:
     activations = activations.cpu()
     annotations = annotations.cpu()
-    model = LinearSVC(C=1.0, penalty='l2', max_iter=10000, class_weight='balanced', verbose = 2)
+    model = LinearSVC(
+        C=1.0, penalty="l2", max_iter=10000, class_weight="balanced", verbose=2
+    )
     model.fit(activations, annotations)
 
     cav = torch.tensor(model.coef_[0])
     print("cav shape:", cav.shape)
-    return cav / ((cav ** 2).sum() ** .5).item()
+    return cav / ((cav**2).sum() ** 0.5).item()
 
 
 class CavProjection(torch.nn.Module):
-    def __init__(self,
-                 activations: torch.Tensor,
-                 annotations: torch.Tensor,
-                 cav: torch.Tensor,
-                 cav_mode: str = None,
-                 correction_strength: float = 1.0):
+    def __init__(
+        self,
+        activations: torch.Tensor,
+        annotations: torch.Tensor,
+        cav: torch.Tensor,
+        cav_mode: str = None,
+        correction_strength: float = 1.0,
+    ):
         super().__init__()
         self.correction_strength = correction_strength
         self.cav_mode = cav_mode
 
         self.cav = self.correction_strength * cav.reshape(-1, 1)
-        z = torch.mean(activations[annotations == 0], dim=0, keepdim=True).to(device=cav.device, dtype=cav.dtype)
+        z = torch.mean(activations[annotations == 0], dim=0, keepdim=True).to(
+            device=cav.device, dtype=cav.dtype
+        )
         self.z = z @ self.cav @ self.cav.T
 
     def forward(self, x):
@@ -642,19 +861,22 @@ class CavProjection(torch.nn.Module):
                 out = out.mean((2, 3))
             else:
                 raise NotImplementedError
-            out = x - (out @ self.cav @ self.cav.T)[:,:,None,None] + self.z[:,:,None,None]
+            out = (
+                x
+                - (out @ self.cav @ self.cav.T)[:, :, None, None]
+                + self.z[:, :, None, None]
+            )
 
         return torch.nn.functional.relu(out)
 
 
 class SimpleProjection(torch.nn.Module):
-    def __init__(self,
-                 activations: torch.Tensor,
-                 annotations: torch.Tensor,
-                 **kwargs):
+    def __init__(self, activations: torch.Tensor, annotations: torch.Tensor, **kwargs):
         super().__init__()
         activations = activations.flatten(start_dim=1)
-        self.difference = activations[annotations == 1].mean(0) - activations[annotations == 0].mean(0)
+        self.difference = activations[annotations == 1].mean(0) - activations[
+            annotations == 0
+        ].mean(0)
 
     def forward(self, x):
         x_flat = x.flatten(start_dim=1)
@@ -662,4 +884,5 @@ class SimpleProjection(torch.nn.Module):
         out = torch.nn.functional.relu(out)
         return out.reshape(x.shape)
 
-CavCache = namedtuple('CavCache', ["layer", "cav", "annotations", "activations"])
+
+CavCache = namedtuple("CavCache", ["layer", "cav", "annotations", "activations"])

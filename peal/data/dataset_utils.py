@@ -22,7 +22,10 @@ def parse_json(data_dir, config, mode, set_negative_to_zero=True):
     if (
         not config.confounding_factors is None
         and len(config.confounding_factors) == 2
-        and not (config.confounder_probability is None and config.full_confounder_config is None)
+        and not (
+            config.confounder_probability is None
+            and config.full_confounder_config is None
+        )
     ):
 
         def extract_instances_tensor_confounder(idx, line):
@@ -122,7 +125,10 @@ def parse_csv(
     if (
         not config.confounding_factors is None
         and len(config.confounding_factors) == 2
-        and not (config.confounder_probability is None and config.full_confounder_config is None)
+        and not (
+            config.confounder_probability is None
+            and config.full_confounder_config is None
+        )
     ):
 
         def extract_instances_tensor_confounder(idx, line):
@@ -143,7 +149,7 @@ def parse_csv(
 
     else:
         data = {}
-        n = [0,0]
+        n = [0, 0]
         for idx, line in enumerate(raw_data):
             key, instances_tensor = extract_instances_tensor(idx, line)
             if (
@@ -208,7 +214,10 @@ def parse_csv(
             if line == "":
                 continue
             key, instances_tensor = extract_instances_tensor(idx=idx, line=line)
-            if instances_tensor[spray_label_idx] != 0 and instances_tensor[spray_label_idx] != 1:
+            if (
+                instances_tensor[spray_label_idx] != 0
+                and instances_tensor[spray_label_idx] != 1
+            ):
                 try:
                     keys_out.remove(key)
                     del data[key]
@@ -223,19 +232,24 @@ def parse_csv(
             data_group_sizes = np.array([0, 0, 0, 0])
             for key in keys_out:
                 attribute_tensor = data[key]
-                data_group_idx = (attribute_tensor[true_feature_index] + 2*attribute_tensor[confounder_index]).int()
+                data_group_idx = (
+                    attribute_tensor[true_feature_index]
+                    + 2 * attribute_tensor[confounder_index]
+                ).int()
                 data_groups[data_group_idx].append(key)
                 data_group_sizes[data_group_idx] += 1
 
             print("group sizes before re-balancing:", data_group_sizes)
             min_len = np.min(data_group_sizes)
             assert min_len > 0, "need at least one spray label per data group"
-            for data_group_idx in {0,1,2,3} - {np.argmin(data_group_sizes).item()}:
+            for data_group_idx in {0, 1, 2, 3} - {np.argmin(data_group_sizes).item()}:
                 while len(data_groups[data_group_idx]) > min_len:
                     key = data_groups[data_group_idx].pop()
                     del data[key]
 
-            print(f"final group sizes: [{len(data_groups[0])}, {len(data_groups[1])}, {len(data_groups[2])}, {len(data_groups[3])}]")
+            print(
+                f"final group sizes: [{len(data_groups[0])}, {len(data_groups[1])}, {len(data_groups[2])}, {len(data_groups[3])}]"
+            )
             keys_out = data_groups[0] + data_groups[1] + data_groups[2] + data_groups[3]
 
     keys_out.sort()
@@ -268,8 +282,12 @@ def process_confounder_data_controlled(
     max_attribute_confounding = np.array([[0, 0], [0, 0]])
 
     if not config.full_confounder_config is None:
-        assert len(config.full_confounder_config) == 4, "confounder config must have 4 entries"
-        assert sum(config.full_confounder_config) == 1, "confounder config must sum to 100%"
+        assert (
+            len(config.full_confounder_config) == 4
+        ), "confounder config must have 4 entries"
+        assert (
+            sum(config.full_confounder_config) == 1
+        ), "confounder config must sum to 100%"
 
         max_attribute_confounding[0][0] = int(
             config.num_samples * config.full_confounder_config[0]

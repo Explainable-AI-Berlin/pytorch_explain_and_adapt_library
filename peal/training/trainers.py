@@ -28,7 +28,9 @@ from peal.global_utils import (
     requires_grad_,
     get_predictions,
     replace_relu_with_leakysoftplus,
-    replace_relu_with_leakyrelu, cprint, onehot,
+    replace_relu_with_leakyrelu,
+    cprint,
+    onehot,
 )
 from peal.training.interfaces import PredictorConfig
 from peal.training.loggers import log_images_to_writer
@@ -45,8 +47,6 @@ from peal.architectures.predictors import (
     TorchvisionModel,
 )
 from peal.architectures.interfaces import ArchitectureConfig
-
-
 
 
 def mixup(data, targets, alpha, n_classes):
@@ -171,12 +171,11 @@ def get_predictor(config, model=None):
                 config.architecture[12:],
                 output_channels,
                 config.data.input_size[-1],
-                config=config
+                config=config,
             )
 
         elif (
-            isinstance(config.architecture, str)
-            and config.architecture[-4:] == ".cpl"
+            isinstance(config.architecture, str) and config.architecture[-4:] == ".cpl"
         ):
             model = torch.load(config.architecture)
 
@@ -296,7 +295,11 @@ class ModelTrainer:
 
                     param_list = param_list_trained
 
-            cprint("trainable parameters: " + str(len(param_list)), self.config.tracking_level, 4)
+            cprint(
+                "trainable parameters: " + str(len(param_list)),
+                self.config.tracking_level,
+                4,
+            )
             if self.config.training.optimizer == "sgd":
                 self.optimizer = torch.optim.SGD(
                     param_list,
@@ -420,7 +423,9 @@ class ModelTrainer:
 
             X = move_to_device(X, self.device)
 
-            if mode == "train" and hasattr(self.train_dataloader.dataset, "diffusion_augmentation"):
+            if mode == "train" and hasattr(
+                self.train_dataloader.dataset, "diffusion_augmentation"
+            ):
                 X = self.train_dataloader.dataset.diffusion_augmentation(X)
 
             y_original = y
@@ -475,7 +480,9 @@ class ModelTrainer:
             for criterion in self.config.task.criterions.keys():
                 criterion_loss = self.config.task.criterions[
                     criterion
-                ] * self.criterions[criterion](self.model, pred, y.to(self.device), latent_code)
+                ] * self.criterions[criterion](
+                    self.model, pred, y.to(self.device), latent_code
+                )
 
                 if criterion in ["l1", "l2", "orthogonality"]:
                     criterion_loss *= self.regularization_level
@@ -491,7 +498,9 @@ class ModelTrainer:
             loss.backward()
             current_state = "MT: " + mode + "_it: " + str(batch_idx)
             if "val_acc" in pbar.stored_values.keys():
-                current_state += ", val_acc: " + str(round(float(pbar.stored_values["val_acc"]), 3))
+                current_state += ", val_acc: " + str(
+                    round(float(pbar.stored_values["val_acc"]), 3)
+                )
 
             current_state += ", loss: " + str(loss.detach().item())
             current_state += ", ".join(
@@ -566,7 +575,9 @@ class ModelTrainer:
                 for i in range(len(self.val_dataloaders)):
                     print("log validation" + str(i) + " images!")
                     log_images_to_writer(
-                        self.val_dataloaders[i], self.logger.writer, "validation" + str(i) + "_"
+                        self.val_dataloaders[i],
+                        self.logger.writer,
+                        "validation" + str(i) + "_",
                     )
 
             self.config.is_loaded = True
@@ -582,7 +593,7 @@ class ModelTrainer:
                 len(self.train_dataloader)
                 + int(np.sum(list(map(lambda dl: len(dl), self.val_dataloaders))))
             ),
-            ncols=200
+            ncols=200,
         )
         pbar.stored_values = {}
         val_accuracy_previous = 0.0
@@ -608,7 +619,6 @@ class ModelTrainer:
                         val_accuracy = val_accuracy_current
 
                     val_accuracy = min(val_accuracy, val_accuracy_current)
-
 
         torch.save(
             self.model.to("cpu").state_dict(),
@@ -804,14 +814,16 @@ def distill_binary_dataset(
         distilled_predictor_config.data = distilled_dataset_config
         predictor_distillation = distilled_predictor_config
         distillation_datasource[i].task_config = predictor_distillation.task
-        distillation_datasource[
-            i
-        ].task_config.x_selection = predictor_dataset.task_config.x_selection
+        distillation_datasource[i].task_config.x_selection = (
+            predictor_dataset.task_config.x_selection
+        )
         try:
             sample = distillation_datasource[-1][0]
 
         except:
-            import pdb; pdb.set_trace()
+            import pdb
+
+            pdb.set_trace()
 
     return distillation_datasource
 
@@ -875,7 +887,9 @@ def distill_dataloader_mixer(
                 predictor_distillation=predictor_distillation,
                 base_path=os.path.join(base_path, str(i)),
                 predictor=predictor,
-                predictor_datasource=copy.deepcopy(distillation_datasource.dataloaders[i]),
+                predictor_datasource=copy.deepcopy(
+                    distillation_datasource.dataloaders[i]
+                ),
             )
 
         else:
@@ -883,7 +897,9 @@ def distill_dataloader_mixer(
                 predictor_distillation=predictor_distillation,
                 base_path=os.path.join(base_path, str(i)),
                 predictor=predictor,
-                predictor_datasets=copy.deepcopy([distillation_datasource.dataloaders[i]]),
+                predictor_datasets=copy.deepcopy(
+                    [distillation_datasource.dataloaders[i]]
+                ),
             )
             distillation_datasource.dataloaders[i] = torch.utils.data.DataLoader(
                 dataset,

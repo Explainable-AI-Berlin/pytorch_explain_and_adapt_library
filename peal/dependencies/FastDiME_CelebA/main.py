@@ -683,7 +683,9 @@ def main(args=None):
                 transformed[~transformed] = target[~transformed] == cfsp
 
             except Exception:
-                import pdb; pdb.set_trace()
+                import pdb
+
+                pdb.set_trace()
 
             if transformed.float().sum().item() == transformed.size(0):
                 break
@@ -698,7 +700,7 @@ def main(args=None):
             if args.save_z_t:
                 z_t_saver(z_t_s, indexes=indexes)
 
-        counterfactuals.append(torch.clamp(cf.detach().cpu(), 0 , 1))
+        counterfactuals.append(torch.clamp(cf.detach().cpu(), 0, 1))
         if args.save_images:
             with torch.no_grad():
                 logits_cf = classifier(cf)
@@ -740,7 +742,6 @@ def main(args=None):
                 stats["target"].append(target.detach().cpu())
                 stats["label"].append(lab.detach().cpu())
                 stats["pred"].append(pred.detach().cpu())
-
 
         if args.save_images:
             if "Shortcut" not in args.dataset:

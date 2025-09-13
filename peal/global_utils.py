@@ -24,7 +24,6 @@ from tqdm import tqdm
 from pathlib import Path
 
 
-
 def onehot(label, n_classes):
     one_hots = torch.zeros(label.size(0), n_classes).to(label.device)
     return one_hots.scatter_(1, label.to(torch.int64).view(-1, 1), 1)
@@ -507,7 +506,9 @@ def get_predictions(args):
             lab = lab.to(device)
 
         except:
-            import pdb; pdb.set_trace()
+            import pdb
+
+            pdb.set_trace()
 
         logits = classifier(img)
         if len(logits.shape) > 1:
@@ -527,7 +528,9 @@ def get_predictions(args):
         df = pd.DataFrame(data=d)
 
     except Exception:
-        import pdb; pdb.set_trace()
+        import pdb
+
+        pdb.set_trace()
 
     df.to_csv(
         args.label_path,
@@ -571,23 +574,27 @@ def high_contrast_heatmap(x, counterfactual):
 def generate_smooth_mask(x1, x2, dilation, max_avg_combination=0.5):
     assert (dilation % 2) == 1, "dilation must be an odd number"
     mask = (x1 - x2).abs().sum(dim=1, keepdim=True)
-    #mask = mask / mask.view(mask.size(0), -1).max(dim=1)[0].view(-1, 1, 1, 1)
-    #dil_mask = mask
+    # mask = mask / mask.view(mask.size(0), -1).max(dim=1)[0].view(-1, 1, 1, 1)
+    # dil_mask = mask
     blurring = torchvision.transforms.GaussianBlur(dilation, sigma=2.0)
     dil_mask = blurring(mask)
 
     dil_mask = torch.clamp(dil_mask, 0, 1)
-    dil_mask = dil_mask / mask.view(dil_mask.size(0), -1).max(dim=1)[0].view(-1, 1, 1, 1)
+    dil_mask = dil_mask / mask.view(dil_mask.size(0), -1).max(dim=1)[0].view(
+        -1, 1, 1, 1
+    )
 
-    '''dil_mask = max_avg_combination * F.avg_pool2d(mask, dilation, stride=1, padding=(dilation - 1) // 2)
+    """dil_mask = max_avg_combination * F.avg_pool2d(mask, dilation, stride=1, padding=(dilation - 1) // 2)
     dil_mask += (1 - max_avg_combination) * F.max_pool2d(
         mask, dilation, stride=1, padding=(dilation - 1) // 2
-    )'''
+    )"""
     # dil_mask = F.max_pool2d(mask, dilation, stride=1, padding=(dilation - 1) // 2)
     return mask, dil_mask
 
 
-def get_intermediate_output(model: torch.nn.Module, x: torch.Tensor, distance_from_last_layer: int):
+def get_intermediate_output(
+    model: torch.nn.Module, x: torch.Tensor, distance_from_last_layer: int
+):
     """
     Runs the model on input x and returns the activation tensor
     that is `distance_from_last_layer` layers away from the final layer.
@@ -602,8 +609,15 @@ def get_intermediate_output(model: torch.nn.Module, x: torch.Tensor, distance_fr
     handles = []
 
     # Get a flat list of all modules in order
-    layers = [m for m in model.modules() if not isinstance(m, torch.nn.Sequential) and not isinstance(m, torch.nn.ModuleList)]
-    layers = [m for m in layers if len(list(m.children())) == 0]  # keep only leaf modules
+    layers = [
+        m
+        for m in model.modules()
+        if not isinstance(m, torch.nn.Sequential)
+        and not isinstance(m, torch.nn.ModuleList)
+    ]
+    layers = [
+        m for m in layers if len(list(m.children())) == 0
+    ]  # keep only leaf modules
 
     # Select the layer we want
     target_layer_index = len(layers) - distance_from_last_layer
@@ -614,7 +628,7 @@ def get_intermediate_output(model: torch.nn.Module, x: torch.Tensor, distance_fr
 
     # Hook to capture the output
     def hook_fn(module, input, output):
-        activations['out'] = output.detach()
+        activations["out"] = output.detach()
 
     handle = target_layer.register_forward_hook(hook_fn)
     handles.append(handle)
@@ -626,7 +640,7 @@ def get_intermediate_output(model: torch.nn.Module, x: torch.Tensor, distance_fr
     for h in handles:
         h.remove()
 
-    return activations['out']
+    return activations["out"]
 
 
 def extract_penultima_activation(x, predictor, distance_from_last_layer=1):
@@ -665,7 +679,6 @@ def extract_penultima_activation(x, predictor, distance_from_last_layer=1):
 
     else:
         return get_intermediate_output(predictor, x, distance_from_last_layer)
-
 
 
 def set_random_seed(seed: int):

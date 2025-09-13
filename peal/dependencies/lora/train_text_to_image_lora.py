@@ -784,13 +784,15 @@ def lora_finetune(args=None):
         batch_size=args.train_batch_size,
         num_workers=args.dataloader_num_workers,
     )
-    empty_input_ids = torch.tensor(tokenizer(
-        args.train_batch_size * ["<|endoftext|> <|endoftext|> <|endoftext|>"],
-        max_length=tokenizer.model_max_length,
-        padding="max_length",
-        truncation=True,
-        return_tensors="pt",
-    ).input_ids).to(accelerator.device)
+    empty_input_ids = torch.tensor(
+        tokenizer(
+            args.train_batch_size * ["<|endoftext|> <|endoftext|> <|endoftext|>"],
+            max_length=tokenizer.model_max_length,
+            padding="max_length",
+            truncation=True,
+            return_tensors="pt",
+        ).input_ids
+    ).to(accelerator.device)
     empty_input_ids = empty_input_ids.unsqueeze(1)
 
     def unwrap_model(model):
@@ -895,17 +897,28 @@ def lora_finetune(args=None):
     fid.update(torch.tensor(255 * real_images, dtype=torch.uint8), real=True)
     if isinstance(args.train_dataset, Image2MixedDataset):
         if len(args.train_dataset.task_config.y_selection) >= 2:
-            target_idx0 = args.train_dataset.attributes.index(args.train_dataset.task_config.y_selection[0])
-            target_idx1 = args.train_dataset.attributes.index(args.train_dataset.task_config.y_selection[1])
+            target_idx0 = args.train_dataset.attributes.index(
+                args.train_dataset.task_config.y_selection[0]
+            )
+            target_idx1 = args.train_dataset.attributes.index(
+                args.train_dataset.task_config.y_selection[1]
+            )
             pos0 = args.train_dataset.attributes_positive[target_idx0]
             pos1 = args.train_dataset.attributes_positive[target_idx1]
             neg0 = args.train_dataset.attributes_negative[target_idx0]
             neg1 = args.train_dataset.attributes_negative[target_idx1]
-            prompt = [neg0 + " " + neg1, neg0 + " " + pos1, pos0 + " " + neg1, pos0 + " " + pos1]
+            prompt = [
+                neg0 + " " + neg1,
+                neg0 + " " + pos1,
+                pos0 + " " + neg1,
+                pos0 + " " + pos1,
+            ]
 
         else:
             if len(args.train_dataset.task_config.y_selection) > 0:
-                target_idx = args.train_dataset.attributes.index(args.train_dataset.task_config.y_selection[0])
+                target_idx = args.train_dataset.attributes.index(
+                    args.train_dataset.task_config.y_selection[0]
+                )
 
             else:
                 target_idx = 0
@@ -926,7 +939,9 @@ def lora_finetune(args=None):
     images_torch_resized = torchvision.transforms.Resize(real_images.shape[-2:])(
         images_torch
     )
-    concatenated_imgs = torch.cat([real_images[:len(prompt)].cpu(), images_torch_resized], dim=0)
+    concatenated_imgs = torch.cat(
+        [real_images[: len(prompt)].cpu(), images_torch_resized], dim=0
+    )
     output_dir = os.path.join(args.base_path, "outputs")
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     torchvision.utils.save_image(
@@ -1000,10 +1015,14 @@ def lora_finetune(args=None):
                 # Get the text embedding for conditioning
                 is_unconditional = random.randint(0, 1)
                 if is_unconditional:
-                    encoder_hidden_states = text_encoder(input_ids, return_dict=False)[0]
+                    encoder_hidden_states = text_encoder(input_ids, return_dict=False)[
+                        0
+                    ]
 
                 else:
-                    encoder_hidden_states = text_encoder(empty_input_ids[:bsz], return_dict=False)[0]
+                    encoder_hidden_states = text_encoder(
+                        empty_input_ids[:bsz], return_dict=False
+                    )[0]
 
                 # Get the target for loss depending on the prediction type
                 if args.prediction_type is not None:
@@ -1024,14 +1043,19 @@ def lora_finetune(args=None):
                 # Predict the noise residual and compute loss
                 try:
                     model_pred = unet(
-                        noisy_latents, timesteps, encoder_hidden_states, return_dict=False
+                        noisy_latents,
+                        timesteps,
+                        encoder_hidden_states,
+                        return_dict=False,
                     )[0]
                     noisy_latents_old = torch.clone(noisy_latents)
                     timesteps_old = torch.clone(timesteps)
                     encoder_hidden_states_old = torch.clone(encoder_hidden_states)
 
                 except Exception as e:
-                    import pdb; pdb.set_trace()
+                    import pdb
+
+                    pdb.set_trace()
 
                 if args.snr_gamma is None:
                     loss = F.mse_loss(
@@ -1129,16 +1153,21 @@ def lora_finetune(args=None):
 
                         logger.info(f"Saved state to {save_path}")
                         images = pipeline(prompt).images
-                        images_torch = torch.stack([ToTensor()(image) for image in images])
-                        images_torch_resized = torchvision.transforms.Resize(real_images.shape[-2:])(
-                            images_torch
+                        images_torch = torch.stack(
+                            [ToTensor()(image) for image in images]
                         )
+                        images_torch_resized = torchvision.transforms.Resize(
+                            real_images.shape[-2:]
+                        )(images_torch)
                         concatenated_imgs = torch.cat(
-                            [real_images[:len(prompt)].cpu(), images_torch_resized], dim=0
+                            [real_images[: len(prompt)].cpu(), images_torch_resized],
+                            dim=0,
                         )
                         torchvision.utils.save_image(
                             concatenated_imgs,
-                            os.path.join(output_dir, embed_numberstring(global_step) + ".png"),
+                            os.path.join(
+                                output_dir, embed_numberstring(global_step) + ".png"
+                            ),
                             nrow=len(prompt),
                         )
 

@@ -2,7 +2,6 @@
 Code directly imported from https://github.com/valeoai/STEEX/blob/b4141c287aa8fd66ab1096442da81084dd2f5504/models/OracleResnetModel.py
 """
 
-
 import torch
 import torch.nn as nn
 

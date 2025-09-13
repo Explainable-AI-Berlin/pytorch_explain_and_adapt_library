@@ -333,9 +333,7 @@ class Block(nn.Module):
 
 
 class Glow(nn.Module):
-    def __init__(
-        self, in_channel, n_flow, n_block, affine=True, conv_lu=True
-    ):
+    def __init__(self, in_channel, n_flow, n_block, affine=True, conv_lu=True):
         super().__init__()
 
         self.blocks = nn.ModuleList()

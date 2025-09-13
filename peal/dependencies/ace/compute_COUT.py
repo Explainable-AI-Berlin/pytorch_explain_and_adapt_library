@@ -14,7 +14,7 @@ from .eval_utils.cout_metrics import evaluate
 from .models.dive.densenet import DiVEDenseNet121
 from .models.steex.DecisionDensenetModel import DecisionDensenetModel
 
-#from .core.attacks_and_models import Normalizer
+# from .core.attacks_and_models import Normalizer
 Normalizer = lambda x: x
 
 from .guided_diffusion.image_datasets import BINARYDATASET, MULTICLASSDATASETS
