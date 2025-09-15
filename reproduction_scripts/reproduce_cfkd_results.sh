@@ -77,7 +77,7 @@ cat ${PEAL_RUNS}/celeba1k/Blond_Hair/resnet18_poisoned098/rrclarc/best_model_res
 
 
 # Reproduce SOTA results on Camelyon17 task
-python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/camelyon17_1k_classifier_unpoisoned.yaml"
+python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/camelyon17_classifier_unpoisoned.yaml"
 python train_generator.py --config "<PEAL_BASE>/configs/cfkd_experiments/generators/camelyon17_1k_ddpm_poisoned098.yaml"
 python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/camelyon17_1k_classifier_poisoned098.yaml"
 # run CFKD
