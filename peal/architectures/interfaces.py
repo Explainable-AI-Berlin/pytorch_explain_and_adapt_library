@@ -9,6 +9,7 @@ class TaskConfig(BaseModel):
     mapped to the weight.
     Like this the loss function can be post_hoc attached without changing the code.
     """
+
     """
     The type of config. This is necessary to find config class from yaml config
     """
@@ -16,7 +17,7 @@ class TaskConfig(BaseModel):
     """
     The criterions used for training the model.
     """
-    criterions: dict = {'ce' : 1.0, 'l2' : 1.0}
+    criterions: dict = {"ce": 1.0, "l2": 1.0}
     """
     The output_type that either can just be the output_type of the dataset or could be some
     possible subtype.
@@ -42,13 +43,14 @@ class TaskConfig(BaseModel):
     """
     Gives the option to only use samples from one or more specified classes
     """
-    class_restriction: Union[int ,list[int], type(None)] = None
+    class_restriction: Union[int, list[int], type(None)] = None
 
 
 class ArchitectureConfig(BaseModel):
     """
     The config template for a neural architecture.
     """
+
     """
     The type of config. This is necessary to find config class from yaml config
     """
@@ -94,6 +96,7 @@ class FCConfig(BaseModel):
     """
     The config template for a Fully Connected Layer.
     """
+
     """
     The type of config. This is necessary to find config class from yaml config
     """
@@ -117,6 +120,7 @@ class VGGConfig(BaseModel):
     """
     The config template for a VGG Layer.
     """
+
     """
     The type of config. This is necessary to find config class from yaml config
     """
@@ -148,6 +152,7 @@ class ResnetConfig(BaseModel):
     """
     The config template for a ResNet layer.
     """
+
     """
     The type of config. This is necessary to find config class from yaml config
     """
@@ -175,6 +180,7 @@ class TransformerConfig(BaseModel):
     """
     The config template for a transformer layer.
     """
+
     """
     The type of config. This is necessary to find config class from yaml config
     """

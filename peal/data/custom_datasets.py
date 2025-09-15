@@ -20,7 +20,10 @@ from torchvision.transforms import ToTensor
 from wilds import get_dataset
 
 from peal.data.dataloaders import DataloaderMixer, WeightedDataloaderList
-from peal.data.dataset_generators import SquareDatasetGenerator, ConfounderDatasetGenerator
+from peal.data.dataset_generators import (
+    SquareDatasetGenerator,
+    ConfounderDatasetGenerator,
+)
 from peal.data.datasets import (
     Image2ClassDataset,
     Image2MixedDataset,
@@ -90,8 +93,10 @@ class ColoredMnist(Image2ClassDataset):
             self.config.split = [1, 1]
 
         self.group_labels = {}
-        group_map_file = self.config.group_map or os.path.join(self.config.dataset_path, "data.csv")
-        with open(group_map_file, 'r') as f:
+        group_map_file = self.config.group_map or os.path.join(
+            self.config.dataset_path, "data.csv"
+        )
+        with open(group_map_file, "r") as f:
             reader = csv.reader(f)
             header = next(reader)
             col_filename = header.index("Name")
@@ -105,13 +110,18 @@ class ColoredMnist(Image2ClassDataset):
         return self.group_labels[filename]
 
     def _create_dataset(self):
-        print(f"creating new ColoredMnist dataset with coloring {self.config.coloring} at {self.config.dataset_path}")
+        print(
+            f"creating new ColoredMnist dataset with coloring {self.config.coloring} at {self.config.dataset_path}"
+        )
         np.random.seed(0 if self.config.seed is None else self.config.seed)
 
         data_info = {"Name": [], "Digit": [], "Colored": [], "Subset": []}
 
         def color_sample(coloring_wanted, coloring_actual, label, img):
-            if label in coloring_wanted and coloring_actual[label] < coloring_wanted[label]:
+            if (
+                label in coloring_wanted
+                and coloring_actual[label] < coloring_wanted[label]
+            ):
                 coloring_actual[label] += 1
                 img = np.asarray(img)
                 zeros = np.zeros(img.shape, dtype=np.uint8)
@@ -124,12 +134,22 @@ class ColoredMnist(Image2ClassDataset):
 
         number_samples_max_train = 4500
         number_samples_max_val_and_test = 750
-        coloring_train = {class_coloring[0] : round(class_coloring[1] * number_samples_max_train)
-                          for class_coloring in self.config.coloring}
-        coloring_val_and_test = {class_coloring[0] : round(class_coloring[1] * number_samples_max_val_and_test)
-                                 for class_coloring in self.config.coloring}
+        coloring_train = {
+            class_coloring[0]: round(class_coloring[1] * number_samples_max_train)
+            for class_coloring in self.config.coloring
+        }
+        coloring_val_and_test = {
+            class_coloring[0]: round(
+                class_coloring[1] * number_samples_max_val_and_test
+            )
+            for class_coloring in self.config.coloring
+        }
 
-        raw_path = self.config.dataset_path if self.config.raw_path is None else self.config.raw_path
+        raw_path = (
+            self.config.dataset_path
+            if self.config.raw_path is None
+            else self.config.raw_path
+        )
 
         mnist_dataset_train = torchvision.datasets.MNIST(
             root=raw_path + "_train_raw",
@@ -172,19 +192,29 @@ class ColoredMnist(Image2ClassDataset):
             if number_samples_train[label] < number_samples_max_train:
                 number_samples_train[label] += 1
                 img = color_sample(coloring_train, coloring_actual_train, label, img)
-                filename = os.path.join(dir_train, str(label), str(current).zfill(6) + ".png")
+                filename = os.path.join(
+                    dir_train, str(label), str(current).zfill(6) + ".png"
+                )
                 data_info["Subset"].append("train")
 
             elif number_samples_val[label] < number_samples_max_val_and_test:
                 number_samples_val[label] += 1
-                img = color_sample(coloring_val_and_test, coloring_actual_val, label, img)
-                filename = os.path.join(dir_val, str(label), str(current).zfill(6) + ".png")
+                img = color_sample(
+                    coloring_val_and_test, coloring_actual_val, label, img
+                )
+                filename = os.path.join(
+                    dir_val, str(label), str(current).zfill(6) + ".png"
+                )
                 data_info["Subset"].append("val")
 
             elif number_samples_test[label] < number_samples_max_val_and_test:
                 number_samples_test[label] += 1
-                img = color_sample(coloring_val_and_test, coloring_actual_test, label, img)
-                filename = os.path.join(dir_test, str(label), str(current).zfill(6) + ".png")
+                img = color_sample(
+                    coloring_val_and_test, coloring_actual_test, label, img
+                )
+                filename = os.path.join(
+                    dir_test, str(label), str(current).zfill(6) + ".png"
+                )
                 data_info["Subset"].append("test")
 
             else:
@@ -195,11 +225,12 @@ class ColoredMnist(Image2ClassDataset):
             data_info["Digit"].append(label)
             current += 1
 
-        with open(os.path.join(self.config.dataset_path, "data.csv"), 'w', newline='') as f:
+        with open(
+            os.path.join(self.config.dataset_path, "data.csv"), "w", newline=""
+        ) as f:
             writer = csv.writer(f)
             writer.writerow(data_info.keys())
             writer.writerows(zip(*data_info.values()))
-
 
 
 def plot_latents_with_arrows(
@@ -462,7 +493,9 @@ class SquareDataset(Image2MixedDataset):
                             current_batch = []
 
                     if not len(current_batch) == 0:
-                        logits.append(predictor(torch.stack(current_batch).to(device)).detach())
+                        logits.append(
+                            predictor(torch.stack(current_batch).to(device)).detach()
+                        )
 
                     logits = torch.cat(logits, dim=0).detach().cpu()
                     prediction_grid = torch.nn.Softmax(dim=1)(logits / temperature)[
@@ -493,7 +526,9 @@ class SquareDataset(Image2MixedDataset):
 
                 except Exception:
                     print("in extract latents")
-                    import pdb; pdb.set_trace()
+                    import pdb
+
+                    pdb.set_trace()
 
                 for idx in range(len(x)):
                     try:
@@ -736,7 +771,9 @@ class Camelyon17AugmentedDataset(Image2MixedDataset):
                 f.write("\n".join(lines))
 
         peal_runs = os.environ.get("PEAL_RUNS", "peal_runs")
-        oracle_path = os.path.join(peal_runs, "camelyon17", "latent_oracle", "model.cpl")
+        oracle_path = os.path.join(
+            peal_runs, "camelyon17", "latent_oracle", "model.cpl"
+        )
         if os.path.exists(oracle_path):
             self.oracle = torch.load(oracle_path)
             self.oracle.eval()
@@ -865,15 +902,21 @@ class WaterbirdsDataset(Image2MixedDataset):
 
 
 def download_celeba_to(target_dir):
-    print('This still has to be implemented!')
+    print("This still has to be implemented!")
     import kagglehub
 
     # Download latest version
     path = kagglehub.dataset_download("jessicali9530/celeba-dataset")
     print("Path to downloaded dataset files:", path)
     shutil.move(path, target_dir)
-    shutil.move(os.path.join(target_dir, "list_attr_celeba.csv"), os.path.join(target_dir, "data.csv"))
-    shutil.move(os.path.join(target_dir, "img_align_celeba", "img_align_celeba"), os.path.join(target_dir, "imgs"))
+    shutil.move(
+        os.path.join(target_dir, "list_attr_celeba.csv"),
+        os.path.join(target_dir, "data.csv"),
+    )
+    shutil.move(
+        os.path.join(target_dir, "img_align_celeba", "img_align_celeba"),
+        os.path.join(target_dir, "imgs"),
+    )
 
 
 class CelebADataset(Image2MixedDataset):
@@ -891,7 +934,9 @@ class CelebADataset(Image2MixedDataset):
 
         else:
             peal_runs = os.environ.get("PEAL_RUNS", "peal_runs")
-            oracle_path = os.path.join(peal_runs, "camelyon17", "latent_oracle", "model.cpl")
+            oracle_path = os.path.join(
+                peal_runs, "camelyon17", "latent_oracle", "model.cpl"
+            )
             if os.path.exists(oracle_path):
                 self.oracle = torch.load(oracle_path)
                 self.oracle.eval()
@@ -913,7 +958,9 @@ class CelebADataset(Image2MixedDataset):
 
 class CelebACopyrighttagDataset(Image2MixedDataset):
     def __init__(self, config, **kwargs):
-        if not os.path.exists(config.dataset_path) and not os.path.exists(config.dataset_origin_path):
+        if not os.path.exists(config.dataset_path) and not os.path.exists(
+            config.dataset_origin_path
+        ):
             download_celeba_to(config.dataset_origin_path)
 
         if not os.path.exists(config.dataset_path):

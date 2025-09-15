@@ -15,5 +15,6 @@ def main():
     adaptor = get_adaptor(adaptor_config)
     adaptor.run()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

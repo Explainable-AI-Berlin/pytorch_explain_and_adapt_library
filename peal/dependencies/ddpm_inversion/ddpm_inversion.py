@@ -19,7 +19,7 @@ from peal.global_utils import load_yaml_config
 class DDPMInversion:
     def __init__(self, config=DDPMInversionConfig()):
         self.config = load_yaml_config(config)
-        #self.config.data = DataConfig(**self.config.data)
+        # self.config.data = DataConfig(**self.config.data)
         if not self.config.data is None and self.config.data.normalization is None:
             self.project_to_pytorch_default = lambda x: (
                 x * torch.tensor(self.config.data.normalization[1])
@@ -43,7 +43,7 @@ class DDPMInversion:
         self.pipe.scheduler.set_timesteps(self.config.num_diffusion_steps)
 
     def run(self, x, prompt_tar_list, prompt_src):
-        #x = self.project_from_pytorch_default(x)
+        # x = self.project_from_pytorch_default(x)
         # TODO do i have to upsample here?
         x0 = torchvision.transforms.Resize([512, 512])(
             torch.clone(x).to(self.device)

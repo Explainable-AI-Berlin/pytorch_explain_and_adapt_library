@@ -153,13 +153,17 @@ class CelebADataset(Dataset):
                 transforms.Resize(image_size),
                 transforms.RandomHorizontalFlip() if random_flip else lambda x: x,
                 transforms.CenterCrop(image_size),
-                transforms.RandomResizedCrop(image_size, (0.95, 1.0))
-                if random_crop
-                else lambda x: x,
+                (
+                    transforms.RandomResizedCrop(image_size, (0.95, 1.0))
+                    if random_crop
+                    else lambda x: x
+                ),
                 transforms.ToTensor(),
-                transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
-                if normalize
-                else lambda x: x,
+                (
+                    transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
+                    if normalize
+                    else lambda x: x
+                ),
             ]
         )
 
@@ -212,9 +216,11 @@ class CelebADatasetHDF5(Dataset):
         self.transform = transforms.Compose(
             [
                 transforms.RandomHorizontalFlip() if random_flip else lambda x: x,
-                transforms.RandomResizedCrop(image_size, (0.95, 1.0))
-                if random_crop
-                else lambda x: x,
+                (
+                    transforms.RandomResizedCrop(image_size, (0.95, 1.0))
+                    if random_crop
+                    else lambda x: x
+                ),
                 transforms.ToTensor(),
                 transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
             ]
@@ -278,13 +284,17 @@ class CelebAMiniVal(CelebADataset):
                 transforms.Resize(image_size),
                 transforms.RandomHorizontalFlip() if random_flip else lambda x: x,
                 transforms.CenterCrop(image_size),
-                transforms.RandomResizedCrop(image_size, (0.95, 1.0))
-                if random_crop
-                else lambda x: x,
+                (
+                    transforms.RandomResizedCrop(image_size, (0.95, 1.0))
+                    if random_crop
+                    else lambda x: x
+                ),
                 transforms.ToTensor(),
-                transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
-                if normalize
-                else lambda x: x,
+                (
+                    transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
+                    if normalize
+                    else lambda x: x
+                ),
             ]
         )
         self.data_dir = data_dir
@@ -346,13 +356,17 @@ class CelebAHQDataset(Dataset):
                 transforms.Resize(image_size),
                 transforms.RandomHorizontalFlip() if random_flip else lambda x: x,
                 transforms.CenterCrop(image_size),
-                transforms.RandomResizedCrop(image_size, (0.95, 1.0))
-                if random_crop
-                else lambda x: x,
+                (
+                    transforms.RandomResizedCrop(image_size, (0.95, 1.0))
+                    if random_crop
+                    else lambda x: x
+                ),
                 transforms.ToTensor(),
-                transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
-                if normalize
-                else lambda x: x,
+                (
+                    transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
+                    if normalize
+                    else lambda x: x
+                ),
             ]
         )
 
@@ -462,9 +476,11 @@ class BDD10k(Dataset):
             [
                 transforms.Resize(image_size),
                 transforms.RandomHorizontalFlip() if random_flip else lambda x: x,
-                transforms.RandomResizedCrop(image_size, (0.80, 1.0), (0.80, 1.05))
-                if random_crop
-                else lambda x: x,
+                (
+                    transforms.RandomResizedCrop(image_size, (0.80, 1.0), (0.80, 1.05))
+                    if random_crop
+                    else lambda x: x
+                ),
                 transforms.ToTensor(),
                 transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
             ]

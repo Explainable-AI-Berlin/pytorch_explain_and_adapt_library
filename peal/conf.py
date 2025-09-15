@@ -51,9 +51,9 @@ autodocgen_config = [
         # intentionally added/removed/changed a documented API
         "write_documented_items_output_file": "autodocgen_documented_items.txt",
         # choose a different title for specific modules, e.g. the toplevel one
-        "module_title_decider": lambda modulename: "API Reference"
-        if modulename == "peal"
-        else modulename,
+        "module_title_decider": lambda modulename: (
+            "API Reference" if modulename == "peal" else modulename
+        ),
     }
 ]
 

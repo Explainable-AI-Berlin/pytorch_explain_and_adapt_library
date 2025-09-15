@@ -31,10 +31,9 @@ def generate_prompt(args, target, pred, binary):
             tp = f"{base} indicating to {t}"
 
         else:
-            #args.dataset == "CelebAHQ":
+            # args.dataset == "CelebAHQ":
             sp = f"{base} with a {s}"
             tp = f"{base} with a {t}"
-
 
     else:
         sp = f"{base} with a " + args.generic_custom_token.replace("&", str(pred))
@@ -121,7 +120,7 @@ def accuracy(logits, label, topk=(1, 5), binary=False):
     if binary:
         prob = torch.sigmoid(logits)
         prob = prob * (label == 1).float() + (1 - prob) * (label == 0).float()
-        res = [((logits > 0).float() == label)]
+        res = [(logits > 0).float() == label]
         res += [torch.ones_like(res[0])] * (len(topk) - 1)
     else:
         maxk = max(topk)

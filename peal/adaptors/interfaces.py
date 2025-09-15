@@ -10,10 +10,12 @@ class Adaptor:
         """
         raise NotImplementedError
 
+
 class AdaptorConfig(BaseModel):
     """
     The config template for an adaptor.
     """
+
     """
     The type of adaptor that shall be used.
     This is necessary to know which pydantic class to use when loading from yaml.
@@ -23,7 +25,7 @@ class AdaptorConfig(BaseModel):
     The category of the config. Can not be changed for adaptor.
     This is also necessary to identify which pydantic class to use when loading from yaml.
     """
-    category: str = 'adaptor'
+    category: str = "adaptor"
     """
     The seed of all randomness to make results reproducible.
     """

@@ -14,20 +14,22 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
+
 class LossComputer:
     def __init__(
-            self,
-            criterion,
-            is_robust,
-            dataset,
-            alpha=None,
-            gamma=0.1,
-            adj=None,
-            min_var_weight=0,
-            step_size=0.01,
-            normalize_loss=False,
-            btl=False,
-            replication=False):
+        self,
+        criterion,
+        is_robust,
+        dataset,
+        alpha=None,
+        gamma=0.1,
+        adj=None,
+        min_var_weight=0,
+        step_size=0.01,
+        normalize_loss=False,
+        btl=False,
+        replication=False,
+    ):
         self.criterion = criterion
         self.is_robust = is_robust
         self.gamma = gamma
@@ -43,7 +45,9 @@ class LossComputer:
             self.group_frac = self.group_counts / self.group_counts.sum()
             # self.group_str = dataset.group_str
         else:
-            self.n_groups, self.group_counts, self.group_frac = self.get_group_stats(dataset)
+            self.n_groups, self.group_counts, self.group_frac = self.get_group_stats(
+                dataset
+            )
             self.group_counts = self.group_counts.cuda()
             self.group_frac = self.group_frac.cuda()
 
@@ -57,10 +61,10 @@ class LossComputer:
             self.adj = torch.zeros(self.n_groups).float().cuda()
 
         if is_robust:
-            assert alpha, 'alpha must be specified'
+            assert alpha, "alpha must be specified"
 
         # quantities maintained throughout training
-        self.adv_probs = torch.ones(self.n_groups).cuda()/self.n_groups
+        self.adv_probs = torch.ones(self.n_groups).cuda() / self.n_groups
         self.exp_avg_loss = torch.zeros(self.n_groups).cuda()
         self.exp_avg_initialized = torch.zeros(self.n_groups).byte().cuda()
 
@@ -77,7 +81,9 @@ class LossComputer:
 
         for key in confounder_str:
             idx = dataset.attributes.index(key)
-            attr_vals = np.array([dataset.data[pt][idx] for pt in dataset.data], dtype=int)
+            attr_vals = np.array(
+                [dataset.data[pt][idx] for pt in dataset.data], dtype=int
+            )
             confounder_vals.append(attr_vals)
             # Taking the max rather than unique, as there might be group labels not included in the dataset
             max_vals.append(attr_vals.max())
@@ -89,21 +95,22 @@ class LossComputer:
 
         for val, max in zip(confounder_vals, max_vals):
             group_idx += val * base_val
-            base_val *= (max + 1)
+            base_val *= max + 1
 
-        group_counts = (torch.arange(n_groups).unsqueeze(1)==group_idx).sum(1)
+        group_counts = (torch.arange(n_groups).unsqueeze(1) == group_idx).sum(1)
         group_frac = group_counts / group_counts.sum()
 
         return n_groups, group_counts, group_frac
+
     ### END: DRO Alterations
-
-
 
     def loss(self, yhat, y, group_idx=None, is_training=False):
         # compute per-sample and per-group losses
         per_sample_losses = self.criterion(yhat, y)
         group_loss, group_count = self.compute_group_avg(per_sample_losses, group_idx)
-        group_acc, group_count = self.compute_group_avg((torch.argmax(yhat,1)==y).float(), group_idx)
+        group_acc, group_count = self.compute_group_avg(
+            (torch.argmax(yhat, 1) == y).float(), group_idx
+        )
 
         # update historical losses
         self.update_exp_avg_loss(group_loss, group_count)
@@ -124,10 +131,10 @@ class LossComputer:
 
     def compute_robust_loss(self, group_loss, group_count):
         adjusted_loss = group_loss
-        if torch.all(self.adj>0):
-            adjusted_loss += self.adj/torch.sqrt(self.group_counts)
+        if torch.all(self.adj > 0):
+            adjusted_loss += self.adj / torch.sqrt(self.group_counts)
         if self.normalize_loss:
-            adjusted_loss = adjusted_loss/(adjusted_loss.sum())
+            adjusted_loss = adjusted_loss / (adjusted_loss.sum())
 
         # import pdb; pdb.set_trace()
         # TODO: GPT says the leak might be here
@@ -146,7 +153,7 @@ class LossComputer:
         return robust_loss, self.adv_probs
 
     def compute_robust_loss_btl(self, group_loss, group_count):
-        adjusted_loss = self.exp_avg_loss + self.adj/torch.sqrt(self.group_counts)
+        adjusted_loss = self.exp_avg_loss + self.adj / torch.sqrt(self.group_counts)
         return self.compute_robust_loss_greedy(group_loss, adjusted_loss)
 
     def compute_robust_loss_greedy(self, group_loss, ref_loss):
@@ -154,11 +161,13 @@ class LossComputer:
         sorted_loss = group_loss[sorted_idx]
         sorted_frac = self.group_frac[sorted_idx]
 
-        mask = torch.cumsum(sorted_frac, dim=0)<=self.alpha
-        weights = mask.float() * sorted_frac /self.alpha
+        mask = torch.cumsum(sorted_frac, dim=0) <= self.alpha
+        weights = mask.float() * sorted_frac / self.alpha
         last_idx = mask.sum()
         weights[last_idx] = 1 - weights.sum()
-        weights = sorted_frac*self.min_var_weight + weights*(1-self.min_var_weight)
+        weights = sorted_frac * self.min_var_weight + weights * (
+            1 - self.min_var_weight
+        )
 
         robust_loss = sorted_loss @ weights
 
@@ -170,20 +179,28 @@ class LossComputer:
     def compute_group_avg(self, losses, group_idx):
         # compute observed counts and mean loss for each group
         # import pdb; pdb.set_trace()
-        group_map = (group_idx == torch.arange(self.n_groups).unsqueeze(1).long().cuda()).float()
+        group_map = (
+            group_idx == torch.arange(self.n_groups).unsqueeze(1).long().cuda()
+        ).float()
         group_count = group_map.sum(1)
-        group_denom = group_count + (group_count==0).float() # avoid nans
-        group_loss = (group_map @ losses.view(-1))/group_denom
+        group_denom = group_count + (group_count == 0).float()  # avoid nans
+        group_loss = (group_map @ losses.view(-1)) / group_denom
         return group_loss, group_count
 
     def update_exp_avg_loss(self, group_loss, group_count):
         with torch.no_grad():
-            prev_weights = (1 - self.gamma*(group_count>0).float()) * (self.exp_avg_initialized>0).float()
+            prev_weights = (1 - self.gamma * (group_count > 0).float()) * (
+                self.exp_avg_initialized > 0
+            ).float()
             curr_weights = 1 - prev_weights
             # import pdb; pdb.set_trace()
             # TODO: Maybe detach gorup_loss?
-            self.exp_avg_loss = self.exp_avg_loss * prev_weights + group_loss * curr_weights
-            self.exp_avg_initialized = (self.exp_avg_initialized>0) + (group_count>0)
+            self.exp_avg_loss = (
+                self.exp_avg_loss * prev_weights + group_loss * curr_weights
+            )
+            self.exp_avg_initialized = (self.exp_avg_initialized > 0) + (
+                group_count > 0
+            )
 
     def reset_stats(self):
         self.processed_data_counts = torch.zeros(self.n_groups).cuda()
@@ -191,62 +208,74 @@ class LossComputer:
         self.update_batch_counts = torch.zeros(self.n_groups).cuda()
         self.avg_group_loss = torch.zeros(self.n_groups).cuda()
         self.avg_group_acc = torch.zeros(self.n_groups).cuda()
-        self.avg_per_sample_loss = 0.
-        self.avg_actual_loss = 0.
-        self.avg_acc = 0.
-        self.batch_count = 0.
+        self.avg_per_sample_loss = 0.0
+        self.avg_actual_loss = 0.0
+        self.avg_acc = 0.0
+        self.batch_count = 0.0
 
-    def update_stats(self, actual_loss, group_loss, group_acc, group_count, weights=None):
+    def update_stats(
+        self, actual_loss, group_loss, group_acc, group_count, weights=None
+    ):
         # avg group loss
         denom = self.processed_data_counts + group_count
-        denom += (denom==0).float()
-        prev_weight = self.processed_data_counts/denom
-        curr_weight = group_count/denom
-        self.avg_group_loss = prev_weight*self.avg_group_loss + curr_weight*group_loss
+        denom += (denom == 0).float()
+        prev_weight = self.processed_data_counts / denom
+        curr_weight = group_count / denom
+        self.avg_group_loss = (
+            prev_weight * self.avg_group_loss + curr_weight * group_loss
+        )
 
         # avg group acc
-        self.avg_group_acc = prev_weight*self.avg_group_acc + curr_weight*group_acc
+        self.avg_group_acc = prev_weight * self.avg_group_acc + curr_weight * group_acc
 
         # batch-wise average actual loss
         denom = self.batch_count + 1
-        self.avg_actual_loss = (self.batch_count/denom)*self.avg_actual_loss + (1/denom)*actual_loss
+        self.avg_actual_loss = (self.batch_count / denom) * self.avg_actual_loss + (
+            1 / denom
+        ) * actual_loss
 
         # counts
         self.processed_data_counts += group_count
         if self.is_robust:
-            self.update_data_counts += group_count*((weights>0).float())
-            self.update_batch_counts += ((group_count*weights)>0).float()
+            self.update_data_counts += group_count * ((weights > 0).float())
+            self.update_batch_counts += ((group_count * weights) > 0).float()
         else:
             self.update_data_counts += group_count
-            self.update_batch_counts += (group_count>0).float()
-        self.batch_count+=1
+            self.update_batch_counts += (group_count > 0).float()
+        self.batch_count += 1
 
         # avg per-sample quantities
-        group_frac = self.processed_data_counts/(self.processed_data_counts.sum())
+        group_frac = self.processed_data_counts / (self.processed_data_counts.sum())
         self.avg_per_sample_loss = group_frac @ self.avg_group_loss
         self.avg_acc = group_frac @ self.avg_group_acc
 
     def get_model_stats(self, model, args, stats_dict):
-        model_norm_sq = 0.
+        model_norm_sq = 0.0
         for param in model.parameters():
             model_norm_sq += torch.norm(param) ** 2
-        stats_dict['model_norm_sq'] = model_norm_sq.item()
-        stats_dict['reg_loss'] = args.weight_decay / 2 * model_norm_sq.item()
+        stats_dict["model_norm_sq"] = model_norm_sq.item()
+        stats_dict["reg_loss"] = args.weight_decay / 2 * model_norm_sq.item()
         return stats_dict
 
     def get_stats(self, model=None, args=None):
         stats_dict = {}
         for idx in range(self.n_groups):
-            stats_dict[f'avg_loss_group:{idx}'] = self.avg_group_loss[idx].item()
-            stats_dict[f'exp_avg_loss_group:{idx}'] = self.exp_avg_loss[idx].item()
-            stats_dict[f'avg_acc_group:{idx}'] = self.avg_group_acc[idx].item()
-            stats_dict[f'processed_data_count_group:{idx}'] = self.processed_data_counts[idx].item()
-            stats_dict[f'update_data_count_group:{idx}'] = self.update_data_counts[idx].item()
-            stats_dict[f'update_batch_count_group:{idx}'] = self.update_batch_counts[idx].item()
+            stats_dict[f"avg_loss_group:{idx}"] = self.avg_group_loss[idx].item()
+            stats_dict[f"exp_avg_loss_group:{idx}"] = self.exp_avg_loss[idx].item()
+            stats_dict[f"avg_acc_group:{idx}"] = self.avg_group_acc[idx].item()
+            stats_dict[f"processed_data_count_group:{idx}"] = (
+                self.processed_data_counts[idx].item()
+            )
+            stats_dict[f"update_data_count_group:{idx}"] = self.update_data_counts[
+                idx
+            ].item()
+            stats_dict[f"update_batch_count_group:{idx}"] = self.update_batch_counts[
+                idx
+            ].item()
 
-        stats_dict['avg_actual_loss'] = self.avg_actual_loss.item()
-        stats_dict['avg_per_sample_loss'] = self.avg_per_sample_loss.item()
-        stats_dict['avg_acc'] = self.avg_acc.item()
+        stats_dict["avg_actual_loss"] = self.avg_actual_loss.item()
+        stats_dict["avg_per_sample_loss"] = self.avg_per_sample_loss.item()
+        stats_dict["avg_acc"] = self.avg_acc.item()
 
         # Model stats
         if model is not None:

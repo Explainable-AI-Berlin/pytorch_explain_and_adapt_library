@@ -2,14 +2,14 @@ import random
 import pandas as pd
 import os.path as osp
 
-if __name__ == '__main__':
-    data_dir = '/scratch/ppar/data/img_align_celeba/'
+if __name__ == "__main__":
+    data_dir = "/scratch/ppar/data/img_align_celeba/"
 
     random.seed(5)
 
-    data = pd.read_csv(osp.join(data_dir, 'list_attr_celeba.csv'))
-    partition_df = pd.read_csv(osp.join(data_dir, 'list_eval_partition.csv'))
-    data = data[partition_df['partition'] == 1]
+    data = pd.read_csv(osp.join(data_dir, "list_attr_celeba.csv"))
+    partition_df = pd.read_csv(osp.join(data_dir, "list_eval_partition.csv"))
+    data = data[partition_df["partition"] == 1]
     data.reset_index(inplace=True)
     data.replace(-1, 0, inplace=True)
 
@@ -18,5 +18,4 @@ if __name__ == '__main__':
 
     minival = data.iloc[indexes]
 
-    minival.to_csv('minival2k.csv')
-
+    minival.to_csv("minival2k.csv")

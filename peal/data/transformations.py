@@ -24,7 +24,9 @@ class CircularCut(object):
         screen = pygame.Surface((width, height))
         screen.fill(background_color)
         pygame.draw.ellipse(screen, (255, 255, 255), pygame.Rect(0, 0, width, height))
-        overlay = Image.frombytes("RGB", (width, height), pygame.image.tostring(screen, "RGB"))
+        overlay = Image.frombytes(
+            "RGB", (width, height), pygame.image.tostring(screen, "RGB")
+        )
         overlay_np = np.array(overlay)
         img_cut = np.minimum(overlay_np, sample_np)
         return Image.fromarray(img_cut)
@@ -147,7 +149,9 @@ class RandomResizeCropPad(object):
         pad_bottom = max(0, output_size[1] - resized_height - pad_top)
 
         # Apply crop/pad
-        img = transforms.functional.pad(img, (pad_left, pad_top, pad_right, pad_bottom), fill=0.5)
+        img = transforms.functional.pad(
+            img, (pad_left, pad_top, pad_right, pad_bottom), fill=0.5
+        )
 
         # Perform center crop
         img = transforms.functional.center_crop(img, output_size)
@@ -156,7 +160,9 @@ class RandomResizeCropPad(object):
 
 
 class DiffusionAugmentation(object):
-    def __init__(self, generator, sampling_time_fraction, num_discretization_steps, dataset=None):
+    def __init__(
+        self, generator, sampling_time_fraction, num_discretization_steps, dataset=None
+    ):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.generator = get_generator(generator).to(self.device)
         self.sampling_time_fraction = sampling_time_fraction
@@ -177,18 +183,30 @@ class DiffusionAugmentation(object):
             img_in = self.dataset.project_to_pytorch_default(img_in)
 
         with torch.no_grad():
-            img_in = self.generator.dataset.project_from_pytorch_default(img_in).to(self.device)
+            img_in = self.generator.dataset.project_from_pytorch_default(img_in).to(
+                self.device
+            )
             z = self.generator.encode(
-                img_in, self.sampling_time_fraction, num_steps=self.num_discretization_steps, stochastic="fully"
+                img_in,
+                self.sampling_time_fraction,
+                num_steps=self.num_discretization_steps,
+                stochastic="fully",
             )
             img_reconstructed = self.generator.decode(
-                z, self.sampling_time_fraction, num_steps=self.num_discretization_steps, stochastic=True
+                z,
+                self.sampling_time_fraction,
+                num_steps=self.num_discretization_steps,
+                stochastic=True,
             )
 
         img_reconstructed.to(device_buffer)
-        img_reconstructed = self.generator.dataset.project_to_pytorch_default(img_reconstructed)
+        img_reconstructed = self.generator.dataset.project_to_pytorch_default(
+            img_reconstructed
+        )
         if not self.dataset is None:
-            img_reconstructed = self.dataset.project_from_pytorch_default(img_reconstructed)
+            img_reconstructed = self.dataset.project_from_pytorch_default(
+                img_reconstructed
+            )
 
         if was_unsqueezed:
             img_reconstructed = img_reconstructed.squeeze(0)

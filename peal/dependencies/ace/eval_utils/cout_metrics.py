@@ -5,7 +5,6 @@ We implemented the RGB version for the evaluation and
 the binary version
 """
 
-
 from tqdm import tqdm
 
 from torch.autograd import Variable

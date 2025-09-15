@@ -185,14 +185,14 @@ class DataloaderMixer(DataLoader):
 
     def __getstate__(self):
         return {
-            "train_config" : self.train_config,
-            "dataloaders" : self.dataloaders,
-            "batch_size" : self.batch_size,
-            "priorities" : self.priorities,
-            "dataset" : self.dataset,
-            "return_src_internal" : self.return_src_internal,
-            "hints_enabled" : self.hints_enabled,
-            "class_balancing_enabled" : self.class_balancing_enabled,
+            "train_config": self.train_config,
+            "dataloaders": self.dataloaders,
+            "batch_size": self.batch_size,
+            "priorities": self.priorities,
+            "dataset": self.dataset,
+            "return_src_internal": self.return_src_internal,
+            "hints_enabled": self.hints_enabled,
+            "class_balancing_enabled": self.class_balancing_enabled,
         }
 
     def __setstate__(self, state):
@@ -289,17 +289,23 @@ class DataloaderMixer(DataLoader):
                     if isinstance(item[i], list) or isinstance(item[i], tuple):
                         for j in range(len(item[i])):
                             try:
-                                item[i][j] = torch.cat([item[i][j], subitem[i][j]], dim=0)
+                                item[i][j] = torch.cat(
+                                    [item[i][j], subitem[i][j]], dim=0
+                                )
 
                             except Exception:
-                                import pdb; pdb.set_trace()
+                                import pdb
+
+                                pdb.set_trace()
 
                     else:
                         try:
                             item[i] = torch.cat([item[i], subitem[i]], dim=0)
 
                         except Exception:
-                            import pdb; pdb.set_trace()
+                            import pdb
+
+                            pdb.set_trace()
 
             if self.return_src:
                 item = (item, 0)
@@ -312,7 +318,9 @@ class DataloaderMixer(DataLoader):
                 self.dataloaders[i].reset(batch_size)
 
             else:
-                new_batch_size = batch_size if batch_size else self.dataloaders[i].batch_size
+                new_batch_size = (
+                    batch_size if batch_size else self.dataloaders[i].batch_size
+                )
                 self.dataloaders[i] = DataLoader(
                     self.dataloaders[i].dataset, batch_size=new_batch_size
                 )
@@ -413,7 +421,9 @@ class DataloaderMixer(DataLoader):
 class WeightedDataloaderList:
     def __init__(self, dataloaders, weights=None):
         for dataloader in dataloaders:
-            assert isinstance(dataloader, torch.utils.data.DataLoader), str(dataloader) + " is not dataloader!"
+            assert isinstance(dataloader, torch.utils.data.DataLoader), (
+                str(dataloader) + " is not dataloader!"
+            )
 
         self.dataloaders = dataloaders
         if not weights is None:
@@ -423,11 +433,12 @@ class WeightedDataloaderList:
             self.weights = torch.ones([len(self.dataloaders)]) / len(self.dataloaders)
 
     def append(self, dataloader):
-        assert isinstance(dataloader, torch.utils.data.DataLoader), str(dataloader) + " is not dataloader!"
+        assert isinstance(dataloader, torch.utils.data.DataLoader), (
+            str(dataloader) + " is not dataloader!"
+        )
         self.dataloaders.append(dataloader)
         self.weights *= 0.5
         self.weights = torch.cat([self.weights, torch.tensor([0.5])])
-
 
 
 def get_dataloader(

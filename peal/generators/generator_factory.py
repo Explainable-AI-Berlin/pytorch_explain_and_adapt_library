@@ -19,7 +19,7 @@ def get_generator(
     generator: Union[InvertibleGenerator, str, dict],
     device: Union[str, torch.device] = "cuda",
     predictor_dataset=None,
-    timestep_respacing: int = None
+    timestep_respacing: int = None,
 ) -> InvertibleGenerator:
     """
     This function returns a generator.
@@ -45,7 +45,10 @@ def get_generator(
         or generator is None
     ):
         generator_config = load_yaml_config(generator)
-        if hasattr(generator_config, "timestep_respacing") and not timestep_respacing is None:
+        if (
+            hasattr(generator_config, "timestep_respacing")
+            and not timestep_respacing is None
+        ):
             generator_config.timestep_respacing = str(timestep_respacing)
 
         generator_class_list = find_subclasses(

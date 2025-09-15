@@ -526,11 +526,13 @@ class Image2MixedDataset(ImageDataset):
             self.load_in_memory()
 
     def load_in_memory(self):
-        print('load dataset into memory!!')
+        print("load dataset into memory!!")
         self.in_memory_images = {}
         self.in_memory_masks = {}
         for name in self.keys:
-            img = np.array(Image.open(os.path.join(self.root_dir, self.config.x_selection, name)))
+            img = np.array(
+                Image.open(os.path.join(self.root_dir, self.config.x_selection, name))
+            )
             self.in_memory_images[name] = img
 
             if self.config.has_hints:
@@ -948,10 +950,13 @@ class Image2ClassDataset(ImageDataset):
                     mask_path = os.path.join(self.mask_dir, target_str, file)
 
                 else:
-                    raise Exception(os.path.join(self.mask_dir, target_str, file) + " not found!")
+                    raise Exception(
+                        os.path.join(self.mask_dir, target_str, file) + " not found!"
+                    )
 
-                self.in_memory_masks[os.path.join(target_str, file)] = np.array(Image.open(mask_path))
-
+                self.in_memory_masks[os.path.join(target_str, file)] = np.array(
+                    Image.open(mask_path)
+                )
 
     def class_idx_to_name(self, class_idx):
         return self.idx_to_name[class_idx]
@@ -1094,7 +1099,9 @@ class Image2ClassDataset(ImageDataset):
 
         if self.hints_enabled:
             if self.config.in_memory:
-                mask = Image.fromarray(self.in_memory_masks[os.path.join(target_str, file)])
+                mask = Image.fromarray(
+                    self.in_memory_masks[os.path.join(target_str, file)]
+                )
 
             else:
                 if os.path.exists(os.path.join(self.mask_dir, file)):
@@ -1104,7 +1111,9 @@ class Image2ClassDataset(ImageDataset):
                     mask_path = os.path.join(self.mask_dir, target_str, file)
 
                 else:
-                    raise Exception(os.path.join(self.mask_dir, target_str, file) + " not found!")
+                    raise Exception(
+                        os.path.join(self.mask_dir, target_str, file) + " not found!"
+                    )
 
                 mask = Image.open(mask_path)
 
