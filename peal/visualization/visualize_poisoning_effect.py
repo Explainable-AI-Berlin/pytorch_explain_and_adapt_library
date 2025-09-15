@@ -13,7 +13,7 @@ data = {
         "DFR": [70.7, 73.0, 71.0, 67.9, 57.7, 51.6],
         "RR-ClarC": [84.1, 78.1, 80.5, 74.3, 73.6, 51.6],
         "CFKD": [86.4, 85.9, 84.5, 83.8, 84.3, 80.2],
-    }
+    },
 }
 
 # Poisoning levels (x-axis)
@@ -31,7 +31,13 @@ fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
 
 for ax, (dataset, methods) in zip(axes, data.items()):
     for method, values in methods.items():
-        ax.plot(poisoning_levels, values, marker="o", label=method, color=colors.get(method, None))
+        ax.plot(
+            poisoning_levels,
+            values,
+            marker="o",
+            label=method,
+            color=colors.get(method, None),
+        )
     ax.set_title(dataset)
     ax.set_xlabel("Correlation")
     ax.set_ylabel("Accuracy")

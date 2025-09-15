@@ -16,14 +16,16 @@ from peal.dependencies.group_dro.models import model_attributes
 from torch.utils.data import Dataset, Subset
 from peal.dependencies.group_dro.data.confounder_dataset import ConfounderDataset
 
+
 class CelebADataset(ConfounderDataset):
     """
     CelebA dataset (already cropped and centered).
     Note: idx and filenames are off by one.
     """
 
-    def __init__(self, root_dir, target_name, confounder_names,
-                 model_type, augment_data):
+    def __init__(
+        self, root_dir, target_name, confounder_names, model_type, augment_data
+    ):
         self.root_dir = root_dir
         self.target_name = target_name
         self.confounder_names = confounder_names
@@ -33,16 +35,16 @@ class CelebADataset(ConfounderDataset):
         # Read in attributes
         self.attrs_df = pd.read_csv(
             # os.path.join(root_dir, 'data', 'list_attr_celeba.csv'))
-            os.path.join(root_dir, 'celeba', 'data.csv'),
+            os.path.join(root_dir, "celeba", "data.csv"),
             sep=r",+",
-            engine='python',
+            engine="python",
             skiprows=1,
         )
 
         # Split out filenames and attribute names
-        self.data_dir = os.path.join(self.root_dir, 'celeba', 'imgs')
-        self.filename_array = self.attrs_df['ImgName'].values
-        self.attrs_df = self.attrs_df.drop(labels='ImgName', axis='columns')
+        self.data_dir = os.path.join(self.root_dir, "celeba", "imgs")
+        self.filename_array = self.attrs_df["ImgName"].values
+        self.attrs_df = self.attrs_df.drop(labels="ImgName", axis="columns")
         self.attr_names = self.attrs_df.columns.copy()
 
         # Then cast attributes to numpy array and set them to 0 and 1
@@ -64,32 +66,41 @@ class CelebADataset(ConfounderDataset):
 
         # Map to groups
         self.n_groups = self.n_classes * pow(2, len(self.confounder_idx))
-        self.group_array = (self.y_array*(self.n_groups/2) + self.confounder_array).astype('int')
+        self.group_array = (
+            self.y_array * (self.n_groups / 2) + self.confounder_array
+        ).astype("int")
 
         # Read in train/val/test splits
         self.split_df = pd.read_csv(
             # os.path.join(root_dir, 'data', 'list_eval_partition.csv'))
-            os.path.join(root_dir, 'celeba', 'data.csv'),
+            os.path.join(root_dir, "celeba", "data.csv"),
             sep=r",+",
-            engine='python',
+            engine="python",
             skiprows=1,
         )
-        self.split_array = self.split_df['split'].values
-        self.split_dict = {
-            'train': 0,
-            'val': 1,
-            'test': 2
-        }
+        self.split_array = self.split_df["split"].values
+        self.split_dict = {"train": 0, "val": 1, "test": 2}
 
-        if model_attributes[self.model_type]['feature_type']=='precomputed':
-            self.features_mat = torch.from_numpy(np.load(
-                os.path.join(root_dir, 'features', model_attributes[self.model_type]['feature_filename']))).float()
+        if model_attributes[self.model_type]["feature_type"] == "precomputed":
+            self.features_mat = torch.from_numpy(
+                np.load(
+                    os.path.join(
+                        root_dir,
+                        "features",
+                        model_attributes[self.model_type]["feature_filename"],
+                    )
+                )
+            ).float()
             self.train_transform = None
             self.eval_transform = None
         else:
             self.features_mat = None
-            self.train_transform = get_transform_celebA(self.model_type, train=True, augment_data=augment_data)
-            self.eval_transform = get_transform_celebA(self.model_type, train=False, augment_data=augment_data)
+            self.train_transform = get_transform_celebA(
+                self.model_type, train=True, augment_data=augment_data
+            )
+            self.eval_transform = get_transform_celebA(
+                self.model_type, train=False, augment_data=augment_data
+            )
 
     def attr_idx(self, attr_name):
         return self.attr_names.get_loc(attr_name)
@@ -99,28 +110,33 @@ def get_transform_celebA(model_type, train, augment_data):
     orig_w = 178
     orig_h = 218
     orig_min_dim = min(orig_w, orig_h)
-    if model_attributes[model_type]['target_resolution'] is not None:
-        target_resolution = model_attributes[model_type]['target_resolution']
+    if model_attributes[model_type]["target_resolution"] is not None:
+        target_resolution = model_attributes[model_type]["target_resolution"]
     else:
         target_resolution = (orig_w, orig_h)
 
     if (not train) or (not augment_data):
-        transform = transforms.Compose([
-            transforms.CenterCrop(orig_min_dim),
-            transforms.Resize(target_resolution),
-            transforms.ToTensor(),
-            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-        ])
+        transform = transforms.Compose(
+            [
+                transforms.CenterCrop(orig_min_dim),
+                transforms.Resize(target_resolution),
+                transforms.ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+            ]
+        )
     else:
         # Orig aspect ratio is 0.81, so we don't squish it in that direction any more
-        transform = transforms.Compose([
-            transforms.RandomResizedCrop(
-                target_resolution,
-                scale=(0.7, 1.0),
-                ratio=(1.0, 1.3333333333333333),
-                interpolation=2),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-        ])
+        transform = transforms.Compose(
+            [
+                transforms.RandomResizedCrop(
+                    target_resolution,
+                    scale=(0.7, 1.0),
+                    ratio=(1.0, 1.3333333333333333),
+                    interpolation=2,
+                ),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+            ]
+        )
     return transform

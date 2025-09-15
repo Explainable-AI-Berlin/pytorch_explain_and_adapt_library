@@ -101,10 +101,10 @@ def latent_convexity_criterion(model, y_pred, y_target, latent_code=None):
     targets2 = y_target[indices].to(latent_code)
 
     targets_onehot = onehot(y_target.to(latent_code), model.config.task.output_channels)
-    targets2_onehot = onehot(targets2,model.config.task.output_channels)
+    targets2_onehot = onehot(targets2, model.config.task.output_channels)
 
-    #lam = torch.FloatTensor([np.random.beta(model.config.training.alpha, model.config.training.alpha)]).to(latent_code)
-    lam = torch.rand(y_target.shape).to(latent_code)[:,None]
+    # lam = torch.FloatTensor([np.random.beta(model.config.training.alpha, model.config.training.alpha)]).to(latent_code)
+    lam = torch.rand(y_target.shape).to(latent_code)[:, None]
     data = latent_code * lam + data2 * (1 - lam)
     targets_new = targets_onehot * lam + targets2_onehot * (1 - lam)
     logits = model.get_last_layer()(data)
@@ -113,7 +113,9 @@ def latent_convexity_criterion(model, y_pred, y_target, latent_code=None):
 
 available_criterions = {
     "ce": cross_entropy_criterion,
-    "bce": lambda model, y_pred, y_target, latent_code: nn.BCEWithLogitsLoss()(y_pred, y_target),
+    "bce": lambda model, y_pred, y_target, latent_code: nn.BCEWithLogitsLoss()(
+        y_pred, y_target
+    ),
     "mse": lambda model, y_pred, y_target, latent_code: nn.MSELoss()(y_pred, y_target),
     "mae": lambda model, y_pred, y_target, latent_code: nn.L1Loss()(y_pred, y_target),
     "mixed": mixed_bce_mse_criterion,

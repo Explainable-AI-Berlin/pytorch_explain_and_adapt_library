@@ -40,9 +40,7 @@ def get_explanation(
     explanation_type, model, target_key, base_path = description
     lrp_target = checkbox_dict[target_key]
     if isinstance(explainer, LRPExplainer):
-        lrp_heatmap, lrp_overlay, prediction = explainer.explain_batch(
-            X, lrp_target
-        )
+        lrp_heatmap, lrp_overlay, prediction = explainer.explain_batch(X, lrp_target)
         lrp_heatmap = lrp_heatmap.cpu()
         lrp_scores = list(
             map(
@@ -83,10 +81,11 @@ def get_explanation(
                 "y_list": lrp_target[current_idx : current_idx + batch_size],
                 "y_target_start_confidence_list": torch.zeros([batch_size]),
             }
-            student_cfkd_counterfactual_explanation = (
-                explainer.explain_batch(
-                    batch, remove_below_threshold=False, explainer_path=base_path, batchwise_clustering=True,
-                )
+            student_cfkd_counterfactual_explanation = explainer.explain_batch(
+                batch,
+                remove_below_threshold=False,
+                explainer_path=base_path,
+                batchwise_clustering=True,
             )
             try:
                 cfkd_counterfactual = torch.stack(
@@ -94,7 +93,9 @@ def get_explanation(
                 ).cpu()
 
             except Exception:
-                import pdb; pdb.set_trace()
+                import pdb
+
+                pdb.set_trace()
 
             cfkd_heatmap = torch.stack(
                 student_cfkd_counterfactual_explanation["x_attribution_list"]

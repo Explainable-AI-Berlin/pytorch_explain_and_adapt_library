@@ -10,48 +10,48 @@ import os
 import torch
 import numpy as np
 from torch.utils.data import Subset
+
 # from data.label_shift_utils import prepare_label_shift_data
 from peal.dependencies.group_dro.data.confounder_utils import prepare_confounder_data
 
 # TODO: How do I set the root directory for the datasets?
-root_dir = './datasets'
+root_dir = "./datasets"
 
 dataset_attributes = {
-    'CelebA': {
-        'root_dir': 'celebA'
-    },
-    'CUB': {
-        'root_dir': 'cub'
-    },
-#    'CIFAR10': {
-#        'root_dir': 'CIFAR10/data'
-#    },
-#    'MultiNLI': {
-#        'root_dir': 'multinli'
-#    }
+    "CelebA": {"root_dir": "celebA"},
+    "CUB": {"root_dir": "cub"},
+    #    'CIFAR10': {
+    #        'root_dir': 'CIFAR10/data'
+    #    },
+    #    'MultiNLI': {
+    #        'root_dir': 'multinli'
+    #    }
 }
 
 for dataset in dataset_attributes:
-    dataset_attributes[dataset]['root_dir'] = os.path.join(root_dir, dataset_attributes[dataset]['root_dir'])
+    dataset_attributes[dataset]["root_dir"] = os.path.join(
+        root_dir, dataset_attributes[dataset]["root_dir"]
+    )
 
-shift_types = ['confounder'] # , 'label_shift_step']
+shift_types = ["confounder"]  # , 'label_shift_step']
+
 
 def prepare_data(
-        root_dir,
-        dataset,
-        target_name,
-        confounder_names,
-        model,
-        augment_data,
-        fraction,
-        shift_type='confounder',
-        train=False,
-        return_full_dataset=False
+    root_dir,
+    dataset,
+    target_name,
+    confounder_names,
+    model,
+    augment_data,
+    fraction,
+    shift_type="confounder",
+    train=False,
+    return_full_dataset=False,
 ):
     # Set root_dir to defaults if necessary
     if root_dir is None:
-        root_dir = dataset_attributes[dataset]['root_dir']
-    if shift_type=='confounder':
+        root_dir = dataset_attributes[dataset]["root_dir"]
+    if shift_type == "confounder":
         return prepare_confounder_data(
             root_dir,
             dataset,
@@ -61,7 +61,10 @@ def prepare_data(
             augment_data,
             fraction,
             train,
-            return_full_dataset)
+            return_full_dataset,
+        )
+
+
 #    elif args.shift_type.startswith('label_shift'):
 #        assert not return_full_dataset
 #        return prepare_label_shift_data(args, train)

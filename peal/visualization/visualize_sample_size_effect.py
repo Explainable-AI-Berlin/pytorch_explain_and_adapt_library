@@ -14,7 +14,7 @@ data = {
         "DFR": [53.0, 51.8, 51.9, 61.1],
         "RR-ClarC": [68.7, 40.9, 40.9, 40.9],
         "CFKD": [86.7, 88.6, 89.7, 89.8],
-    }
+    },
 }
 
 # Sample sizes (x-axis)
@@ -32,7 +32,13 @@ fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
 
 for ax, (dataset, methods) in zip(axes, data.items()):
     for method, values in methods.items():
-        ax.plot(sample_sizes, values, marker="o", label=method, color=colors.get(method, None))
+        ax.plot(
+            sample_sizes,
+            values,
+            marker="o",
+            label=method,
+            color=colors.get(method, None),
+        )
     ax.set_title(dataset)
     ax.set_xlabel("Sample Size (log scale)")
     ax.set_ylabel("Accuracy")

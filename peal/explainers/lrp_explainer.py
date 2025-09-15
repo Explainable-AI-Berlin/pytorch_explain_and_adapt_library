@@ -46,11 +46,7 @@ CANONIZERS = {
 
 class LRPExplainer:
     def __init__(
-        self,
-        explainer_config,
-        predictor=None,
-        num_classes=None,
-        datasets=None
+        self, explainer_config, predictor=None, num_classes=None, datasets=None
     ):
         self.explainer_config = load_yaml_config(explainer_config)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -139,9 +135,7 @@ class LRPExplainer:
         if self.predictor_datasets[1].config.has_hints:
             self.predictor_datasets[1].enable_hints()
 
-        pbar = tqdm(
-            total=self.explainer_config.max_samples
-        )
+        pbar = tqdm(total=self.explainer_config.max_samples)
         pbar.stored_values = {}
         pbar.stored_values["n_total"] = 0
         for idx in range(len(self.predictor_datasets[1])):

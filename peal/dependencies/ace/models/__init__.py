@@ -4,7 +4,9 @@ from torchvision import models
 
 from peal.dependencies.ace.models.normalizer import Normalizer
 from peal.dependencies.ace.models.dive.densenet import DiVEDenseNet121
-from peal.dependencies.ace.models.steex.DecisionDensenetModel import DecisionDensenetModel
+from peal.dependencies.ace.models.steex.DecisionDensenetModel import (
+    DecisionDensenetModel,
+)
 
 
 def get_classifier(args):

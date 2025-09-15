@@ -79,7 +79,12 @@ class Model2ModelTeacher(TeacherInterface):
             teacher_original.append(pred_original)
             teacher_counterfactual.append(pred_counterfactual)
 
-        if self.tracking_level >= 5 and mode == "validation" or self.tracking_level >= 5 and mode == "train":
+        if (
+            self.tracking_level >= 5
+            and mode == "validation"
+            or self.tracking_level >= 5
+            and mode == "train"
+        ):
             self.dataset.generate_contrastive_collage(
                 y_counterfactual_teacher_list=teacher_counterfactual,
                 y_original_teacher_list=teacher_original,

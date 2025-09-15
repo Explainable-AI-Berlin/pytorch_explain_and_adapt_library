@@ -7,7 +7,7 @@ from peal.generators.generator_factory import get_generator
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, required=True)
-    #add_class_arguments(parser, ModelConfig)
+    # add_class_arguments(parser, ModelConfig)
     args = parser.parse_args()
 
     generator_config = load_yaml_config(args.config)
@@ -16,5 +16,6 @@ def main():
     generator = get_generator(generator_config)
     generator.train_model()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

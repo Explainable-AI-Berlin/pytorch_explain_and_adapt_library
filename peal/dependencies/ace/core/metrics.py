@@ -8,7 +8,7 @@ def accuracy(logits, label, topk=(1, 5), binary=False):
     If set the binary flag to true, it will compute the top1 and the rest will return 1
     """
     if binary:
-        res = [((logits > 0).float() == label)]
+        res = [(logits > 0).float() == label]
         res += [torch.ones_like(res[0])] * (len(topk) - 1)
 
     else:

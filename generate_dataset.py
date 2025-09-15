@@ -1,8 +1,16 @@
 import argparse
 
 from peal.data.interfaces import DataConfig
-from peal.global_utils import load_yaml_config, add_class_arguments, integrate_arguments, set_random_seed
-from peal.data.dataset_generators import ConfounderDatasetGenerator, SquareDatasetGenerator
+from peal.global_utils import (
+    load_yaml_config,
+    add_class_arguments,
+    integrate_arguments,
+    set_random_seed,
+)
+from peal.data.dataset_generators import (
+    ConfounderDatasetGenerator,
+    SquareDatasetGenerator,
+)
 
 
 def main():
@@ -23,5 +31,6 @@ def main():
         cdg = SquareDatasetGenerator(data_config=config)
         cdg.generate_dataset()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

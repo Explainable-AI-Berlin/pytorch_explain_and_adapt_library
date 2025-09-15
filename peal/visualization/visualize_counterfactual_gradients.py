@@ -63,13 +63,17 @@ def visualize_step(
     for it in range(x_original.shape[0]):
         if x_original.size() != pe.size():
             pe = transform(pe)
-        original_vs_counterfactual.append(high_contrast_heatmap(x_original[it], pe[it])[0])
+        original_vs_counterfactual.append(
+            high_contrast_heatmap(x_original[it], pe[it])[0]
+        )
 
     ref = torch.zeros_like(x_original[0])
     gradient_img = []
     for it in range(x_original.shape[0]):
         gradient_img.append(
-            high_contrast_heatmap(ref, img_predictor_unnormalized.grad[it].detach().cpu())[0]
+            high_contrast_heatmap(
+                ref, img_predictor_unnormalized.grad[it].detach().cpu()
+            )[0]
         )
 
     if z:
@@ -77,7 +81,9 @@ def visualize_step(
         ref = torch.zeros_like(z[0][0])
         clean_img_new = z[0].data.detach().cpu()
         clean_img_new = (
-            transform(clean_img_new) if z[0].size() != x_original.size() else clean_img_new
+            transform(clean_img_new)
+            if z[0].size() != x_original.size()
+            else clean_img_new
         )
         for it in range(x_original.shape[0]):
             grad_heatmap = high_contrast_heatmap(ref, -z[0].grad[it].detach().cpu())[0]

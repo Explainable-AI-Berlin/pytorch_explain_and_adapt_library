@@ -116,7 +116,9 @@ def get_datasets(
             transform_list_train.append(transforms.RandomAdjustSharpness(0.3))
 
         if "blur" in config.invariances:
-            transform_list_train.append(v2.GaussianBlur(kernel_size=(5, 9), sigma=(0.1, 5.)))
+            transform_list_train.append(
+                v2.GaussianBlur(kernel_size=(5, 9), sigma=(0.1, 5.0))
+            )
 
         #
         if not config.crop_size is None:
@@ -138,11 +140,14 @@ def get_datasets(
 
         if config.diffusion_augmented and not config.batch_wise_augmentation:
             from peal.data.transformations import DiffusionAugmentation
-            transform_list_train.append(DiffusionAugmentation(
-                config.generator,
-                config.sampling_time_fraction,
-                config.num_discretization_steps
-            ))
+
+            transform_list_train.append(
+                DiffusionAugmentation(
+                    config.generator,
+                    config.sampling_time_fraction,
+                    config.num_discretization_steps,
+                )
+            )
 
     #
     transform_train = transforms.Compose(transform_list_train)
@@ -216,6 +221,7 @@ def get_datasets(
     )
     if config.diffusion_augmented and config.batch_wise_augmentation:
         from peal.data.transformations import DiffusionAugmentation
+
         train_data.diffusion_augmentation = DiffusionAugmentation(
             config.generator,
             config.sampling_time_fraction,

@@ -8,6 +8,7 @@ from torchvision.transforms.functional import resize
 
 NUM_CLUSTERS = 2
 
+
 def plot_images_with_custom_padding(
     imgs, confidences, task_names, method_names, output_path
 ):
@@ -36,8 +37,12 @@ def plot_images_with_custom_padding(
 
             # Add confidence values below the image
             ax.text(
-                0.5, -0.1, f"{confidences[i, j]:.2f}", fontsize=8, ha='center',
-                transform=ax.transAxes
+                0.5,
+                -0.1,
+                f"{confidences[i, j]:.2f}",
+                fontsize=8,
+                ha="center",
+                transform=ax.transAxes,
             )
 
             if i == 0:  # Add task names as column headers
@@ -45,8 +50,12 @@ def plot_images_with_custom_padding(
 
             if j == 0:  # Add method names as row labels
                 ax.text(
-                    -1.0, 0.5, method_names[i], fontsize=8, ha='center',
-                    transform=ax.transAxes
+                    -1.0,
+                    0.5,
+                    method_names[i],
+                    fontsize=8,
+                    ha="center",
+                    transform=ax.transAxes,
                 )
 
     plt.tight_layout()
@@ -54,7 +63,7 @@ def plot_images_with_custom_padding(
         top=1 - sum(row_spacing) / num_methods,
         bottom=0 + sum(row_spacing) / num_methods,
         left=0 + sum(col_spacing) / num_tasks,
-        right=1 - sum(col_spacing) / num_tasks
+        right=1 - sum(col_spacing) / num_tasks,
     )
     plt.savefig(output_path, dpi=300)
     plt.close(fig)
@@ -65,8 +74,10 @@ if __name__ == "__main__":
     base_paths = [
         base_path + "/celeba/Smiling/classifier_natural",
         base_path + "/celeba/Blond_Hair/classifier_natural_success",
-        base_path + "/square/colora_confounding_colorb/torchvision/classifier_poisoned098",
-        base_path + "/celeba_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned100",
+        base_path
+        + "/square/colora_confounding_colorb/torchvision/classifier_poisoned098",
+        base_path
+        + "/celeba_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned100",
         base_path + "/camelyon17/classifier_poisoned100",
     ]
     methods = ["ace_cfkd", "dime_cfkd", "fastdime_cfkd", "pdc_cfkd"]
@@ -94,7 +105,7 @@ if __name__ == "__main__":
         "SCE (ours) (2)",
     ]
     # 23
-    #sample_idxs = [[17, 43], [20, 23], [3, 2], [8, 4], [7, 9]]
+    # sample_idxs = [[17, 43], [20, 23], [3, 2], [8, 4], [7, 9]]
     o = 58
     sample_idxs = [[98 - o, 99 - o], [98 - o, 99 - o], [3, 2], [8, 4], [7, 9]]
     imgs = torch.zeros([1 + 2 * len(methods), 2 * len(base_paths), 3, 128, 128])
@@ -125,9 +136,21 @@ if __name__ == "__main__":
                             tracked_values["y_target_start_confidence_list"][sample_idx]
                         )
                         target_confidences[0][2 * dataset_idx + i] = c
-                        string = task_names[2 * dataset_idx + i] + "_Original_" + str(int(100 * c)) + ".png"
-                        string = string.replace(" ", "_").replace("-","_").replace("\n", "").replace("+", "_")
-                        torchvision.utils.save_image(img, os.path.join("vis_imgs", string))
+                        string = (
+                            task_names[2 * dataset_idx + i]
+                            + "_Original_"
+                            + str(int(100 * c))
+                            + ".png"
+                        )
+                        string = (
+                            string.replace(" ", "_")
+                            .replace("-", "_")
+                            .replace("\n", "")
+                            .replace("+", "_")
+                        )
+                        torchvision.utils.save_image(
+                            img, os.path.join("vis_imgs", string)
+                        )
 
                     for cluster_idx in range(NUM_CLUSTERS):
                         img = resize(
@@ -149,8 +172,22 @@ if __name__ == "__main__":
                         target_confidences[1 + 2 * method_idx + cluster_idx][
                             2 * dataset_idx + i
                         ] = c
-                        s = task_names[2 * dataset_idx + i] + "_" + methods[method_idx] + "_" + str(cluster_idx) + "_" + str(int(100 * c)) + ".png"
-                        s = s.replace(" ", "_").replace("-","_").replace("\n", "").replace("+", "_")
+                        s = (
+                            task_names[2 * dataset_idx + i]
+                            + "_"
+                            + methods[method_idx]
+                            + "_"
+                            + str(cluster_idx)
+                            + "_"
+                            + str(int(100 * c))
+                            + ".png"
+                        )
+                        s = (
+                            s.replace(" ", "_")
+                            .replace("-", "_")
+                            .replace("\n", "")
+                            .replace("+", "_")
+                        )
                         torchvision.utils.save_image(img, os.path.join("vis_imgs", s))
 
     """for method_idx, method_name in enumerate(method_names):
@@ -170,4 +207,3 @@ if __name__ == "__main__":
         method_names,
         "vis_imgs/collage_with_custom_padding.png",
     )
-

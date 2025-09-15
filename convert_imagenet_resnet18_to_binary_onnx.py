@@ -19,7 +19,7 @@ class BinaryImageNetModel(torch.nn.Module):
 def convert_to_binary_onnx(class1=248, class2=269, name="husky_vs_wulf"):
     binary_classifier = BinaryImageNetModel(class1, class2)
     binary_classifier.eval()
-    peal_runs = os.environ.get('PEAL_RUNS')
+    peal_runs = os.environ.get("PEAL_RUNS")
 
     if not os.path.exists(peal_runs + "/imagenet"):
         os.makedirs(peal_runs + "/imagenet")

@@ -41,7 +41,8 @@ def arguments():
 
     return parser.parse_args()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     args = arguments()
 
     device = torch.device("cuda:" + args.gpu)
@@ -49,7 +50,6 @@ if __name__ == '__main__':
     # # load oracle
     oracle_metrics = OracleMetrics(weights_path=args.oracle_path, device=device)
     oracle_metrics.eval()
-
 
     # create dataset to read the counterfactual results images
     class CFDataset:
@@ -112,7 +112,6 @@ if __name__ == '__main__':
                 img = img.convert("RGB")
             return self.transform(img)
 
-
     CELEBAPATH = os.path.join(args.celeba_path, "list_attr_celeba.csv")
     CELEBAPATHP = os.path.join(args.celeba_path, "list_eval_partition.csv")
     # extract the names of the labels
@@ -127,7 +126,9 @@ if __name__ == '__main__':
     corrs = np.zeros(40)
 
     for i in range(40):
-        corrs[i] = np.corrcoef(df["Smiling"].to_numpy(), df.iloc[:, i + 1].to_numpy())[0, 1]
+        corrs[i] = np.corrcoef(df["Smiling"].to_numpy(), df.iloc[:, i + 1].to_numpy())[
+            0, 1
+        ]
 
     df = pd.read_csv(CELEBAPATH)
     p = pd.read_csv(CELEBAPATHP)
@@ -150,7 +151,6 @@ if __name__ == '__main__':
         diffs[1, i] = df[df["Smiling"] == 0].iloc[:, i + 1].mean()
 
     maindiff = np.abs(diffs[0] - diffs[1])
-
 
     @torch.no_grad()
     def get_attrs_and_target_from_ds(path, exp_name, oracle, device):
@@ -182,7 +182,6 @@ if __name__ == '__main__':
         oracle_preds["cf"]["pred"] = np.concatenate(oracle_preds["cf"]["pred"])
 
         return oracle_preds
-
 
     def compute_CorrMetric(
         path,
@@ -236,7 +235,9 @@ if __name__ == '__main__':
                     width=0.3,
                     label="Metric",
                 )
-                plt.xticks(np.arange(len(our_corrs))[:top], our_corrs[:top], rotation=90)
+                plt.xticks(
+                    np.arange(len(our_corrs))[:top], our_corrs[:top], rotation=90
+                )
             else:
                 plt.bar(
                     np.arange(len(our_corrs))[:top] - 0.15,
@@ -260,7 +261,6 @@ if __name__ == '__main__':
             plt.show()
 
         return our_corrs
-
 
     def plot_bar(data, labs, top, sorted):
         r = 90
@@ -295,7 +295,6 @@ if __name__ == '__main__':
             )
 
         plt.show()
-
 
     # get results from dataset
 

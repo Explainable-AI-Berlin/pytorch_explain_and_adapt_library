@@ -162,13 +162,17 @@ class CelebAHQDataset:
                 transforms.Resize(image_size),
                 transforms.RandomHorizontalFlip() if random_flip else lambda x: x,
                 transforms.CenterCrop(image_size),
-                transforms.RandomResizedCrop(image_size, (0.95, 1.0))
-                if random_crop
-                else lambda x: x,
+                (
+                    transforms.RandomResizedCrop(image_size, (0.95, 1.0))
+                    if random_crop
+                    else lambda x: x
+                ),
                 transforms.ToTensor(),
-                transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
-                if normalize
-                else lambda x: x,
+                (
+                    transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
+                    if normalize
+                    else lambda x: x
+                ),
             ]
         )
 
@@ -249,12 +253,16 @@ class BDD100k:  # Jacob et al trained on 10k subset of BDD100k. datadir ~/save/B
             [
                 transforms.Resize((image_size, 2 * image_size)),
                 transforms.ToTensor(),
-                torch.nn.ConstantPad2d((0, 0, image_size // 2, image_size // 2), 0)
-                if padding
-                else lambda x: x,  # lambda x: F.pad(x, (0, 0, 128, 128), value=0)
-                transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
-                if normalize
-                else lambda x: x,
+                (
+                    torch.nn.ConstantPad2d((0, 0, image_size // 2, image_size // 2), 0)
+                    if padding
+                    else lambda x: x
+                ),  # lambda x: F.pad(x, (0, 0, 128, 128), value=0)
+                (
+                    transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
+                    if normalize
+                    else lambda x: x
+                ),
             ]
         )
 

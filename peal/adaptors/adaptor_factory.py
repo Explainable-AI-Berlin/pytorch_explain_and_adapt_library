@@ -3,9 +3,7 @@ import os
 
 from typing import Union
 
-from peal.adaptors.interfaces import (
-    Adaptor
-)
+from peal.adaptors.interfaces import Adaptor
 from peal.global_utils import (
     load_yaml_config,
     find_subclasses,
