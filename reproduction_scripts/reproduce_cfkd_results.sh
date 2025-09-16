@@ -57,7 +57,7 @@ python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predict
 python train_generator.py --config "<PEAL_BASE>/configs/cfkd_experiments/generators/celeba1k_ddpm_poisoned098.yaml"
 python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/celeba1k_Blond_Hair_classifier_poisoned098.yaml"
 # run CFKD
-python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/celeba_Blond_Hair_confounding_Male_poisoned098_sce_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/celeba1k_Blond_Hair_confounding_Male_poisoned098_sce_cfkd.yaml"
 python evaluate_predictor.py --model_path $PEAL_RUNS/celeba1k/Blond_Hair/resnet18_poisoned098/sce_cfkd/model.cpl --data_config configs/cfkd_experiments/data/celeba.yaml --model_config configs/cfkd_experiments/predictors/celeba1k_Blond_Hair_classifier_poisoned098.yaml
 # run DiffAug
 python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/celeba1k_Blond_Hair_classifier_poisoned098_diffusion_augmented.yaml"
@@ -270,18 +270,21 @@ python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square2kx098_pfc_cfkd.
 python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/square2k_classifier_poisoned098_dfr.yaml"
 python evaluate_predictor.py --model_path $PEAL_RUNS/square2k/colora_confounding_colorb/torchvision/classifier_poisoned098/dfr/model.cpl --data_config configs/cfkd_experiments/data/square_unpoisoned.yaml --model_config configs/cfkd_experiments/predictors/square2k_classifier_poisoned098_dfr.yaml
 python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/clarc/square2k_poisoned098_rrclarc.yaml"
+cat ${PEAL_RUNS}/square2k/colora_confounding_colorb/torchvision/classifier_poisoned098/rrclarc/best_model_result.txt
 
 # for 4k samples
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square4kx098_pfc_cfkd.yaml"
 python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/square4k_classifier_poisoned098_dfr.yaml"
 python evaluate_predictor.py --model_path $PEAL_RUNS/square4k/colora_confounding_colorb/torchvision/classifier_poisoned098/dfr/model.cpl --data_config configs/cfkd_experiments/data/square_unpoisoned.yaml --model_config configs/cfkd_experiments/predictors/square4k_classifier_poisoned098_dfr.yaml
 python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/clarc/square4k_poisoned098_rrclarc.yaml"
+cat ${PEAL_RUNS}/square4k/colora_confounding_colorb/torchvision/classifier_poisoned098/rrclarc/best_model_result.txt
 
 # for 8k samples
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/square8kx098_pfc_cfkd.yaml"
 python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/square8k_classifier_poisoned098_dfr.yaml"
 python evaluate_predictor.py --model_path $PEAL_RUNS/square8k/colora_confounding_colorb/torchvision/classifier_poisoned098/dfr/model.cpl --data_config configs/cfkd_experiments/data/square_unpoisoned.yaml --model_config configs/cfkd_experiments/predictors/square8k_classifier_poisoned098_dfr.yaml
 python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/clarc/square8k_poisoned098_rrclarc.yaml"
+cat ${PEAL_RUNS}/square8k/colora_confounding_colorb/torchvision/classifier_poisoned098/rrclarc/best_model_result.txt
 
 # For the CelebA copyrighttag dataset
 # for 1k samples
@@ -292,18 +295,21 @@ python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_Co
 python train_predictor.py --config configs/cfkd_experiments/predictors/celeba2k_Smiling_confounding_copyrighttag_classifier_poisoned098_dfr.yaml
 python evaluate_predictor.py --model_path $PEAL_RUNS/celeba2k_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned098/dfr/model.cpl --data_config configs/cfkd_experiments/data/Smiling_confounding_copyrighttag_celeba.yaml --model_config configs/cfkd_experiments/predictors/celeba2k_Smiling_confounding_copyrighttag_classifier_poisoned098_dfr.yaml
 python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/clarc/celeba2k_smiling_confounding_copyrighttag_098_rrclarc.yaml"
+cat ${PEAL_RUNS}/celeba2k_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned098/rrclarc/best_model_result.txt
 
 # for 4k samples
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba4kx100_pfc_cfkd.yaml"
 python train_predictor.py --config configs/cfkd_experiments/predictors/celeba4k_Smiling_confounding_copyrighttag_classifier_poisoned098_dfr.yaml
 python evaluate_predictor.py --model_path $PEAL_RUNS/celeba4k_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned098/dfr/model.cpl --data_config configs/cfkd_experiments/data/Smiling_confounding_copyrighttag_celeba.yaml --model_config configs/cfkd_experiments/predictors/celeba4k_Smiling_confounding_copyrighttag_classifier_poisoned098_dfr.yaml
 python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/clarc/celeba4k_smiling_confounding_copyrighttag_098_rrclarc.yaml"
+cat ${PEAL_RUNS}/celeba4k_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned098/rrclarc/best_model_result.txt
 
 # for 8k samples
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba8kx100_pfc_cfkd.yaml"
 python train_predictor.py --config configs/cfkd_experiments/predictors/celeba8k_Smiling_confounding_copyrighttag_classifier_poisoned098_dfr.yaml
 python evaluate_predictor.py --model_path $PEAL_RUNS/celeba8k_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned098/dfr/model.cpl --data_config configs/cfkd_experiments/data/Smiling_confounding_copyrighttag_celeba.yaml --model_config configs/cfkd_experiments/predictors/celeba8k_Smiling_confounding_copyrighttag_classifier_poisoned098_dfr.yaml
 python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/clarc/celeba8k_smiling_confounding_copyrighttag_098_rrclarc.yaml"
+cat ${PEAL_RUNS}/celeba8k_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned098/rrclarc/best_model_result.txt
 
 
 
