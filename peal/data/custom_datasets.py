@@ -972,3 +972,14 @@ class CelebACopyrighttagDataset(Image2MixedDataset):
             cdg.generate_dataset()
 
         super(CelebACopyrighttagDataset, self).__init__(config=config, **kwargs)
+
+
+class FollicleDataset(Image2MixedDataset):
+    def __init__(self, config, **kwargs):
+        # Login using e.g. `huggingface-cli login` to access this dataset
+        if not os.path.exists(config.dataset_path):
+            from datasets import load_dataset
+            ds = load_dataset("janphhe/follicles_true_features", num_proc=8)
+            import pdb; pdb.set_trace()
+
+        super(FollicleDataset, self).__init__(config=config, **kwargs)
