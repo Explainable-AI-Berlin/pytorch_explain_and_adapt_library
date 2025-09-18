@@ -1,10 +1,11 @@
-training          : <PEAL_BASE>/configs/sce_experiments/training/sensitive_distillation_imagenet.yaml
+training          : <PEAL_BASE>/configs/cfkd_experiments/training/latent_convexity_distillation.yaml
 distill_from      : predictor
 architecture      : torchvision_resnet18
 task:
   criterions:
     ce     : 1.0
     l2     : 100.0
+    lc     : 10.0
   output_type             : singleclass
   output_channels         : 2
   y_selection             : [prediction]

@@ -291,6 +291,7 @@ cat ${PEAL_RUNS}/square8k/colora_confounding_colorb/torchvision/classifier_poiso
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_pfc_cfkd.yaml"
 
 # for 2k samples
+python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/celeba2k_Smiling_confounding_copyrighttag_classifier_poisoned098.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba2kx100_pfc_cfkd.yaml"
 python train_predictor.py --config configs/cfkd_experiments/predictors/celeba2k_Smiling_confounding_copyrighttag_classifier_poisoned098_dfr.yaml
 python evaluate_predictor.py --model_path $PEAL_RUNS/celeba2k_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned098/dfr/model.cpl --data_config configs/cfkd_experiments/data/Smiling_confounding_copyrighttag_celeba.yaml --model_config configs/cfkd_experiments/predictors/celeba2k_Smiling_confounding_copyrighttag_classifier_poisoned098_dfr.yaml
@@ -298,6 +299,7 @@ python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/cl
 cat ${PEAL_RUNS}/celeba2k_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned098/rrclarc/best_model_result.txt
 
 # for 4k samples
+python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/celeba4k_Smiling_confounding_copyrighttag_classifier_poisoned098.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba4kx100_pfc_cfkd.yaml"
 python train_predictor.py --config configs/cfkd_experiments/predictors/celeba4k_Smiling_confounding_copyrighttag_classifier_poisoned098_dfr.yaml
 python evaluate_predictor.py --model_path $PEAL_RUNS/celeba4k_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned098/dfr/model.cpl --data_config configs/cfkd_experiments/data/Smiling_confounding_copyrighttag_celeba.yaml --model_config configs/cfkd_experiments/predictors/celeba4k_Smiling_confounding_copyrighttag_classifier_poisoned098_dfr.yaml
@@ -305,6 +307,7 @@ python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/cl
 cat ${PEAL_RUNS}/celeba4k_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned098/rrclarc/best_model_result.txt
 
 # for 8k samples
+python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/celeba8k_Smiling_confounding_copyrighttag_classifier_poisoned098.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/Smiling_confounding_CopyrightTag_celeba8kx100_pfc_cfkd.yaml"
 python train_predictor.py --config configs/cfkd_experiments/predictors/celeba8k_Smiling_confounding_copyrighttag_classifier_poisoned098_dfr.yaml
 python evaluate_predictor.py --model_path $PEAL_RUNS/celeba8k_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned098/dfr/model.cpl --data_config configs/cfkd_experiments/data/Smiling_confounding_copyrighttag_celeba.yaml --model_config configs/cfkd_experiments/predictors/celeba8k_Smiling_confounding_copyrighttag_classifier_poisoned098_dfr.yaml

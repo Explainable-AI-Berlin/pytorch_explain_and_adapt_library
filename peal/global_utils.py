@@ -449,7 +449,7 @@ def replace_relu_with_leakyrelu(model):
             setattr(model, child_name, torch.nn.LeakyReLU(negative_slope=0.1))
 
         else:
-            replace_relu_with_leakysoftplus(child)
+            replace_relu_with_leakyrelu(child)
 
     return model
 

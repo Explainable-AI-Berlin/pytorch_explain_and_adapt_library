@@ -6,7 +6,7 @@ learning_rate           : 0.001
 optimizer               : adam
 adv_training            : False
 class_balanced          : True
-use_mixup               : True
+use_mixup               : False
 label_smoothing         : 0.05
 mixup_alpha             : 10
 steps_per_epoch         : 1000
