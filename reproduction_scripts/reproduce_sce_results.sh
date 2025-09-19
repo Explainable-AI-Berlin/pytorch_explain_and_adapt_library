@@ -1,4 +1,4 @@
-# This script is meant to be able to reproduce the results of the PDC paper (ARXIV_LINK).
+# This script is meant to be able to reproduce the results of the SCE paper (ARXIV_LINK).
 # The results were reproduced with the following software versions: (GIT_HASH)
 # the batch sizes are optimized for a GPU with 80gb VRAM, but can be decreased for smaller GPUs
 # this script was executed at commit XXX
@@ -32,7 +32,7 @@ python run_cfkd.py --config "<PEAL_BASE>/configs/sce_experiments/adaptors/celeba
 # you can see the collages in $PEAL_BASE/celeba/Smiling/classifier_natural/fastdime_cfkd/0/validation_collages0
 # metrics: tensorboard --logdir $PEAL_BASE/celeba/Smiling/classifier_natural/fastdime_cfkd/logs
 
-# get the explanations for PDC
+# get the explanations for SCE
 python run_cfkd.py --config "<PEAL_BASE>/configs/sce_experiments/adaptors/celeba_Smiling_natural_sce_cfkd.yaml"
 # you can see the collages in $PEAL_BASE/celeba/Smiling/classifier_natural/sce_cfkd/0/validation_collages0
 # metrics: tensorboard --logdir $PEAL_BASE/celeba/Smiling/classifier_natural/sce_cfkd/logs
@@ -56,7 +56,7 @@ python run_cfkd.py --config "<PEAL_BASE>/configs/sce_experiments/adaptors/celeba
 # you can see the collages in $PEAL_BASE/celeba/Blond_Hair/classifier_natural/fastdime_cfkd/0/validation_collages0
 # metrics: tensorboard --logdir $PEAL_BASE/celeba/Blond_Hair/classifier_natural/fastdime_cfkd/logs
 
-# get the explanations for PDC
+# get the explanations for SCE
 python run_cfkd.py --config "<PEAL_BASE>/configs/sce_experiments/adaptors/celeba_Blond_Hair_natural_sce_cfkd.yaml"
 # you can see the collages in $PEAL_BASE/celeba/Blond_Hair/classifier_natural/sce_cfkd/0/validation_collages0
 # metrics: tensorboard --logdir $PEAL_BASE/celeba/Blond_Hair/classifier_natural/sce_cfkd/logs

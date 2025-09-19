@@ -384,6 +384,7 @@ class ModelTrainer:
     def run_epoch(self, dataloader, mode="train", pbar=None):
         """ """
         sources = {}
+        #import pdb; pdb.set_trace()
         for batch_idx, sample in enumerate(dataloader):
             if hasattr(dataloader, "return_src") and dataloader.return_src:
                 sample, source = sample
