@@ -88,39 +88,29 @@ The documentation can be found in the corresponding Python classes in the code.
 
 This can be done no code with the Command Line Interface of PEAL!!!
 The biggest effort is to reformat the dataset to a ```peal.data.datasets.Image2MixedDataset```.
-All labels have to be written into a "<PEAL_DATA>/my_data/data.csv" file with the header "ImagePath,Label1,Label2,...LabelN".
+All labels have to be written into a "$PEAL_DATA/my_data/data.csv" file with the header "ImagePath,Label1,Label2,...LabelN".
 It could also only have one label with "ImagePath,Label1" and we can only optimize for like this anyway.
-All Images have to be placed in the folder "<PEAL_DATA>/my_data" in the correct relative path.
+All Images have to be placed in the folder "$PEAL_DATA/my_data" in the correct relative path.
+Then, one can copy and adapt the config files for CelebA Smiling as follows:
 
-Then, one can copy and adapt the config files for CelebA Smiling.
-First, one has to copy configs/sce_experiments/data/celeba.yaml to configs/my_experiments/data/my_data.yaml.
-Then, one has to copy configs/sce_experiments/data/celeba_generator.yaml to configs/my_experiments/data/my_data_generator.yaml.
-Then, the dataset_class and confounding_factors have to be removed
-(because you do have neither for your new dataset yet).
-Then, num_samples, input_size and output_size should be adapted to your dataset.
-Now, one has to copy configs/sce_experiments/generators/celeba_ddpm.yaml to configs/my_experiments/generators/my_data_ddpm.yaml.
-In this file one has to replace base_path with "$PEAL_RUNS/my_data/ddpm" and data with "<PEAL_BASE>/configs/my_experiments/data/my_data_generator.yaml".
-Now you can train your DDPM generator with:
-
-```python train_generator.py --config "<PEAL_BASE>/configs/my_experiments/generators/my_data_ddpm.yaml"```
-
-In parallel you can copy "configs/sce_experiments/predictors/celeba_classifier_smiling.yaml" to "configs/my_experiments/predictors/my_data_classifier.yaml".
-Here, you have to replace model_path with "$PEAL_RUNS/my_data/classifier", data with "<PEAL_BASE>/configs/my_experiments/data/my_data.yaml" and y_selection with "[Label1]".
-Now you can train your predictor with:
-
-```python train_predictor.py --config "<PEAL_BASE>/configs/my_experiments/predictors/my_data_classifier.yaml"```
-
-After finishing generator and predictor training you can copy "configs/sce_experiments/adaptors/celeba_Smiling_natural_sce_cfkd.yaml" 
+1) copy configs/sce_experiments/data/celeba.yaml to configs/my_experiments/data/my_data.yaml.
+2) copy configs/sce_experiments/data/celeba_generator.yaml to configs/my_experiments/data/my_data_generator.yaml.
+3) In both, remove the dataset_class and confounding_factors (because you don't have either for your new dataset yet).
+4) In both set dataset_path to "$PEAL_DATA/my_data"
+5) In both adapt num_samples, input_size and output_size to your dataset.
+6) copy configs/sce_experiments/generators/celeba_ddpm.yaml to configs/my_experiments/generators/my_data_ddpm.yaml.
+7) In this file replace base_path with "$PEAL_RUNS/my_data/ddpm" and data with "<PEAL_BASE>/configs/my_experiments/data/my_data_generator.yaml".
+8) Train your DDPM generator with: ```python train_generator.py --config "<PEAL_BASE>/configs/my_experiments/generators/my_data_ddpm.yaml"```
+9) In parallel, you can copy "configs/sce_experiments/predictors/celeba_Smiling_classifier.yaml" to "configs/my_experiments/predictors/my_data_classifier.yaml".
+10) Here, you have to replace model_path with "$PEAL_RUNS/my_data/classifier", data with p and y_selection with "[Label1]".
+11) Now you can train your predictor with: ```python train_predictor.py --config "<PEAL_BASE>/configs/my_experiments/predictors/my_data_classifier.yaml"```
+12) After finishing generator and predictor training, you can copy "configs/sce_experiments/adaptors/celeba_Smiling_natural_sce_cfkd.yaml" 
 to "configs/my_experiments/adaptors/my_data_sce_cfkd.yaml".
-Overwrite data with "<PEAL_BASE>/my_experiments/configs/data/my_data.yaml", student with "$PEAL_RUNS/my_data/classifier/model.cpl",
-generator with "$PEAL_RUNS/my_data/ddpm/config.yaml", base_dir with "$PEAL_RUNS/my_data/classifier/sce_cfkd" and
-y_selection with "[Label1]".
-Now you can run SCE with:
+13) Overwrite data with "<PEAL_BASE>/configs/my_experiments/data/my_data.yaml", student with "$PEAL_RUNS/my_data/classifier/model.cpl", generator with "$PEAL_RUNS/my_data/ddpm/config.yaml", base_dir with "$PEAL_RUNS/my_data/classifier/sce_cfkd" and y_selection with "[Label1]".
+14) Now you can run SCE with: ```python run_cfkd.py --config "<PEAL_BASE>/configs/my_experiments/adaptors/my_data_sce_cfkd.yaml"```
+15) Now you can find your counterfactuals under "$PEAL_RUNS/my_data/classifier/sce_cfkd/validation_collages".
 
-```python run_cfkd.py --config "<PEAL_BASE>/configs/my_experiments/adaptors/my_data_sce_cfkd.yaml"```
-
-Now you can find your counterfactuals under "$PEAL_RUNS/my_data/classifier/sce_cfkd/validation_collages".
-If you further want to process them you can load the .npz array "$PEAL_RUNS/my_data/classifier/sce_cfkd/validation_tracked_values.npz".
+If you further want to process them, you can load the .npz array "$PEAL_RUNS/my_data/classifier/sce_cfkd/validation_tracked_values.npz".
 The originals in this array can be found under the key "x_list" and the counterfactuals under "x_counterfactual_list".
 
 
@@ -207,17 +197,10 @@ Now you can find your counterfactuals under "$PEAL_RUNS/my_data/classifier/sce_c
 If you further want to process them you can load the .npz array "$PEAL_RUNS/my_data/classifier/sce_cfkd/validation_tracked_values.npz".
 The originals in this array can be found under the key "x_list" and the counterfactuals under "x_counterfactual_list".
 
-
-
-**Planned Installation Instructions (Not Functional yet!!!):**
-
-pip install peal
-
-otherwise the project can also be downloaded, a conda or virtualenv environment can be installed based on the requirements.txt (we tested the program for Python 3.9.15) and peal can be used by adding the path to the project to the PYTHONPATH as described in the jupyter notebooks.
-
 **Example Workflow CFKD adaptor:**
 
-Assuming you have a predictor ```my_classifier``` and a dataset ```my_dataset```.
+Here we introduce a code snippet that does the same as "run_cfkd.py" does in a no-code CLI manner.
+Assuming you have a predictor ```my_classifier``` and a dataset ```my_dataset``` and a peal.adaptor.counterfactual_knowledge_distillation.CFKDConfig ```adaptor_config``` configuring your CFKD run.
 
 ```
 from peal.adaptors.counterfactual_knowledge_distillion import CFKD
@@ -225,7 +208,8 @@ from peal.adaptors.counterfactual_knowledge_distillion import CFKD
 cfkd = CFKD(
   student = my_classifier,
   datasource = my_dataset,
-  teacher = 'human@8000'
+  teacher = 'human@8000',
+  adaptor_config = adaptor_config,
 )
 
 fixed_classifier = cfkd.run()
@@ -246,24 +230,6 @@ Then the following happens:
 6) The classifier is finetuned based on $PEAL/configs/training/finetune_classifier.yaml and saved under peal_runs/run1/i/finetuned_model/model.cpl
 
 7) If i smaller then the maximum number of finetune iterations go back to 3.
-
-
-**Example Workflow Predictor-distilled counterfactual explainer:**
-
-Assuming you have a predictor ```my_classifier``` and a dataset ```my_dataset```.
-
-```
-from peal.explainers.counterfactual_explainer import CounterfactualExplainer
-
-pdc = CounterfactualExplainer(
-  student = my_classifier,
-  datasource = my_dataset,
-)
-
-explanations, interpretations = pdc.run()
-```
-
-Now in explanations you have the counterfactuals and in interpretations the explanations of the counterfactuals.
 
 
 **Structure of the Project:**
