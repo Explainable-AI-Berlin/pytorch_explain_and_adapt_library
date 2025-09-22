@@ -1,0 +1,12 @@
+# python train_predictor.py --config "<PEAL_BASE>/configs/sce_experiments/predictors/celeba_Smiling_classifier.yaml"
+model_path        : $PEAL_RUNS/my_data/classifier
+data              : "<PEAL_BASE>/configs/my_experiments/data/my_data.yaml"
+training          : <PEAL_BASE>/configs/sce_experiments/training/img_classifier_balanced.yaml
+architecture      : torchvision_resnet18
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [Fracture]

@@ -1,7 +1,6 @@
 import copy
 import csv
 import os
-import random
 import shutil
 import tarfile
 from pathlib import Path
@@ -14,7 +13,7 @@ import torchvision
 from PIL import Image
 import matplotlib.cm as cm
 import requests
-from torch.utils.data import DataLoader, ConcatDataset
+from torch.utils.data import ConcatDataset
 
 from torchvision.transforms import ToTensor
 from wilds import get_dataset
@@ -520,40 +519,26 @@ class SquareDataset(Image2MixedDataset):
                 if batch_idx >= max_batches:
                     break
 
-                try:
-                    x, y = batch  # Assuming batch contains images and hints
-                    y, hint = y[:2]
-
-                except Exception:
-                    print("in extract latents")
-                    import pdb
-
-                    pdb.set_trace()
+                x, y = batch  # Assuming batch contains images and hints
+                y, hint = y[:2]
 
                 for idx in range(len(x)):
-                    try:
-                        latents.append(
-                            [
-                                self.check_foreground(x[idx], hint[idx]),
-                                self.check_background(x[idx], hint[idx]),
-                            ]
-                        )
-
-                    except Exception:
-                        import pdb
-
-                        pdb.set_trace()
+                    latents.append(
+                        [
+                            self.check_foreground(x[idx], hint[idx]),
+                            self.check_background(x[idx], hint[idx]),
+                        ]
+                    )
 
                     y_list.append(y[idx])
 
             return latents, y_list
 
-        # TODO introduce new functionality into the dataloader mixer!
         if isinstance(train_dataloader, DataloaderMixer):
             train_hints_buffer = train_dataloader.hints_enabled
             train_dataloader.enable_hints()
 
-        elif train_dataloader:
+        else:
             train_hints_buffer = train_dataloader.dataset.hints_enabled
             train_dataloader.dataset.enable_hints()
 
@@ -979,7 +964,24 @@ class FollicleDataset(Image2MixedDataset):
         # Login using e.g. `huggingface-cli login` to access this dataset
         if not os.path.exists(config.dataset_path):
             from datasets import load_dataset
-            ds = load_dataset("janphhe/follicles_true_features", num_proc=8)
-            import pdb; pdb.set_trace()
+
+            ds = load_dataset("janphhe/follicles_true_features", "imgs_config", num_proc=8)
+            for split in ds.keys():
+                for i in range(len(ds[split])):
+                    label = ds[split][i]['label']
+                    image = ds[split][i]['image']
+
+                    # create a folder for the label if it does not exist
+                    label_folder = os.path.join(config.dataset_path, str(label))
+
+                    if not os.path.exists(label_folder):
+                        os.makedirs(label_folder)
+
+                    # save the image in the label folder
+                    image.save(os.path.join(label_folder, f"img_{i}.png"), "PNG")
+
+            import pdb
+
+            pdb.set_trace()
 
         super(FollicleDataset, self).__init__(config=config, **kwargs)

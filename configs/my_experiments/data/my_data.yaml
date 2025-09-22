@@ -1,0 +1,8 @@
+dataset_path            : $PEAL_DATA/chexpert
+num_samples             : 223415
+input_type              : image
+input_size              : [3, 128, 128]
+output_type             : multiclass
+output_size             : [18]
+downsize                : Resize
+delimiter               : ","

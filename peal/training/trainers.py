@@ -18,7 +18,6 @@ from tqdm import tqdm
 from peal.data.dataset_factory import get_datasets
 from peal.data.datasets import Image2MixedDataset, Image2ClassDataset
 from peal.dependencies.attacks.attacks import PGD_L2
-from peal.generators.generator_factory import get_generator
 from peal.global_utils import (
     orthogonal_initialization,
     move_to_device,
@@ -100,7 +99,7 @@ def calculate_test_accuracy(
                 y = y[0]
 
         y_pred = model(x.to(device)).argmax(-1).detach().to("cpu")
-        correct += float(torch.sum(y_pred == y))
+        correct += float(torch.sum(y == y_pred))
         num_samples += x.shape[0]
         if tracking_level >= 1:
             pbar.set_description(
@@ -384,7 +383,7 @@ class ModelTrainer:
     def run_epoch(self, dataloader, mode="train", pbar=None):
         """ """
         sources = {}
-        #import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
         for batch_idx, sample in enumerate(dataloader):
             if hasattr(dataloader, "return_src") and dataloader.return_src:
                 sample, source = sample
@@ -717,26 +716,6 @@ class ModelTrainer:
                     self.model.to("cpu"), os.path.join(self.model_path, "model.cpl")
                 )
                 val_accuracy_max = val_accuracy
-
-                """
-                dummy_input = next(iter(self.val_dataloaders[0]))[0]  # Batch size = 1, input size = 10
-                # Export to ONNX
-                onnx_file_path = os.path.join(self.model_path, "model.onnx")
-                torch.onnx.export(
-                    self.model,                     # Model to export
-                    dummy_input,               # Dummy input
-                    onnx_file_path,            # Output file
-                    export_params=True,        # Store the trained parameters
-                    opset_version=11,          # ONNX version to export (e.g., 11)
-                    do_constant_folding=True,  # Optimize constants
-                    input_names=['input'],     # Input tensor name(s)
-                    output_names=['output'],   # Output tensor name(s)
-                    dynamic_axes={             # Support variable-length axes (if applicable)
-                        'input': {0: 'batch_size'},
-                        'output': {0: 'batch_size'}
-                    }
-                )
-                """
                 self.model.to(self.device)
 
             # increase regularization and reset checkpoint if overfitting occurs
@@ -816,9 +795,9 @@ def distill_binary_dataset(
         distilled_predictor_config.data = distilled_dataset_config
         predictor_distillation = distilled_predictor_config
         distillation_datasource[i].task_config = predictor_distillation.task
-        distillation_datasource[i].task_config.x_selection = (
-            predictor_dataset.task_config.x_selection
-        )
+        distillation_datasource[
+            i
+        ].task_config.x_selection = predictor_dataset.task_config.x_selection
         try:
             sample = distillation_datasource[-1][0]
 

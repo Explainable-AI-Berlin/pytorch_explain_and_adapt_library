@@ -1,6 +1,4 @@
 import os
-from datetime import datetime
-
 import torch
 import copy
 import shutil
@@ -8,6 +6,7 @@ import torchvision
 import numpy as np
 import platform
 
+from datetime import datetime
 from torch.utils.tensorboard import SummaryWriter
 from pathlib import Path
 from tqdm import tqdm
@@ -229,7 +228,6 @@ class CFKD(Adaptor):
         self,
         student: nn.Module = None,
         datasource: Union[list, tuple] = None,
-        output_size: int = None,
         generator: Union[InvertibleGenerator, Path, str] = None,
         base_dir: Union[str, Path] = None,
         teacher: Union[str, TeacherInterface] = None,
@@ -267,9 +265,6 @@ class CFKD(Adaptor):
 
         self.adaptor_config.data.in_memory = self.adaptor_config.in_memory
         self.adaptor_config.test_data.in_memory = self.adaptor_config.in_memory
-        '''assert (
-            self.adaptor_config.finetune_iterations == 0 or self.adaptor_config.batch_size % 2 == 0
-        ), "only even batch sizes are supported so far for CFKD finetuning!"'''
         self.adaptor_config.explainer.tracking_level = (
             self.adaptor_config.tracking_level
         )
@@ -287,7 +282,6 @@ class CFKD(Adaptor):
         #
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         if student is None:
-            # student = torch.load(self.adaptor_config.student, map_location=self.device)
             student, student_config = get_predictor(
                 self.adaptor_config.student, device=self.device
             )
