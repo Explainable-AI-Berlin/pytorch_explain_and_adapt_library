@@ -6,121 +6,62 @@ The contribution of this library is two-fold:
 
 2) Adapt Neural Network models according to a given feedback of a human expert.
 
-**Usage with the command line**
+If you find this useful, consider citing:
 
-First in order when using the existing config system, one should be aware of the following system variabales used that can be also set yourself:
+```
+@article{bender2025towards,
+  title={Towards Desiderata-Driven Design of Visual Counterfactual Explainers},
+  author={Bender, Sidney and Herrmann, Jan and M{\"u}ller, Klaus-Robert and Montavon, Gr{\'e}goire},
+  journal={arXiv preprint arXiv:2506.14698},
+  year={2025}
+}
+```
 
-$PEAL_DATA - the path to the data folder, where the datasets are stored, is set per default to "./datasets".
-If you download datasets like CelebA or the Follicles dataset you have to place it in this folder.
+**Setup usage with the command line**
 
-$PEAL_RUNS - the path to the runs folder, where the runs are stored, is set per default to "./peal_runs".
-If you search for logs, visualizations or want to use the run for another run you should search here.
+First, when using the existing config system, one should be aware of the following system variables that can also be set yourself:
 
-<PEAL_BASE>, the path where the code lies looks a bit like a environment variable as well, but it can be automatically inferred by the library.
+$PEAL_DATA - the path to the data folder, where the datasets are stored, is set by default to "./datasets".
+If you download datasets like CelebA or the Follicles dataset, you have to place them in this folder.
+
+$PEAL_RUNS - the path to the runs folder, where the runs are stored, is set by default to "./peal_runs".
+If you search for logs, visualizations, or want to use the run for another run, you should search here.
+
+<PEAL_BASE>, the path where the code lies looks a bit like an environment variable as well, but it can be automatically inferred by the library.
 Hence, there is no need and also no option to set it yourself.
 
-Then, one should create a conda environment based on the environment.yml file like:
+Then, one should create a conda environment based on the environment.yml file, like:
 ```conda env create -f environment.yaml``` and activate it with ```conda activate peal```.
 
 An alternative to conda is to work with apptainer by running ```apptainer build python_container.sif python_container.def``` and then run everything inside ```apptainer run --nv python_container.sif```.
 
-Now one can utilize different top level scripts to use the library:
+**How to no-code use a custom binary image classification dataset with a predictor and a generator from PEAL**
 
-```python generate_dataset.py --config "<PATH_TO_CONFIG>"```
-Generates a synthetic dataset like the squares dataset based on a data config file.
-Another option is to augment a already downloaded dataset like CelebA with a controlled confounder.
-Existing data config files can be found in configs/sce_experiments/data.
-The generated dataset will appear in $PEAL_DATA.
-For the replication of the experiments on synthetic / augmented datasets from the paper one first needs to generate the articial datasets.
-A full, documented overview over the parameters that can be set by datasets so far can be found in ```peal.data.datasets.DataConfig```.
-To implement a new dataset ```MyDataset``` create a subclass of ```peal.data.interfaces.PealDataset``` inside ```peal.data```.
-Then set ```dataset_class="MyDataset"``` in your data config file and ```MyDataset``` will be used automatically.
-However, a lot of ImageDataset like MNIST, CIFAR-10, ImageNet etc can be already expressed via the ```peal.data.datasets.Image2ClassDataset```.
-Moreover, a lot of datasets like CelebA, Squares, Follicles or Regression dataset can be already expressed via the ```peal.data.datasets.Image2MixedDataset```.
-
-```python train_predictor.py --config "<PATH_TO_CONFIG>"```
-Trains a predictor (either a singleclass classifier, a multiclass classifier, a regressor or a mixed model) based on a predictor config file.
-Existing predictor config files can be found in configs/sce_experiments/predictors.
-In order to replicate most experiments from the papers one needs to train a student predictor and a teacher predictor.
-Trained predictors will appear in $PEAL_RUNS.
-A full, documented overview over the parameters that can be set by predictors so far can be found in ```peal.training.trainers.PredictorConfig```.
-
-```python train_generator.py --config "<PATH_TO_CONFIG>"```
-Trains a generative model based on a generator config file.
-Existing generator config files can be found in configs/sce_experiments/models.
-In order to e.g. use counterfactual explainations one needs to train a corresponding generator.
-Trained generators will appear in $PEAL_RUNS.
-A full, documented overview over the parameters that can be set by generators so far can be found in subclasses of ```peal.generators.interfaces.GeneratorConfig``` in ```peal.generators```.
-To implement a new generator ```MyGenerator``` create a subclass of either ```peal.generators.interfaces.InvertibleGenerator``` or of ```peal.generators.interfaces.EditCapableGenerator``` inside ```peal.generators```.
-Then create a new subclass ```MyGeneratorConfig``` of ```peal.generators.interfaces.GeneratorConfig``` inside ```peal.generators```.
-Set ```generator_type="MyGenerator"``` in ```MyGeneratorConfig```.
-Now ```MyGenerator``` will be used automatically and configured by ```MyGeneratorConfig``` while initialization.
-
-```python run_explainer.py --config "<PATH_TO_CONFIG>"```
-Explains the predictions of a predictor based on a explainer config file.
-Existing explainer config files can be found in configs/sce_experiments/explainers.
-The results of the explanations will be visualized in a web interface.
-Furthermore, they are saved in a folder inside the folder where the predictor that was explained is saved.
-A full, documented overview over the parameters that can be set by explainers so far can be found in subclasses of ```peal.explainers.interfaces.ExplainerConfig``` in ```peal.explainers```.
-To implement a new explainer ```MyExplainer``` create a subclass of ```peal.explainers.interfaces.Explainer``` inside ```peal.explainers```.
-Then create a new subclass ```MyExplainerConfig``` of ```peal.explainers.interfaces.ExplainerConfig``` inside ```peal.explainers```.
-Set ```explainer_type="MyExplainer"``` in ```MyExplainerConfig```.
-Now ```MyExplainer``` will be used automatically and configured by ```MyExplainerConfig``` while initialization.
-
-
-```python run_adaptor.py --config "<PATH_TO_CONFIG>"```
-Adapts a predictor based on a adaptor config file.
-Existing adaptor config files can be found in configs/sce_experiments/adaptors.
-The results of the explanations will be saved in a folder inside the folder where the predictor that was adapted is saved.
-A full, documented overview over the parameters that can be set by adaptors so far can be found in subclasses of ```peal.adaptors.interfaces.AdaptorConfig``` in ```peal.adaptors```.
-To implement a new adaptor ```MyAdaptor``` create a subclass of ```peal.adaptors.interfaces.Adaptor``` inside ```peal.adaptors```.
-Then create a new subclass ```MyAdaptorConfig``` of ```peal.adaptors.interfaces.AdaptorConfig``` inside ```peal.adaptors```.
-Set ```adaptor_type="MyAdaptor"``` in ```MyAdaptorConfig```.
-Now ```MyAdaptor``` will be used automatically and configured by ```MyAdaptorConfig``` while initialization.
-
-
-Hint: All configuration is done via Pydantic.
-Hence, the config files can be given as YAML files, but will be parsed as Python objects.
-In this process only the values that are set in the YAML file are overwritten in the Python template, the rest of the values will stay at the default.
-The documentation can be found in the corresponding Python classes in the code.
-
-**How to use a custom binary image classification dataset with a predictor and a generator from PEAL**
-
-This can be done no code with the Command Line Interface of PEAL!!!
 The biggest effort is to reformat the dataset to a ```peal.data.datasets.Image2MixedDataset```.
-All labels have to be written into a "<PEAL_DATA>/my_data/data.csv" file with the header "ImagePath,Label1,Label2,...LabelN".
+All labels have to be written into a "$PEAL_DATA/my_data/data.csv" file with the header "ImagePath,Label1,Label2,...LabelN".
 It could also only have one label with "ImagePath,Label1" and we can only optimize for like this anyway.
-All Images have to be placed in the folder "<PEAL_DATA>/my_data" in the correct relative path.
+All Images have to be placed in the folder "$PEAL_DATA/my_data" in the correct relative path.
+Then, one can copy and adapt the config files for CelebA Smiling as follows:
 
-Then, one can copy and adapt the config files for CelebA Smiling.
-First, one has to copy configs/sce_experiments/data/celeba.yaml to configs/my_experiments/data/my_data.yaml.
-Then, one has to copy configs/sce_experiments/data/celeba_generator.yaml to configs/my_experiments/data/my_data_generator.yaml.
-Then, the dataset_class and confounding_factors have to be removed
-(because you do have neither for your new dataset yet).
-Then, num_samples, input_size and output_size should be adapted to your dataset.
-Now, one has to copy configs/sce_experiments/generators/celeba_ddpm.yaml to configs/my_experiments/generators/my_data_ddpm.yaml.
-In this file one has to replace base_path with "$PEAL_RUNS/my_data/ddpm" and data with "<PEAL_BASE>/configs/my_experiments/data/my_data_generator.yaml".
-Now you can train your DDPM generator with:
-
-```python train_generator.py --config "<PEAL_BASE>/configs/my_experiments/generators/my_data_ddpm.yaml"```
-
-In parallel you can copy "configs/sce_experiments/predictors/celeba_classifier_smiling.yaml" to "configs/my_experiments/predictors/my_data_classifier.yaml".
-Here, you have to replace model_path with "$PEAL_RUNS/my_data/classifier", data with "<PEAL_BASE>/configs/my_experiments/data/my_data.yaml" and y_selection with "[Label1]".
-Now you can train your predictor with:
-
-```python train_predictor.py --config "<PEAL_BASE>/configs/my_experiments/predictors/my_data_classifier.yaml"```
-
-After finishing generator and predictor training you can copy "configs/sce_experiments/adaptors/celeba_Smiling_natural_sce_cfkd.yaml" 
+1) copy configs/sce_experiments/data/celeba.yaml to configs/my_experiments/data/my_data.yaml.
+2) copy configs/sce_experiments/data/celeba_generator.yaml to configs/my_experiments/data/my_data_generator.yaml.
+3) In both, remove the dataset_class and confounding_factors (because you don't have either for your new dataset yet).
+4) In both set dataset_path to "$PEAL_DATA/my_data"
+5) In both adapt num_samples, input_size and output_size to your dataset.
+6) copy configs/sce_experiments/generators/celeba_ddpm.yaml to configs/my_experiments/generators/my_data_ddpm.yaml.
+7) In this file replace base_path with "$PEAL_RUNS/my_data/ddpm" and data with "<PEAL_BASE>/configs/my_experiments/data/my_data_generator.yaml".
+8) Train your DDPM generator with: ```python train_generator.py --config "<PEAL_BASE>/configs/my_experiments/generators/my_data_ddpm.yaml"```
+9) In parallel, you can copy "configs/sce_experiments/predictors/celeba_Smiling_classifier.yaml" to "configs/my_experiments/predictors/my_data_classifier.yaml".
+10) Here, you have to replace model_path with "$PEAL_RUNS/my_data/classifier", data with p and y_selection with "[Label1]".
+11) Now you can train your predictor with: ```python train_predictor.py --config "<PEAL_BASE>/configs/my_experiments/predictors/my_data_classifier.yaml"```
+12) After finishing generator and predictor training, you can copy "configs/sce_experiments/adaptors/celeba_Smiling_natural_sce_cfkd.yaml" 
 to "configs/my_experiments/adaptors/my_data_sce_cfkd.yaml".
-Overwrite data with "<PEAL_BASE>/my_experiments/configs/data/my_data.yaml", student with "$PEAL_RUNS/my_data/classifier/model.cpl",
-generator with "$PEAL_RUNS/my_data/ddpm/config.yaml", base_dir with "$PEAL_RUNS/my_data/classifier/sce_cfkd" and
-y_selection with "[Label1]".
-Now you can run SCE with:
+13) Overwrite data with "<PEAL_BASE>/configs/my_experiments/data/my_data.yaml", student with "$PEAL_RUNS/my_data/classifier/model.cpl", generator with "$PEAL_RUNS/my_data/ddpm/config.yaml", base_dir with "$PEAL_RUNS/my_data/classifier/sce_cfkd" and y_selection with "[Label1]".
+14) Now you can run SCE with: ```python run_cfkd.py --config "<PEAL_BASE>/configs/my_experiments/adaptors/my_data_sce_cfkd.yaml"```
+15) Now you can find your most salient counterfactuals under "$PEAL_RUNS/my_data/classifier/sce_cfkd/validation_collages0_0".
+16) You can find secondary counterfactuals under "$PEAL_RUNS/my_data/classifier/sce_cfkd/validation_collages0_1", but it might be possible that they look destroyed if SCE could not find another counterfactual and forced it too much
 
-```python run_cfkd.py --config "<PEAL_BASE>/configs/my_experiments/adaptors/my_data_sce_cfkd.yaml"```
-
-Now you can find your counterfactuals under "$PEAL_RUNS/my_data/classifier/sce_cfkd/validation_collages".
-If you further want to process them you can load the .npz array "$PEAL_RUNS/my_data/classifier/sce_cfkd/validation_tracked_values.npz".
+If you further want to process them, you can load the .npz array "$PEAL_RUNS/my_data/classifier/sce_cfkd/validation_tracked_values.npz".
 The originals in this array can be found under the key "x_list" and the counterfactuals under "x_counterfactual_list".
 
 
@@ -204,20 +145,75 @@ y_selection with "[Label1]".
 Next, you can run SCE with:
 ```python run_cfkd.py --config "<PEAL_BASE>/configs/my_experiments/adaptors/my_data_sce_cfkd.yaml"```
 Now you can find your counterfactuals under "$PEAL_RUNS/my_data/classifier/sce_cfkd/validation_collages".
-If you further want to process them you can load the .npz array "$PEAL_RUNS/my_data/classifier/sce_cfkd/validation_tracked_values.npz".
+If you further want to process them, you can load the .npz array "$PEAL_RUNS/my_data/classifier/sce_cfkd/validation_tracked_values.npz".
 The originals in this array can be found under the key "x_list" and the counterfactuals under "x_counterfactual_list".
 
+**Execute your own code based on PEAL components:**
+
+You can utilize different top-level scripts to use the library:
+
+```python generate_dataset.py --config "<PATH_TO_CONFIG>"```
+Generates a synthetic dataset like the squares dataset based on a data config file.
+Another option is to augment a already downloaded dataset like CelebA with a controlled confounder.
+Existing data config files can be found in configs/sce_experiments/data.
+The generated dataset will appear in $PEAL_DATA.
+For the replication of the experiments on synthetic / augmented datasets from the paper one first needs to generate the articial datasets.
+A full, documented overview over the parameters that can be set by datasets so far can be found in ```peal.data.datasets.DataConfig```.
+To implement a new dataset ```MyDataset``` create a subclass of ```peal.data.interfaces.PealDataset``` inside ```peal.data```.
+Then set ```dataset_class="MyDataset"``` in your data config file and ```MyDataset``` will be used automatically.
+However, a lot of ImageDataset like MNIST, CIFAR-10, ImageNet etc can be already expressed via the ```peal.data.datasets.Image2ClassDataset```.
+Moreover, a lot of datasets like CelebA, Squares, Follicles or Regression dataset can be already expressed via the ```peal.data.datasets.Image2MixedDataset```.
+
+```python train_predictor.py --config "<PATH_TO_CONFIG>"```
+Trains a predictor (either a singleclass classifier, a multiclass classifier, a regressor or a mixed model) based on a predictor config file.
+Existing predictor config files can be found in configs/sce_experiments/predictors.
+In order to replicate most experiments from the papers one needs to train a student predictor and a teacher predictor.
+Trained predictors will appear in $PEAL_RUNS.
+A full, documented overview over the parameters that can be set by predictors so far can be found in ```peal.training.trainers.PredictorConfig```.
+
+```python train_generator.py --config "<PATH_TO_CONFIG>"```
+Trains a generative model based on a generator config file.
+Existing generator config files can be found in configs/sce_experiments/models.
+In order to e.g. use counterfactual explainations one needs to train a corresponding generator.
+Trained generators will appear in $PEAL_RUNS.
+A full, documented overview over the parameters that can be set by generators so far can be found in subclasses of ```peal.generators.interfaces.GeneratorConfig``` in ```peal.generators```.
+To implement a new generator ```MyGenerator``` create a subclass of either ```peal.generators.interfaces.InvertibleGenerator``` or of ```peal.generators.interfaces.EditCapableGenerator``` inside ```peal.generators```.
+Then create a new subclass ```MyGeneratorConfig``` of ```peal.generators.interfaces.GeneratorConfig``` inside ```peal.generators```.
+Set ```generator_type="MyGenerator"``` in ```MyGeneratorConfig```.
+Now ```MyGenerator``` will be used automatically and configured by ```MyGeneratorConfig``` while initialization.
+
+```python run_explainer.py --config "<PATH_TO_CONFIG>"```
+Explains the predictions of a predictor based on a explainer config file.
+Existing explainer config files can be found in configs/sce_experiments/explainers.
+The results of the explanations will be visualized in a web interface.
+Furthermore, they are saved in a folder inside the folder where the predictor that was explained is saved.
+A full, documented overview over the parameters that can be set by explainers so far can be found in subclasses of ```peal.explainers.interfaces.ExplainerConfig``` in ```peal.explainers```.
+To implement a new explainer ```MyExplainer``` create a subclass of ```peal.explainers.interfaces.Explainer``` inside ```peal.explainers```.
+Then create a new subclass ```MyExplainerConfig``` of ```peal.explainers.interfaces.ExplainerConfig``` inside ```peal.explainers```.
+Set ```explainer_type="MyExplainer"``` in ```MyExplainerConfig```.
+Now ```MyExplainer``` will be used automatically and configured by ```MyExplainerConfig``` while initialization.
 
 
-**Planned Installation Instructions (Not Functional yet!!!):**
+```python run_adaptor.py --config "<PATH_TO_CONFIG>"```
+Adapts a predictor based on a adaptor config file.
+Existing adaptor config files can be found in configs/sce_experiments/adaptors.
+The results of the explanations will be saved in a folder inside the folder where the predictor that was adapted is saved.
+A full, documented overview over the parameters that can be set by adaptors so far can be found in subclasses of ```peal.adaptors.interfaces.AdaptorConfig``` in ```peal.adaptors```.
+To implement a new adaptor ```MyAdaptor``` create a subclass of ```peal.adaptors.interfaces.Adaptor``` inside ```peal.adaptors```.
+Then create a new subclass ```MyAdaptorConfig``` of ```peal.adaptors.interfaces.AdaptorConfig``` inside ```peal.adaptors```.
+Set ```adaptor_type="MyAdaptor"``` in ```MyAdaptorConfig```.
+Now ```MyAdaptor``` will be used automatically and configured by ```MyAdaptorConfig``` while initialization.
 
-pip install peal
 
-otherwise the project can also be downloaded, a conda or virtualenv environment can be installed based on the requirements.txt (we tested the program for Python 3.9.15) and peal can be used by adding the path to the project to the PYTHONPATH as described in the jupyter notebooks.
+Hint: All configuration is done via Pydantic.
+Hence, the config files can be given as YAML files, but will be parsed as Python objects.
+In this process only the values that are set in the YAML file are overwritten in the Python template, the rest of the values will stay at the default.
+The documentation can be found in the corresponding Python classes in the code.
 
 **Example Workflow CFKD adaptor:**
 
-Assuming you have a predictor ```my_classifier``` and a dataset ```my_dataset```.
+Here we introduce a code snippet that does the same as "run_cfkd.py" does in a no-code CLI manner.
+Assuming you have a predictor ```my_classifier``` and a dataset ```my_dataset``` and a peal.adaptor.counterfactual_knowledge_distillation.CFKDConfig ```adaptor_config``` configuring your CFKD run.
 
 ```
 from peal.adaptors.counterfactual_knowledge_distillion import CFKD
@@ -225,7 +221,8 @@ from peal.adaptors.counterfactual_knowledge_distillion import CFKD
 cfkd = CFKD(
   student = my_classifier,
   datasource = my_dataset,
-  teacher = 'human@8000'
+  teacher = 'human@8000',
+  adaptor_config = adaptor_config,
 )
 
 fixed_classifier = cfkd.run()
@@ -246,24 +243,6 @@ Then the following happens:
 6) The classifier is finetuned based on $PEAL/configs/training/finetune_classifier.yaml and saved under peal_runs/run1/i/finetuned_model/model.cpl
 
 7) If i smaller then the maximum number of finetune iterations go back to 3.
-
-
-**Example Workflow Predictor-distilled counterfactual explainer:**
-
-Assuming you have a predictor ```my_classifier``` and a dataset ```my_dataset```.
-
-```
-from peal.explainers.counterfactual_explainer import CounterfactualExplainer
-
-pdc = CounterfactualExplainer(
-  student = my_classifier,
-  datasource = my_dataset,
-)
-
-explanations, interpretations = pdc.run()
-```
-
-Now in explanations you have the counterfactuals and in interpretations the explanations of the counterfactuals.
 
 
 **Structure of the Project:**
@@ -299,7 +278,7 @@ Has to be watched in web browser directly to make sense
 
 If you want to contribute to the project, please follow the following guidelines:
 
-1) Use the black formatter for python files
+1) Use the black formatter with 88 columns for python files
 
 2) Avoid code redundancy as much as possible
 
