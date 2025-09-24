@@ -56,7 +56,7 @@ Then, one can copy and adapt the config files for CelebA Smiling as follows:
 11) Now you can train your predictor with: ```python train_predictor.py --config "<PEAL_BASE>/configs/my_experiments/predictors/my_data_classifier.yaml"```
 12) After finishing generator and predictor training, you can copy "configs/sce_experiments/adaptors/celeba_Smiling_natural_sce_cfkd.yaml" 
 to "configs/my_experiments/adaptors/my_data_sce_cfkd.yaml".
-13) Overwrite data with "<PEAL_BASE>/configs/my_experiments/data/my_data.yaml", student with "$PEAL_RUNS/my_data/classifier/model.cpl", generator with "$PEAL_RUNS/my_data/ddpm/config.yaml", base_dir with "$PEAL_RUNS/my_data/classifier/sce_cfkd" and y_selection with "[Label1]".
+13) Overwrite data with "<PEAL_BASE>/configs/my_experiments/data/my_data.yaml", student with "$PEAL_RUNS/my_data/classifier/model.cpl", generator with "$PEAL_RUNS/my_data/ddpm/config.yaml", base_dir with "$PEAL_RUNS/my_data/classifier/sce_cfkd" and y_selection with "[Label1]" and calculate_explainer_stats with "False".
 14) Now you can run SCE with: ```python run_cfkd.py --config "<PEAL_BASE>/configs/my_experiments/adaptors/my_data_sce_cfkd.yaml"```
 15) Now you can find your most salient counterfactuals under "$PEAL_RUNS/my_data/classifier/sce_cfkd/validation_collages0_0".
 16) You can find secondary counterfactuals under "$PEAL_RUNS/my_data/classifier/sce_cfkd/validation_collages0_1", but it might be possible that they look destroyed if SCE could not find another counterfactual and forced it too much
