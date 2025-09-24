@@ -5,6 +5,7 @@ batch_size                           :  2
 tracking_level                       :  5
 finetune_iterations                  :  0
 max_validation_samples               :  200
+calculate_explainer_stats            :  False
 explainer                            :  <PEAL_BASE>/configs/sce_experiments/explainers/sce_default256x256.yaml
 data                                 :  <PEAL_BASE>/configs/sce_experiments/data/imagenet_husky_vs_wulf_resnet18.yaml
 student                              :  $PEAL_RUNS/imagenet/husky_vs_wulf_classifier/model.onnx

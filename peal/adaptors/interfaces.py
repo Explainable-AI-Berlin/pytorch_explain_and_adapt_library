@@ -43,7 +43,7 @@ class AdaptorConfig(BaseModel):
     """
     Whether to calculate explainer stats like sparsity, diversity, etc.
     """
-    calculate_explainer_stats: bool = True
+    calculate_explainer_stats: bool = False
     """
     Whether to load all datasets into the RAM or not. Careful with big datasets!
     """

@@ -9,7 +9,7 @@ max_validation_samples               :  200
 continuous_learning                  :  "finetune"
 calculate_explainer_stats            :  False
 calculate_group_accuracies           :  True
-explainer                            :  <PEAL_BASE>/configs/cfkd_experiments/explainers/sce_default128x128.yaml
+explainer                            :  <PEAL_BASE>/configs/sce_experiments/explainers/sce_default128x128.yaml
 training                             :  <PEAL_BASE>/configs/cfkd_experiments/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/cfkd_experiments/data/camelyon17_1k_poisoned098.yaml
 test_data                            :  <PEAL_BASE>/configs/cfkd_experiments/data/camelyon17_unpoisoned.yaml

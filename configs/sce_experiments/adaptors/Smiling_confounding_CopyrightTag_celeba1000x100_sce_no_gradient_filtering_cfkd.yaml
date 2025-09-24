@@ -7,7 +7,7 @@ min_train_samples                    :  800
 finetune_iterations                  :  1
 max_validation_samples               :  200
 continuous_learning                  :  "finetune"
-use_visualization                    :  True
+calculate_explainer_stats            :  True
 calculate_group_accuracies           :  True
 explainer                            :  <PEAL_BASE>/configs/sce_experiments/explainers/sce_no_gradient_filtering128x128.yaml
 training                             :  <PEAL_BASE>/configs/sce_experiments/training/img_finetuning.yaml

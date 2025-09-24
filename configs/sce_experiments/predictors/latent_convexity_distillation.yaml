@@ -1,4 +1,4 @@
-training          : <PEAL_BASE>/configs/cfkd_experiments/training/latent_convexity_distillation.yaml
+training          : <PEAL_BASE>/configs/sce_experiments/training/latent_convexity_distillation.yaml
 distill_from      : predictor
 architecture      : torchvision_resnet18
 task:

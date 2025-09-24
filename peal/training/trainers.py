@@ -631,6 +631,7 @@ class ModelTrainer:
 
         self.config.training.epoch = 0
         while self.config.training.epoch < self.config.training.max_epochs:
+            #import pdb; pdb.set_trace()
             pbar.stored_values["Epoch"] = self.config.training.epoch
             self.logger.writer.add_scalar(
                 "regularization_level",
