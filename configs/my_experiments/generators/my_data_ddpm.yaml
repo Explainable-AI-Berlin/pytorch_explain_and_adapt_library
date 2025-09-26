@@ -1,6 +1,0 @@
-# python -W ignore train_generator.py --config "<PEAL_BASE>/configs/sce_experiments/generators/celeba_ddpm.yaml"
-generator_type : DDPM
-category : generator
-base_path : $PEAL_RUNS/my_data/ddpm
-data: <PEAL_BASE>/configs/my_experiments/data/my_data_generator.yaml
-batch_size: 49
