@@ -385,6 +385,9 @@ class ModelTrainer:
         sources = {}
         # import pdb; pdb.set_trace()
         for batch_idx, sample in enumerate(dataloader):
+            if batch_idx >= self.config.training.steps_per_epoch:
+                break
+
             if hasattr(dataloader, "return_src") and dataloader.return_src:
                 sample, source = sample
                 source = str(source)

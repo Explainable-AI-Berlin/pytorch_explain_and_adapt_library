@@ -9,3 +9,4 @@ class_balanced          : False
 use_mixup               : False
 label_smoothing         : 0.1
 mixup_alpha             : 10
+steps_per_epoch         : 1000

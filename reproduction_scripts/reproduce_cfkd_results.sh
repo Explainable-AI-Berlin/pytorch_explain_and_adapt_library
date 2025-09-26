@@ -101,6 +101,7 @@ cat ${PEAL_RUNS}/camelyon17_1k/classifier_poisoned098/rrclarc/best_model_result.
 
 
 # Reproduce SOTA results on follicle dataset
+# If the automatic download fails, you can manually download https://huggingface.co/datasets/janphhe/follicles_true_features and put it into $PEAL_DATA/follicles
 python train_generator.py --config "<PEAL_BASE>/configs/cfkd_experiments/generators/follicle_ddpm.yaml"
 python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/follicle_cut_classifier.yaml"
 # run CFKD (careful, needs feedback through the human in the loop!!!)
