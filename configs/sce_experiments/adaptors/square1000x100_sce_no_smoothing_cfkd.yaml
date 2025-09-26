@@ -9,6 +9,7 @@ max_validation_samples               :  200
 continuous_learning                  :  "finetune"
 calculate_group_accuracies           :  True
 in_memory                            :  True
+calculate_explainer_stats            :  True
 explainer                            :  <PEAL_BASE>/configs/sce_experiments/explainers/sce_no_smoothing.yaml
 training                             :  <PEAL_BASE>/configs/sce_experiments/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/sce_experiments/data/square_poisoned100.yaml

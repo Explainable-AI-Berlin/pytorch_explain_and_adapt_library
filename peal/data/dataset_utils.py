@@ -103,8 +103,13 @@ def parse_csv(
             key = instance_attributes[key_idx]
             instance_attributes = instance_attributes[key_idx + 1 :]
 
-        while "" in instance_attributes:
-            instance_attributes.remove("")
+        """while "" in instance_attributes:
+            instance_attributes.remove("")"""
+
+        # TODO is this a good choice?
+        for i in range(len(instance_attributes)):
+            if instance_attributes[i] == "":
+                instance_attributes[i] = "0.0"
 
         def is_valid_float(s):
             try:

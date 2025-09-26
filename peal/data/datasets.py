@@ -487,8 +487,6 @@ class Image2MixedDataset(ImageDataset):
         self.tokenizer = None
         self.return_dict = return_dict
         self.class_restrictions_enabled = False
-        # TODO
-        # self.config.class_ratios = None
         if data_dir is None:
             data_dir = os.path.join(self.root_dir, self.config.label_rel_path)
 
