@@ -2,7 +2,7 @@ category: explainer
 explainer_type: SCE
 # parameters analyzed in ablation study
 use_gradient_filtering: true
-distilled_predictor: <PEAL_BASE>/configs/sce_experiments/predictors/latent_convexity_distillation.yaml
+distilled_predictor: <PEAL_BASE>/configs/sce_experiments/predictors/sensitive_distillation.yaml
 dist_l1: 0.0005
 inpaint: 0.15
 allow_overlap: false
