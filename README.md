@@ -47,19 +47,18 @@ Then, one can copy and adapt the config files for CelebA Smiling as follows:
 2) copy configs/sce_experiments/data/celeba_generator.yaml to configs/my_experiments/data/my_data_generator.yaml.
 3) In both, remove the dataset_class and confounding_factors (because you don't have either for your new dataset yet).
 4) In both set dataset_path to "$PEAL_DATA/my_data"
-5) In both adapt num_samples, input_size and output_size to your dataset.
-6) copy configs/sce_experiments/generators/celeba_ddpm.yaml to configs/my_experiments/generators/my_data_ddpm.yaml.
-7) In this file replace base_path with "$PEAL_RUNS/my_data/ddpm" and data with "<PEAL_BASE>/configs/my_experiments/data/my_data_generator.yaml".
-8) Train your DDPM generator with: ```python train_generator.py --config "<PEAL_BASE>/configs/my_experiments/generators/my_data_ddpm.yaml"```
-9) In parallel, you can copy "configs/sce_experiments/predictors/celeba_Smiling_classifier.yaml" to "configs/my_experiments/predictors/my_data_classifier.yaml".
-10) Here, you have to replace model_path with "$PEAL_RUNS/my_data/classifier", data with p and y_selection with "[Label1]".
-11) Now you can train your predictor with: ```python train_predictor.py --config "<PEAL_BASE>/configs/my_experiments/predictors/my_data_classifier.yaml"```
-12) After finishing generator and predictor training, you can copy "configs/sce_experiments/adaptors/celeba_Smiling_natural_sce_cfkd.yaml" 
+5) copy configs/sce_experiments/generators/celeba_ddpm.yaml to configs/my_experiments/generators/my_data_ddpm.yaml.
+6) In this file replace base_path with "$PEAL_RUNS/my_data/ddpm" and data with "<PEAL_BASE>/configs/my_experiments/data/my_data_generator.yaml".
+7) Train your DDPM generator with: ```python train_generator.py --config "<PEAL_BASE>/configs/my_experiments/generators/my_data_ddpm.yaml"```
+8) In parallel, you can copy "configs/sce_experiments/predictors/celeba_Smiling_classifier.yaml" to "configs/my_experiments/predictors/my_data_classifier.yaml".
+9) Here, you have to replace model_path with "$PEAL_RUNS/my_data/classifier", data with p and y_selection with "[Label1]".
+10) Now you can train your predictor with: ```python train_predictor.py --config "<PEAL_BASE>/configs/my_experiments/predictors/my_data_classifier.yaml"```
+11) After finishing generator and predictor training, you can copy "configs/sce_experiments/adaptors/celeba_Smiling_natural_sce_cfkd.yaml" 
 to "configs/my_experiments/adaptors/my_data_sce_cfkd.yaml".
-13) Overwrite data with "<PEAL_BASE>/configs/my_experiments/data/my_data.yaml", student with "$PEAL_RUNS/my_data/classifier/model.cpl", generator with "$PEAL_RUNS/my_data/ddpm/config.yaml", base_dir with "$PEAL_RUNS/my_data/classifier/sce_cfkd" and y_selection with "[Label1]" and calculate_explainer_stats with "False".
-14) Now you can run SCE with: ```python run_cfkd.py --config "<PEAL_BASE>/configs/my_experiments/adaptors/my_data_sce_cfkd.yaml"```
-15) Now you can find your most salient counterfactuals under "$PEAL_RUNS/my_data/classifier/sce_cfkd/validation_collages0_0".
-16) You can find secondary counterfactuals under "$PEAL_RUNS/my_data/classifier/sce_cfkd/validation_collages0_1", but it might be possible that they look destroyed if SCE could not find another counterfactual and forced it too much
+12) Overwrite data with "<PEAL_BASE>/configs/my_experiments/data/my_data.yaml", student with "$PEAL_RUNS/my_data/classifier/model.cpl", generator with "$PEAL_RUNS/my_data/ddpm/config.yaml", base_dir with "$PEAL_RUNS/my_data/classifier/sce_cfkd" and y_selection with "[Label1]" and calculate_explainer_stats with "False".
+13) Now you can run SCE with: ```python run_cfkd.py --config "<PEAL_BASE>/configs/my_experiments/adaptors/my_data_sce_cfkd.yaml"```
+14) Now you can find your most salient counterfactuals under "$PEAL_RUNS/my_data/classifier/sce_cfkd/validation_collages0_1".
+15) You can find secondary counterfactuals under "$PEAL_RUNS/my_data/classifier/sce_cfkd/validation_collages0_0", but it might be possible that they look destroyed if SCE could not find another counterfactual and forced it too much
 
 If you further want to process them, you can load the .npz array "$PEAL_RUNS/my_data/classifier/sce_cfkd/validation_tracked_values.npz".
 The originals in this array can be found under the key "x_list" and the counterfactuals under "x_counterfactual_list".
