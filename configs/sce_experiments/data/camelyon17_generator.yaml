@@ -1,4 +1,4 @@
-dataset_class           : Camelyon17Dataset
+dataset_class           : Camelyon17AugmentedDataset
 dataset_path            : $PEAL_DATA/camelyon17
 split                   : [1.0, 1.0]
 input_type              : image
