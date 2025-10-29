@@ -4,3 +4,4 @@ category : generator
 base_path : $PEAL_RUNS/celeba/ddpm
 data: <PEAL_BASE>/configs/sce_experiments/data/celeba_generator.yaml
 batch_size: 100
+max_steps: 50000
