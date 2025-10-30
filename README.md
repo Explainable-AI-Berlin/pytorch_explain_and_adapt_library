@@ -38,9 +38,9 @@ An alternative to conda is to work with apptainer by running ```apptainer build 
 **How to no-code use a custom binary image classification dataset with a predictor and a generator from PEAL**
 
 The biggest effort is to reformat the dataset to a ```peal.data.datasets.Image2MixedDataset```.
-All labels have to be written into a "$PEAL_DATA/my_data/data.csv" file with the header "ImagePath,Label1,Label2,...LabelN".
-It could also only have one label with "ImagePath,Label1" and we can only optimize for like this anyway.
-All Images have to be placed in the folder "$PEAL_DATA/my_data" in the correct relative path.
+All labels have to be written into a "$PEAL_DATA/my_data/data.csv" file with the header "imgs,Label1,Label2,...LabelN".
+It could also only have one label with "imgs,Label1" and we can only optimize for like this anyway.
+All Images have to be placed in the folder "$PEAL_DATA/my_data/imgs" in the correct relative path.
 Then, one can copy and adapt the config files for CelebA Smiling as follows:
 
 1) copy configs/sce_experiments/data/celeba.yaml to configs/my_experiments/data/my_data.yaml.
