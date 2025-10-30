@@ -1,0 +1,23 @@
+# python run_cfkd.py --config "<PEAL_BASE>/configs/sce_experiments/adaptors/isic2019_MEL_natural_sce_cfkd.yaml"
+adaptor_type                         :  "CFKD"
+category                             :  "adaptor"
+batch_size                           :  4
+tracking_level                       :  4
+finetune_iterations                  :  0
+max_validation_samples               :  200
+max_test_batches                     :  10
+calculate_explainer_stats            :  True
+calculate_group_accuracies           :  False
+explainer                            :  <PEAL_BASE>/configs/sce_experiments/explainers/sce_default128x128.yaml
+data                                 :  <PEAL_BASE>/configs/sce_experiments/data/isic2019.yaml
+student                              :  $PEAL_RUNS/isic2019/MEL/classifier_natural/model.cpl
+teacher                              :  Baseline:true
+generator                            :  $PEAL_RUNS/isic2019/ddpm/config.yaml
+base_dir                             :  $PEAL_RUNS/isic2019/MEL/classifier_natural/sce_cfkd
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [MEL]

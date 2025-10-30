@@ -1,0 +1,7 @@
+# python -W ignore train_generator.py --config "<PEAL_BASE>/configs/sce_experiments/generators/isic2019_ddpm.yaml"
+generator_type : DDPM
+category : generator
+base_path : $PEAL_RUNS/isic2019/ddpm
+data: <PEAL_BASE>/configs/sce_experiments/data/isic2019_generator.yaml
+batch_size: 100
+max_steps: 50000

@@ -853,7 +853,7 @@ class CelebADataset(Image2MixedDataset):
 
         else:
             peal_runs = os.environ.get("PEAL_RUNS", "peal_runs")
-            oracle_path = os.path.join(peal_runs, "camelyon17", "latent_oracle", "model.cpl")
+            oracle_path = os.path.join(peal_runs, "celeba", "latent_oracle", "model.cpl")
             if os.path.exists(oracle_path):
                 self.oracle = torch.load(oracle_path)
                 self.oracle.eval()
