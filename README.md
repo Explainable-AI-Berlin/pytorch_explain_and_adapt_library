@@ -46,7 +46,7 @@ Then, one can copy and adapt the config files for CelebA Smiling as follows:
 1) copy configs/sce_experiments/data/celeba.yaml to configs/my_experiments/data/my_data.yaml.
 2) copy configs/sce_experiments/data/celeba_generator.yaml to configs/my_experiments/data/my_data_generator.yaml.
 3) In both, remove the dataset_class and confounding_factors (because you don't have either for your new dataset yet).
-4) In both set dataset_path to "$PEAL_DATA/my_data"
+4) In both set dataset_path to "$PEAL_DATA/my_data". You can also set num_samples and output_size, but for this tutorial, it does not matter. Do not change the input_size except if you know what you are doing, because the generative model is restricted in this regard!
 5) copy configs/sce_experiments/generators/celeba_ddpm.yaml to configs/my_experiments/generators/my_data_ddpm.yaml.
 6) In this file replace base_path with "$PEAL_RUNS/my_data/ddpm" and data with "<PEAL_BASE>/configs/my_experiments/data/my_data_generator.yaml".
 7) Train your DDPM generator with: ```python train_generator.py --config "<PEAL_BASE>/configs/my_experiments/generators/my_data_ddpm.yaml"```
