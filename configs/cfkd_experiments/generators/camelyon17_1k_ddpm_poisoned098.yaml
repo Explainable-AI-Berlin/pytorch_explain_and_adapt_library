@@ -5,4 +5,4 @@ base_path : $PEAL_RUNS/camelyon17_1k/ddpm
 data: "<PEAL_BASE>/configs/cfkd_experiments/data/camelyon17_1k_poisoned098_generator.yaml"
 image_size: 128
 batch_size: 100
-max_steps: 10000000
+max_steps: 50000

@@ -312,6 +312,7 @@ def get_config_model(config_data):
 
 def load_yaml_config(config_path, config_model=None, return_namespace=True):
     config_data = _load_yaml_config(config_path)
+
     if (
         config_model is None
         and isinstance(config_data, dict)

@@ -499,7 +499,7 @@ class SquareDataset(Image2MixedDataset):
             train_hints_buffer = train_dataloader.hints_enabled
             train_dataloader.enable_hints()
 
-        else:
+        elif train_dataloader:
             train_hints_buffer = train_dataloader.dataset.hints_enabled
             train_dataloader.dataset.enable_hints()
 
@@ -853,13 +853,18 @@ class CelebADataset(Image2MixedDataset):
 
         else:
             peal_runs = os.environ.get("PEAL_RUNS", "peal_runs")
-            oracle_path = os.path.join(peal_runs, "camelyon17", "latent_oracle", "model.cpl")
+            oracle_path = os.path.join(peal_runs, "celeba", "latent_oracle", "model.cpl")
             if os.path.exists(oracle_path):
                 self.oracle = torch.load(oracle_path)
                 self.oracle.eval()
 
     def sample_to_latent(self, sample, mask=None):
-        self.oracle.to(sample.device)
+        if isinstance(self.oracle, torch.nn.Module):
+            self.oracle.to(sample.device)
+
+        else:
+            self.oracle_metric.to(sample.device)
+
         sample_inflated = False
         if not len(sample.shape) == 4:
             sample_inflated = True
