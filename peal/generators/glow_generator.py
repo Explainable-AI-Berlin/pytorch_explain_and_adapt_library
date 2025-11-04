@@ -54,27 +54,32 @@ class GlowGeneratorConfig(GeneratorConfig):
     full_args: Union[None, dict] = None
 
 
-
 class GlowGenerator(InvertibleGenerator):
-    def __init__(self, config, model_dir=None, device="cpu", predictor_dataset=None, train=True):
+    def __init__(
+        self, config, model_dir=None, device="cpu", predictor_dataset=None, train=True
+    ):
         super().__init__()
         self.config = load_yaml_config(config)
         print(self.config)
-        print('initialize generator')
+        print("initialize generator")
         self.glow = Glow(
-            3, self.config.n_flow, self.config.n_block, affine=self.config.affine, conv_lu=not self.config.no_lu
+            3,
+            self.config.n_flow,
+            self.config.n_block,
+            affine=self.config.affine,
+            conv_lu=not self.config.no_lu,
         ).to(device)
-        print('initializing generator done!')
+        print("initializing generator done!")
         if os.path.exists(os.path.join(self.config.base_path, "final.pt")):
-            print('load weights!')
-            print('load weights!')
-            print('load weights!')
+            print("load weights!")
+            print("load weights!")
+            print("load weights!")
             self.glow.load_state_dict(
                 torch.load(os.path.join(self.config.base_path, "final.pt")),
             )
-            print('weights loaded!')
-            print('weights loaded!')
-            print('weights loaded!')
+            print("weights loaded!")
+            print("weights loaded!")
+            print("weights loaded!")
 
         self.train_dataset, self.val_dataset, _ = get_datasets(self.config.data)
         self.dataset = self.val_dataset
@@ -153,7 +158,9 @@ class GlowGenerator(InvertibleGenerator):
         if not os.path.exists(self.config.base_path):
             Path(self.config.base_path).mkdir(parents=True, exist_ok=True)
 
-        save_yaml_config(self.config, os.path.join(self.config.base_path, "config.yaml"))
+        save_yaml_config(
+            self.config, os.path.join(self.config.base_path, "config.yaml")
+        )
 
         writer = SummaryWriter(os.path.join(self.config.base_path, "logs"))
         train_dataloader = get_dataloader(

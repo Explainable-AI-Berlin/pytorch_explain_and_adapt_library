@@ -7,8 +7,7 @@ min_train_samples                    :  900
 finetune_iterations                  :  0
 max_validation_samples               :  100
 continuous_learning                  :  "retrain"
-replace_model                        :  True
-use_visualization                    :  True
+calculate_explainer_stats            :  True
 calculate_group_accuracies           :  True
 explainer                            :  <PEAL_BASE>/configs/sce_experiments/explainers/fastdime_default.yaml
 training                             :  <PEAL_BASE>/configs/sce_experiments/training/img_finetuning.yaml

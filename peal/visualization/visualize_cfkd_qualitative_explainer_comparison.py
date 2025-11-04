@@ -134,15 +134,11 @@ if __name__ == "__main__":
                         )
 
                     cluster_idx = 0
-                    imgs[1 + method_idx + cluster_idx][2 * dataset_idx + i] = (
-                        resize(
-                            torch.from_numpy(
-                                tracked_values["clusters" + str(cluster_idx)][
-                                    sample_idx
-                                ]
-                            ),
-                            [128, 128],
-                        )
+                    imgs[1 + method_idx + cluster_idx][2 * dataset_idx + i] = resize(
+                        torch.from_numpy(
+                            tracked_values["clusters" + str(cluster_idx)][sample_idx]
+                        ),
+                        [128, 128],
                     )
                     target_confidences[1 + method_idx + cluster_idx][
                         2 * dataset_idx + i

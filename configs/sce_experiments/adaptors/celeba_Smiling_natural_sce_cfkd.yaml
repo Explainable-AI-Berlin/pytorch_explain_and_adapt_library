@@ -2,9 +2,11 @@
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  4
-tracking_level                       :  5
+tracking_level                       :  4
 finetune_iterations                  :  0
 max_validation_samples               :  200
+max_test_batches                     :  10
+calculate_explainer_stats            :  True
 calculate_group_accuracies           :  False
 explainer                            :  <PEAL_BASE>/configs/sce_experiments/explainers/sce_default128x128.yaml
 data                                 :  <PEAL_BASE>/configs/sce_experiments/data/celeba.yaml

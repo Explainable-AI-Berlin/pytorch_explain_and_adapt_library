@@ -1,7 +1,6 @@
 import copy
 import csv
 import os
-import random
 import shutil
 import tarfile
 from pathlib import Path
@@ -14,13 +13,16 @@ import torchvision
 from PIL import Image
 import matplotlib.cm as cm
 import requests
-from torch.utils.data import DataLoader, ConcatDataset
+from torch.utils.data import ConcatDataset
 
 from torchvision.transforms import ToTensor
 from wilds import get_dataset
 
 from peal.data.dataloaders import DataloaderMixer, WeightedDataloaderList
-from peal.data.dataset_generators import SquareDatasetGenerator, ConfounderDatasetGenerator
+from peal.data.dataset_generators import (
+    SquareDatasetGenerator,
+    ConfounderDatasetGenerator,
+)
 from peal.data.datasets import (
     Image2ClassDataset,
     Image2MixedDataset,
@@ -91,7 +93,7 @@ class ColoredMnist(Image2ClassDataset):
 
         self.group_labels = {}
         group_map_file = self.config.group_map or os.path.join(self.config.dataset_path, "data.csv")
-        with open(group_map_file, 'r') as f:
+        with open(group_map_file, "r") as f:
             reader = csv.reader(f)
             header = next(reader)
             col_filename = header.index("Name")
@@ -124,10 +126,14 @@ class ColoredMnist(Image2ClassDataset):
 
         number_samples_max_train = 4500
         number_samples_max_val_and_test = 750
-        coloring_train = {class_coloring[0] : round(class_coloring[1] * number_samples_max_train)
-                          for class_coloring in self.config.coloring}
-        coloring_val_and_test = {class_coloring[0] : round(class_coloring[1] * number_samples_max_val_and_test)
-                                 for class_coloring in self.config.coloring}
+        coloring_train = {
+            class_coloring[0]: round(class_coloring[1] * number_samples_max_train)
+            for class_coloring in self.config.coloring
+        }
+        coloring_val_and_test = {
+            class_coloring[0]: round(class_coloring[1] * number_samples_max_val_and_test)
+            for class_coloring in self.config.coloring
+        }
 
         raw_path = self.config.dataset_path if self.config.raw_path is None else self.config.raw_path
 
@@ -195,11 +201,10 @@ class ColoredMnist(Image2ClassDataset):
             data_info["Digit"].append(label)
             current += 1
 
-        with open(os.path.join(self.config.dataset_path, "data.csv"), 'w', newline='') as f:
+        with open(os.path.join(self.config.dataset_path, "data.csv"), "w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(data_info.keys())
             writer.writerows(zip(*data_info.values()))
-
 
 
 def plot_latents_with_arrows(
@@ -271,9 +276,7 @@ def plot_latents_with_arrows(
             "",
             xy=(cf[0], cf[1]),
             xytext=(orig[0], orig[1]),
-            arrowprops=dict(
-                fc="green", ec="green", edgecolor="yellow", arrowstyle="->", alpha=0.7
-            ),
+            arrowprops=dict(fc="green", ec="green", edgecolor="yellow", arrowstyle="->", alpha=0.7),
         )
 
     # Setting limits for the plot (0 to 1 for both axes)
@@ -335,9 +338,7 @@ def plot_latents_with_arrows(
     red_patch = plt.Line2D([0], [0], color="red", lw=4, label="Pred < 0.5")
 
     # Display the updated legend
-    ax.legend(
-        handles=[original_marker, cf_marker, blue_patch, red_patch], loc="upper right"
-    )
+    ax.legend(handles=[original_marker, cf_marker, blue_patch, red_patch], loc="upper right")
 
     # Show the plot
     plt.grid(True)
@@ -353,9 +354,7 @@ class SquareDataset(Image2MixedDataset):
                 cdg.generate_dataset()
 
             else:
-                raise NotImplementedError(
-                    "Only confounder_probability=0.5 can be used to generate the dataset"
-                )
+                raise NotImplementedError("Only confounder_probability=0.5 can be used to generate the dataset")
 
         super(SquareDataset, self).__init__(config=config, **kwargs)
 
@@ -388,9 +387,7 @@ class SquareDataset(Image2MixedDataset):
         for idx in range(len(x_list)):
             x = x_list[idx]
             hint = hint_list[idx]
-            original_latents.append(
-                [self.check_foreground(x, hint), self.check_background(x, hint)]
-            )
+            original_latents.append([self.check_foreground(x, hint), self.check_background(x, hint)])
             counterfactual_latents.append(
                 [
                     self.check_foreground(counterfactuals[idx], hint),
@@ -465,15 +462,11 @@ class SquareDataset(Image2MixedDataset):
                         logits.append(predictor(torch.stack(current_batch).to(device)).detach())
 
                     logits = torch.cat(logits, dim=0).detach().cpu()
-                    prediction_grid = torch.nn.Softmax(dim=1)(logits / temperature)[
-                        :, 0
-                    ].reshape(100, 100)
+                    prediction_grid = torch.nn.Softmax(dim=1)(logits / temperature)[:, 0].reshape(100, 100)
                     prediction_grids.append(prediction_grid)
 
             # Average the predictions across grids
-            prediction_grid = torch.mean(
-                torch.stack(prediction_grids).to(torch.float32), dim=0
-            ).numpy()
+            prediction_grid = torch.mean(torch.stack(prediction_grids).to(torch.float32), dim=0).numpy()
             np.save(grid_path, prediction_grid)
 
         else:
@@ -487,33 +480,21 @@ class SquareDataset(Image2MixedDataset):
                 if batch_idx >= max_batches:
                     break
 
-                try:
-                    x, y = batch  # Assuming batch contains images and hints
-                    y, hint = y[:2]
-
-                except Exception:
-                    print("in extract latents")
-                    import pdb; pdb.set_trace()
+                x, y = batch  # Assuming batch contains images and hints
+                y, hint = y[:2]
 
                 for idx in range(len(x)):
-                    try:
-                        latents.append(
-                            [
-                                self.check_foreground(x[idx], hint[idx]),
-                                self.check_background(x[idx], hint[idx]),
-                            ]
-                        )
-
-                    except Exception:
-                        import pdb
-
-                        pdb.set_trace()
+                    latents.append(
+                        [
+                            self.check_foreground(x[idx], hint[idx]),
+                            self.check_background(x[idx], hint[idx]),
+                        ]
+                    )
 
                     y_list.append(y[idx])
 
             return latents, y_list
 
-        # TODO introduce new functionality into the dataloader mixer!
         if isinstance(train_dataloader, DataloaderMixer):
             train_hints_buffer = train_dataloader.hints_enabled
             train_dataloader.enable_hints()
@@ -522,9 +503,7 @@ class SquareDataset(Image2MixedDataset):
             train_hints_buffer = train_dataloader.dataset.hints_enabled
             train_dataloader.dataset.enable_hints()
 
-        train_latents, train_y_list = (
-            extract_latents(train_dataloader) if train_dataloader else ([], [])
-        )
+        train_latents, train_y_list = extract_latents(train_dataloader) if train_dataloader else ([], [])
 
         if train_dataloader and not train_hints_buffer:
             if isinstance(train_dataloader, DataloaderMixer):
@@ -542,9 +521,7 @@ class SquareDataset(Image2MixedDataset):
             val_hints_buffer = val_dataloader.dataset.hints_enabled
             val_dataloader.dataset.enable_hints()
             max_batches = max(1, 8 // val_weights[val_idx])
-            val_latents_current, val_y_list_current = extract_latents(
-                val_dataloader, max_batches=max_batches
-            )
+            val_latents_current, val_y_list_current = extract_latents(val_dataloader, max_batches=max_batches)
             val_latents.extend(val_latents_current)
             val_y_list.extend(val_y_list_current)
             if not val_hints_buffer:
@@ -559,9 +536,7 @@ class SquareDataset(Image2MixedDataset):
         contour_fill = plt.contourf(xx, yy, prediction_grid, levels=100, cmap=cmap)
 
         # Add contour lines with black color and thicker lines
-        contour_lines = plt.contour(
-            xx, yy, prediction_grid, levels=10, colors="black", linewidths=1.5
-        )
+        contour_lines = plt.contour(xx, yy, prediction_grid, levels=10, colors="black", linewidths=1.5)
 
         # Plot training and validation samples
         train_latents = np.array(train_latents)
@@ -624,9 +599,7 @@ class SquareDataset(Image2MixedDataset):
         print("visualize_decision_boundary saved under " + path)
 
     def check_foreground(self, x, hint):
-        intensity_foreground = torch.sum(
-            hint[..., 0, :, :] * x[..., 0, :, :]
-        ) / torch.sum(hint[..., 0, :, :])
+        intensity_foreground = torch.sum(hint[..., 0, :, :] * x[..., 0, :, :]) / torch.sum(hint[..., 0, :, :])
         return intensity_foreground
 
     def check_background(self, x, hint):
@@ -657,20 +630,9 @@ class SquareDataset(Image2MixedDataset):
         if idx_to_info is None:
 
             def idx_to_info(x, x_counterfactual, hint):
-                s = (
-                    "Foreground: "
-                    + str(round(float(self.check_foreground(x, hint)), 3))
-                    + " -> "
-                )
-                s += (
-                    str(round(float(self.check_foreground(x_counterfactual, hint)), 3))
-                    + ", "
-                )
-                s += (
-                    "Background: "
-                    + str(round(float(self.check_background(x, hint)), 3))
-                    + " -> "
-                )
+                s = "Foreground: " + str(round(float(self.check_foreground(x, hint)), 3)) + " -> "
+                s += str(round(float(self.check_foreground(x_counterfactual, hint)), 3)) + ", "
+                s += "Background: " + str(round(float(self.check_background(x, hint)), 3)) + " -> "
                 s += str(round(float(self.check_background(x_counterfactual, hint)), 3))
                 return s
 
@@ -722,9 +684,7 @@ class Camelyon17AugmentedDataset(Image2MixedDataset):
     def __init__(self, config, **kwargs):
         if not os.path.exists(config.dataset_path):
             original_dataset = get_dataset(dataset="camelyon17", download=True)
-            Path(os.path.join(config.dataset_path, "imgs")).mkdir(
-                parents=True, exist_ok=True
-            )
+            Path(os.path.join(config.dataset_path, "imgs")).mkdir(parents=True, exist_ok=True)
             lines = ["img,tumor,hospital"]
             for i in range(len(original_dataset)):
                 img, label, meta = original_dataset[i]
@@ -762,9 +722,7 @@ class RxRx1AugmentedDataset(Image2MixedDataset):
     def __init__(self, config, **kwargs):
         if not os.path.exists(config.dataset_path):
             original_dataset = get_dataset(dataset="rxrx1", download=True)
-            Path(os.path.join(config.dataset_path, "imgs")).mkdir(
-                parents=True, exist_ok=True
-            )
+            Path(os.path.join(config.dataset_path, "imgs")).mkdir(parents=True, exist_ok=True)
             lines = ["img, label, confounder"]
             for i in range(len(original_dataset)):
                 img, label, meta = original_dataset[i]
@@ -787,9 +745,7 @@ class WaterbirdsDataset(Image2MixedDataset):
             download_path = os.path.join(config.dataset_path, "downloads")
             Path(download_path).mkdir(parents=True, exist_ok=True)
 
-            if os.path.exists(
-                os.path.join(download_path, "segmentations", "200.Common_Yellowthroat")
-            ):
+            if os.path.exists(os.path.join(download_path, "segmentations", "200.Common_Yellowthroat")):
                 print("Found segmentation masks folder. Skipping downloading.")
 
             else:
@@ -865,15 +821,21 @@ class WaterbirdsDataset(Image2MixedDataset):
 
 
 def download_celeba_to(target_dir):
-    print('This still has to be implemented!')
+    print("This still has to be implemented!")
     import kagglehub
 
     # Download latest version
     path = kagglehub.dataset_download("jessicali9530/celeba-dataset")
     print("Path to downloaded dataset files:", path)
     shutil.move(path, target_dir)
-    shutil.move(os.path.join(target_dir, "list_attr_celeba.csv"), os.path.join(target_dir, "data.csv"))
-    shutil.move(os.path.join(target_dir, "img_align_celeba", "img_align_celeba"), os.path.join(target_dir, "imgs"))
+    shutil.move(
+        os.path.join(target_dir, "list_attr_celeba.csv"),
+        os.path.join(target_dir, "data.csv"),
+    )
+    shutil.move(
+        os.path.join(target_dir, "img_align_celeba", "img_align_celeba"),
+        os.path.join(target_dir, "imgs"),
+    )
 
 
 class CelebADataset(Image2MixedDataset):
@@ -891,13 +853,18 @@ class CelebADataset(Image2MixedDataset):
 
         else:
             peal_runs = os.environ.get("PEAL_RUNS", "peal_runs")
-            oracle_path = os.path.join(peal_runs, "camelyon17", "latent_oracle", "model.cpl")
+            oracle_path = os.path.join(peal_runs, "celeba", "latent_oracle", "model.cpl")
             if os.path.exists(oracle_path):
                 self.oracle = torch.load(oracle_path)
                 self.oracle.eval()
 
     def sample_to_latent(self, sample, mask=None):
-        self.oracle.to(sample.device)
+        if isinstance(self.oracle, torch.nn.Module):
+            self.oracle.to(sample.device)
+
+        else:
+            self.oracle_metric.to(sample.device)
+
         sample_inflated = False
         if not len(sample.shape) == 4:
             sample_inflated = True
@@ -925,3 +892,89 @@ class CelebACopyrighttagDataset(Image2MixedDataset):
             cdg.generate_dataset()
 
         super(CelebACopyrighttagDataset, self).__init__(config=config, **kwargs)
+
+
+class FollicleDataset(Image2MixedDataset):
+    def __init__(self, config, **kwargs):
+        # Login using e.g. `huggingface-cli login` to access this dataset
+        if not os.path.exists(config.dataset_path):
+            from datasets import load_dataset
+
+            metadata_data_with_annotations = load_dataset(
+                "janphhe/follicles_true_features", data_files="data_with_annotations.csv"
+            )
+            ds_imgs = load_dataset("janphhe/follicles_true_features", "imgs_config", num_proc=8)
+            ds_imgs_cut = load_dataset("janphhe/follicles_true_features", "imgs_cut_config", num_proc=8)
+            ds_masks = load_dataset("janphhe/follicles_true_features", "masks_config", num_proc=8)
+            attributes = [e for e in metadata_data_with_annotations["train"].features.keys()][:-1]
+            attribute_values = [metadata_data_with_annotations["train"][attributes[i]] for i in range(len(attributes))]
+            csv_file = ",".join(attributes) + "\n"
+            for i in range(len(attribute_values[0])):
+                csv_file += ",".join([str(attribute_values[j][i]) for j in range(len(attributes))]) + "\n"
+
+            os.makedirs(config.dataset_path)
+            os.makedirs(os.path.join(config.dataset_path, "imgs", "0"))
+            os.makedirs(os.path.join(config.dataset_path, "imgs", "1"))
+            os.makedirs(os.path.join(config.dataset_path, "imgs_cut", "0"))
+            os.makedirs(os.path.join(config.dataset_path, "imgs_cut", "1"))
+            os.makedirs(os.path.join(config.dataset_path, "masks"))
+            with open(os.path.join(config.dataset_path, "data.csv"), "w") as f:
+                f.write(csv_file)
+
+            for split in ds_imgs.keys():
+                for i in range(len(ds_imgs[split])):
+                    label = ds_imgs[split][i]["label"]
+                    image = ds_imgs[split][i]["image"]
+
+                    # create a folder for the label if it does not exist
+                    label_folder = os.path.join(config.dataset_path, str(label))
+
+                    if not os.path.exists(label_folder):
+                        os.makedirs(label_folder)
+
+                    # save the image in the label folder
+                    image.save(
+                        os.path.join(config.dataset_path, "imgs", attribute_values[attributes.index("imgs")]), "PNG"
+                    )
+
+            for split in ds_imgs_cut.keys():
+                for i in range(len(ds_imgs_cut[split])):
+                    label = ds_imgs_cut[split][i]["label"]
+                    image = ds_imgs_cut[split][i]["image"]
+
+                    # create a folder for the label if it does not exist
+                    label_folder = os.path.join(config.dataset_path, str(label))
+
+                    if not os.path.exists(label_folder):
+                        os.makedirs(label_folder)
+
+                    # save the image in the label folder
+                    image.save(
+                        os.path.join(
+                            config.dataset_path, "imgs_cut", attribute_values[attributes.index("imgs_cut")]
+                        ),
+                        "PNG",
+                    )
+
+            for split in ds_masks.keys():
+                for i in range(len(ds_masks[split])):
+                    label = ds_masks[split][i]["label"]
+                    image = ds_masks[split][i]["image"]
+
+                    # create a folder for the label if it does not exist
+                    label_folder = os.path.join(config.dataset_path, str(label))
+
+                    if not os.path.exists(label_folder):
+                        os.makedirs(label_folder)
+
+                    # save the image in the label folder
+                    image.save(
+                        os.path.join(
+                            config.dataset_path,
+                            "masks",
+                            os.path.split(attribute_values[attributes.index("imgs")])[-1],
+                        ),
+                        "PNG",
+                    )
+
+        super(FollicleDataset, self).__init__(config=config, **kwargs)

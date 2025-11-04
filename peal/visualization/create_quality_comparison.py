@@ -23,6 +23,7 @@ def create_bar_diagram(data, title, ax, colors):
     # Add title below the plot
     ax.text(0.5, -0.1, title, transform=ax.transAxes, ha="center", va="top", fontsize=8)
 
+
 if __name__ == "__main__":
     # Example usage:
     data = np.array(
@@ -37,7 +38,9 @@ if __name__ == "__main__":
     titles = ["Smiling", "Blond_Hair", "Waterbirds", "Square"]
     colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"]
 
-    fig, axs = plt.subplots(1, data.shape[0], figsize=(25, 4))  # Reduced height from 6 to 4
+    fig, axs = plt.subplots(
+        1, data.shape[0], figsize=(25, 4)
+    )  # Reduced height from 6 to 4
     plt.subplots_adjust(wspace=0.3, bottom=0.2)  # Adjusted bottom margin
 
     for i in range(data.shape[0]):
@@ -45,7 +48,8 @@ if __name__ == "__main__":
 
     # Add a global color legend
     legend_elements = [
-        plt.Rectangle((0, 0), 1, 1, facecolor=color, edgecolor="none") for color in colors
+        plt.Rectangle((0, 0), 1, 1, facecolor=color, edgecolor="none")
+        for color in colors
     ]
     fig.legend(
         legend_elements,

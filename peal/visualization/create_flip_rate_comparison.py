@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.colors as mcolors
 
+
 def create_bar_diagram(data, title, ax, base_colors, bar_width=0.6, group_offset=1.5):
     """
     Creates a grouped and stacked bar diagram for each category with bars touching within groups.
@@ -22,8 +23,15 @@ def create_bar_diagram(data, title, ax, base_colors, bar_width=0.6, group_offset
     ]
 
     # Plot stacked bars for each method
-    rects_low = ax.bar(x, data[:, 0], bar_width, color=base_colors, label='Low')
-    rects_high = ax.bar(x, data[:, 1] - data[:, 0], bar_width, bottom=data[:, 0], color=high_colors, label='High')
+    rects_low = ax.bar(x, data[:, 0], bar_width, color=base_colors, label="Low")
+    rects_high = ax.bar(
+        x,
+        data[:, 1] - data[:, 0],
+        bar_width,
+        bottom=data[:, 0],
+        color=high_colors,
+        label="High",
+    )
 
     # Add labels to bars
     ax.bar_label(rects_low, fmt="%.2f", label_type="center", fontsize=12, padding=1)
@@ -42,15 +50,20 @@ def create_bar_diagram(data, title, ax, base_colors, bar_width=0.6, group_offset
         spine.set_visible(False)
 
     # Add title below the plot
-    ax.text(0.5, -0.1, title, transform=ax.transAxes, ha="center", va="top", fontsize=12)
+    ax.text(
+        0.5, -0.1, title, transform=ax.transAxes, ha="center", va="top", fontsize=12
+    )
+
 
 if __name__ == "__main__":
-    data = np.array([
-        [[0.97, 0.99], [0.91, 1.0], [0.78, 1.0], [0.75, 0.81]],
-        [[0.41, 0.51], [0.59, 0.92], [0.39, 0.75], [0.89, 0.91]],
-        [[0.2, 0.59], [0.29, 0.74], [0.3, 0.67], [0.78, 0.94]],
-        [[0.03, 0.04], [0.21, 0.35], [0.06, 0.26], [0.93, 0.94]],
-    ])
+    data = np.array(
+        [
+            [[0.97, 0.99], [0.91, 1.0], [0.78, 1.0], [0.75, 0.81]],
+            [[0.41, 0.51], [0.59, 0.92], [0.39, 0.75], [0.89, 0.91]],
+            [[0.2, 0.59], [0.29, 0.74], [0.3, 0.67], [0.78, 0.94]],
+            [[0.03, 0.04], [0.21, 0.35], [0.06, 0.26], [0.93, 0.94]],
+        ]
+    )
     labels = ["ACE", "DiME", "FastDiME", "PDC (ours)"]
     titles = ["Smiling", "Blond_Hair", "Waterbirds", "Square"]
     base_colors = ["#1f44b4", "#1f77b4", "#1faab4", "#d62728"]
@@ -58,7 +71,9 @@ if __name__ == "__main__":
     fig, axs = plt.subplots(1, len(titles), figsize=(16, 6), sharey=True)
 
     for i, ax in enumerate(axs):
-        create_bar_diagram(data[i], titles[i], ax=ax, base_colors=base_colors, bar_width=0.8)
+        create_bar_diagram(
+            data[i], titles[i], ax=ax, base_colors=base_colors, bar_width=0.8
+        )
 
     # Add a global legend
     legend_elements = [

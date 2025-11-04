@@ -49,7 +49,11 @@ def calculate_validation_statistics(
             confidence_scores.append([])
 
         pbar = tqdm(
-            total=int(min(max_validation_samples, len(dataloader.dataset)) / dataloader.batch_size + 0.9999)
+            total=int(
+                min(max_validation_samples, len(dataloader.dataset))
+                / dataloader.batch_size
+                + 0.9999
+            )
             * (
                 explainer.explainer_config.gradient_steps
                 if hasattr(explainer.explainer_config, "gradient_steps")
@@ -62,14 +66,23 @@ def calculate_validation_statistics(
             """if not it == 41:
             continue"""
 
-            if num_samples >= int(max_validation_samples / len(dataloaders)) or x.shape[0] != dataloader.batch_size:
+            if (
+                num_samples >= int(max_validation_samples / len(dataloaders))
+                or x.shape[0] != dataloader.batch_size
+            ):
                 break
 
             pred_confidences = (
-                torch.nn.Softmax(dim=-1)(model(x.to(device)) / explainer.explainer_config.temperature).detach().cpu()
+                torch.nn.Softmax(dim=-1)(
+                    model(x.to(device)) / explainer.explainer_config.temperature
+                )
+                .detach()
+                .cpu()
             )
             y_pred = logits_to_prediction(pred_confidences)
-            if ("hint_list" in tracked_keys or "idx_list" in tracked_keys) and isinstance(y, list):
+            if (
+                "hint_list" in tracked_keys or "idx_list" in tracked_keys
+            ) and isinstance(y, list):
                 y_res = y[1:]
                 y = y[0]
                 if "hint_list" in tracked_keys:
@@ -91,7 +104,9 @@ def calculate_validation_statistics(
             batch_targets = (y_pred + 1) % output_size
             batch_target_start_confidences = []
             for sample_idx in range(pred_confidences.shape[0]):
-                batch_target_start_confidences.append(pred_confidences[sample_idx][batch_targets[sample_idx]])
+                batch_target_start_confidences.append(
+                    pred_confidences[sample_idx][batch_targets[sample_idx]]
+                )
 
             batch = {}
             batch["x_list"] = x
@@ -104,7 +119,9 @@ def calculate_validation_statistics(
 
             batch["y_source_list"] = y_pred
             batch["y_target_list"] = batch_targets
-            batch["y_target_start_confidence_list"] = torch.stack(batch_target_start_confidences, 0)
+            batch["y_target_start_confidence_list"] = torch.stack(
+                batch_target_start_confidences, 0
+            )
             results = explainer.explain_batch(
                 batch=batch,
                 base_path=base_path,
@@ -140,7 +157,9 @@ def calculate_validation_statistics(
             error_matrix = torch.tensor(error_matrix)
 
         else:
-            error_matrix = torch.ones([output_size, output_size]) - torch.eye(output_size)
+            error_matrix = torch.ones([output_size, output_size]) - torch.eye(
+                output_size
+            )
             error_matrix = error_matrix.flatten() / error_matrix.sum()
 
         validation_stats = {

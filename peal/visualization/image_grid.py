@@ -146,14 +146,18 @@ def make_image_grid(checkbox_dict, image_dicts):
         try:
             columns.append(
                 make_column(
-                    image_dicts[key][0]
-                    if not isinstance(image_dicts[key][0], list)
-                    else zip_tensors(image_dicts[key][0]),
+                    (
+                        image_dicts[key][0]
+                        if not isinstance(image_dicts[key][0], list)
+                        else zip_tensors(image_dicts[key][0])
+                    ),
                     image_dicts[key][1],
                     key,
                 )
             )
         except Exception:
-            import pdb; pdb.set_trace()
+            import pdb
+
+            pdb.set_trace()
 
     return Image.fromarray(np.concatenate(columns, axis=1))

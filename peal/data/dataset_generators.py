@@ -869,7 +869,10 @@ def latent_to_square_image(
         position_y + SIZE_BORDER : position_y + SIZE_ADDED - SIZE_BORDER,
     ] = np.clip(
         foreground
-        + noise[position_x + SIZE_BORDER : position_x + SIZE_ADDED - SIZE_BORDER, position_y + SIZE_BORDER : position_y + SIZE_ADDED - SIZE_BORDER],
+        + noise[
+            position_x + SIZE_BORDER : position_x + SIZE_ADDED - SIZE_BORDER,
+            position_y + SIZE_BORDER : position_y + SIZE_ADDED - SIZE_BORDER,
+        ],
         0,
         255,
     )
@@ -953,11 +956,18 @@ class SquareDatasetGenerator:
 
             sample_name = embed_numberstring(sample_idx, 8) + ".png"
             img, noise = latent_to_square_image(
-                position_x=position_x, position_y=position_y, color_a=color_a, color_b=color_b
+                position_x=position_x,
+                position_y=position_y,
+                color_a=color_a,
+                color_b=color_b,
             )
             img.save(os.path.join(self.data_config.dataset_path, "imgs", sample_name))
             img_inverse, noise = latent_to_square_image(
-                position_x=position_x, position_y=position_y, color_a=color_a, color_b=255 - color_b, noise=noise
+                position_x=position_x,
+                position_y=position_y,
+                color_a=color_a,
+                color_b=255 - color_b,
+                noise=noise,
             )
             """img_inverse = np.abs(img_base - 255)
             img_inverse[
@@ -1041,12 +1051,10 @@ class SquareDatasetGenerator:
                     "w",
                 ).write("\n".join(lines_out_inverse))
 
+        open(os.path.join(self.data_config.dataset_path, "data.csv"), "w").write(
+            "\n".join(lines_out)
+        )
         open(
-            os.path.join(self.data_config.dataset_path, "data.csv"), "w"
-        ).write("\n".join(lines_out))
-        open(
-            os.path.join(
-                self.data_config.dataset_path + "_inverse", "data.csv"
-            ),
+            os.path.join(self.data_config.dataset_path + "_inverse", "data.csv"),
             "w",
         ).write("\n".join(lines_out_inverse))

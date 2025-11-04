@@ -1,7 +1,12 @@
 import argparse
 import sys
 
-from peal.global_utils import load_yaml_config, add_class_arguments, integrate_arguments, set_random_seed
+from peal.global_utils import (
+    load_yaml_config,
+    add_class_arguments,
+    integrate_arguments,
+    set_random_seed,
+)
 from peal.training.trainers import ModelTrainer
 from peal.training.interfaces import PredictorConfig
 
@@ -27,5 +32,6 @@ def main():
         continue_training=config.continue_training, is_initialized=config.is_loaded
     )
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

@@ -86,7 +86,7 @@ from peal.global_utils import (
     get_predictions,
     replace_relu_with_leakysoftplus,
     replace_relu_with_leakyrelu,
-    cprint
+    cprint,
 )
 from peal.training.loggers import log_images_to_writer
 from peal.training.loggers import Logger
@@ -95,7 +95,7 @@ from peal.training.trainers import PredictorConfig, get_predictor
 from peal.data.dataloaders import (
     create_dataloaders_from_datasource,
     DataloaderMixer,
-    WeightedDataloaderList
+    WeightedDataloaderList,
 )
 from peal.generators.interfaces import Generator
 from peal.architectures.interfaces import ArchitectureConfig, TaskConfig
@@ -116,10 +116,10 @@ from torch.utils.data.sampler import WeightedRandomSampler
 
 
 dro_criterions = {
-    "ce": nn.CrossEntropyLoss(reduction='none'),
-    "bce": nn.BCEWithLogitsLoss(reduction='none'),
-    "mse": nn.MSELoss(reduction='none'),
-    "mae": nn.MSELoss(reduction='none'),
+    "ce": nn.CrossEntropyLoss(reduction="none"),
+    "bce": nn.BCEWithLogitsLoss(reduction="none"),
+    "mse": nn.MSELoss(reduction="none"),
+    "mae": nn.MSELoss(reduction="none"),
 }
 
 
@@ -143,7 +143,7 @@ class PealGroupDROConfig(AdaptorConfig):
     alpha: float = None
     gamma: float = 0.1
     adj: float = None
-    min_var_weight: float = 0 # I'm guessing this is a float
+    min_var_weight: float = 0  # I'm guessing this is a float
     step_size: float = 0.01
     normalize_loss: bool = False
     btl: bool = False
@@ -253,8 +253,6 @@ class PealGroupDRO(Adaptor):
         gigabyte_vram=None,
         val_dataloader_weights=[1.0],
     ):
-
-
         """
         TODO: Weird error with PEAL archiecture configs
         When using PealGroupDRO with a PEAL architecture config, the model is not loaded correctly. The architecture
@@ -285,7 +283,9 @@ class PealGroupDRO(Adaptor):
         try:
             self.model.to(self.device)
         except Exception:
-            import pdb; pdb.set_trace()
+            import pdb
+
+            pdb.set_trace()
 
         ### BEGIN: DRO Alterations
         """
@@ -302,8 +302,7 @@ class PealGroupDRO(Adaptor):
 
         if isinstance(datasource, str):
             dataset_train, dataset_val, dataset_test = get_datasets(
-                config=self.config.data,
-                base_dir=datasource
+                config=self.config.data, base_dir=datasource
             )
 
         elif isinstance(datasource[0], torch.utils.data.Dataset):
@@ -324,11 +323,11 @@ class PealGroupDRO(Adaptor):
         shuffle = True
         sampler = None
 
-        self.n_groups = 2 ** dataset_train.output_size
+        self.n_groups = 2**dataset_train.output_size
 
         if self.adaptor_config.reweight_groups:
 
-            """ 
+            """
             group_array = torch.zeros(len(dataset_train), dtype=torch.int)
             confounding_factors = dataset_train.config.confounding_factors
             confounding_factors_idx = torch.zeros(len(confounding_factors), dtype=torch.int)
@@ -353,7 +352,7 @@ class PealGroupDRO(Adaptor):
 
             group_array = []
             # TODO: This n_groups calculation seems dubious
-            n_groups = 2 ** dataset_train.output_size
+            n_groups = 2**dataset_train.output_size
 
             for x, y in dataset_train:
                 y, confounder = y
@@ -361,34 +360,38 @@ class PealGroupDRO(Adaptor):
                 group_array.append(group_idx)
 
             _group_array = torch.LongTensor([g.item() for g in group_array])
-            _group_counts = (torch.arange(n_groups).unsqueeze(1) == _group_array).sum(1).float()
+            _group_counts = (
+                (torch.arange(n_groups).unsqueeze(1) == _group_array).sum(1).float()
+            )
 
             group_weights = len(dataset_train) / _group_counts
             weights = group_weights[_group_array]
 
             shuffle = False
-            sampler = WeightedRandomSampler(weights, len(dataset_train), replacement=True)
+            sampler = WeightedRandomSampler(
+                weights, len(dataset_train), replacement=True
+            )
 
         self.train_dataloader = DataLoader(
             dataset_train,
             shuffle=shuffle,
             sampler=sampler,
             batch_size=self.config.training.train_batch_size,
-            num_workers=0
+            num_workers=0,
         )
 
         self.val_dataloaders = DataLoader(
             dataset_val,
             shuffle=False,
             batch_size=self.config.training.val_batch_size,
-            num_workers=0
+            num_workers=0,
         )
 
         self.test_dataloader = DataLoader(
             dataset_test,
             shuffle=False,
             batch_size=self.config.training.test_batch_size,
-            num_workers=0
+            num_workers=0,
         )
         ### END: DRO Alterations
 
@@ -452,7 +455,11 @@ class PealGroupDRO(Adaptor):
 
                 param_list = param_list_trained
 
-            cprint("trainable parameters: " + str(len(param_list)), self.config.tracking_level, 4)
+            cprint(
+                "trainable parameters: " + str(len(param_list)),
+                self.config.tracking_level,
+                4,
+            )
             if self.config.training.optimizer == "sgd":
                 self.optimizer = torch.optim.SGD(
                     param_list,
@@ -516,7 +523,9 @@ class PealGroupDRO(Adaptor):
         self.regularization_criterions = {}
         self.train_criterions = {}
         self.val_criterions = {}
-        if isinstance(self.val_dataloaders, list) or isinstance(self.val_dataloaders, tuple):
+        if isinstance(self.val_dataloaders, list) or isinstance(
+            self.val_dataloaders, tuple
+        ):
             self.val_criterions = len(self.val_dataloaders) * [{}]
 
         construct_loss_computer = lambda dro_cr, d_set: LossComputer(
@@ -529,21 +538,27 @@ class PealGroupDRO(Adaptor):
             self.adaptor_config.min_var_weight,
             self.adaptor_config.step_size,
             self.adaptor_config.normalize_loss,
-            self.adaptor_config.btl
+            self.adaptor_config.btl,
         )
 
         for criterion_key in self.config.task.criterions.keys():
             if criterion_key in ["l1", "l2", "orthogonality"]:
-                self.regularization_criterions[criterion_key] = available_criterions[criterion_key]
+                self.regularization_criterions[criterion_key] = available_criterions[
+                    criterion_key
+                ]
             elif criterion_key in dro_criterions:
                 dro_criterion = dro_criterions[criterion_key]
                 self.train_criterions[criterion_key] = construct_loss_computer(
                     dro_criterion, self.train_dataloader.dataset
                 )
                 for i, dataloader in enumerate(self.val_dataloaders):
-                    self.val_criterions[i][criterion_key] = construct_loss_computer(dro_criterion, dataloader.dataset)
+                    self.val_criterions[i][criterion_key] = construct_loss_computer(
+                        dro_criterion, dataloader.dataset
+                    )
             else:
-                raise RuntimeError(f"Criterion {criterion_key} is not implemented for use in the GroupDRO adaptor")
+                raise RuntimeError(
+                    f"Criterion {criterion_key} is not implemented for use in the GroupDRO adaptor"
+                )
         ### END: DRO Adaptations
 
         if logger is None:
@@ -572,7 +587,6 @@ class PealGroupDRO(Adaptor):
                 max_norm=self.config.training.attack_epsilon,
             )
 
-
     def run(self, continue_training=False, is_initialized=False):
         """
         Runs GroupDRO method.
@@ -592,15 +606,16 @@ class PealGroupDRO(Adaptor):
         else:
             print("CUDA is not available.")
     """
+
     # @profile
     def run_epoch(self, dataloader, loss_criterions, mode="train", pbar=None):
         """ """
-        #self.log_cpu_memory_usage()
-        #self.log_gpu_memory_usage()
+        # self.log_cpu_memory_usage()
+        # self.log_gpu_memory_usage()
         sources = {}
         for batch_idx, sample in enumerate(dataloader):
-            #self.log_cpu_memory_usage()
-            #self.log_gpu_memory_usage()
+            # self.log_cpu_memory_usage()
+            # self.log_gpu_memory_usage()
             if hasattr(dataloader, "return_src") and dataloader.return_src:
                 sample, source = sample
                 source = str(source)
@@ -694,7 +709,9 @@ class PealGroupDRO(Adaptor):
             for criterion in self.regularization_criterions.keys():
                 criterion_loss = self.config.task.criterions[
                     criterion
-                ] * self.regularization_criterions[criterion](self.model, pred, y.to(self.device))
+                ] * self.regularization_criterions[criterion](
+                    self.model, pred, y.to(self.device)
+                )
                 criterion_loss *= self.regularization_level
 
                 loss_logs[criterion] = criterion_loss.detach().item()
@@ -705,7 +722,9 @@ class PealGroupDRO(Adaptor):
             for criterion in loss_criterions.keys():
                 criterion_loss = self.config.task.criterions[
                     criterion
-                ] * loss_criterions[criterion].loss(pred, y.to(self.device), group_idx.to(self.device))
+                ] * loss_criterions[criterion].loss(
+                    pred, y.to(self.device), group_idx.to(self.device)
+                )
 
                 loss_logs[criterion] = criterion_loss.detach().item()
                 loss += criterion_loss
@@ -735,7 +754,9 @@ class PealGroupDRO(Adaptor):
             loss.backward()
             current_state = "MT: " + mode + "_it: " + str(batch_idx)
             if "val_acc" in pbar.stored_values.keys():
-                current_state += ", val_acc: " + str(round(float(pbar.stored_values["val_acc"]), 3))
+                current_state += ", val_acc: " + str(
+                    round(float(pbar.stored_values["val_acc"]), 3)
+                )
 
             current_state += ", loss: " + str(loss.detach().item())
             current_state += ", ".join(
@@ -766,7 +787,6 @@ class PealGroupDRO(Adaptor):
             if mode == "train":
                 self.optimizer.step()
 
-
             ### BEGIN: DRO Alterations
             # Get average worst group accuracy among loss_criterions
             avg_group_acc = torch.zeros(self.n_groups).to(self.device)
@@ -792,7 +812,7 @@ class PealGroupDRO(Adaptor):
         cprint("Training Config: " + str(self.config), self.config.tracking_level, 4)
         ### BEGIN: DRO Alterations
         if (not continue_training) and self.reset_weights:
-        ### END: DRO Alterations
+            ### END: DRO Alterations
             if "orthogonality" in self.config.task.criterions.keys():
                 cprint("Orthogonal initialization!!!", self.config.tracking_level, 4)
                 orthogonal_initialization(self.model)
@@ -826,10 +846,14 @@ class PealGroupDRO(Adaptor):
 
                 print("log train images!")
                 try:
-                    log_images_to_writer(self.train_dataloader, self.logger.writer, "train")
+                    log_images_to_writer(
+                        self.train_dataloader, self.logger.writer, "train"
+                    )
                 except StopIteration:
-                    print("Encountered StopIteration error in log_images_to_writer while logging the training "
-                          + "dataloader, when there are fewer than three batches in the dataloader")
+                    print(
+                        "Encountered StopIteration error in log_images_to_writer while logging the training "
+                        + "dataloader, when there are fewer than three batches in the dataloader"
+                    )
                 for i in range(len(self.val_dataloaders)):
                     print("log validation" + str(i) + " images!")
                     # TODO: log_images_to_writer will raise a StopIteration error if there are fewer than three
@@ -837,11 +861,15 @@ class PealGroupDRO(Adaptor):
                     # with small datasets.
                     try:
                         log_images_to_writer(
-                            self.val_dataloaders[i], self.logger.writer, "validation" + str(i) + "_"
+                            self.val_dataloaders[i],
+                            self.logger.writer,
+                            "validation" + str(i) + "_",
                         )
                     except StopIteration:
-                        print("Encountered StopIteration error in log_images_to_writer while logging the validation "
-                              + "dataloater, when there are fewer than three batches in the dataloader")
+                        print(
+                            "Encountered StopIteration error in log_images_to_writer while logging the validation "
+                            + "dataloater, when there are fewer than three batches in the dataloader"
+                        )
 
             self.config.is_loaded = True
             save_yaml_config(self.config, os.path.join(self.model_path, "config.yaml"))
@@ -850,14 +878,13 @@ class PealGroupDRO(Adaptor):
             writer = SummaryWriter(os.path.join(self.model_path, "logs"))
             self.logger.writer = writer
 
-
         pbar = tqdm(
             total=self.config.training.max_epochs
             * (
                 len(self.train_dataloader)
                 + int(np.sum(list(map(lambda dl: len(dl), self.val_dataloaders))))
             ),
-            ncols=200
+            ncols=200,
         )
         pbar.stored_values = {}
         val_accuracy_max = 0.0
@@ -869,7 +896,10 @@ class PealGroupDRO(Adaptor):
         for idx, val_dataloader in enumerate(self.val_dataloaders):
             if len(val_dataloader) >= 1:
                 val_loss, val_accuracy_current = self.run_epoch(
-                    val_dataloader, self.val_criterions[idx], mode="validation_" + str(idx), pbar=pbar
+                    val_dataloader,
+                    self.val_criterions[idx],
+                    mode="validation_" + str(idx),
+                    pbar=pbar,
                 )
                 if self.config.training.early_stopping_goal == "average_accuracy":
                     if val_accuracy is None:
@@ -919,7 +949,10 @@ class PealGroupDRO(Adaptor):
             for idx, val_dataloader in enumerate(self.val_dataloaders):
                 if len(val_dataloader) >= 1:
                     val_loss, val_accuracy_current = self.run_epoch(
-                        val_dataloader, self.val_criterions[idx], mode="validation_" + str(idx), pbar=pbar
+                        val_dataloader,
+                        self.val_criterions[idx],
+                        mode="validation_" + str(idx),
+                        pbar=pbar,
                     )
                     if self.config.training.early_stopping_goal == "average_accuracy":
                         if val_accuracy is None:

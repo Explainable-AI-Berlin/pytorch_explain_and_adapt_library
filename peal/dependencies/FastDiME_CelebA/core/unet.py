@@ -33,7 +33,7 @@ class AttentionPool2d(nn.Module):
     ):
         super().__init__()
         self.positional_embedding = nn.Parameter(
-            th.randn(embed_dim, spacial_dim ** 2 + 1) / embed_dim ** 0.5
+            th.randn(embed_dim, spacial_dim**2 + 1) / embed_dim**0.5
         )
         self.qkv_proj = conv_nd(1, embed_dim, 3 * embed_dim, 1)
         self.c_proj = conv_nd(1, embed_dim, output_dim or embed_dim, 1)
@@ -321,7 +321,7 @@ def count_flops_attn(model, _x, y):
     # We perform two matmuls with the same number of ops.
     # The first computes the weight matrix, the second computes
     # the combination of the value vectors.
-    matmul_ops = 2 * b * (num_spatial ** 2) * c
+    matmul_ops = 2 * b * (num_spatial**2) * c
     model.total_ops += th.DoubleTensor([matmul_ops])
 
 
@@ -445,7 +445,7 @@ class UNetModel(nn.Module):
         use_scale_shift_norm=False,
         resblock_updown=False,
         use_new_attention_order=False,
-        multiclass=False
+        multiclass=False,
     ):
         super().__init__()
 
@@ -654,9 +654,9 @@ class UNetModel(nn.Module):
 
         if self.num_classes is not None:
             if self.multiclass:
-                assert (y.shape == (x.shape[0], self.num_classes))
+                assert y.shape == (x.shape[0], self.num_classes)
             else:
-                assert (y.shape == (x.shape[0],))
+                assert y.shape == (x.shape[0],)
             emb = emb + self.label_emb(y)
 
         h = x.type(self.dtype)
@@ -904,7 +904,7 @@ class EncoderUNetModel(nn.Module):
             return self.out(h)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     """
     The full UNet model with attention and timestep embedding.
 
@@ -934,11 +934,11 @@ if __name__ == '__main__':
     :param use_new_attention_order: use a different attention pattern for potentially
                                     increased efficiency.
     """
-    MODEL_FLAGS="--attention_resolutions 32,16,8 --class_cond False --diffusion_steps 500 --image_size 128 --learn_sigma True --noise_schedule linear --num_channels 128 --num_head_channels 64 --num_res_blocks 2 --resblock_updown True --use_fp16 True --use_scale_shift_norm True"
-    x = th.rand(4, 3, 224//4, 288//4)
-    #x = th.rand(4, 3, 8, 8)
+    MODEL_FLAGS = "--attention_resolutions 32,16,8 --class_cond False --diffusion_steps 500 --image_size 128 --learn_sigma True --noise_schedule linear --num_channels 128 --num_head_channels 64 --num_res_blocks 2 --resblock_updown True --use_fp16 True --use_scale_shift_norm True"
+    x = th.rand(4, 3, 224 // 4, 288 // 4)
+    # x = th.rand(4, 3, 8, 8)
     unet = UNetModel(
-        image_size=[224//4, 288//4],
+        image_size=[224 // 4, 288 // 4],
         in_channels=3,
         model_channels=128,
         out_channels=3,
@@ -957,11 +957,13 @@ if __name__ == '__main__':
         use_scale_shift_norm=False,
         resblock_updown=False,
         use_new_attention_order=False,
-        multiclass=False
+        multiclass=False,
     )
 
     t = th.Tensor([0, 50, 100, 150]).long()
-    out = unet(x,t)
+    out = unet(x, t)
     print(out.shape)
 
-    import pdb; pdb.set_trace()
+    import pdb
+
+    pdb.set_trace()

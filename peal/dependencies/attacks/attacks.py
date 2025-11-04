@@ -113,7 +113,9 @@ class PGD_L2(Attacker):
                     adv = adv + noise
 
                 except Exception:
-                    import pdb; pdb.set_trace()
+                    import pdb
+
+                    pdb.set_trace()
 
             logits = model(adv)
             pred_labels = logits.argmax(1)

@@ -341,13 +341,16 @@ def generate_time_counterfactuals(args=None):
             print(args.editor)
             print(args.editor)
             if not args.editor is None:
-                print('DDPM inversion')
-                print('DDPM inversion')
-                print('DDPM inversion')
+                print("DDPM inversion")
+                print("DDPM inversion")
+                print("DDPM inversion")
                 target_confidences = torch.zeros([img.shape[0]])
                 attack = 0
                 cf_final = torch.clone(img)
-                while target_confidences.min() < args.y_target_goal_confidence and attack < args.max_attacks:
+                while (
+                    target_confidences.min() < args.y_target_goal_confidence
+                    and attack < args.max_attacks
+                ):
                     cf = args.editor.run(x=img, prompt_tar_list=tp, prompt_src=sp)
                     cf_postprocessed = postprocess(cf, args.classifier_image_size)
                     logits = classifier(cf_postprocessed.to(device))
@@ -388,9 +391,9 @@ def generate_time_counterfactuals(args=None):
                         guidance_scale=gsi,
                         p=args.p,
                         return_pil=False,
-                        negative_prompt=tp
-                        if args.use_negative_guidance_inverse
-                        else None,
+                        negative_prompt=(
+                            tp if args.use_negative_guidance_inverse else None
+                        ),
                         l2=args.l2,
                         feats=feats,
                     )

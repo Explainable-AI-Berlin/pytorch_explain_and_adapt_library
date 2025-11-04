@@ -26,7 +26,12 @@ def plot_accuracy_line(data):
     # Define color and label mappings
     colors = ["red", "blue", "grey", "green"]
     labels = ["Random", "Oracle", "Human", "Mask"]
-    inner_labels = ["Empirical Accuracy", "Average Group Accuracy", "Worst Group Accuracy", "Feedback Accuracy"]
+    inner_labels = [
+        "Empirical Accuracy",
+        "Average Group Accuracy",
+        "Worst Group Accuracy",
+        "Feedback Accuracy",
+    ]
 
     # Create a dictionary to map colors to labels for legend clarity
     color_label_map = dict(zip(colors, labels))
@@ -40,7 +45,9 @@ def plot_accuracy_line(data):
             else:
                 linestyle = "dashed"
 
-            axs[i].plot(data[j, i, :], label=labels[j], color=colors[j], linestyle=linestyle)
+            axs[i].plot(
+                data[j, i, :], label=labels[j], color=colors[j], linestyle=linestyle
+            )
 
         # Set labels and title
         axs[i].set_xlabel("Iteration")
@@ -53,7 +60,11 @@ def plot_accuracy_line(data):
         *[(plt.Line2D([], [], color=c), color_label_map[c]) for c in colors]
     )
     fig.legend(
-        handles, labels=labels, loc="upper center", bbox_to_anchor=(0.5, 1.0), ncol=len(labels)
+        handles,
+        labels=labels,
+        loc="upper center",
+        bbox_to_anchor=(0.5, 1.0),
+        ncol=len(labels),
     )  # Adjust location
 
     # Add space above the subplots
@@ -61,6 +72,7 @@ def plot_accuracy_line(data):
 
     # Show the plot
     plt.show()
+
 
 if __name__ == "__main__":
     # Generate random data for testing

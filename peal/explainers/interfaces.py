@@ -7,6 +7,7 @@ class ExplainerConfig(BaseModel):
     """
     This class defines the config of a ExplainerConfig.
     """
+
     """
     The type of explanation that shall be used.
     This is necessary to know which pydantic class to use when loading from yaml.
@@ -16,12 +17,12 @@ class ExplainerConfig(BaseModel):
     The category of the config. Can not be changed for explainer.
     This is also necessary to identify which pydantic class to use when loading from yaml.
     """
-    category: str = 'explainer'
+    category: str = "explainer"
     """
     The directory where the explanations are stored.
     This only is used if explainer is executed directly and not e.g. executed via CFKD.
     """
-    explanations_dir: str = 'explanations'
+    explanations_dir: str = "explanations"
     """
     The port the feedback for the explanations shall be given when using the webinterface.
     """
@@ -75,6 +76,7 @@ class ExplainerConfig(BaseModel):
 
 class ExplainerInterface:
     explainer_config: ExplainerConfig
+
     def explain_batch(self, batch, **args):
         raise NotImplementedError
 

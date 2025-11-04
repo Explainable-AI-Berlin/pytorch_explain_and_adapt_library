@@ -114,7 +114,7 @@ def run_epoch(
         data_loader(iterations), desc="Iterations", total=args.iterations
     ):
         image = image.to(device, dtype=torch_dtype)
-        image = torchvision.transforms.Resize([512,512])(image)
+        image = torchvision.transforms.Resize([512, 512])(image)
         text_inputs = tokenizer(
             text,
             padding="max_length",
@@ -356,12 +356,16 @@ def textual_inversion_training(args=None):
     real_images = torch.stack(real_images, dim=0).to(device) * 0.5 + 0.5
     fid.update(torch.tensor(255 * real_images, dtype=torch.uint8), real=True)
 
-    #images = pipeline(5 * [args.prompt]).images
+    # images = pipeline(5 * [args.prompt]).images
     images = pipeline(2 * [""] + 3 * [args.prompt]).images
     images_torch = torch.stack([ToTensor()(image) for image in images])
-    images_torch_resized = torchvision.transforms.Resize(real_images.shape[-2:])(images_torch)
-    concatenated_imgs = torch.cat([real_images[:5].cpu() , images_torch_resized], dim=0)
-    torchvision.utils.save_image(concatenated_imgs, args.output_path[:-4] + "_start.png",nrow=5)
+    images_torch_resized = torchvision.transforms.Resize(real_images.shape[-2:])(
+        images_torch
+    )
+    concatenated_imgs = torch.cat([real_images[:5].cpu(), images_torch_resized], dim=0)
+    torchvision.utils.save_image(
+        concatenated_imgs, args.output_path[:-4] + "_start.png", nrow=5
+    )
 
     fid.update(
         torch.tensor(
@@ -445,9 +449,15 @@ def textual_inversion_training(args=None):
         )
         images = pipeline(5 * [args.prompt]).images
         images_torch = torch.stack([ToTensor()(image) for image in images])
-        images_torch_resized = torchvision.transforms.Resize(real_images.shape[-2:])(images_torch)
-        concatenated_imgs = torch.cat([real_images[:5].cpu() , images_torch_resized], dim=0)
-        torchvision.utils.save_image(concatenated_imgs, args.output_path[:-4] + f"_image_{epoch}.png",nrow=5)
+        images_torch_resized = torchvision.transforms.Resize(real_images.shape[-2:])(
+            images_torch
+        )
+        concatenated_imgs = torch.cat(
+            [real_images[:5].cpu(), images_torch_resized], dim=0
+        )
+        torchvision.utils.save_image(
+            concatenated_imgs, args.output_path[:-4] + f"_image_{epoch}.png", nrow=5
+        )
 
         fid.update(
             torch.tensor(

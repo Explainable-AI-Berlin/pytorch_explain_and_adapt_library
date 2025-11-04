@@ -36,7 +36,7 @@ def main():
         data_dir=args.data_dir,
         batch_size=args.batch_size,
         image_size=args.image_size,
-        class_cond=args.class_cond
+        class_cond=args.class_cond,
     )
 
     logger.log("training...")
@@ -74,8 +74,8 @@ def create_argparser():
         resume_checkpoint="",
         use_fp16=False,
         fp16_scale_growth=1e-3,
-        output_path='',
-        gpus=''
+        output_path="",
+        gpus="",
     )
     defaults.update(model_and_diffusion_defaults())
     parser = argparse.ArgumentParser()

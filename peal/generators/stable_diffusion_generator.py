@@ -16,8 +16,10 @@ from PIL import Image
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.transforms import ToTensor
 
-from peal.dependencies.ddpm_inversion.ddm_inversion.inversion_utils import inversion_forward_process, \
-    inversion_reverse_process
+from peal.dependencies.ddpm_inversion.ddm_inversion.inversion_utils import (
+    inversion_forward_process,
+    inversion_reverse_process,
+)
 from peal.editors.ddpm_inversion import DDPMInversionConfig
 from peal.data.dataloaders import get_dataloader
 from peal.data.dataset_factory import get_datasets
@@ -51,7 +53,7 @@ class StableDiffusionConfig(GeneratorConfig):
     """
     generator_type: str = "StableDiffusion"
     base_path: str = "/home/space/datasets/peal/peal_runs/stable_diffusion"
-    #full_args: Union[None, dict] = None
+    # full_args: Union[None, dict] = None
     """
     The config of the data.
     """
@@ -76,7 +78,7 @@ class StableDiffusionConfig(GeneratorConfig):
     random_flip: bool = False
     train_batch_size: int = 16
     num_train_epochs: int = 100
-    max_train_steps: Union[int, type(None)] = 100000 # None
+    max_train_steps: Union[int, type(None)] = 100000  # None
     gradient_accumulation_steps: int = 1
     gradient_checkpointing: bool = False
     learning_rate: float = 1e-4
@@ -109,8 +111,6 @@ class StableDiffusionConfig(GeneratorConfig):
     task_config: Union[TaskConfig, type(None)] = None
 
 
-
-
 class StableDiffusion(InvertibleGenerator, EditCapableGenerator):
     def __init__(self, config, classifier_dataset=None, model_dir=None, device="cpu"):
         super().__init__()
@@ -138,7 +138,7 @@ class StableDiffusion(InvertibleGenerator, EditCapableGenerator):
             self.config.sd_model,
         )
         self.pipeline.to(device)
-        #self.pipeline.run_safety_checker = lambda image, device, dtype: image, False
+        # self.pipeline.run_safety_checker = lambda image, device, dtype: image, False
         self.pipeline.safety_checker = None
         """lora_dir = os.path.join(self.model_dir, "pytorch_lora_weights.safetensors")
         if os.path.exists(lora_dir):
@@ -182,7 +182,7 @@ class StableDiffusion(InvertibleGenerator, EditCapableGenerator):
         """
 
         # TODO why are gradients in ACE scaled???
-        #t = torch.tensor([self.steps - 1] * x.size(0), device=x.device)
+        # t = torch.tensor([self.steps - 1] * x.size(0), device=x.device)
         x0 = torchvision.transforms.Resize([512, 512])(
             torch.clone(x).to(self.device)
         )  # load_512(image_path, *offsets, device)
@@ -195,7 +195,7 @@ class StableDiffusion(InvertibleGenerator, EditCapableGenerator):
             self.pipe,
             w0,
             etas=self.config.eta,
-            prompt=x.shape[0]*[""],
+            prompt=x.shape[0] * [""],
             cfg_scale=self.config.cfg_scale_src,
             prog_bar=True,
             num_inference_steps=self.config.num_diffusion_steps,
@@ -205,11 +205,15 @@ class StableDiffusion(InvertibleGenerator, EditCapableGenerator):
 
     def decode(self, z, t=1.0):
         # TODO test decode function via sampling function
-        from peal.dependencies.ddpm_inversion.prompt_to_prompt.ptp_classes import AttentionStore
+        from peal.dependencies.ddpm_inversion.prompt_to_prompt.ptp_classes import (
+            AttentionStore,
+        )
+
         controller = AttentionStore()
         from peal.dependencies.ddpm_inversion.prompt_to_prompt.ptp_utils import (
             register_attention_control,
         )
+
         register_attention_control(self.pipe, controller)
         wt, zs, wts = z
         w0, _ = inversion_reverse_process(
@@ -221,7 +225,7 @@ class StableDiffusion(InvertibleGenerator, EditCapableGenerator):
             prog_bar=True,
             zs=zs[: (self.config.num_diffusion_steps - self.config.skip)],
             controller=controller,
-            #classifier=classifier_loss,
+            # classifier=classifier_loss,
         )
 
         # vae decode image
@@ -252,11 +256,13 @@ class StableDiffusion(InvertibleGenerator, EditCapableGenerator):
         if not os.path.exists(self.config.base_path):
             Path(self.config.base_path).mkdir(parents=True, exist_ok=True)
 
-        save_yaml_config(self.config, os.path.join(self.config.base_path, "config.yaml"))
+        save_yaml_config(
+            self.config, os.path.join(self.config.base_path, "config.yaml")
+        )
         finetune_args = types.SimpleNamespace(**self.config.__dict__)
         finetune_args.train_dataset = self.train_dataset
         finetune_args.pipeline = self.pipeline
-        finetune_args.resume_from_checkpoint = 'latest'
+        finetune_args.resume_from_checkpoint = "latest"
 
         """train_dataloader = get_dataloader(
             self.train_dataset, mode="train", batch_size=self.config.batch_size
@@ -303,10 +309,10 @@ class StableDiffusion(InvertibleGenerator, EditCapableGenerator):
         )
         if self.generator_dataset.task_config is None:
             self.generator_dataset.task_config = TaskConfig()
-            self.generator_dataset.task_config.y_selection = ['prediction']
+            self.generator_dataset.task_config.y_selection = ["prediction"]
 
         else:
-            self.generator_dataset.task_config.y_selection = ['prediction']
+            self.generator_dataset.task_config.y_selection = ["prediction"]
 
         self.generator_dataset_val.task_config = self.generator_dataset.task_config
         if explainer_config.learn_dataset_embedding:
@@ -314,7 +320,9 @@ class StableDiffusion(InvertibleGenerator, EditCapableGenerator):
                 base_path, "explainer", "context", "context_embedding"
             )
             if not os.path.exists(context_embedding_path):
-                os.makedirs(os.path.join(base_path, "explainer", "context"), exist_ok=True)
+                os.makedirs(
+                    os.path.join(base_path, "explainer", "context"), exist_ok=True
+                )
                 train_context_embedding_args = types.SimpleNamespace(
                     embedding_files=[],
                     output_path=context_embedding_path,
@@ -340,10 +348,16 @@ class StableDiffusion(InvertibleGenerator, EditCapableGenerator):
         # TODO how to extend this for multiclass??
         for class_idx in range(self.generator_dataset.config.output_size[0]):
             class_token_path = os.path.join(
-                base_path, "explainer", "class" + str(class_idx), "class_token" + str(class_idx)
+                base_path,
+                "explainer",
+                "class" + str(class_idx),
+                "class_token" + str(class_idx),
             )
             if not os.path.exists(class_token_path):
-                os.makedirs(os.path.join(base_path, "explainer", "class" + str(class_idx)), exist_ok=True)
+                os.makedirs(
+                    os.path.join(base_path, "explainer", "class" + str(class_idx)),
+                    exist_ok=True,
+                )
                 class_related_bias_embedding_args = types.SimpleNamespace(
                     embedding_files=embedding_files,
                     output_path=class_token_path,
@@ -376,10 +390,16 @@ class StableDiffusion(InvertibleGenerator, EditCapableGenerator):
             self.editor = DDPMInversion(ddpm_inversion_config)
             embedding_files = []
             for class_idx in range(self.generator_dataset.config.output_size[0]):
-                embedding_files.append(os.path.join(base_path, "explainer", "class0", "class_token" + str(class_idx)))
+                embedding_files.append(
+                    os.path.join(
+                        base_path, "explainer", "class0", "class_token" + str(class_idx)
+                    )
+                )
 
             if explainer_config.learn_dataset_embedding:
-                embedding_files = [os.path.join(base_path, "explainer", "context", "context_embedding")] + embedding_files
+                embedding_files = [
+                    os.path.join(base_path, "explainer", "context", "context_embedding")
+                ] + embedding_files
 
             load_tokens_and_embeddings(sd_model=self.editor.pipe, files=embedding_files)
 

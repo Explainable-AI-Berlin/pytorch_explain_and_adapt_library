@@ -1,4 +1,4 @@
-dataset_name            : follicles
+dataset_class           : FollicleDataset
 dataset_path            : $PEAL_DATA/follicles
 num_samples             : 1389
 split                   : []

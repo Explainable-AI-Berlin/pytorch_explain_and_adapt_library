@@ -5,7 +5,13 @@ from peal.teachers.interfaces import TeacherInterface
 
 
 class BaselineTeacher(TeacherInterface):
-    def __init__(self, strategy='random', dataset=None, tracking_level=0, counterfactual_type="1sided"):
+    def __init__(
+        self,
+        strategy="random",
+        dataset=None,
+        tracking_level=0,
+        counterfactual_type="1sided",
+    ):
         self.strategy = strategy
         self.dataset = dataset
         self.tracking_level = tracking_level
@@ -48,15 +54,15 @@ class BaselineTeacher(TeacherInterface):
                 feedback.append("student not swapped!")
 
             else:
-                if self.strategy == 'random':
+                if self.strategy == "random":
                     f = np.random.randint(0, 2)
                     feedback.append("true" if f else "false")
 
-                elif self.strategy == 'false':
-                    feedback.append('false')
+                elif self.strategy == "false":
+                    feedback.append("false")
 
-                elif self.strategy == 'true':
-                    feedback.append('true')
+                elif self.strategy == "true":
+                    feedback.append("true")
 
             teacher_original.append(-1)
             teacher_counterfactual.append(-1)

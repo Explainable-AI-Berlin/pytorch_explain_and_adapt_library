@@ -1,0 +1,12 @@
+adv_training: true
+class_balanced: true
+label_smoothing: 0.1
+learning_rate: 0.001
+max_epochs: 10
+mixup_alpha: 10
+optimizer: adam
+steps_per_epoch: 1000
+test_batch_size: 32
+train_batch_size: 32
+use_mixup: false
+val_batch_size: 4

@@ -353,18 +353,22 @@ def inversion_reverse_process(
                         xt.detach() - beta_prod_t ** (0.5) * pred_noise
                     ) / alpha_prod_t ** (0.5)
                     log_probs = classifier(pred_x0)
-                    grad_classifier = torch.autograd.grad(log_probs.sum(), x_noise, retain_graph=False)[0].detach()
-                    x_noise_adapted = xt.detach() - grad_classifier # * (1 - a_t).sqrt()
+                    grad_classifier = torch.autograd.grad(
+                        log_probs.sum(), x_noise, retain_graph=False
+                    )[0].detach()
+                    x_noise_adapted = (
+                        xt.detach() - grad_classifier
+                    )  # * (1 - a_t).sqrt()
                     cond_out = model.unet.forward(
-                        x_noise_adapted, timestep=t, encoder_hidden_states=text_embeddings
+                        x_noise_adapted,
+                        timestep=t,
+                        encoder_hidden_states=text_embeddings,
                     )
 
             else:
                 cond_out = model.unet.forward(
                     xt, timestep=t, encoder_hidden_states=text_embeddings
                 )
-
-
 
         z = zs[idx] if not zs is None else None
         z = z.expand(batch_size, -1, -1, -1)

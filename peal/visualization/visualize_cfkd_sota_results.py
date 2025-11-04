@@ -71,11 +71,13 @@ def plot_images_with_custom_padding(
 if __name__ == "__main__":
     base_path = os.environ.get("PEAL_RUNS", "peal_runs")
     base_paths = [
-        base_path + "/square1k/colora_confounding_colorb/torchvision/classifier_poisoned098",
-        base_path + "/celeba1k_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned098",
+        base_path
+        + "/square1k/colora_confounding_colorb/torchvision/classifier_poisoned098",
+        base_path
+        + "/celeba1k_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned098",
         base_path + "/celeba1k/Blond_Hair/resnet18_poisoned098",
         base_path + "/follicles_cut/classifier_natural",
-        #base_path + "/camelyon17_1k/classifier_poisoned098",
+        # base_path + "/camelyon17_1k/classifier_poisoned098",
     ]
     methods = [
         "sce_cfkd/0",
@@ -90,8 +92,8 @@ if __name__ == "__main__":
         "Blond to Non-Blond",
         "Growing to Primordial",
         "Primordial to Growing",
-        #"Healthy to Cancer",
-        #"Cancer to Healthy",
+        # "Healthy to Cancer",
+        # "Cancer to Healthy",
     ]
     method_names = [
         "Original",
@@ -126,22 +128,14 @@ if __name__ == "__main__":
                             tracked_values["y_target_start_confidence_list"][sample_idx]
                         )
 
-                    imgs[1 + method_idx][2 * dataset_idx + i] = (
-                        resize(
-                            torch.from_numpy(
-                                tracked_values["x_counterfactual_list"][
-                                    sample_idx
-                                ]
-                            ),
-                            [128, 128],
-                        )
+                    imgs[1 + method_idx][2 * dataset_idx + i] = resize(
+                        torch.from_numpy(
+                            tracked_values["x_counterfactual_list"][sample_idx]
+                        ),
+                        [128, 128],
                     )
-                    target_confidences[1 + method_idx][
-                        2 * dataset_idx + i
-                    ] = float(
-                        tracked_values["y_target_end_confidence_list"][
-                            sample_idx
-                        ]
+                    target_confidences[1 + method_idx][2 * dataset_idx + i] = float(
+                        tracked_values["y_target_end_confidence_list"][sample_idx]
                     )
                     print(tracked_values_path)
 

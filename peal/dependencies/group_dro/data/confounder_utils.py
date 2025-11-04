@@ -17,6 +17,7 @@ from torch.utils.data import Dataset, Subset
 from peal.dependencies.group_dro.data.celebA_dataset import CelebADataset
 from peal.dependencies.group_dro.data.cub_dataset import CUBDataset
 from peal.dependencies.group_dro.data.dro_dataset import DRODataset
+
 # from data.multinli_dataset import MultiNLIDataset
 
 ################
@@ -24,50 +25,56 @@ from peal.dependencies.group_dro.data.dro_dataset import DRODataset
 ################
 
 confounder_settings = {
-    'CelebA':{
-        'constructor': CelebADataset
-    },
-    'CUB':{
-        'constructor': CUBDataset
-    },
-#    'MultiNLI':{
-#        'constructor': MultiNLIDataset
-#    }
+    "CelebA": {"constructor": CelebADataset},
+    "CUB": {"constructor": CUBDataset},
+    #    'MultiNLI':{
+    #        'constructor': MultiNLIDataset
+    #    }
 }
+
 
 ########################
 ### DATA PREPARATION ###
 ########################
 def prepare_confounder_data(
-        root_dir,
-        dataset,
-        target_name,
-        confounder_names,
-        model,
-        augment_data,
-        fraction,
-        train=False,
-        return_full_dataset=False
+    root_dir,
+    dataset,
+    target_name,
+    confounder_names,
+    model,
+    augment_data,
+    fraction,
+    train=False,
+    return_full_dataset=False,
 ):
-    full_dataset = confounder_settings[dataset]['constructor'](
+    full_dataset = confounder_settings[dataset]["constructor"](
         root_dir=root_dir,
         target_name=target_name,
         confounder_names=confounder_names,
         model_type=model,
-        augment_data=augment_data)
+        augment_data=augment_data,
+    )
     if return_full_dataset:
         return DRODataset(
             full_dataset,
             process_item_fn=None,
             n_groups=full_dataset.n_groups,
             n_classes=full_dataset.n_classes,
-            group_str_fn=full_dataset.group_str)
+            group_str_fn=full_dataset.group_str,
+        )
     if train:
-        splits = ['train', 'val', 'test']
+        splits = ["train", "val", "test"]
     else:
-        splits = ['test']
+        splits = ["test"]
     subsets = full_dataset.get_splits(splits, train_frac=fraction)
-    dro_subsets = [DRODataset(subsets[split], process_item_fn=None, n_groups=full_dataset.n_groups,
-                              n_classes=full_dataset.n_classes, group_str_fn=full_dataset.group_str) \
-                   for split in splits]
+    dro_subsets = [
+        DRODataset(
+            subsets[split],
+            process_item_fn=None,
+            n_groups=full_dataset.n_groups,
+            n_classes=full_dataset.n_classes,
+            group_str_fn=full_dataset.group_str,
+        )
+        for split in splits
+    ]
     return dro_subsets

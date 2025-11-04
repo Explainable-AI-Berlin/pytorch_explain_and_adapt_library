@@ -267,9 +267,7 @@ def main(args=None):
         if os.path.exists(args.output_path):
             shutil.move(
                 args.output_path,
-                args.output_path
-                + "_old_"
-                + datetime.now().strftime("%Y%m%d_%H%M%S"),
+                args.output_path + "_old_" + datetime.now().strftime("%Y%m%d_%H%M%S"),
             )
 
         os.makedirs(osp.join(args.output_path, "Results"), exist_ok=True)
@@ -400,10 +398,12 @@ def main(args=None):
     dist_fn = get_dist_fn()
 
     main_args = {
-        "predict": joint_classifier
-        if args.attack_joint
-        and not (args.attack_joint_checkpoint or args.attack_joint_shortcut)
-        else classifier,
+        "predict": (
+            joint_classifier
+            if args.attack_joint
+            and not (args.attack_joint_checkpoint or args.attack_joint_shortcut)
+            else classifier
+        ),
         "loss_fn": args.loss_fn,  # we can implement here a custom loss fn
         "dist_fn": dist_fn,
         "eps": args.attack_epsilon / 255,
@@ -413,7 +413,9 @@ def main(args=None):
         and not isinstance(classifier, SequentialModel),
         "step": args.attack_step / 255,
         "y_target_goal_confidence": args.y_target_goal_confidence,
-        "original_predictor": args.original_classifier if hasattr(args, "original_classifier") else None,
+        "original_predictor": (
+            args.original_classifier if hasattr(args, "original_classifier") else None
+        ),
     }
 
     attack = get_attack(
@@ -443,16 +445,16 @@ def main(args=None):
 
     start_time = time()
     save_imgs = {
-        "pre-explanation": ImageSaver(
-            args.output_path, osp.join(args.exp_name, "pre-explanation")
-        )
-        if args.save_images
-        else None,
-        "explanation": ImageSaver(
-            args.output_path, osp.join(args.exp_name, "explanation")
-        )
-        if args.save_images
-        else None,
+        "pre-explanation": (
+            ImageSaver(args.output_path, osp.join(args.exp_name, "pre-explanation"))
+            if args.save_images
+            else None
+        ),
+        "explanation": (
+            ImageSaver(args.output_path, osp.join(args.exp_name, "explanation"))
+            if args.save_images
+            else None
+        ),
     }
 
     stats = {
@@ -489,26 +491,32 @@ def main(args=None):
             lab, target = lab
             lab = lab.to(
                 dist_util.dev(),
-                dtype=torch.float
-                if args.dataset in BINARYDATASET
-                or isinstance(args.dataset, PealDataset)
-                else torch.long,
+                dtype=(
+                    torch.float
+                    if args.dataset in BINARYDATASET
+                    or isinstance(args.dataset, PealDataset)
+                    else torch.long
+                ),
             )
             target = target.to(
                 dist_util.dev(),
-                dtype=torch.float
-                if args.dataset in BINARYDATASET
-                or isinstance(args.dataset, PealDataset)
-                else torch.long,
+                dtype=(
+                    torch.float
+                    if args.dataset in BINARYDATASET
+                    or isinstance(args.dataset, PealDataset)
+                    else torch.long
+                ),
             )
 
         else:
             lab = lab.to(
                 dist_util.dev(),
-                dtype=torch.float
-                if args.dataset in BINARYDATASET
-                or isinstance(args.dataset, PealDataset)
-                else torch.long,
+                dtype=(
+                    torch.float
+                    if args.dataset in BINARYDATASET
+                    or isinstance(args.dataset, PealDataset)
+                    else torch.long
+                ),
             )
 
             # Initial Classification, no noise included
@@ -560,8 +568,12 @@ def main(args=None):
             inpaint=args.sampling_inpaint,
             dilation=args.sampling_dilation,
             ispeal=isinstance(classifier, SequentialModel),
-            classifier_dataset=args.classifier_dataset if hasattr(args, "classifier_dataset") else None,
-            generator_dataset=args.generator_dataset if hasattr(args, "generator_dataset") else None,
+            classifier_dataset=(
+                args.classifier_dataset if hasattr(args, "classifier_dataset") else None
+            ),
+            generator_dataset=(
+                args.generator_dataset if hasattr(args, "generator_dataset") else None
+            ),
         )
         counterfactuals.append(ce.detach().cpu())
         histories.extend(history)

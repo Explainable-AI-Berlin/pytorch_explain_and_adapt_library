@@ -540,9 +540,9 @@ def mask_opt_fn2(x_tau, x_cf, y, classifier, top_k, use_logits, multiclass=False
                 canvas[..., :-2, 1:-1] += bm[..., 1:-1, 1:-1]
                 canvas = (canvas > 0).float() - bm  # here we take only the borders
                 canvas = canvas.view(mask.size(0), -1).bool()
-                canvas[
-                    changed
-                ] = False  # we remove those that already changed since we don't want any modification
+                canvas[changed] = (
+                    False  # we remove those that already changed since we don't want any modification
+                )
                 # if changed[~changed].size(0) != x_cf.size(0):
                 #     import pdb; pdb.set_trace()
                 mask_grads[~changed.view(-1, 1) & ~canvas] = float("inf")

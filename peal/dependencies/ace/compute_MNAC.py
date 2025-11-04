@@ -10,7 +10,7 @@ from tqdm import tqdm
 from torch.utils import data
 from torchvision import transforms
 
-#from core.attacks_and_models import Normalizer
+# from core.attacks_and_models import Normalizer
 Normalizer = lambda x: x
 
 from .eval_utils.oracle_celeba_metrics import OracleMetrics

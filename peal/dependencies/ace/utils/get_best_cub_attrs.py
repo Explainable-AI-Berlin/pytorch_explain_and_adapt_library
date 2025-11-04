@@ -1,4 +1,4 @@
-if __name__ == '__main__':
+if __name__ == "__main__":
     with open(data_dir + "/attributes/image_attribute_labels.txt", "r") as f:
         attr_data = [l.split(" ") for l in f.readlines()]
 
@@ -6,7 +6,6 @@ if __name__ == '__main__':
     ids = list(dict.fromkeys(ids))
 
     attrs = np.zeros((len(ids), 312), dtype="bool")
-
 
     for attr in attr_data:
         img_id = int(attr[0]) - 1

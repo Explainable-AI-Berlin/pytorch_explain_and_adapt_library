@@ -154,9 +154,7 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         if os.path.exists(self.model_path) and self.config.is_trained:
             print("load ddpm model weights!!!")
             self.model.load_state_dict(torch.load(self.model_path, map_location=device))
-            save_yaml_config(
-                self.config, os.path.join(self.model_dir, "config.yaml")
-            )
+            save_yaml_config(self.config, os.path.join(self.model_dir, "config.yaml"))
 
         else:
             self.model_path = os.path.join(self.model_dir, "final.pt")
@@ -293,13 +291,15 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         indices = list(range(respaced_steps))[::-1]
         x_normalized = self.dataset.project_to_pytorch_default(x)
         pe_normalized = self.dataset.project_to_pytorch_default(pe)
-        mask, dil_mask = generate_smooth_mask(x_normalized, pe_normalized, dilation, max_avg_combination)
+        mask, dil_mask = generate_smooth_mask(
+            x_normalized, pe_normalized, dilation, max_avg_combination
+        )
         """if old_mask is not None:
             dil_mask = dil_mask - inpaint * old_mask.to(dil_mask) * mask_momentum"""
 
         boolmask = (dil_mask < inpaint).float()
         if boolmask_in is not None:
-            added_term = torch.ones_like(boolmask) - boolmask_in[:,0:1].to(boolmask)
+            added_term = torch.ones_like(boolmask) - boolmask_in[:, 0:1].to(boolmask)
             new_candidate = boolmask + added_term
             boolmask = torch.minimum(torch.ones_like(boolmask), new_candidate)
 

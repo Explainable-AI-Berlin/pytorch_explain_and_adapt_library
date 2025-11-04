@@ -55,16 +55,19 @@ def main():
 
     model.eval()
     test_dataloader = create_dataloaders_from_datasource(model_config)[args.partition]
-    correct, group_accuracies, group_distribution, groups, worst_group_accuracy = calculate_test_accuracy(
-        model, test_dataloader, device, True
+    correct, group_accuracies, group_distribution, groups, worst_group_accuracy = (
+        calculate_test_accuracy(model, test_dataloader, device, True)
     )
-    partitions = ['Training', 'Validation', 'Test']
+    partitions = ["Training", "Validation", "Test"]
     print(partitions[args.partition] + " accuracy: " + str(correct))
     print("Group accuracies: " + str(group_accuracies))
     print("Group distribution: " + str(group_distribution))
     print("Samples per Group: " + str(groups))
     print("Worst group accuracy: " + str(worst_group_accuracy))
-    print("Average group accuracy: " + str(float(np.sum(np.array(group_accuracies))) / 4))
+    print(
+        "Average group accuracy: " + str(float(np.sum(np.array(group_accuracies))) / 4)
+    )
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

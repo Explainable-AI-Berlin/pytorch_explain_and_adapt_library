@@ -11,9 +11,11 @@ import yaml
 
 import blobfile as bf
 import torch as th
-#import torch.distributed as dist
+
+# import torch.distributed as dist
 import torchvision.utils
-#from torch.nn.parallel.distributed import DistributedDataParallel as DDP
+
+# from torch.nn.parallel.distributed import DistributedDataParallel as DDP
 from torch.optim import AdamW
 from tqdm import tqdm
 from pathlib import Path
@@ -78,7 +80,7 @@ class TrainLoop:
 
         self.step = 0
         self.resume_step = 0
-        #self.global_batch = self.batch_size * dist.get_world_size()
+        # self.global_batch = self.batch_size * dist.get_world_size()
         self.global_batch = self.batch_size
 
         self.sync_cuda = th.cuda.is_available()
@@ -146,7 +148,7 @@ class TrainLoop:
             print("done")
 
         # TODO what is this doing?
-        #dist_util.sync_params(self.model.parameters())
+        # dist_util.sync_params(self.model.parameters())
 
     def _load_ema_parameters(self, rate):
         ema_params = copy.deepcopy(self.mp_trainer.master_params)
@@ -155,17 +157,17 @@ class TrainLoop:
         ema_checkpoint = find_ema_checkpoint(main_checkpoint, self.resume_step, rate)
         if ema_checkpoint:
             """if dist.get_rank() == 0:
-                print(f"loading EMA from checkpoint: {ema_checkpoint}...")
-                # state_dict = dist_util.load_state_dict(
-                #     ema_checkpoint, map_location=dist_util.dev()
-                # )"""
+            print(f"loading EMA from checkpoint: {ema_checkpoint}...")
+            # state_dict = dist_util.load_state_dict(
+            #     ema_checkpoint, map_location=dist_util.dev()
+            # )"""
             state_dict = load_from_DDP_model(
                 th.load(ema_checkpoint, map_location=dist_util.dev())
             )
             ema_params = self.mp_trainer.state_dict_to_master_params(state_dict)
             print("done")
 
-        #dist_util.sync_params(ema_params)
+        # dist_util.sync_params(ema_params)
         return ema_params
 
     def _load_optimizer_state(self):
@@ -213,7 +215,7 @@ class TrainLoop:
 
             batch, cond = current
             if isinstance(cond, torch.Tensor):
-                #cond = {"y": cond}
+                # cond = {"y": cond}
                 cond = {}
 
             if self.step % self.save_interval == 0:
@@ -221,9 +223,7 @@ class TrainLoop:
                 imgs = self.data.dataloader.dataset.project_to_pytorch_default(
                     self.diffusion.p_sample_loop(self.model, batch.shape)
                 )
-                x = self.data.dataloader.dataset.project_to_pytorch_default(
-                    batch
-                )
+                x = self.data.dataloader.dataset.project_to_pytorch_default(batch)
                 nrow = int(th.sqrt(torch.tensor(x.shape[0])))
                 n_buffer = nrow + x.shape[0] - nrow * nrow
                 buffer = torch.zeros_like(x.cpu())[:n_buffer]
@@ -254,10 +254,15 @@ class TrainLoop:
                     pbar.config, os.path.join(self.model_dir, "config.yaml")
                 )
 
-                th.save(self.model.state_dict(), os.path.join(self.model_dir, f"final.cpl"))
-                print('reload model!')
+                th.save(
+                    self.model.state_dict(), os.path.join(self.model_dir, f"final.cpl")
+                )
+                print("reload model!")
                 self.model.load_state_dict(
-                    torch.load(os.path.join(self.model_dir, f"final.cpl"), map_location=dist_util.dev())
+                    torch.load(
+                        os.path.join(self.model_dir, f"final.cpl"),
+                        map_location=dist_util.dev(),
+                    )
                 )
                 imgs_reloaded = self.data.dataloader.dataset.project_to_pytorch_default(
                     self.diffusion.p_sample_loop(self.model, batch.shape)
@@ -268,7 +273,8 @@ class TrainLoop:
                     os.path.join(
                         copy.deepcopy(self.model_dir),
                         os.path.join(
-                            "outputs", f"reloaded_{(self.step+self.resume_step):06d}.png"
+                            "outputs",
+                            f"reloaded_{(self.step+self.resume_step):06d}.png",
                         ),
                     ),
                     nrow=nrow,
@@ -356,15 +362,10 @@ class TrainLoop:
     def save(self, pbar=None):
         def save_checkpoint(rate, params):
             state_dict = self.mp_trainer.master_params_to_state_dict(params)
-            #if dist.get_rank() == 0:
+            # if dist.get_rank() == 0:
             print(f"saving model {rate}...")
-            filename = os.path.join(
-                f"model", f"{(self.step+self.resume_step):06d}.pt"
-            )
-            if (
-                not pbar is None
-                and pbar.config.current_fid <= pbar.config.best_fid
-            ):
+            filename = os.path.join(f"model", f"{(self.step+self.resume_step):06d}.pt")
+            if not pbar is None and pbar.config.current_fid <= pbar.config.best_fid:
                 pbar.config.best_fid = pbar.config.current_fid
                 with bf.BlobFile(
                     bf.join(copy.deepcopy(self.model_dir), f"final_best_fid.pt"), "wb"
@@ -390,7 +391,7 @@ class TrainLoop:
         for rate, params in zip(self.ema_rate, self.ema_params):
             save_checkpoint(rate, params)
 
-        #if dist.get_rank() == 0:
+        # if dist.get_rank() == 0:
         with bf.BlobFile(
             bf.join(
                 copy.deepcopy(self.model_dir),
@@ -400,7 +401,7 @@ class TrainLoop:
         ) as f:
             th.save(self.opt.state_dict(), f)
 
-        #dist.barrier()
+        # dist.barrier()
 
 
 def parse_resume_step_from_filename(filename):

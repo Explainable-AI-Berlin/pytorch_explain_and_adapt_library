@@ -1,3 +1,4 @@
+dataset_class           : CelebADataset
 dataset_path            : $PEAL_DATA/celeba
 split                   : [1.0,1.0]
 input_type              : image

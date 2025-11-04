@@ -6,8 +6,10 @@ from diffusers.models.attention_processor import Attention
 
 from .edict import EDICT
 
+
 def hasnan(t):
     return torch.any(torch.isnan(t))
+
 
 class DDIMInversion(EDICT):
 
@@ -22,25 +24,27 @@ class DDIMInversion(EDICT):
         eta=0.0,
         generator=None,
         cross_attention_kwargs=None,
-
         decode=True,
         return_pil=True,
-
         # EDICT inputs, useless rn
         p=0.93,
         negative_prompt=None,
         negative_prompt_embeds=None,
         l2=0.0,
     ):
-        assert hasattr(self, 'reverse_scheduler'), 'Pipeline must has "reverse_scheduler" scheduler. Initialize it with pipeline.reverse_scheduler = DDIMInverseScheduler'
+        assert hasattr(
+            self, "reverse_scheduler"
+        ), 'Pipeline must has "reverse_scheduler" scheduler. Initialize it with pipeline.reverse_scheduler = DDIMInverseScheduler'
 
         do_classifier_free_guidance = guidance_scale != 1.0
-        do_negative_guidance = (negative_prompt is not None) or (negative_prompt_embeds is not None)
+        do_negative_guidance = (negative_prompt is not None) or (
+            negative_prompt_embeds is not None
+        )
 
         # Prepare variables
         device = self._execution_device
         # extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta)
-        extra_step_kwargs = {'eta': eta}
+        extra_step_kwargs = {"eta": eta}
 
         # Prepare timesteps
         self.reverse_scheduler.set_timesteps(total_num_inference_steps, device=device)
@@ -60,7 +64,8 @@ class DDIMInversion(EDICT):
         cond, uncond = self.encode_prompt(
             prompt=prompt,
             prompt_embeds=prompt_embeds,
-            do_classifier_free_guidance=do_classifier_free_guidance and not do_negative_guidance,
+            do_classifier_free_guidance=do_classifier_free_guidance
+            and not do_negative_guidance,
         )
 
         if do_negative_guidance and do_classifier_free_guidance:
@@ -72,13 +77,15 @@ class DDIMInversion(EDICT):
 
         feats = {} if (l2 > 0) else None
 
-        for t in timesteps[:num_inference_steps]:  # still need to set this to something intermediate
+        for t in timesteps[
+            :num_inference_steps
+        ]:  # still need to set this to something intermediate
 
             eps = self.unet(
                 xt,
                 t,
                 encoder_hidden_states=cond,
-                cross_attention_kwargs=cross_attention_kwargs
+                cross_attention_kwargs=cross_attention_kwargs,
             ).sample
 
             if do_classifier_free_guidance:
@@ -86,7 +93,7 @@ class DDIMInversion(EDICT):
                     xt,
                     t,
                     encoder_hidden_states=uncond,
-                    cross_attention_kwargs=cross_attention_kwargs
+                    cross_attention_kwargs=cross_attention_kwargs,
                 ).sample
 
                 eps = eps_uncond + guidance_scale * (eps - eps_uncond)
@@ -94,8 +101,10 @@ class DDIMInversion(EDICT):
             xt = self.reverse_scheduler.step(eps, t, xt, eta=eta).prev_sample
 
             if torch.any(torch.isnan(xt)) or torch.any(torch.isnan(yt)):
-                print('Found nan!')
-                import ipdb; ipdb.set_trace()
+                print("Found nan!")
+                import ipdb
+
+                ipdb.set_trace()
 
             if l2 > 0:
                 feats[t.item()] = [xt.detach().cpu(), yt.detach().cpu()]
@@ -106,7 +115,13 @@ class DDIMInversion(EDICT):
             if return_pil:
                 xt_dec = self.numpy_to_pil(xt_dec)
 
-        return xt, xt, x0_dec, xt_dec, feats  # Return cond and uncond embeddings just in case
+        return (
+            xt,
+            xt,
+            x0_dec,
+            xt_dec,
+            feats,
+        )  # Return cond and uncond embeddings just in case
 
     def Denoise(
         self,
@@ -120,27 +135,31 @@ class DDIMInversion(EDICT):
         eta=0.0,
         generator=None,
         cross_attention_kwargs=None,
-
         decode=True,
         return_pil=True,
-
         # EDICT inputs, useless
         p=0.93,
         negative_prompt=None,
         negative_prompt_embeds=None,
         l2=0.0,
-        feats=None
+        feats=None,
     ):
-        assert hasattr(self, 'reverse_scheduler'), 'Pipeline must has "reverse_scheduler" scheduler. Initialize it with pipeline.reverse_scheduler = DDIMInverseScheduler'
-        assert not ((feats is None) and (l2 > 0)), 'If l2 is higher than 0, then feats should be differennt than None'
+        assert hasattr(
+            self, "reverse_scheduler"
+        ), 'Pipeline must has "reverse_scheduler" scheduler. Initialize it with pipeline.reverse_scheduler = DDIMInverseScheduler'
+        assert not (
+            (feats is None) and (l2 > 0)
+        ), "If l2 is higher than 0, then feats should be differennt than None"
 
         do_classifier_free_guidance = guidance_scale != 1.0
-        do_negative_guidance = negative_prompt is not None or negative_prompt_embeds is not None
+        do_negative_guidance = (
+            negative_prompt is not None or negative_prompt_embeds is not None
+        )
 
         # Prepare variables
         device = self._execution_device
         # extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta)
-        extra_step_kwargs = {'eta': eta}
+        extra_step_kwargs = {"eta": eta}
 
         # Prepare timesteps
         self.scheduler.set_timesteps(total_num_inference_steps, device=device)
@@ -150,7 +169,8 @@ class DDIMInversion(EDICT):
         cond, uncond = self.encode_prompt(
             prompt=prompt,
             prompt_embeds=prompt_embeds,
-            do_classifier_free_guidance=do_classifier_free_guidance and not do_negative_guidance,
+            do_classifier_free_guidance=do_classifier_free_guidance
+            and not do_negative_guidance,
         )
 
         if do_negative_guidance and do_classifier_free_guidance:
@@ -166,7 +186,7 @@ class DDIMInversion(EDICT):
                 xt,
                 t,
                 encoder_hidden_states=cond,
-                cross_attention_kwargs=cross_attention_kwargs
+                cross_attention_kwargs=cross_attention_kwargs,
             ).sample
 
             if do_classifier_free_guidance:
@@ -174,10 +194,9 @@ class DDIMInversion(EDICT):
                     yt,
                     t,
                     encoder_hidden_states=uncond,
-                    cross_attention_kwargs=cross_attention_kwargs
+                    cross_attention_kwargs=cross_attention_kwargs,
                 ).sample
                 eps = eps_uncond + guidance_scale * (eps - eps_uncond)
-            
 
             xt = self.scheduler.step(eps, t, xt, eta=eta).prev_sample
 
@@ -201,25 +220,27 @@ class NaiveInversion(EDICT):
         eta=0.0,
         generator=None,
         cross_attention_kwargs=None,
-
         decode=True,
         return_pil=True,
-
         # EDICT inputs, useless rn
         p=0.93,
         negative_prompt=None,
         negative_prompt_embeds=None,
         l2=0.0,
     ):
-        assert hasattr(self, 'reverse_scheduler'), 'Pipeline must has "reverse_scheduler" scheduler. Initialize it with pipeline.reverse_scheduler = DDIMInverseScheduler'
+        assert hasattr(
+            self, "reverse_scheduler"
+        ), 'Pipeline must has "reverse_scheduler" scheduler. Initialize it with pipeline.reverse_scheduler = DDIMInverseScheduler'
 
         do_classifier_free_guidance = guidance_scale != 1.0
-        do_negative_guidance = (negative_prompt is not None) or (negative_prompt_embeds is not None)
+        do_negative_guidance = (negative_prompt is not None) or (
+            negative_prompt_embeds is not None
+        )
 
         # Prepare variables
         device = self._execution_device
         # extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta)
-        extra_step_kwargs = {'eta': eta}
+        extra_step_kwargs = {"eta": eta}
 
         # Prepare timesteps
         self.reverse_scheduler.set_timesteps(total_num_inference_steps, device=device)
@@ -239,7 +260,8 @@ class NaiveInversion(EDICT):
         cond, uncond = self.encode_prompt(
             prompt=prompt,
             prompt_embeds=prompt_embeds,
-            do_classifier_free_guidance=do_classifier_free_guidance and not do_negative_guidance,
+            do_classifier_free_guidance=do_classifier_free_guidance
+            and not do_negative_guidance,
         )
 
         if do_negative_guidance and do_classifier_free_guidance:
@@ -254,9 +276,8 @@ class NaiveInversion(EDICT):
         xt = self.scheduler.add_noise(
             original_samples=xt,
             noise=torch.randn_like(xt),
-            timesteps=torch.ones(xt.size(0),
-                                 dtype=torch.long,
-                                 device=device) * timesteps[num_inference_steps]
+            timesteps=torch.ones(xt.size(0), dtype=torch.long, device=device)
+            * timesteps[num_inference_steps],
         )
 
         xt_dec = None
@@ -265,7 +286,13 @@ class NaiveInversion(EDICT):
             if return_pil:
                 xt_dec = self.numpy_to_pil(xt_dec)
 
-        return xt, xt, x0_dec, xt_dec, feats  # Return cond and uncond embeddings just in case
+        return (
+            xt,
+            xt,
+            x0_dec,
+            xt_dec,
+            feats,
+        )  # Return cond and uncond embeddings just in case
 
     def Denoise(
         self,
@@ -279,27 +306,31 @@ class NaiveInversion(EDICT):
         eta=0.0,
         generator=None,
         cross_attention_kwargs=None,
-
         decode=True,
         return_pil=True,
-
         # EDICT inputs, useless
         p=0.93,
         negative_prompt=None,
         negative_prompt_embeds=None,
         l2=0.0,
-        feats=None
+        feats=None,
     ):
-        assert hasattr(self, 'reverse_scheduler'), 'Pipeline must has "reverse_scheduler" scheduler. Initialize it with pipeline.reverse_scheduler = DDIMInverseScheduler'
-        assert not ((feats is None) and (l2 > 0)), 'If l2 is higher than 0, then feats should be differennt than None'
+        assert hasattr(
+            self, "reverse_scheduler"
+        ), 'Pipeline must has "reverse_scheduler" scheduler. Initialize it with pipeline.reverse_scheduler = DDIMInverseScheduler'
+        assert not (
+            (feats is None) and (l2 > 0)
+        ), "If l2 is higher than 0, then feats should be differennt than None"
 
         do_classifier_free_guidance = guidance_scale != 1.0
-        do_negative_guidance = negative_prompt is not None or negative_prompt_embeds is not None
+        do_negative_guidance = (
+            negative_prompt is not None or negative_prompt_embeds is not None
+        )
 
         # Prepare variables
         device = self._execution_device
         # extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta)
-        extra_step_kwargs = {'eta': eta}
+        extra_step_kwargs = {"eta": eta}
 
         # Prepare timesteps
         self.scheduler.set_timesteps(total_num_inference_steps, device=device)
@@ -309,7 +340,8 @@ class NaiveInversion(EDICT):
         cond, uncond = self.encode_prompt(
             prompt=prompt,
             prompt_embeds=prompt_embeds,
-            do_classifier_free_guidance=do_classifier_free_guidance and not do_negative_guidance,
+            do_classifier_free_guidance=do_classifier_free_guidance
+            and not do_negative_guidance,
         )
 
         if do_negative_guidance and do_classifier_free_guidance:
@@ -325,7 +357,7 @@ class NaiveInversion(EDICT):
                 xt,
                 t,
                 encoder_hidden_states=cond,
-                cross_attention_kwargs=cross_attention_kwargs
+                cross_attention_kwargs=cross_attention_kwargs,
             ).sample
 
             if do_classifier_free_guidance:
@@ -333,10 +365,9 @@ class NaiveInversion(EDICT):
                     yt,
                     t,
                     encoder_hidden_states=uncond,
-                    cross_attention_kwargs=cross_attention_kwargs
+                    cross_attention_kwargs=cross_attention_kwargs,
                 ).sample
                 eps = eps_uncond + guidance_scale * (eps - eps_uncond)
-            
 
             xt = self.scheduler.step(eps, t, xt, eta=eta).prev_sample
 

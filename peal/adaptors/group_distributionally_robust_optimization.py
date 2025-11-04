@@ -1,5 +1,4 @@
-"""
-"""
+""" """
 
 import copy
 from datetime import datetime
@@ -22,7 +21,7 @@ from tqdm import tqdm
 from pydantic import BaseModel, PositiveInt
 from typing import Union
 
-#from group_DRO.train import train
+# from group_DRO.train import train
 from peal.data.dataset_factory import get_datasets
 from peal.data.interfaces import DataConfig
 from peal.data.datasets import Image2MixedDataset, Image2ClassDataset
@@ -64,10 +63,10 @@ from torch.utils.data.sampler import WeightedRandomSampler
 
 
 dro_criterions = {
-    "ce": nn.CrossEntropyLoss(reduction='none'),
-    "bce": nn.BCEWithLogitsLoss(reduction='none'),
-    "mse": nn.MSELoss(reduction='none'),
-    "mae": nn.MSELoss(reduction='none'),
+    "ce": nn.CrossEntropyLoss(reduction="none"),
+    "bce": nn.BCEWithLogitsLoss(reduction="none"),
+    "mse": nn.MSELoss(reduction="none"),
+    "mae": nn.MSELoss(reduction="none"),
 }
 
 
@@ -131,7 +130,7 @@ class GroupDROConfig(AdaptorConfig):
 
 
 class GroupDRO(Adaptor):
-    """ GroupDRO Adaptor """
+    """GroupDRO Adaptor"""
 
     def __init__(
         self,
@@ -169,7 +168,6 @@ class GroupDRO(Adaptor):
         else:
             self.model_path = model_path
 
-
         # TODO: Check for unsupported parameters in configs
         # config.training.class_balanced
         # config.training.adv_training
@@ -197,13 +195,14 @@ class GroupDRO(Adaptor):
         if self.adaptor_config.replication_dataset is None:
             self._load_PEAL_dataset(datasource)
         elif self.adaptor_config.replication_dataset in ["celeba", "waterbirds"]:
-            print("Loading replication dataset", self.adaptor_config.replication_dataset)
+            print(
+                "Loading replication dataset", self.adaptor_config.replication_dataset
+            )
             self._load_replication_dataset(self.adaptor_config.replication_dataset)
         else:
             raise NotImplementedError(
                 f"Dataset {self.adaptor_config.replication_dataset} not implemented. Only celebA and waterbirds are implemented."
             )
-
 
         #########################################################
         # Initialize model
@@ -215,20 +214,21 @@ class GroupDRO(Adaptor):
                 and not self.data_config.input_type == "image"
             ):
                 input_channels = len(self.task_config.x_selection)
-            elif not(self.adaptor_config.replication_dataset is None):
+            elif not (self.adaptor_config.replication_dataset is None):
                 input_channels = 3
             else:
                 input_channels = self.data_config.input_size[0]
 
             if not self.task_config.output_channels is None:
                 output_channels = self.task_config.output_channels
-            elif not(self.adaptor_config.replication_dataset is None):
+            elif not (self.adaptor_config.replication_dataset is None):
                 output_channels = 2
             else:
                 output_channels = self.data_config.output_size[0]
 
-            if (isinstance(self.architecture_config, ArchitectureConfig)
-                    and not(self.adaptor_config.replication_dataset is None)):
+            if isinstance(self.architecture_config, ArchitectureConfig) and not (
+                self.adaptor_config.replication_dataset is None
+            ):
                 self.model = SequentialModel(
                     self.architecture_config,
                     input_channels,
@@ -260,7 +260,7 @@ class GroupDRO(Adaptor):
             if k in dro_criterions.keys() and not objective_found:
                 self.objective = dro_criterions[k]
                 objective_found = True
-            elif k not in ['l2']:
+            elif k not in ["l2"]:
                 if objective_found:
                     raise Exception(
                         f"Multiple objectives found. Only one (non l2) objective is allowed. Found: {self.task_config.criterions.keys()}"
@@ -269,7 +269,6 @@ class GroupDRO(Adaptor):
                     raise Exception(
                         f"Criterion {k} not supported. Supported criteria are: {dro_criterions.keys()}"
                     )
-
 
     def run(self, continue_training=False, is_initialized=False):
 
@@ -282,24 +281,26 @@ class GroupDRO(Adaptor):
 
         # Move previous run directory if it exists
         if not is_initialized and os.path.exists(self.model_path):
-                shutil.move(
-                    self.model_path,
-                    self.model_path + "_old_" + datetime.now().strftime("%Y%m%d_%H%M%S")
-                )
+            shutil.move(
+                self.model_path,
+                self.model_path + "_old_" + datetime.now().strftime("%Y%m%d_%H%M%S"),
+            )
 
         # Create directories where model history will be located
         os.makedirs(os.path.join(self.model_path, "checkpoints"))
 
         # Log config file
-        save_yaml_config(self.adaptor_config, os.path.join(self.model_path, "config.yaml"))
+        save_yaml_config(
+            self.adaptor_config, os.path.join(self.model_path, "config.yaml")
+        )
 
         # Set generalization adjustment
         if self.adaptor_config.replication_dataset is None:
-            n_groups = 2 ** self.train_dataloader.dataset.output_size
+            n_groups = 2**self.train_dataloader.dataset.output_size
         else:
             n_groups = self.train_dataloader.dataset.n_groups
         adjustments = self.adaptor_config.generalization_adjustment
-        if (type(adjustments) in [float, int]):
+        if type(adjustments) in [float, int]:
             adjustments = [adjustments]
         if len(adjustments) == 1:
             adjustments = np.array(adjustments * n_groups)
@@ -335,7 +336,7 @@ class GroupDRO(Adaptor):
             filter(lambda p: p.requires_grad, self.model.parameters()),
             lr=self.training_config.learning_rate,
             momentum=0.9,
-            weight_decay=self.task_config.criterions['l2']
+            weight_decay=self.task_config.criterions["l2"],
         )
 
         # Instantiate scheduler
@@ -343,23 +344,23 @@ class GroupDRO(Adaptor):
         if self.adaptor_config.scheduler:
             scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
                 optimizer,
-                'min',
+                "min",
                 factor=0.1,
                 patience=5,
                 threshold=0.0001,
                 min_lr=0,
-                eps=1e-08)
+                eps=1e-08,
+            )
         else:
             scheduler = None
 
         # Instantiate progress bar
         pbar = tqdm(
-            total = self.training_config.max_epochs
+            total=self.training_config.max_epochs
             * (len(self.train_dataloader) + len(self.val_dataloaders)),
-            ncols=80
+            ncols=80,
         )
         pbar.stored_values = {}
-
 
         val_accuracy_max = 0.0
         # TODO: Set range argument to self.training_config.epochs (or similar)
@@ -376,7 +377,8 @@ class GroupDRO(Adaptor):
                 self.train_dataloader,
                 train_loss_computer,
                 is_training=True,
-                pbar=pbar)
+                pbar=pbar,
+            )
 
             gc.collect()
 
@@ -397,7 +399,8 @@ class GroupDRO(Adaptor):
                 self.val_dataloaders,
                 val_loss_computer,
                 is_training=False,
-                pbar=pbar)
+                pbar=pbar,
+            )
 
             # self.log_memory_usage(pbar)
             gc.collect()
@@ -407,7 +410,7 @@ class GroupDRO(Adaptor):
             # TODO: Save model in checkpoints
             torch.save(
                 self.model.state_dict(),
-                os.path.join(self.model_path, "checkpoints", f"{epoch}.cpl")
+                os.path.join(self.model_path, "checkpoints", f"{epoch}.cpl"),
             )
 
             val_accuracy = val_loss_computer.avg_acc
@@ -417,14 +420,14 @@ class GroupDRO(Adaptor):
                 # Save the model
                 torch.save(
                     self.model.state_dict(),
-                    os.path.join(self.model_path, "checkpoints", "final.cpl")
+                    os.path.join(self.model_path, "checkpoints", "final.cpl"),
                 )
 
             # TODO: Implement automatic adjustment
 
-
-
-    def run_epoch(self, epoch, model, optimizer, loader, loss_computer, is_training, pbar=None):
+    def run_epoch(
+        self, epoch, model, optimizer, loader, loss_computer, is_training, pbar=None
+    ):
 
         if is_training:
             model.train()
@@ -439,7 +442,7 @@ class GroupDRO(Adaptor):
                 conf = None
                 if self.adaptor_config.replication_dataset is None:
                     x, y = batch
-                    y, conf = y # Group is included in the label, need to separate
+                    y, conf = y  # Group is included in the label, need to separate
                     group = y * loader.dataset.output_size + conf
                 else:
                     x, y, group = batch
@@ -450,7 +453,7 @@ class GroupDRO(Adaptor):
 
                 outputs = model(x)
 
-                loss_main = loss_computer.loss(outputs, y , group, is_training)
+                loss_main = loss_computer.loss(outputs, y, group, is_training)
 
                 if is_training:
                     optimizer.zero_grad()
@@ -466,7 +469,12 @@ class GroupDRO(Adaptor):
                 del x, y, group, conf, batch
 
         # Output state of the epoch to the terminal
-        current_state = "Model Training: " + ("train" if is_training else "val") + "_it:" + str(batch_idx)
+        current_state = (
+            "Model Training: "
+            + ("train" if is_training else "val")
+            + "_it:"
+            + str(batch_idx)
+        )
         current_state += ", loss:" + f"{loss_computer.avg_actual_loss.item():.8f}"
         current_state += ", acc:" + f"{loss_computer.avg_acc.item():.8f}"
         current_state += ", "
@@ -495,15 +503,13 @@ class GroupDRO(Adaptor):
             pbar.write(to_out)
     """
 
-
     def _load_PEAL_dataset(self, datasource=None):
         if datasource is None:
             datasource = self.data_config.dataset_path
 
         if isinstance(datasource, str):
             dataset_train, dataset_val, dataset_test = get_datasets(
-                config=self.data_config,
-                base_dir=datasource
+                config=self.data_config, base_dir=datasource
             )
         elif isinstance(datasource[0], torch.utils.data.Dataset):
             if len(datasource) == 2:
@@ -525,7 +531,7 @@ class GroupDRO(Adaptor):
         if self.adaptor_config.reweight_groups:
             group_array = []
             # TODO: This n_groups calculation seems dubious
-            n_groups = 2 ** dataset_train.output_size
+            n_groups = 2**dataset_train.output_size
 
             for x, y in dataset_train:
                 y, confounder = y
@@ -533,34 +539,38 @@ class GroupDRO(Adaptor):
                 group_array.append(group_idx)
 
             _group_array = torch.LongTensor([g.item() for g in group_array])
-            _group_counts = (torch.arange(n_groups).unsqueeze(1) == _group_array).sum(1).float()
+            _group_counts = (
+                (torch.arange(n_groups).unsqueeze(1) == _group_array).sum(1).float()
+            )
 
             group_weights = len(dataset_train) / _group_counts
             weights = group_weights[_group_array]
 
             shuffle = False
-            sampler = WeightedRandomSampler(weights, len(dataset_train), replacement=True)
+            sampler = WeightedRandomSampler(
+                weights, len(dataset_train), replacement=True
+            )
 
         self.train_dataloader = DataLoader(
             dataset_train,
             shuffle=shuffle,
             sampler=sampler,
             batch_size=self.training_config.train_batch_size,
-            num_workers=0
+            num_workers=0,
         )
 
         self.val_dataloaders = DataLoader(
             dataset_val,
             shuffle=False,
             batch_size=self.training_config.val_batch_size,
-            num_workers=0
+            num_workers=0,
         )
 
         self.test_dataloader = DataLoader(
             dataset_test,
             shuffle=False,
             batch_size=self.training_config.test_batch_size,
-            num_workers=0
+            num_workers=0,
         )
 
     def _load_replication_dataset(self, replication_dataset):
@@ -580,14 +590,18 @@ class GroupDRO(Adaptor):
         if self.predictor_config.architecture.startswith("torchvision_"):
             model = self.predictor_config.architecture[12:]
         else:
-            raise ValueError(f"Architecture {self.predictor_config.architecture} not supported. "
-                             + "Supported architectures are: torchvision_wideresnet50, torchvision_resnet50 "
-                             + "and torchvision_vision34.")
+            raise ValueError(
+                f"Architecture {self.predictor_config.architecture} not supported. "
+                + "Supported architectures are: torchvision_wideresnet50, torchvision_resnet50 "
+                + "and torchvision_vision34."
+            )
 
-        if model not in ['wideresnet50', 'resnet50', 'resnet34']:
-            raise ValueError(f"Architecture {self.predictor_config.architecture} not supported. "
-                             + "Supported architectures are: torchvision_wideresnet50, torchvision_resnet50 "
-                             + "and torchvision_vision34.")
+        if model not in ["wideresnet50", "resnet50", "resnet34"]:
+            raise ValueError(
+                f"Architecture {self.predictor_config.architecture} not supported. "
+                + "Supported architectures are: torchvision_wideresnet50, torchvision_resnet50 "
+                + "and torchvision_vision34."
+            )
 
         train_data, val_data, test_data = prepare_data(
             root_dir=peal_data,
@@ -597,25 +611,25 @@ class GroupDRO(Adaptor):
             model=model,
             augment_data=False,
             fraction=1.0,
-            shift_type='confounder',
-            train=True
+            shift_type="confounder",
+            train=True,
         )
 
         self.train_dataloader = train_data.get_loader(
             train=True,
             reweight_groups=self.adaptor_config.reweight_groups,
             batch_size=self.training_config.train_batch_size,
-            num_workers=0
+            num_workers=0,
         )
         self.val_dataloaders = val_data.get_loader(
             train=False,
             reweight_groups=None,
             batch_size=self.training_config.val_batch_size,
-            num_workers=0
+            num_workers=0,
         )
         self.test_dataloader = test_data.get_loader(
             train=False,
             reweight_groups=None,
             batch_size=self.training_config.test_batch_size,
-            num_workers=0
+            num_workers=0,
         )

@@ -1,0 +1,7 @@
+dataset_path            : $PEAL_DATA/isic2019
+input_type              : image
+input_size              : [3, 128, 128]
+output_type             : multiclass
+output_size             : [40]
+downsize                : Resize
+delimiter               : ","

@@ -38,9 +38,9 @@ class SimSiam(nn.Module):
             self.encoder.fc,
             nn.BatchNorm1d(dim, affine=False),
         )  # output layer
-        self.encoder.fc[
-            6
-        ].bias.requires_grad = False  # hack: not use bias as it is followed by BN
+        self.encoder.fc[6].bias.requires_grad = (
+            False  # hack: not use bias as it is followed by BN
+        )
 
         # build a 2-layer predictor
         self.predictor = nn.Sequential(

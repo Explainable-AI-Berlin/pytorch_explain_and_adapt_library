@@ -6,6 +6,8 @@ from typing import Tuple
 from peal.explainers.interfaces import ExplainerConfig
 
 from pydantic import BaseModel
+
+
 class GeneratorConfig(BaseModel):
     """
     This class defines the config of a generator.
@@ -18,7 +20,7 @@ class GeneratorConfig(BaseModel):
     """
     The category of the config
     """
-    category: str = 'generator'
+    category: str = "generator"
     """
     The batch size of the generator.
     """
@@ -26,8 +28,9 @@ class GeneratorConfig(BaseModel):
     """
     The name of the class.
     """
-    current_fid: float = float('inf')
+    current_fid: float = float("inf")
     seed: int = 0
+
 
 class Generator(nn.Module):
     def sample_x(self, batch_size=1):
@@ -112,18 +115,22 @@ class InvertibleGenerator(Generator):
 class EditCapableGenerator(Generator):
     def edit(
         self,
-            x_in: torch.Tensor,
-            target_confidence_goal: float,
-            source_classes: torch.Tensor,
-            target_classes: torch.Tensor,
-            predictor: nn.Module,
-            explainer_config: ExplainerConfig,
-            predictor_datasets: list,
-            pbar: object = None,
-            mode: object = "",
-            base_path: object = "",
+        x_in: torch.Tensor,
+        target_confidence_goal: float,
+        source_classes: torch.Tensor,
+        target_classes: torch.Tensor,
+        predictor: nn.Module,
+        explainer_config: ExplainerConfig,
+        predictor_datasets: list,
+        pbar: object = None,
+        mode: object = "",
+        base_path: object = "",
     ) -> Tuple[
-        list[torch.Tensor], list[torch.Tensor], list[torch.Tensor], list[torch.Tensor], list[torch.Tensor]
+        list[torch.Tensor],
+        list[torch.Tensor],
+        list[torch.Tensor],
+        list[torch.Tensor],
+        list[torch.Tensor],
     ]:
         """
         This function edits the input to match the target confidence goal and target classes

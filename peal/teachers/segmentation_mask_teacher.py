@@ -4,7 +4,13 @@ from peal.teachers.interfaces import TeacherInterface
 
 
 class SegmentationMaskTeacher(TeacherInterface):
-    def __init__(self, attribution_threshold, dataset, counterfactual_type = '1sided', tracking_level=0):
+    def __init__(
+        self,
+        attribution_threshold,
+        dataset,
+        counterfactual_type="1sided",
+        tracking_level=0,
+    ):
         self.attribution_threshold = attribution_threshold
         self.dataset = dataset
         self.counterfactual_type = counterfactual_type

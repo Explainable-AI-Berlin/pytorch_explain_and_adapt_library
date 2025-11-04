@@ -1,0 +1,12 @@
+# python train_predictor.py --config "<PEAL_BASE>/configs/sce_experiments/predictors/isic2019_MEL_classifier.yaml"
+model_path        : $PEAL_RUNS/isic2019/MEL/classifier_natural
+data              : <PEAL_BASE>/configs/sce_experiments/data/isic2019.yaml
+training          : <PEAL_BASE>/configs/sce_experiments/training/img_classifier_balanced.yaml
+architecture      : torchvision_resnet18
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [MEL]

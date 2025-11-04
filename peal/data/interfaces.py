@@ -268,4 +268,4 @@ class DataConfig(BaseModel):
     diffusion_augmented: bool = False
     sampling_time_fraction: float = 0.3
     num_discretization_steps: int = 20
-    batch_wise_augmentation : bool = True
+    batch_wise_augmentation: bool = True

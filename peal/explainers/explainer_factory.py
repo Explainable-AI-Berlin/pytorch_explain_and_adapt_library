@@ -37,7 +37,7 @@ def get_explainer(
     """
     if not isinstance(explainer, ExplainerInterface):
         explainer_config = load_yaml_config(explainer)
-        if explainer_config.explainer_type in ['PDC', "ACE", "TIME"]:
+        if explainer_config.explainer_type in ["PDC", "ACE", "TIME"]:
             explainer_out = CounterfactualExplainer(
                 explainer_config=explainer_config,
                 datasets=predictor_datasets,

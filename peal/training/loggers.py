@@ -177,9 +177,9 @@ class Logger:
             )
             if not pbar is None:
                 pbar.stored_values[mode + "_accuracy"] = accuracy
-                pbar.stored_values[
-                    mode + "_predicted_classes"
-                ] = predictions_one_hot.mean(0).cpu()[:2]
+                pbar.stored_values[mode + "_predicted_classes"] = (
+                    predictions_one_hot.mean(0).cpu()[:2]
+                )
                 pbar.stored_values[mode + "_targets"] = targets_one_hot.mean(0).cpu()[
                     :2
                 ]
@@ -308,10 +308,14 @@ def log_images_to_writer(dataloader, writer, tag="train"):
 
         if hasattr(dataloader.dataset, "diffusion_augmentation"):
             # Apply diffusion augmentation if available
-            sample_train_imgs_augmented = dataloader.dataset.diffusion_augmentation(sample_train_imgs)
+            sample_train_imgs_augmented = dataloader.dataset.diffusion_augmentation(
+                sample_train_imgs
+            )
             if hasattr(dataloader.dataset, "project_to_pytorch_default"):
-                sample_train_imgs_augmented = dataloader.dataset.project_to_pytorch_default(
-                    sample_train_imgs_augmented
+                sample_train_imgs_augmented = (
+                    dataloader.dataset.project_to_pytorch_default(
+                        sample_train_imgs_augmented
+                    )
                 )
 
         if hasattr(dataloader.dataset, "project_to_pytorch_default"):
