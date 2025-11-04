@@ -901,6 +901,9 @@ def distill_predictor(
     predictor_datasource,
     replace_with_activation=None,
     tracking_level=4,
+    predictor_distilled=None,
+    only_last_layer=False,
+    continue_training=False,
 ):
     predictor_distillation = load_yaml_config(
         predictor_distillation,
@@ -954,24 +957,26 @@ def distill_predictor(
             "Either distill from dataset or use available dataset type for relabeling"
         )
 
-    if isinstance(predictor, torch.nn.Module):
-        predictor_distilled = copy.deepcopy(predictor)
+    if predictor_distilled is None:
+        if isinstance(predictor, torch.nn.Module):
+            predictor_distilled = copy.deepcopy(predictor)
 
-    else:
-        # TODO how can I determine that there are no gradients anymore?
-        predictor_distilled = get_predictor(predictor_distillation)
+        else:
+            # TODO how can I determine that there are no gradients anymore?
+            predictor_distilled = get_predictor(predictor_distillation)
 
-    if replace_with_activation == "leakysoftplus":
-        predictor_distilled = replace_relu_with_leakysoftplus(predictor_distilled)
+        if replace_with_activation == "leakysoftplus":
+            predictor_distilled = replace_relu_with_leakysoftplus(predictor_distilled)
 
-    elif replace_with_activation == "leakyrelu":
-        predictor_distilled = replace_relu_with_leakyrelu(predictor_distilled)
+        elif replace_with_activation == "leakyrelu":
+            predictor_distilled = replace_relu_with_leakyrelu(predictor_distilled)
 
     distillation_trainer = ModelTrainer(
         config=predictor_distillation,
         model=predictor_distilled,
         datasource=distillation_datasource,
         model_path=os.path.join(base_path, "distilled_predictor"),
+        only_last_layer=only_last_layer,
     )
-    distillation_trainer.fit()
+    distillation_trainer.fit(continue_training=continue_training)
     return predictor_distilled

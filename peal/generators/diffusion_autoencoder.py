@@ -1,46 +1,21 @@
 import os
 import types
-import shutil
 import copy
-from pathlib import Path
-
 import torch
-import io
-import blobfile as bf
-import torchvision
-from diffusers import StableDiffusionPipeline
 
-from mpi4py import MPI
+from pathlib import Path
 from torch import nn
-from PIL import Image
-from torch.utils.tensorboard import SummaryWriter
-from torchvision.transforms import ToTensor
-from transformers import AutoModel, AutoImageProcessor
-
-from peal.dependencies.ddpm_inversion.ddm_inversion.inversion_utils import inversion_forward_process, \
-    inversion_reverse_process
-from peal.dependencies.diffusion_regression_counterfactuals.src.related_work.diffae.experiment import LitModel
-from peal.dependencies.diffusion_regression_counterfactuals.src.related_work.diffae.templates import square64_autoenc
-from peal.editors.ddpm_inversion import DDPMInversionConfig
-from peal.data.dataloaders import get_dataloader
-from peal.data.dataset_factory import get_datasets
-from peal.data.datasets import Image2MixedDataset
-from peal.dependencies.ddpm_inversion.ddpm_inversion import DDPMInversion
-from peal.dependencies.lora.train_text_to_image_lora import lora_finetune
-from peal.dependencies.time.core.utils import load_tokens_and_embeddings
-from peal.generators.interfaces import EditCapableGenerator, InvertibleGenerator
-from peal.global_utils import load_yaml_config, embed_numberstring, save_yaml_config
-from peal.dependencies.time.generate_ce import (
-    generate_time_counterfactuals,
-)
-from peal.dependencies.time.get_predictions import get_predictions
-from peal.dependencies.time.training import textual_inversion_training
-
 from typing import Union
 
+from peal.dependencies.diffusion_regression_counterfactuals.src.related_work.diffae.experiment import LitModel
+from peal.dependencies.diffusion_regression_counterfactuals.src.related_work.diffae.templates import square64_autoenc
+from peal.data.dataset_factory import get_datasets
+from peal.generators.interfaces import EditCapableGenerator, InvertibleGenerator
+from peal.global_utils import load_yaml_config, save_yaml_config
 from peal.generators.interfaces import GeneratorConfig
 from peal.data.interfaces import DataConfig
 from peal.architectures.interfaces import TaskConfig
+from peal.training.trainers import distill_predictor
 
 
 class DiffusionAutoencoderConfig(GeneratorConfig):
@@ -52,65 +27,8 @@ class DiffusionAutoencoderConfig(GeneratorConfig):
     """
     The type of generator that shall be used.
     """
-    generator_type: str = "StableDiffusion"
-    base_path: str = "/home/space/datasets/peal/peal_runs/stable_diffusion"
-    #full_args: Union[None, dict] = None
-    """
-    The config of the data.
-    """
-    data: DataConfig = DataConfig()
-    sd_model: str = "CompVis/stable-diffusion-v1-4"
-    #
-    revision: Union[str, type(None)] = None
-    variant: Union[str, type(None)] = None
-    dataset_name: Union[str, type(None)] = None
-    dataset_config_name: Union[str, type(None)] = None
-    train_data_dir: Union[str, type(None)] = None
-    image_column: Union[str, type(None)] = "image"
-    caption_column: Union[str, type(None)] = "text"
-    validation_prompt: Union[str, type(None)] = None
-    num_validation_images: int = 4
-    validation_epochs: int = 1
-    max_train_samples: Union[int, type(None)] = None
-    cache_dir: Union[str, type(None)] = None
-    resolution: int = 512
-    center_crop: bool = False
-    random_flip: bool = False
-    train_batch_size: int = 16
-    num_train_epochs: int = 100
-    max_train_steps: Union[int, type(None)] = 100000 # None
-    gradient_accumulation_steps: int = 1
-    gradient_checkpointing: bool = False
-    learning_rate: float = 1e-4
-    scale_lr: bool = False
-    lr_scheduler: str = "constant"
-    lr_warmup_steps: int = 500
-    snr_gamma: Union[float, type(None)] = None
-    use_8bit_adam: bool = False
-    allow_tf32: bool = False
-    dataloader_num_workers: int = 0
-    adam_beta1: float = 0.9
-    adam_beta2: float = 0.999
-    adam_weight_decay: float = 1e-2
-    adam_epsilon: float = 1e-08
-    max_grad_norm: float = 1.0
-    push_to_hub: bool = False
-    hub_token: Union[str, type(None)] = None
-    prediction_type: Union[str, type(None)] = None
-    hub_model_id: Union[str, type(None)] = None
-    logging_dir: Union[str, type(None)] = "logs"
-    mixed_precision: Union[str, type(None)] = None
-    report_to: Union[str, type(None)] = "tensorboard"
-    local_rank: int = 1
-    checkpointing_steps: int = 500
-    checkpoints_total_limit: Union[int, type(None)] = None
-    resume_from_checkpoint: Union[str, type(None)] = None
-    enable_xformers_memory_efficient_attention: bool = False
-    noise_offset: float = 0.0
-    rank: int = 10
-    task_config: Union[TaskConfig, type(None)] = None
-    encoder : str = "facebook/dinov2-small"
-    use_lora: bool = False
+    generator_type: str = "DiffusionAutoencoder"
+    base_path: str = "/home/space/datasets/peal/peal_runs/diffusion_autoencoder"
 
 
 class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
@@ -145,37 +63,22 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         else:
             self.model = LitModel(conf)
 
-        if self.config.encoder[:len("facebook/dinov2")] == "facebook/dinov2":
-            sem_encoder = AutoModel.from_pretrained(self.config.encoder).to("cuda")
-            sem_encoder_processor = AutoImageProcessor.from_pretrained(self.config.encoder)
-            cs = sem_encoder_processor.crop_size
-            def img_semantic_encoder(x):
-                x_resized = torchvision.transforms.Resize([cs['height'],cs['width']])(x)
-                def pv(v):
-                    v = torch.tensor(v).to(x_resized)[:, None, None]
-                    return torch.tile(v, [1, cs['height'],cs['width']])
-
-                x_processed = (x_resized - pv(sem_encoder_processor.image_mean)) / pv(sem_encoder_processor.image_std)
-                latent_code = sem_encoder(x_processed.to(('cuda')))['last_hidden_state'][:,0]
-
-                return latent_code
-
-            self.img_semantic_encoder = img_semantic_encoder
-
-    def sample_x(self, batch_size=1):
-        images = self.pipeline(batch_size * [""]).images
-        images_torch = torch.stack([ToTensor()(image) for image in images])
-        return images_torch
+    def sample_z(self, batch_size=1):
+        # TODO this has to be done properly!!!
+        z_sem = torch.randn(batch_size, 4, 8, 8)
+        xT = torch.randn(batch_size, 3, 64, 64)
+        return z_sem, xT
 
     def encode(self, x, t=1.0):
-        z = None
-        # TODO implement encoding properly
-        return z
+        z_sem: torch.Tensor = self.model.encode(x)
+        # TODO why is t not used here???
+        xT: torch.Tensor = self.model.encode_stochastic(x, z_sem)
+        return z_sem, xT
 
     def decode(self, z, t=1.0):
-        x = None
-        # TODO implement decoding properly
-        return x
+        z_sem, xT = z
+        # return self.model.render(xT, z_sem, T=self.backward_t, grads=True)
+        return self.model.render(xT, z_sem, T=t, grads=True)
 
     def train_model(
         self,
@@ -188,7 +91,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         finetune_args = types.SimpleNamespace(**self.config.__dict__)
         finetune_args.train_dataset = self.train_dataset
         finetune_args.pipeline = self.pipeline
-        finetune_args.resume_from_checkpoint = 'latest'
+        finetune_args.resume_from_checkpoint = "latest"
         finetune_args.img_semantic_encoder = self.img_semantic_encoder
         # TODO add actual training here
 
@@ -198,25 +101,42 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         target_confidence_goal: float,
         source_classes: torch.Tensor,
         target_classes: torch.Tensor,
-        classifier: nn.Module,
-        explainer_config,
-        predictor_dataset,
+        predictor: nn.Module,
+        explainer_config: dict,
+        predictor_datasets: list,
         pbar=None,
-        mode="",
-        base_path="",
+        base_path: str = "",
+        mode: str = "",
     ):
-        if self.generator_dataset is None:
-            self.initialize(classifier, base_path, explainer_config)
+        if not explainer_config.distilled_predictor is None:
+            distilled_path = os.path.join(base_path, "explainer", "distilled_predictor", "model.cpl")
+            if not os.path.exists(distilled_path):
+                self.gradient_predictor = distill_predictor(
+                    explainer_config.distilled_predictor,
+                    base_path,
+                    predictor,
+                    predictor_datasets,
+                    predictor_distilled=nn.Sequential(
+                        [
+                            self.model.encoder,
+                            nn.Linear(self.model.encoder.output_dimensions, self.predictor_dataset.output_size),
+                        ]
+                    ),  # TODO fix this!
+                    only_last_layer=True,
+                    continue_training=True,
+                )
 
-        classifier_to_generator = (
-            lambda x: self.generator_dataset.project_from_pytorch_default(
-                self.predictor_dataset.project_to_pytorch_default(x)
-            )
+            else:
+                self.gradient_predictor = torch.load(distilled_path, map_location=self.device)
+
+        else:
+            self.gradient_predictor = predictor
+
+        classifier_to_generator = lambda x: self.generator_dataset.project_from_pytorch_default(
+            self.predictor_dataset.project_to_pytorch_default(x)
         )
-        generator_to_classifier = (
-            lambda x: self.predictor_dataset.project_from_pytorch_default(
-                self.generator_dataset.project_to_pytorch_default(x)
-            )
+        generator_to_classifier = lambda x: self.predictor_dataset.project_from_pytorch_default(
+            self.generator_dataset.project_to_pytorch_default(x)
         )
         dataset = [
             (
@@ -229,35 +149,15 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         print([x_in.min(), x_in.max()])
         print([x_in.min(), x_in.max()])
         print([x_in.min(), x_in.max()])
-        ce_generation_args = types.SimpleNamespace(
-            embedding_files=[
-                os.path.join(base_path, "explainer", "context_embedding"),
-                os.path.join(base_path, "explainer", "class_token0"),
-                os.path.join(base_path, "explainer", "class_token1"),
-            ],
-            postprocess=lambda x, size: self.generator_dataset.project_to_pytorch_default(
-                x
-            ),
-            dataset=dataset,
-            classifier=classifier,
-            output_path=os.path.join(base_path, "explainer", "outputs"),
-            partition="val",
-            batch_size=explainer_config.inference_batch_size,
-            neg_custom_token=explainer_config.class_custom_token[0],
-            pos_custom_token=explainer_config.class_custom_token[1],
-            editor=self.editor,
-            **explainer_config.__dict__
-        )
-        x_counterfactuals = generate_time_counterfactuals(ce_generation_args)
-        x_counterfactuals = generator_to_classifier(torch.cat(x_counterfactuals, dim=0))
+        z_sem, xT = self.encode(x_in.to(self.device))
+        z_sem2 = self._calculate_z_counterfactuals(z_sem)
+        x_counterfactuals = self.decode((z_sem2, xT))
         print("[x_counterfactuals.min(), x_counterfactuals.max()]")
         print([x_counterfactuals.min(), x_counterfactuals.max()])
         print([x_counterfactuals.min(), x_counterfactuals.max()])
         print([x_counterfactuals.min(), x_counterfactuals.max()])
-        device = [p for p in classifier.parameters()][0].device
-        preds = torch.nn.Softmax(dim=-1)(
-            classifier(x_counterfactuals.to(device)).detach().cpu()
-        )
+        device = [p for p in predictor.parameters()][0].device
+        preds = torch.nn.Softmax(dim=-1)(predictor(x_counterfactuals.to(device)).detach().cpu())
 
         y_target_end_confidence = torch.zeros([x_in.shape[0]])
         for i in range(x_in.shape[0]):
@@ -269,3 +169,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             list(y_target_end_confidence),
             list(x_in),
         )
+
+    def _calculate_z_counterfactuals(self, z_sem: torch.Tensor) -> torch.Tensor:
+        # TODO this has to be implemented properly!!!
+        return z_sem
