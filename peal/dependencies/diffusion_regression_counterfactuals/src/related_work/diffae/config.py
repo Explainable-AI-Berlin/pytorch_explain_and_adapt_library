@@ -15,10 +15,6 @@ from .diffusion.resample import UniformSampler
 from .diffusion.diffusion import space_timesteps
 from ...diff_cf_ir.squares_dataset import SquaresDataset
 
-
-if "DCFIR_OUTPATH" not in os.environ:
-    raise ValueError("DCFIR_OUTPATH not set in the environment")
-
 data_paths = {
     "ffhqlmdb256": os.path.expanduser("datasets/ffhq256.lmdb"),
     # used for training a classifier
@@ -33,7 +29,7 @@ data_paths = {
         "datasets/celeba_anno/CelebAMask-HQ-attribute-anno.txt"
     ),
     "celeba_relight": os.path.expanduser("datasets/celeba_hq_light/celeba_light.txt"),
-    "square64": os.path.join(os.environ["DCFIR_OUTPATH"], "datasets", "square"),
+    "square64": os.path.join(os.environ["DCFIR_OUTPATH"] if "DCFIR_OUTPATH" in os.environ else ".", "datasets", "square"),
 }
 
 
