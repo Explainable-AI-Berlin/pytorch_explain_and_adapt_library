@@ -29,6 +29,16 @@ class DiffusionAutoencoderConfig(GeneratorConfig):
     """
     generator_type: str = "DiffusionAutoencoder"
     base_path: str = "/home/space/datasets/peal/peal_runs/diffusion_autoencoder"
+    """
+    The config of the data.
+    """
+    data: DataConfig = DataConfig()
+    """
+    The task config for the diffusion autoencoder.
+    """
+    task_config: Union[TaskConfig, None] = None
+    checkpoint_path: str = "peal_runs/diffusion_autoencoder/final.ckpt"
+    encoder_dimensions : int = 512
 
 
 class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
@@ -59,6 +69,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             self.model = LitModel.load_from_checkpoint(
                 checkpoint_path=self.config.checkpoint_path, conf=conf, map_location="cpu"
             )
+            import pdb; pdb.set_trace()
 
         else:
             self.model = LitModel(conf)
@@ -117,9 +128,9 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
                     predictor,
                     predictor_datasets,
                     predictor_distilled=nn.Sequential(
-                        [
-                            self.model.encoder,
-                            nn.Linear(self.model.encoder.output_dimensions, self.predictor_dataset.output_size),
+                        *[
+                            self.model.ema_model.encoder,
+                            nn.Linear(self.config.encoder_dimensions, self.predictor_dataset.output_size),
                         ]
                     ),  # TODO fix this!
                     only_last_layer=True,

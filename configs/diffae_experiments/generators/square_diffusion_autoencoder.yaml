@@ -7,3 +7,4 @@ image_size: 64
 batch_size: 196
 save_interval: 1000
 max_steps: 10000
+encoder_dimensions : 512
