@@ -45,6 +45,8 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
     def __init__(self, config, predictor_dataset=None, model_dir=None, device="cpu"):
         super().__init__()
         self.config = load_yaml_config(config)
+        # check if cuda device is available and assign to self.device
+        self.device = torch.device(device if torch.cuda.is_available() else "cpu")
         self.predictor_dataset = copy.deepcopy(predictor_dataset)
         # TODO something is wrong here!!!
         self.train_dataset = get_datasets(self.config.data)[0]
@@ -54,7 +56,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         elif not self.predictor_dataset is None:
             self.train_dataset.task_config = self.predictor_dataset.task_config
 
-        self.generator_dataset = None
+        self.generator_dataset = self.train_dataset
 
         if not model_dir is None:
             self.model_dir = model_dir
@@ -89,7 +91,8 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
     def decode(self, z, t=1.0):
         z_sem, xT = z
         # return self.model.render(xT, z_sem, T=self.backward_t, grads=True)
-        return self.model.render(xT, z_sem, T=t, grads=True)
+        #return self.model.render(xT, z_sem, T=t, grads=True)
+        return self.model.render(xT, z_sem, grads=True)
 
     def train_model(
         self,
@@ -124,7 +127,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             if not os.path.exists(distilled_path):
                 self.gradient_predictor = distill_predictor(
                     explainer_config.distilled_predictor,
-                    base_path,
+                    os.path.join(base_path, "explainer"),
                     predictor,
                     predictor_datasets,
                     predictor_distilled=nn.Sequential(
@@ -163,6 +166,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         z_sem, xT = self.encode(x_in.to(self.device))
         z_sem2 = self._calculate_z_counterfactuals(z_sem)
         x_counterfactuals = self.decode((z_sem2, xT))
+        x_counterfactuals = generator_to_classifier(x_counterfactuals.cpu())
         print("[x_counterfactuals.min(), x_counterfactuals.max()]")
         print([x_counterfactuals.min(), x_counterfactuals.max()])
         print([x_counterfactuals.min(), x_counterfactuals.max()])
@@ -179,6 +183,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             list(x_in - x_counterfactuals.cpu()),
             list(y_target_end_confidence),
             list(x_in),
+            [],
         )
 
     def _calculate_z_counterfactuals(self, z_sem: torch.Tensor) -> torch.Tensor:
