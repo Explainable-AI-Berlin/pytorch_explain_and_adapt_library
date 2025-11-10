@@ -133,7 +133,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
                     predictor_distilled=nn.Sequential(
                         *[
                             self.model.ema_model.encoder,
-                            nn.Linear(self.config.encoder_dimensions, self.predictor_dataset.output_size),
+                            nn.Linear(self.config.encoder_dimensions, self.predictor_dataset.output_size, bias=False),
                         ]
                     ),  # TODO fix this!
                     only_last_layer=True,
@@ -152,21 +152,27 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         generator_to_classifier = lambda x: self.predictor_dataset.project_from_pytorch_default(
             self.generator_dataset.project_to_pytorch_default(x)
         )
-        dataset = [
-            (
-                torch.zeros([len(x_in)], dtype=torch.long),
-                classifier_to_generator(x_in),
-                [source_classes, target_classes],
-            )
-        ]
         print("[x_in.min(), x_in.max()]")
         print([x_in.min(), x_in.max()])
         print([x_in.min(), x_in.max()])
         print([x_in.min(), x_in.max()])
-        z_sem, xT = self.encode(x_in.to(self.device))
+        x_generator = classifier_to_generator(x_in)
+        x_generator = 2 * x_generator
+        #x_generator = x_in
+        print("[x_generator.min(), x_generator.max()]")
+        print([x_generator.min(), x_generator.max()])
+        print([x_generator.min(), x_generator.max()])
+        print([x_generator.min(), x_generator.max()])
+        z_sem, xT = self.encode(x_generator.to(self.device))
         z_sem2 = self._calculate_z_counterfactuals(z_sem)
-        x_counterfactuals = self.decode((z_sem2, xT))
-        x_counterfactuals = generator_to_classifier(x_counterfactuals.cpu())
+        x_counterfactuals_generator = self.decode((z_sem2, xT))
+        # x_counterfactuals_generator = x_generator
+        print("[x_counterfactuals_generator.min(), x_counterfactuals_generator.max()]")
+        print([x_counterfactuals_generator.min(), x_counterfactuals_generator.max()])
+        print([x_counterfactuals_generator.min(), x_counterfactuals_generator.max()])
+        print([x_counterfactuals_generator.min(), x_counterfactuals_generator.max()])
+        # x_counterfactuals = generator_to_classifier(x_counterfactuals_generator.cpu())
+        x_counterfactuals = x_counterfactuals_generator
         print("[x_counterfactuals.min(), x_counterfactuals.max()]")
         print([x_counterfactuals.min(), x_counterfactuals.max()])
         print([x_counterfactuals.min(), x_counterfactuals.max()])
@@ -187,5 +193,16 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         )
 
     def _calculate_z_counterfactuals(self, z_sem: torch.Tensor) -> torch.Tensor:
-        # TODO this has to be implemented properly!!!
-        return z_sem
+        # get the last module from the nn.Sequential self.gradient_predictor
+        last_layer = list(self.gradient_predictor.children())[-1]
+        # get weight from last layer
+        b = last_layer.weight[0]
+        a = z_sem
+        #
+        dot_ab = torch.sum(a * b, dim=-1, keepdim=True)   # shape (batch, 1)
+        dot_bb = torch.sum(b * b)                         # scalar
+
+        # projection and reflection
+        proj = dot_ab / dot_bb * b                        # shape (batch, n)
+        reflected = 2 * proj - a
+        return reflected
