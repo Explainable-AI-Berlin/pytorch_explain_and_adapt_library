@@ -1,3 +1,4 @@
 category: explainer
 explainer_type: DAEdistill
 distilled_predictor: <PEAL_BASE>/configs/diffae_experiments/predictors/dae_distill_predictor.yaml
+use_clustering: false

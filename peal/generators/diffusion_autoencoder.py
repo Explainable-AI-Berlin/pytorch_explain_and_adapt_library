@@ -46,7 +46,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         super().__init__()
         self.config = load_yaml_config(config)
         # check if cuda device is available and assign to self.device
-        self.device = torch.device(device if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.predictor_dataset = copy.deepcopy(predictor_dataset)
         # TODO something is wrong here!!!
         self.train_dataset = get_datasets(self.config.data)[0]
@@ -76,10 +76,12 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         else:
             self.model = LitModel(conf)
 
+        self.model.to(self.device)
+
     def sample_z(self, batch_size=1):
-        # TODO this has to be done properly!!!
-        z_sem = torch.randn(batch_size, 4, 8, 8)
-        xT = torch.randn(batch_size, 3, 64, 64)
+        # TODO this has to be done properly with the learned prior!!!
+        z_sem = torch.randn(batch_size, self.config.encoder_dimensions).to(self.device)
+        xT = torch.randn([batch_size] + self.config.data.input_size).to(self.device)
         return z_sem, xT
 
     def encode(self, x, t=1.0):
@@ -123,6 +125,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         mode: str = "",
     ):
         if not explainer_config.distilled_predictor is None:
+            #assert explainer_config.distilled_predictor.task.output_channels == 1
             distilled_path = os.path.join(base_path, "explainer", "distilled_predictor", "model.cpl")
             if not os.path.exists(distilled_path):
                 self.gradient_predictor = distill_predictor(
@@ -133,7 +136,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
                     predictor_distilled=nn.Sequential(
                         *[
                             self.model.ema_model.encoder,
-                            nn.Linear(self.config.encoder_dimensions, self.predictor_dataset.output_size, bias=False),
+                            nn.Linear(self.config.encoder_dimensions, 1, bias=False),
                         ]
                     ),  # TODO fix this!
                     only_last_layer=True,

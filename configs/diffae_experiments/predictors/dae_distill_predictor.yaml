@@ -3,8 +3,8 @@ distill_from      : predictor
 architecture      : torchvision_resnet18
 task:
   criterions:
-    ce     : 1.0
     l2     : 100.0
-  output_type             : singleclass
-  output_channels         : 2
+    bce    : 1.0
+  output_type             : multiclass #singleclass #multiclass
+  output_channels         : 2 #1
   y_selection             : [prediction]
