@@ -414,6 +414,7 @@ class CFKD(Adaptor):
         self.validation_data_config.data.x_selection = "imgs"
         self.validation_data_config.data.num_samples = self.adaptor_config.max_validation_samples
         self.validation_data_config.data.split = [0.0, 1.0]
+        self.group_accuracies = None
 
     def initialize_run(self):
         cprint("initialize run!!!", self.adaptor_config.tracking_level, 2)
@@ -509,6 +510,7 @@ class CFKD(Adaptor):
                     self.adaptor_config.tracking_level,
                     2,
                 )
+                self.group_accuracies = group_accuracies
                 cprint(
                     "group_distribution: " + str(group_distribution),
                     self.adaptor_config.tracking_level,
@@ -961,18 +963,29 @@ class CFKD(Adaptor):
         else:
             flip_rate_reference = num_samples
 
-        flip_rate = (
-            len(
-                list(
-                    filter(
-                        lambda x: x >= 0.51,
-                        tracked_values["y_target_end_confidence_list"][:num_samples],
-                    )
-                )
+        flipped_samples = list(
+            filter(
+                lambda x: x >= 0.51,
+                tracked_values["y_target_end_confidence_list"][:num_samples],
             )
-            / flip_rate_reference
         )
+
+        flip_rate = len(flipped_samples) / flip_rate_reference
         ood_rate = len(list(filter(lambda sample: sample == "ood", feedback))) / num_samples
+        flipped_samples_tensor = torch.cat(
+            [torch.ones(len(flipped_samples)), torch.zeros(num_samples - len(flipped_samples))]
+        )
+        cprint(
+            "flip_rate_tensor: " + str(flipped_samples_tensor.mean()),
+            self.adaptor_config.tracking_level,
+            2,
+        )
+        flip_rate_var = flipped_samples_tensor.var() / torch.sqrt(len(flipped_samples_tensor))
+        cprint(
+            "flip_rate_var: " + str(flip_rate_var),
+            self.adaptor_config.tracking_level,
+            2,
+        )
 
         num_true_1sided = len(
             list(
@@ -1003,6 +1016,8 @@ class CFKD(Adaptor):
             "ood_rate": ood_rate,
             "feedback_accuracy": fa_1sided,
         }
+        feedback_stats["flip_rate_distilled_tensor"] = float(flipped_samples_tensor.mean())
+        feedback_stats["flip_rate_distilled_var"] = float(flip_rate_var)
         cprint("flip_rate: " + str(flip_rate), self.adaptor_config.tracking_level, 2)
 
         if self.adaptor_config.calculate_explainer_stats:
@@ -1051,6 +1066,22 @@ class CFKD(Adaptor):
                 self.adaptor_config.tracking_level,
                 2,
             )
+            flipped_samples_tensor = torch.cat(
+                [torch.ones(len(flipped_samples)), torch.zeros(num_samples - len(flipped_samples))]
+            )
+            feedback_stats["flip_rate_distilled_tensor"] = float(flipped_samples_tensor.mean())
+            cprint(
+                "flip_rate_distilled_tensor: " + str(flipped_samples_tensor.mean()),
+                self.adaptor_config.tracking_level,
+                2,
+            )
+            flip_rate_distilled_var = flipped_samples_tensor.var() / torch.sqrt(len(flipped_samples_tensor))
+            feedback_stats["flip_rate_distilled_var"] = float(flip_rate_distilled_var)
+            cprint(
+                "flip_rate_distilled_var: " + str(flip_rate_distilled_var),
+                self.adaptor_config.tracking_level,
+                2,
+            )
             num_true_1sided_distilled = len(
                 list(
                     filter(
@@ -1083,6 +1114,37 @@ class CFKD(Adaptor):
                 self.adaptor_config.tracking_level,
                 2,
             )
+            if not self.group_accuracies is None:
+                group_accuracies = torch.tensor(self.group_accuracies).flatten().argsort()
+                r_dominant = 1 - (group_accuracies[-1] + group_accuracies[-2]) / 2
+                r_actual = 1 - fa_1sided_distilled
+                unbiasedness = (r_actual / r_dominant) if r_dominant > 0 else 0.0
+                feedback_stats["unbiasedness"] = float(unbiasedness)
+                cprint(
+                    "unbiasedness: " + str(unbiasedness),
+                    self.adaptor_config.tracking_level,
+                    2,
+                )
+                r_actual_tensor = torch.cat(
+                    [torch.zeros(num_true_1sided_distilled), torch.ones(num_false_1sided_distilled)]
+                )
+                unbiasedness_tensor = (
+                    (r_actual_tensor / r_dominant) if r_dominant > 0 else torch.zeros(len(r_actual_tensor))
+                )
+                feedback_stats["unbiasedness_tensor"] = float(unbiasedness_tensor.mean())
+                cprint(
+                    "unbiasedness_tensor: " + str(unbiasedness_tensor.mean()),
+                    self.adaptor_config.tracking_level,
+                    2,
+                )
+                unbiasedness_var = unbiasedness_tensor.var() / torch.sqrt(len(unbiasedness_tensor))
+                feedback_stats["unbiasedness_var"] = float(unbiasedness_var)
+                cprint(
+                    "unbiasedness_var: " + str(unbiasedness_var),
+                    self.adaptor_config.tracking_level,
+                    2,
+                )
+
             tracked_stats = self.explainer.calculate_latent_difference_stats(tracked_values)
             for key in tracked_stats.keys():
                 feedback_stats[key] = tracked_stats[key]

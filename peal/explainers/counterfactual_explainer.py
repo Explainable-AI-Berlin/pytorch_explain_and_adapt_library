@@ -1860,7 +1860,9 @@ class CounterfactualExplainer(ExplainerInterface):
 
             if len(latent_differences_valid) == 0:
                 latent_sparsity = 0.0
+                latent_sparsity_var = 0.0
                 latent_diversity = 0.0
+                latent_diversity_var = 0.0
 
             else:
                 latent_sparsities = []
@@ -1883,6 +1885,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 latent_sparsity = 1.0 - float(
                     torch.mean(torch.tensor(latent_sparsities))
                 )
+                latent_sparsity_var = torch.var(torch.tensor(latent_sparsities)) / torch.sqrt(len(latent_sparsities))
                 if self.explainer_config.num_attempts >= 2:
                     cosine_similiarities_list = [
                         torch.abs(
@@ -1895,9 +1898,11 @@ class CounterfactualExplainer(ExplainerInterface):
                     ]
                     cosine_similiarities = torch.tensor(cosine_similiarities_list)
                     latent_diversity = 1.0 - float(torch.mean(cosine_similiarities))
+                    latent_sparsity_var = torch.var(torch.tensor(cosine_similiarities)) / torch.sqrt(len(cosine_similiarities))
 
                 else:
                     latent_diversity = 0.0
+                    latent_diversity_var = 0.0
 
             tracked_stats["latent_sparsity"] = latent_sparsity
             cprint(
@@ -1905,9 +1910,21 @@ class CounterfactualExplainer(ExplainerInterface):
                 self.explainer_config.tracking_level,
                 2,
             )
+            tracked_stats["latent_sparsity_var"] = latent_sparsity_var
+            cprint(
+                "latent_sparsity_var: " + str(latent_sparsity_var),
+                self.explainer_config.tracking_level,
+                2,
+            )
             tracked_stats["latent_diversity"] = latent_diversity
             cprint(
                 "latent_diversity: " + str(latent_diversity),
+                self.explainer_config.tracking_level,
+                2,
+            )
+            tracked_stats["latent_diversity_var"] = latent_diversity_var
+            cprint(
+                "latent_diversity_var: " + str(latent_diversity_var),
                 self.explainer_config.tracking_level,
                 2,
             )
