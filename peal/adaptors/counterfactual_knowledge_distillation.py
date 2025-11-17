@@ -1,3 +1,4 @@
+import math
 import os
 import torch
 import copy
@@ -186,6 +187,10 @@ class CFKDConfig(AdaptorConfig):
     A list of the feedback accuracies.
     """
     feedback_accuracies: list = []
+    """
+    The group accuracies of the model after every finetuning iteration.
+    """
+    group_accuracies: list = []
     """
     What type of counterfactuals are valid. 1sided means that we can only start from samples with correct prediction,
     2sided also allows that we start from samples with wrong orignal prediction.
@@ -414,7 +419,6 @@ class CFKD(Adaptor):
         self.validation_data_config.data.x_selection = "imgs"
         self.validation_data_config.data.num_samples = self.adaptor_config.max_validation_samples
         self.validation_data_config.data.split = [0.0, 1.0]
-        self.group_accuracies = None
 
     def initialize_run(self):
         cprint("initialize run!!!", self.adaptor_config.tracking_level, 2)
@@ -510,7 +514,8 @@ class CFKD(Adaptor):
                     self.adaptor_config.tracking_level,
                     2,
                 )
-                self.group_accuracies = group_accuracies
+                self.adaptor_config.group_accuracies.append(group_accuracies)
+                save_yaml_config(self.adaptor_config, os.path.join(self.base_dir, "config.yaml"))
                 cprint(
                     "group_distribution: " + str(group_distribution),
                     self.adaptor_config.tracking_level,
@@ -980,7 +985,7 @@ class CFKD(Adaptor):
             self.adaptor_config.tracking_level,
             2,
         )
-        flip_rate_var = flipped_samples_tensor.var() / torch.sqrt(len(flipped_samples_tensor))
+        flip_rate_var = flipped_samples_tensor.std() / math.sqrt(len(flipped_samples_tensor))
         cprint(
             "flip_rate_var: " + str(flip_rate_var),
             self.adaptor_config.tracking_level,
@@ -1016,8 +1021,8 @@ class CFKD(Adaptor):
             "ood_rate": ood_rate,
             "feedback_accuracy": fa_1sided,
         }
-        feedback_stats["flip_rate_distilled_tensor"] = float(flipped_samples_tensor.mean())
-        feedback_stats["flip_rate_distilled_var"] = float(flip_rate_var)
+        feedback_stats["flip_rate_tensor"] = float(flipped_samples_tensor.mean())
+        feedback_stats["flip_rate_var"] = float(flip_rate_var)
         cprint("flip_rate: " + str(flip_rate), self.adaptor_config.tracking_level, 2)
 
         if self.adaptor_config.calculate_explainer_stats:
@@ -1071,14 +1076,24 @@ class CFKD(Adaptor):
             )
             feedback_stats["flip_rate_distilled_tensor"] = float(flipped_samples_tensor.mean())
             cprint(
-                "flip_rate_distilled_tensor: " + str(flipped_samples_tensor.mean()),
+                "flip_rate_distilled_tensor: " + str(feedback_stats["flip_rate_distilled_tensor"]),
                 self.adaptor_config.tracking_level,
                 2,
             )
-            flip_rate_distilled_var = flipped_samples_tensor.var() / torch.sqrt(len(flipped_samples_tensor))
+            flip_rate_distilled_var = flipped_samples_tensor.std() / math.sqrt(len(flipped_samples_tensor))
             feedback_stats["flip_rate_distilled_var"] = float(flip_rate_distilled_var)
             cprint(
                 "flip_rate_distilled_var: " + str(flip_rate_distilled_var),
+                self.adaptor_config.tracking_level,
+                2,
+            )
+            feedback_stats["non_adversarial_rate"] = (
+                float(feedback_stats["flip_rate_distilled_tensor"] / feedback_stats["flip_rate_tensor"])
+                if feedback_stats["flip_rate_tensor"] > 0
+                else 0.0
+            )
+            cprint(
+                "non_adversarial_rate: " + str(feedback_stats["non_adversarial_rate"]),
                 self.adaptor_config.tracking_level,
                 2,
             )
@@ -1114,10 +1129,28 @@ class CFKD(Adaptor):
                 self.adaptor_config.tracking_level,
                 2,
             )
-            if not self.group_accuracies is None:
-                group_accuracies = torch.tensor(self.group_accuracies).flatten().argsort()
-                r_dominant = 1 - (group_accuracies[-1] + group_accuracies[-2]) / 2
+            if len(self.adaptor_config.group_accuracies) > 0:
+                group_accuracies = torch.tensor(self.adaptor_config.group_accuracies[-1]).flatten()
+                group_accuracies_idxs = group_accuracies.argsort()
+                r_dominant = (
+                    1
+                    - (
+                        group_accuracies[group_accuracies_idxs[0]]
+                        + group_accuracies[group_accuracies_idxs[1]]
+                    )
+                    / 2
+                )
+                cprint(
+                    "r_dominant: " + str(r_dominant),
+                    self.adaptor_config.tracking_level,
+                    2,
+                )
                 r_actual = 1 - fa_1sided_distilled
+                cprint(
+                    "r_actual: " + str(r_actual),
+                    self.adaptor_config.tracking_level,
+                    2,
+                )
                 unbiasedness = (r_actual / r_dominant) if r_dominant > 0 else 0.0
                 feedback_stats["unbiasedness"] = float(unbiasedness)
                 cprint(
@@ -1137,7 +1170,7 @@ class CFKD(Adaptor):
                     self.adaptor_config.tracking_level,
                     2,
                 )
-                unbiasedness_var = unbiasedness_tensor.var() / torch.sqrt(len(unbiasedness_tensor))
+                unbiasedness_var = unbiasedness_tensor.std() / math.sqrt(len(unbiasedness_tensor))
                 feedback_stats["unbiasedness_var"] = float(unbiasedness_var)
                 cprint(
                     "unbiasedness_var: " + str(unbiasedness_var),
@@ -1928,6 +1961,8 @@ class CFKD(Adaptor):
                     self.adaptor_config.tracking_level,
                     2,
                 )
+                self.adaptor_config.group_accuracies.append(group_accuracies)
+                save_yaml_config(self.adaptor_config, os.path.join(self.base_dir, "config.yaml"))
                 cprint(
                     "group_distribution: " + str(group_distribution),
                     self.adaptor_config.tracking_level,
