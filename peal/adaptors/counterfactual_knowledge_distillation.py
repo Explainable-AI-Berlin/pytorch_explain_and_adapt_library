@@ -1981,6 +1981,14 @@ class CFKD(Adaptor):
                     2,
                 )
                 writer.add_scalar("test_avg_group_accuracy", avg_group_accuracy, finetune_iteration)
+                old_avg_group_accuracy = np.mean(self.adaptor_config.group_accuracies[-2])
+                gain = (avg_group_accuracy - old_avg_group_accuracy) / (1 - old_avg_group_accuracy)
+                cprint(
+                    "gain: " + str(gain),
+                    self.adaptor_config.tracking_level,
+                    2,
+                )
+                writer.add_scalar("gain", gain, finetune_iteration)
 
             writer.add_scalar("test_accuracy", test_accuracy, finetune_iteration)
             cprint(
