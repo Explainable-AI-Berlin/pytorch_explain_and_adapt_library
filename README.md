@@ -2,9 +2,11 @@ Welcome to the Pytorch Explain and Adapt Library (PEAL)!
 
 The contribution of this library is two-fold:
 
-1) Explain Neural Network models based on different explanation techniques.
+1) Official implementation of the **Smoothed Counterfactual Explorer (SCE)**.
 
-2) Adapt Neural Network models according to a given feedback of a human expert.
+2) Official implementation of **Counterfactual Knowledge Distillation (CFKD)**.
+
+Additionally, the library includes reimplementations of other commonly used counterfactual explainers and model robustification techniques.
 
 If you find this useful or use SCE (https://arxiv.org/pdf/2506.14698), consider citing:
 
