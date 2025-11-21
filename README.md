@@ -38,15 +38,15 @@ An alternative to conda is to work with apptainer by running ```apptainer build 
 **How to no-code use a custom binary image classification dataset with a predictor and a generator from PEAL**
 
 The biggest effort is to reformat the dataset to a ```peal.data.datasets.Image2MixedDataset```.
-All labels have to be written into a "$PEAL_DATA/my_data/data.csv" file with the header "ImagePath,Label1,Label2,...LabelN".
-It could also only have one label with "ImagePath,Label1" and we can only optimize for like this anyway.
-All Images have to be placed in the folder "$PEAL_DATA/my_data" in the correct relative path.
+All labels have to be written into a "$PEAL_DATA/my_data/data.csv" file with the header "imgs,Label1,Label2,...LabelN".
+It could also only have one label with "imgs,Label1" and we can only optimize for like this anyway.
+All Images have to be placed in the folder "$PEAL_DATA/my_data/imgs" in the correct relative path.
 Then, one can copy and adapt the config files for CelebA Smiling as follows:
 
 1) copy configs/sce_experiments/data/celeba.yaml to configs/my_experiments/data/my_data.yaml.
 2) copy configs/sce_experiments/data/celeba_generator.yaml to configs/my_experiments/data/my_data_generator.yaml.
 3) In both, remove the dataset_class and confounding_factors (because you don't have either for your new dataset yet).
-4) In both set dataset_path to "$PEAL_DATA/my_data"
+4) In both set dataset_path to "$PEAL_DATA/my_data". You can also set num_samples and output_size, but for this tutorial, it does not matter. Do not change the input_size except if you know what you are doing, because the generative model is restricted in this regard!
 5) copy configs/sce_experiments/generators/celeba_ddpm.yaml to configs/my_experiments/generators/my_data_ddpm.yaml.
 6) In this file replace base_path with "$PEAL_RUNS/my_data/ddpm" and data with "<PEAL_BASE>/configs/my_experiments/data/my_data_generator.yaml".
 7) Train your DDPM generator with: ```python train_generator.py --config "<PEAL_BASE>/configs/my_experiments/generators/my_data_ddpm.yaml"```
