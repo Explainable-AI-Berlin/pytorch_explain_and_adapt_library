@@ -2,17 +2,30 @@ Welcome to the Pytorch Explain and Adapt Library (PEAL)!
 
 The contribution of this library is two-fold:
 
-1) Explain Neural Network models based on different explanation techniques.
+1) Official implementation of the **Smoothed Counterfactual Explorer (SCE)**.
 
-2) Adapt Neural Network models according to a given feedback of a human expert.
+2) Official implementation of **Counterfactual Knowledge Distillation (CFKD)**.
 
-If you find this useful, consider citing:
+Additionally, the library includes reimplementations of other commonly used counterfactual explainers and model robustification techniques.
+
+If you find this useful or use SCE (https://arxiv.org/pdf/2506.14698), consider citing:
 
 ```
 @article{bender2025towards,
   title={Towards Desiderata-Driven Design of Visual Counterfactual Explainers},
   author={Bender, Sidney and Herrmann, Jan and M{\"u}ller, Klaus-Robert and Montavon, Gr{\'e}goire},
   journal={arXiv preprint arXiv:2506.14698},
+  year={2025}
+}
+```
+
+If you use CFKD (https://arxiv.org/pdf/2510.17524) useful consider citing:
+
+```
+@article{bender2025mitigating,
+  title={Mitigating Clever Hans Strategies in Image Classifiers through Generating Counterexamples},
+  author={Bender, Sidney and Delzer, Ole and Herrmann, Jan and Marxfeld, Heike Antje and M{\"u}ller, Klaus-Robert and Montavon, Gr{\'e}goire},
+  journal={arXiv preprint arXiv:2510.17524},
   year={2025}
 }
 ```
@@ -62,6 +75,7 @@ to "configs/my_experiments/adaptors/my_data_sce_cfkd.yaml".
 
 If you further want to process them, you can load the .npz array "$PEAL_RUNS/my_data/classifier/sce_cfkd/validation_tracked_values.npz".
 The originals in this array can be found under the key "x_list" and the counterfactuals under "x_counterfactual_list".
+If you additionally want to use CFKD look how you have to configure your adaptor config according to the configs found e.g. in the configs/cfkd_experiments/adaptors.
 
 
 **How to use a custom image dataset and a custom predictor**

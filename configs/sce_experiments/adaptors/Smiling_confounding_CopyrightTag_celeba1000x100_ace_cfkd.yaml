@@ -11,7 +11,7 @@ calculate_explainer_stats            :  True
 calculate_group_accuracies           :  True
 explainer                            :  <PEAL_BASE>/configs/sce_experiments/explainers/ace_default.yaml
 training                             :  <PEAL_BASE>/configs/sce_experiments/training/img_finetuning.yaml
-data                                 :  <PEAL_BASE>/configs/sce_experiments/data/Smiling_confounding_copyrighttag_celeba1000_poisoned100.yaml
+data                                 :  <PEAL_BASE>/configs/sce_experiments/data/Smiling_confounding_copyrighttag_celeba_poisoned100.yaml
 test_data                            :  <PEAL_BASE>/configs/sce_experiments/data/Smiling_confounding_copyrighttag_celeba.yaml
 base_dir                             :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned100/ace_cfkd
 student                              :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned100/model.cpl
