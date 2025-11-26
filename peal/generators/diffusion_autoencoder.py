@@ -49,14 +49,16 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.predictor_dataset = copy.deepcopy(predictor_dataset)
         # TODO something is wrong here!!!
-        self.train_dataset = get_datasets(self.config.data)[0]
+        self.generator_datasets = get_datasets(self.config.data)[0]
         if not self.config.task_config is None:
-            self.train_dataset.task_config = self.config.task_config
+            self.generator_datasets[0].task_config = self.config.task_config
+            self.generator_datasets[1].task_config = self.config.task_config
 
         elif not self.predictor_dataset is None:
-            self.train_dataset.task_config = self.predictor_dataset.task_config
+            self.generator_datasets[0].task_config = self.predictor_dataset.task_config
+            self.generator_datasets[1].task_config = self.predictor_dataset.task_config
 
-        self.generator_dataset = self.train_dataset
+        self.generator_dataset = self.generator_datasets[0]
 
         if not model_dir is None:
             self.model_dir = model_dir
@@ -124,6 +126,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         base_path: str = "",
         mode: str = "",
     ):
+        device = [p for p in predictor.parameters()][0].device
         if not explainer_config.distilled_predictor is None:
             #assert explainer_config.distilled_predictor.task.output_channels == 1
             distilled_path = os.path.join(base_path, "explainer", "distilled_predictor", "model.cpl")
@@ -132,7 +135,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
                     explainer_config.distilled_predictor,
                     os.path.join(base_path, "explainer"),
                     predictor,
-                    predictor_datasets,
+                    self.generator_datasets,
                     predictor_distilled=nn.Sequential(
                         *[
                             self.model.ema_model.encoder,
@@ -159,6 +162,10 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         print([x_in.min(), x_in.max()])
         print([x_in.min(), x_in.max()])
         print([x_in.min(), x_in.max()])
+
+        preds = torch.nn.Softmax(dim=-1)(predictor(x_in.to(device)).detach().cpu())
+        print("preds_before: " + str(preds.argmax(dim=-1)))
+
         x_generator = classifier_to_generator(x_in)
         x_generator = 2 * x_generator
         #x_generator = x_in
@@ -167,8 +174,16 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         print([x_generator.min(), x_generator.max()])
         print([x_generator.min(), x_generator.max()])
         z_sem, xT = self.encode(x_generator.to(self.device))
-        z_sem2 = self._calculate_z_counterfactuals(z_sem)
+        w = list(self.gradient_predictor.children())[-1].weight[0]
+        dot_ab = torch.sum(z_sem * w, dim=-1, keepdim=True) > 0
+        print("dot_ab before editing:", dot_ab.squeeze().detach().cpu().numpy())
+        z_sem2 = self._calculate_z_counterfactuals(z_sem) > 0
+        dot_ab2 = torch.sum(z_sem2 * w, dim=-1, keepdim=True)
+        print("dot_ab after editing:", dot_ab2.squeeze().detach().cpu().numpy())
         x_counterfactuals_generator = self.decode((z_sem2, xT))
+        z_sem3, _ = self.encode(x_generator.to(self.device)) > 0
+        dot_ab3 = torch.sum(z_sem2 * w, dim=-1, keepdim=True)
+        print("dot_ab3:", dot_ab3.squeeze().detach().cpu().numpy())
         # x_counterfactuals_generator = x_generator
         print("[x_counterfactuals_generator.min(), x_counterfactuals_generator.max()]")
         print([x_counterfactuals_generator.min(), x_counterfactuals_generator.max()])
@@ -180,12 +195,14 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         print([x_counterfactuals.min(), x_counterfactuals.max()])
         print([x_counterfactuals.min(), x_counterfactuals.max()])
         print([x_counterfactuals.min(), x_counterfactuals.max()])
-        device = [p for p in predictor.parameters()][0].device
-        preds = torch.nn.Softmax(dim=-1)(predictor(x_counterfactuals.to(device)).detach().cpu())
 
+        preds = torch.nn.Softmax(dim=-1)(predictor(x_counterfactuals.to(device)).detach().cpu())
         y_target_end_confidence = torch.zeros([x_in.shape[0]])
         for i in range(x_in.shape[0]):
             y_target_end_confidence[i] = preds[i, target_classes[i]]
+
+        print("preds_after:", preds.argmax(dim=-1))
+        import pdb; pdb.set_trace()
 
         return (
             list(x_counterfactuals.cpu()),
@@ -207,5 +224,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
 
         # projection and reflection
         proj = dot_ab / dot_bb * b                        # shape (batch, n)
-        reflected = 2 * proj - a
+        # reflected = 2 * proj - a
+        reflected = a - 2 * proj
+        #import pdb; pdb.set_trace()
         return reflected
