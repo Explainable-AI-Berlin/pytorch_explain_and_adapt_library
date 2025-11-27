@@ -49,7 +49,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.predictor_dataset = copy.deepcopy(predictor_dataset)
         # TODO something is wrong here!!!
-        self.generator_datasets = get_datasets(self.config.data)[0]
+        self.generator_datasets = get_datasets(self.config.data)
         if not self.config.task_config is None:
             self.generator_datasets[0].task_config = self.config.task_config
             self.generator_datasets[1].task_config = self.config.task_config
@@ -175,14 +175,14 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         print([x_generator.min(), x_generator.max()])
         z_sem, xT = self.encode(x_generator.to(self.device))
         w = list(self.gradient_predictor.children())[-1].weight[0]
-        dot_ab = torch.sum(z_sem * w, dim=-1, keepdim=True) > 0
+        dot_ab = torch.tensor(torch.sum(z_sem * w, dim=-1, keepdim=True) > 0, dtype=torch.uint8)
         print("dot_ab before editing:", dot_ab.squeeze().detach().cpu().numpy())
-        z_sem2 = self._calculate_z_counterfactuals(z_sem) > 0
-        dot_ab2 = torch.sum(z_sem2 * w, dim=-1, keepdim=True)
+        z_sem2 = self._calculate_z_counterfactuals(z_sem)
+        dot_ab2 = torch.tensor(torch.sum(z_sem2 * w, dim=-1, keepdim=True) > 0, dtype=torch.uint8)
         print("dot_ab after editing:", dot_ab2.squeeze().detach().cpu().numpy())
         x_counterfactuals_generator = self.decode((z_sem2, xT))
-        z_sem3, _ = self.encode(x_generator.to(self.device)) > 0
-        dot_ab3 = torch.sum(z_sem2 * w, dim=-1, keepdim=True)
+        z_sem3, _ = self.encode(x_counterfactuals_generator.to(self.device))
+        dot_ab3 = torch.tensor(torch.sum(z_sem3 * w, dim=-1, keepdim=True) > 0, dtype=torch.uint8)
         print("dot_ab3:", dot_ab3.squeeze().detach().cpu().numpy())
         # x_counterfactuals_generator = x_generator
         print("[x_counterfactuals_generator.min(), x_counterfactuals_generator.max()]")

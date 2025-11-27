@@ -310,7 +310,7 @@ class TorchvisionModel(torch.nn.Module):
             feature_extractor = torch.nn.Sequential(*submodules[:-1])
             return feature_extractor(x)
 
-        elif self.model_type == "dino_v2":
+        elif self.model_type[:len("dino_v2")] == "dino_v2":
             cs = self.processor.crop_size
             x_resized = torchvision.transforms.Resize([cs["height"], cs["width"]])(x)
 
@@ -331,7 +331,10 @@ class TorchvisionModel(torch.nn.Module):
 
         else:
             # Reshape and permute the input tensor
-            x = self._process_input(x)
+            try:
+                x = self._process_input(x)
+            except:
+                import pdb; pdb.set_trace()
             n = x.shape[0]
 
             # Expand the class token to the full batch
@@ -369,7 +372,7 @@ class TorchvisionModel(torch.nn.Module):
             else:
                 return self.model(x)
 
-        elif self.model_type in ["dino_v2", "UNI"]:
+        elif self.model_type in ["dino_v2", "UNI", "dino_v2_small", "dino_v2_base"]:
             # xt = self.processor(x)['pixel_values']
             latent_code = self.feature_extractor(x)
             x_out = self.fc(latent_code)
