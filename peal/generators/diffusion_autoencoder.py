@@ -8,7 +8,11 @@ from torch import nn
 from typing import Union
 
 from peal.dependencies.diffusion_regression_counterfactuals.src.related_work.diffae.experiment import LitModel
-from peal.dependencies.diffusion_regression_counterfactuals.src.related_work.diffae.templates import square64_autoenc
+from peal.dependencies.diffusion_regression_counterfactuals.src.related_work.diffae.templates_latent import (
+    square64_autoenc,
+    train,
+    square64_autoenc_latent,
+)
 from peal.data.dataset_factory import get_datasets
 from peal.generators.interfaces import EditCapableGenerator, InvertibleGenerator
 from peal.global_utils import load_yaml_config, save_yaml_config
@@ -38,7 +42,9 @@ class DiffusionAutoencoderConfig(GeneratorConfig):
     """
     task_config: Union[TaskConfig, None] = None
     checkpoint_path: str = "peal_runs/diffusion_autoencoder/final.ckpt"
-    encoder_dimensions : int = 512
+    encoder_dimensions: int = 512
+    encoder_path: Union[str, None] = None
+    is_torchvision_resnet: bool = False
 
 
 class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
@@ -69,16 +75,15 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         self.data_dir = os.path.join(self.model_dir, "data_test")
         self.counterfactual_path = os.path.join(self.model_dir, "counterfactuals_test")
         conf = square64_autoenc()
-        if os.path.exists(self.config.checkpoint_path):
+        self.checkpoint_path = os.path.join(self.config.base_path, "square64_ddim", "last.ckpt")
+        if os.path.exists(self.checkpoint_path):
             self.model = LitModel.load_from_checkpoint(
-                checkpoint_path=self.config.checkpoint_path, conf=conf, map_location="cpu"
+                checkpoint_path=self.checkpoint_path, conf=conf, map_location="cpu"
             )
-            import pdb; pdb.set_trace()
+            self.model.to(self.device)
 
         else:
-            self.model = LitModel(conf)
-
-        self.model.to(self.device)
+            self.model = None  # LitModel(conf)
 
     def sample_z(self, batch_size=1):
         # TODO this has to be done properly with the learned prior!!!
@@ -95,7 +100,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
     def decode(self, z, t=1.0):
         z_sem, xT = z
         # return self.model.render(xT, z_sem, T=self.backward_t, grads=True)
-        #return self.model.render(xT, z_sem, T=t, grads=True)
+        # return self.model.render(xT, z_sem, T=t, grads=True)
         return self.model.render(xT, z_sem, grads=True)
 
     def train_model(
@@ -106,12 +111,57 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             Path(self.config.base_path).mkdir(parents=True, exist_ok=True)
 
         save_yaml_config(self.config, os.path.join(self.config.base_path, "config.yaml"))
-        finetune_args = types.SimpleNamespace(**self.config.__dict__)
-        finetune_args.train_dataset = self.train_dataset
-        finetune_args.pipeline = self.pipeline
-        finetune_args.resume_from_checkpoint = "latest"
-        finetune_args.img_semantic_encoder = self.img_semantic_encoder
-        # TODO add actual training here
+        # finetune_args = types.SimpleNamespace(**self.config.__dict__)
+        #
+        if not self.config.encoder_path is None:
+            encoder = torch.load(self.config.encoder_path, map_location="cpu")
+            if self.config.is_torchvision_resnet:
+                # remove the head
+                encoder.fc = nn.Identity()
+
+            # nn module that normalizes with self.generator_dataset.config.normalization
+            class NormalizationModule(nn.Module):
+                def __init__(self, mean, std):
+                    super().__init__()
+                    self.mean = torch.tensor(mean)
+                    self.std = torch.tensor(std)
+
+                def forward(self, x):
+                    return (x - self.mean.to(x.device)) / self.std.to(x.device)
+
+            normalization = NormalizationModule(
+                self.generator_dataset.config.normalization[0], self.generator_dataset.config.normalization[1]
+            )
+            # include the normalization directly into the encoder
+            encoder = torch.nn.Sequential(normalization, encoder)
+
+        else:
+            encoder = None
+
+        conf = square64_autoenc()
+        conf.base_dir = self.config.base_path
+        conf.dataset = self.generator_dataset
+        conf.encoder = encoder
+        return_dict_buffer = self.generator_dataset.return_dict
+        idx_enabled_buffer = self.generator_dataset.idx_enabled
+        self.generator_dataset.return_dict = True
+        self.generator_dataset.idx_enabled = True
+        train(conf)
+        conf.eval_programs = ["infer"]
+        # DHA: Assume pretrained. The model is loaded in eval mode.
+        train(conf, mode="eval")
+
+        # NOTE: a lot of gpus can speed up this process
+        conf = square64_autoenc_latent(self.config.base_path)
+        conf.base_dir = self.config.base_path
+        conf.dataset = self.generator_dataset
+        conf.encoder = encoder
+        train(conf)
+        self.generator_dataset.return_dict = return_dict_buffer
+        self.generator_dataset.idx_enabled = idx_enabled_buffer
+
+        self.model = LitModel.load_from_checkpoint(checkpoint_path=self.checkpoint_path, conf=conf, map_location="cpu")
+        self.model.to(self.device)
 
     def edit(
         self,
@@ -128,7 +178,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
     ):
         device = [p for p in predictor.parameters()][0].device
         if not explainer_config.distilled_predictor is None:
-            #assert explainer_config.distilled_predictor.task.output_channels == 1
+            # assert explainer_config.distilled_predictor.task.output_channels == 1
             distilled_path = os.path.join(base_path, "explainer", "distilled_predictor", "model.cpl")
             if not os.path.exists(distilled_path):
                 self.gradient_predictor = distill_predictor(
@@ -168,7 +218,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
 
         x_generator = classifier_to_generator(x_in)
         x_generator = 2 * x_generator
-        #x_generator = x_in
+        # x_generator = x_in
         print("[x_generator.min(), x_generator.max()]")
         print([x_generator.min(), x_generator.max()])
         print([x_generator.min(), x_generator.max()])
@@ -202,7 +252,9 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             y_target_end_confidence[i] = preds[i, target_classes[i]]
 
         print("preds_after:", preds.argmax(dim=-1))
-        import pdb; pdb.set_trace()
+        import pdb
+
+        pdb.set_trace()
 
         return (
             list(x_counterfactuals.cpu()),
@@ -219,12 +271,12 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         b = last_layer.weight[0]
         a = z_sem
         #
-        dot_ab = torch.sum(a * b, dim=-1, keepdim=True)   # shape (batch, 1)
-        dot_bb = torch.sum(b * b)                         # scalar
+        dot_ab = torch.sum(a * b, dim=-1, keepdim=True)  # shape (batch, 1)
+        dot_bb = torch.sum(b * b)  # scalar
 
         # projection and reflection
-        proj = dot_ab / dot_bb * b                        # shape (batch, n)
+        proj = dot_ab / dot_bb * b  # shape (batch, n)
         # reflected = 2 * proj - a
         reflected = a - 2 * proj
-        #import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
         return reflected

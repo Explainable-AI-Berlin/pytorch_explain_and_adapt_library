@@ -1,4 +1,6 @@
 #!/bin/bash
+export DCFIR_HOME="$PWD"
+export DCFIR_OUTPATH="$PEAL_RUNS/square/diff_cf_ir_results"
 set -e
 
 if [ -z "$DCFIR_OUTPATH" ] || [ -z "$DCFIR_HOME" ]; then

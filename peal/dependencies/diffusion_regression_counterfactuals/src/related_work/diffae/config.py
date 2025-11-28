@@ -41,6 +41,9 @@ class PretrainConfig(BaseConfig):
 
 @dataclass
 class TrainConfig(BaseConfig):
+    # additional parameters
+    dataset: Union[type(None), torch.utils.data.Dataset] = None
+    encoder: Union[type(None), torch.nn.Module] = None
     # random seed
     seed: int = 0
     train_mode: TrainMode = TrainMode.diffusion
@@ -276,7 +279,10 @@ class TrainConfig(BaseConfig):
         return self._make_latent_diffusion_conf(T=self.latent_T_eval)
 
     def make_dataset(self, path=None, **kwargs):
-        if self.data_name == "ffhqlmdb256":
+        if not self.dataset is None:
+            return self.dataset
+
+        elif self.data_name == "ffhqlmdb256":
             return FFHQlmdb(
                 path=path or self.data_path, image_size=self.img_size, **kwargs
             )

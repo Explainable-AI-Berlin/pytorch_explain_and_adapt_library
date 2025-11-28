@@ -1,6 +1,6 @@
 #!/bin/bash
 export DCFIR_HOME="$PWD"
-export DCFIR_OUTPATH="$PWD/diff_cf_ir_results"
+export DCFIR_OUTPATH="$PEAL_RUNS/square/diff_cf_ir_results"
 set -e
 if [ -z "$DCFIR_OUTPATH" ] || [ -z "$DCFIR_HOME" ]; then
     echo "DCFIR_OUTPATH or DCFIR_HOME is not defined. Please set it manually before running this script."

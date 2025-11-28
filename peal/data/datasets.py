@@ -719,7 +719,7 @@ class Image2MixedDataset(ImageDataset):
             ), "output shape inacceptable for singleclass classification"
             target = target[0].to(torch.int64)
 
-        return_dict = {"x": img_tensor, "y": target}
+        return_dict = {"img": img_tensor, "labels": target}
 
         if self.hints_enabled:
             if self.config.in_memory:
@@ -773,7 +773,7 @@ class Image2MixedDataset(ImageDataset):
                 return_dict["has_confounder"] = has_confounder
 
         if self.idx_enabled:
-            return_dict["idx"] = idx
+            return_dict["index"] = idx
 
         if self.url_enabled:
             return_dict["url"] = name

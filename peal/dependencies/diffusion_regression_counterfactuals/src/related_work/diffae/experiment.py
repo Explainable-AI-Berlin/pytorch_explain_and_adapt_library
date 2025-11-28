@@ -30,6 +30,10 @@ class LitModel(L.LightningModule):
         self.conf = conf
 
         self.model = conf.make_model_conf().make_model()
+        if not conf.encoder is None:
+            import pdb; pdb.set_trace()
+            self.model.encoder = conf.encoder
+
         self.ema_model = copy.deepcopy(self.model)
         self.ema_model.requires_grad_(False)
         self.ema_model.eval()

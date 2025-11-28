@@ -1,5 +1,6 @@
-from src.related_work.diffae.templates_latent import *
+from src.related_work.diffae.templates_latent import square64_autoenc_latent, square64_autoenc, os, train
 import argparse
+import torch
 
 if __name__ == "__main__":
     torch.set_float32_matmul_precision("high")
