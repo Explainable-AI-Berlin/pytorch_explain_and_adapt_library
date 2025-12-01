@@ -88,8 +88,8 @@ def calculate_test_accuracy(
             break
 
         if calculate_group_accuracies:
-            x = sample["x"]
-            y = sample["y"]
+            x = sample["img"]
+            y = sample["labels"]
             has_confounder = sample["has_confounder"]
             group = y + test_dataloader.dataset.output_size * has_confounder
 
