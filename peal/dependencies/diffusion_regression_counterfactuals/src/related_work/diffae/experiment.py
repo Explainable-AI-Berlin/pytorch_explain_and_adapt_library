@@ -31,9 +31,9 @@ class LitModel(L.LightningModule):
 
         self.model = conf.make_model_conf().make_model()
         if not conf.encoder is None:
-            import pdb; pdb.set_trace()
             self.model.encoder = conf.encoder
 
+        self.first_encoder_parameter = torch.tensor(list(self.model.encoder.parameters())[0])
         self.ema_model = copy.deepcopy(self.model)
         self.ema_model.requires_grad_(False)
         self.ema_model.eval()
@@ -352,6 +352,7 @@ class LitModel(L.LightningModule):
         """
         # batch size here is local!
         # forward
+        # self.first_encoder_parameter - torch.tensor(list(self.model.encoder.parameters())[0]).cpu()
         if self.conf.train_mode.require_dataset_infer():
             # this mode as pre-calculated cond
             cond = batch[0]
@@ -640,15 +641,25 @@ class LitModel(L.LightningModule):
     def configure_optimizers(self):
         out = {}
         print(f"Optimizer {self.conf.optimizer} with lr {self.conf.lr}")
+        self.first_encoder_parameter2 = torch.tensor(list(self.model.encoder.parameters())[0])
+        for param in self.model.encoder.parameters():
+            param.requires_grad = False
+
+        if self.conf.encoder is None:
+            parameters = self.model.parameters()
+
+        else:
+            parameters = [param for param in self.model.parameters() if param not in set(self.model.encoder.parameters())]
+
         if self.conf.optimizer == OptimizerType.adam:
             optim = torch.optim.Adam(
-                self.model.parameters(),
+                parameters,
                 lr=self.conf.lr,
                 weight_decay=self.conf.weight_decay,
             )
         elif self.conf.optimizer == OptimizerType.adamw:
             optim = torch.optim.AdamW(
-                self.model.parameters(),
+                parameters,
                 lr=self.conf.lr,
                 weight_decay=self.conf.weight_decay,
             )

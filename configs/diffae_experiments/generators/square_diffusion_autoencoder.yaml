@@ -8,5 +8,3 @@ batch_size: 196
 save_interval: 1000
 max_steps: 10000
 encoder_dimensions : 512
-encoder_path: $PEAL_RUNS/square/colora_confounding_colorb/classifier_all_attributes_resnet18/model.cpl
-is_torchvision_resnet: true

@@ -43,8 +43,12 @@ class DiffusionAutoencoderConfig(GeneratorConfig):
     task_config: Union[TaskConfig, None] = None
     checkpoint_path: str = "peal_runs/diffusion_autoencoder/final.ckpt"
     encoder_dimensions: int = 512
+    save_every_samples: int = 20000
+    total_samples: int = 40000000
+    batch_size: int = 20
     encoder_path: Union[str, None] = None
     is_torchvision_resnet: bool = False
+    is_loaded: bool = False
 
 
 class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
@@ -75,8 +79,9 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         self.data_dir = os.path.join(self.model_dir, "data_test")
         self.counterfactual_path = os.path.join(self.model_dir, "counterfactuals_test")
         conf = square64_autoenc()
+        self.adjust_config(conf)
         self.checkpoint_path = os.path.join(self.config.base_path, "square64_ddim", "last.ckpt")
-        if os.path.exists(self.checkpoint_path):
+        if os.path.exists(self.checkpoint_path) and self.config.is_loaded:
             self.model = LitModel.load_from_checkpoint(
                 checkpoint_path=self.checkpoint_path, conf=conf, map_location="cpu"
             )
@@ -103,21 +108,12 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         # return self.model.render(xT, z_sem, T=t, grads=True)
         return self.model.render(xT, z_sem, grads=True)
 
-    def train_model(
-        self,
-    ):
-        # write the yaml config on disk
-        if not os.path.exists(self.config.base_path):
-            Path(self.config.base_path).mkdir(parents=True, exist_ok=True)
-
-        save_yaml_config(self.config, os.path.join(self.config.base_path, "config.yaml"))
-        # finetune_args = types.SimpleNamespace(**self.config.__dict__)
-        #
+    def adjust_config(self, conf):
         if not self.config.encoder_path is None:
             encoder = torch.load(self.config.encoder_path, map_location="cpu")
             if self.config.is_torchvision_resnet:
                 # remove the head
-                encoder.fc = nn.Identity()
+                encoder.model.fc = nn.Identity()
 
             # nn module that normalizes with self.generator_dataset.config.normalization
             class NormalizationModule(nn.Module):
@@ -138,14 +134,30 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         else:
             encoder = None
 
-        conf = square64_autoenc()
+
         conf.base_dir = self.config.base_path
         conf.dataset = self.generator_dataset
         conf.encoder = encoder
-        return_dict_buffer = self.generator_dataset.return_dict
-        idx_enabled_buffer = self.generator_dataset.idx_enabled
+        conf.img_size = self.generator_dataset.config.input_size[-1]
+        conf.model_conf.image_size = self.generator_dataset.config.input_size[-1]
+        conf.batch_size = self.config.batch_size
+        conf.save_every_samples = self.config.save_every_samples
+        conf.total_samples = self.config.total_samples
         self.generator_dataset.return_dict = True
         self.generator_dataset.idx_enabled = True
+
+    def train_model(
+        self,
+    ):
+        # write the yaml config on disk
+        if not os.path.exists(self.config.base_path):
+            Path(self.config.base_path).mkdir(parents=True, exist_ok=True)
+
+        save_yaml_config(self.config, os.path.join(self.config.base_path, "config.yaml"))
+        # finetune_args = types.SimpleNamespace(**self.config.__dict__)
+        #
+        conf = square64_autoenc()
+        self.adjust_config(conf)
         train(conf)
         conf.eval_programs = ["infer"]
         # DHA: Assume pretrained. The model is loaded in eval mode.
@@ -153,12 +165,8 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
 
         # NOTE: a lot of gpus can speed up this process
         conf = square64_autoenc_latent(self.config.base_path)
-        conf.base_dir = self.config.base_path
-        conf.dataset = self.generator_dataset
-        conf.encoder = encoder
+        self.adjust_config(conf)
         train(conf)
-        self.generator_dataset.return_dict = return_dict_buffer
-        self.generator_dataset.idx_enabled = idx_enabled_buffer
 
         self.model = LitModel.load_from_checkpoint(checkpoint_path=self.checkpoint_path, conf=conf, map_location="cpu")
         self.model.to(self.device)
