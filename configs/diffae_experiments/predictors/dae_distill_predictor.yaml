@@ -6,5 +6,5 @@ task:
     l2     : 100.0
     bce    : 1.0
   output_type             : multiclass #singleclass #multiclass
-  output_channels         : 2 #1
+  output_channels         : 1 #2 #1
   y_selection             : [prediction]

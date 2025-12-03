@@ -16,7 +16,7 @@ test_data                            :  <PEAL_BASE>/configs/cfkd_experiments/dat
 student                              :  $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/classifier_poisoned098/model.cpl
 teacher                              :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_unpoisoned/model.cpl
 #generator                            :  $PEAL_RUNS/square1k/diffae/config.yaml
-generator                            :  <PEAL_BASE>/configs/diffae_experiments/generators/square_diffusion_autoencoder.yaml
+generator                            :  $PEAL_RUNS/square/diffusion_autoencoder/config.yaml
 base_dir                             :  $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/classifier_poisoned098/dae_cfkd
 task:
   criterions:

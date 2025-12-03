@@ -1,13 +1,23 @@
 import os
+import shutil
 import types
 import copy
+from datetime import time, datetime
+
 import torch
 
 from pathlib import Path
+
+import torchvision
 from torch import nn
 from typing import Union
 
-from peal.dependencies.diffusion_regression_counterfactuals.src.related_work.diffae.experiment import LitModel
+from transformers import AutoModel, AutoImageProcessor
+
+from peal.data.dataloaders import WeightedDataloaderList
+from peal.dependencies.diffusion_regression_counterfactuals.src.related_work.diffae.experiment import (
+    LitModel,
+)
 from peal.dependencies.diffusion_regression_counterfactuals.src.related_work.diffae.templates_latent import (
     square64_autoenc,
     train,
@@ -48,7 +58,8 @@ class DiffusionAutoencoderConfig(GeneratorConfig):
     batch_size: int = 20
     encoder_path: Union[str, None] = None
     is_torchvision_resnet: bool = False
-    is_loaded: bool = False
+    is_loaded: bool = True
+    model_type: Union[str, None] = None
 
 
 class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
@@ -76,16 +87,24 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         else:
             self.model_dir = self.config.base_path
 
-        self.data_dir = os.path.join(self.model_dir, "data_test")
-        self.counterfactual_path = os.path.join(self.model_dir, "counterfactuals_test")
+        self.set_encoder()
         conf = square64_autoenc()
         self.adjust_config(conf)
-        self.checkpoint_path = os.path.join(self.config.base_path, "square64_ddim", "last.ckpt")
-        if os.path.exists(self.checkpoint_path) and self.config.is_loaded:
-            self.model = LitModel.load_from_checkpoint(
-                checkpoint_path=self.checkpoint_path, conf=conf, map_location="cpu"
-            )
-            self.model.to(self.device)
+        self.checkpoint_path = os.path.join(
+            self.config.base_path, "square64_ddim", "last.ckpt"
+        )
+        if os.path.exists(self.checkpoint_path):
+            if self.config.is_loaded:
+                self.model = LitModel.load_from_checkpoint(
+                    checkpoint_path=self.checkpoint_path, conf=conf, map_location="cpu"
+                )
+                self.model.to(self.device)
+
+            else:
+                shutil.move(
+                    self.config.base_path,
+                    self.config.base_path + "_old_" + datetime.now().strftime("%Y%m%d_%H%M%S"),
+                )
 
         else:
             self.model = None  # LitModel(conf)
@@ -108,52 +127,137 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         # return self.model.render(xT, z_sem, T=t, grads=True)
         return self.model.render(xT, z_sem, grads=True)
 
-    def adjust_config(self, conf):
-        if not self.config.encoder_path is None:
+    def set_encoder(self):
+        if not self.config.model_type is None:
+            if self.config.model_type[: len("dino_v2")] == "dino_v2":
+                if self.config.model_type == "dino_v2_small":
+                    model = AutoModel.from_pretrained("facebook/dinov2-small")
+                    processor = AutoImageProcessor.from_pretrained(
+                        "facebook/dinov2-small"
+                    )
+
+                elif self.config.model_type == "dino_v2_base":
+                    model = AutoModel.from_pretrained("facebook/dinov2-base")
+                    processor = AutoImageProcessor.from_pretrained(
+                        "facebook/dinov2-base"
+                    )
+
+                elif self.config.model_type == "dino_v2":
+                    model = AutoModel.from_pretrained("facebook/dinov2-large")
+                    processor = AutoImageProcessor.from_pretrained(
+                        "facebook/dinov2-large"
+                    )
+
+                class DinoV2(nn.Module):
+                    def __init__(self, model, processor):
+                        super().__init__()
+                        self.model = model
+                        self.processor = processor
+
+                    def forward(self, x):
+                        cs = self.processor.crop_size
+                        x_resized = torchvision.transforms.Resize(
+                            [cs["height"], cs["width"]]
+                        )(x)
+
+                        def pv(v):
+                            v = torch.tensor(v).to(x_resized)[:, None, None]
+                            return torch.tile(v, [1, cs["height"], cs["width"]])
+
+                        x_processed = (x_resized - pv(self.processor.image_mean)) / pv(
+                            self.processor.image_std
+                        )
+                        latent_code = self.model(x_processed)["last_hidden_state"][:, 0]
+                        return latent_code
+
+                encoder = DinoV2(model, processor)
+
+            elif self.config.model_type == "UNI":
+                import timm
+                from timm.data import resolve_data_config
+                from timm.data.transforms_factory import create_transform
+                from huggingface_hub import login
+
+                login()  # login with your User Access Token, found at https://huggingface.co/settings/tokens
+
+                # pretrained=True needed to load UNI weights (and download weights for the first time)
+                # init_values need to be passed in to successfully load LayerScale parameters (e.g. - block.0.ls1.gamma)
+                model = timm.create_model(
+                    "hf-hub:MahmoodLab/uni",
+                    pretrained=True,
+                    init_values=1e-5,
+                    dynamic_img_size=True,
+                )
+                transform = create_transform(
+                    **resolve_data_config(model.pretrained_cfg, model=model)
+                )
+
+                class UNI(nn.Module):
+                    def __init__(self, model, transform):
+                        super().__init__()
+                        self.model = model
+                        self.transform = transform
+
+                    def forward(self, x):
+                        x_processed = self.transform(x)
+                        latent_code = self.model(x_processed)
+                        return latent_code
+
+                encoder = UNI(model, transform)
+
+        elif not self.config.encoder_path is None:
             encoder = torch.load(self.config.encoder_path, map_location="cpu")
             if self.config.is_torchvision_resnet:
                 # remove the head
                 encoder.model.fc = nn.Identity()
 
-            # nn module that normalizes with self.generator_dataset.config.normalization
-            class NormalizationModule(nn.Module):
-                def __init__(self, mean, std):
-                    super().__init__()
-                    self.mean = torch.tensor(mean)
-                    self.std = torch.tensor(std)
-
-                def forward(self, x):
-                    return (x - self.mean.to(x.device)) / self.std.to(x.device)
-
-            normalization = NormalizationModule(
-                self.generator_dataset.config.normalization[0], self.generator_dataset.config.normalization[1]
-            )
-            # include the normalization directly into the encoder
-            encoder = torch.nn.Sequential(normalization, encoder)
-
         else:
             encoder = None
 
+        if not encoder is None:
+            # nn module that normalizes with self.generator_dataset.config.normalization
 
+
+            normalization = NormalizationModule(
+                self.generator_dataset.config.normalization[0],
+                self.generator_dataset.config.normalization[1],
+            )
+            # include the normalization directly into the encoder
+            self.encoder = torch.nn.Sequential(normalization, encoder)
+
+        else:
+            self.encoder = None
+
+    def adjust_config(self, conf):
         conf.base_dir = self.config.base_path
         conf.dataset = self.generator_dataset
-        conf.encoder = encoder
         conf.img_size = self.generator_dataset.config.input_size[-1]
         conf.model_conf.image_size = self.generator_dataset.config.input_size[-1]
         conf.batch_size = self.config.batch_size
         conf.save_every_samples = self.config.save_every_samples
         conf.total_samples = self.config.total_samples
-        self.generator_dataset.return_dict = True
-        self.generator_dataset.idx_enabled = True
+        conf.style_ch = self.config.encoder_dimensions
+        conf.net_beatgans_embed_channels = self.config.encoder_dimensions
+        conf.embed_channels = self.config.encoder_dimensions
+        conf.enc_out_channels = self.config.encoder_dimensions
+        conf.encoder = self.encoder
+        #import pdb; pdb.set_trace()
 
     def train_model(
         self,
     ):
+        return_dict_buffer = self.generator_dataset.return_dict
+        idx_enabled_buffer = self.generator_dataset.idx_enabled
+        self.generator_dataset.return_dict = True
+        self.generator_dataset.idx_enabled = True
         # write the yaml config on disk
         if not os.path.exists(self.config.base_path):
             Path(self.config.base_path).mkdir(parents=True, exist_ok=True)
 
-        save_yaml_config(self.config, os.path.join(self.config.base_path, "config.yaml"))
+        self.config.is_loaded = True
+        save_yaml_config(
+            self.config, os.path.join(self.config.base_path, "config.yaml")
+        )
         # finetune_args = types.SimpleNamespace(**self.config.__dict__)
         #
         conf = square64_autoenc()
@@ -168,8 +272,12 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         self.adjust_config(conf)
         train(conf)
 
-        self.model = LitModel.load_from_checkpoint(checkpoint_path=self.checkpoint_path, conf=conf, map_location="cpu")
+        self.model = LitModel.load_from_checkpoint(
+            checkpoint_path=self.checkpoint_path, conf=conf, map_location="cpu"
+        )
         self.model.to(self.device)
+        self.generator_dataset.return_dict = return_dict_buffer
+        self.generator_dataset.idx_enabled = idx_enabled_buffer
 
     def edit(
         self,
@@ -185,37 +293,68 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         mode: str = "",
     ):
         device = [p for p in predictor.parameters()][0].device
+
+        classifier_to_generator = (
+            lambda x: self.generator_dataset.project_from_pytorch_default(
+                self.predictor_dataset.project_to_pytorch_default(x)
+            )
+        )
+        generator_to_classifier = (
+            lambda x: self.predictor_dataset.project_from_pytorch_default(
+                self.generator_dataset.project_to_pytorch_default(x)
+            )
+        )
+
+        distilled_datasources = []
+        for idx, predictor_dataset in enumerate(predictor_datasets):
+            distilled_datasource = copy.deepcopy(predictor_dataset)
+            if isinstance(distilled_datasource, torch.utils.data.DataLoader):
+                distilled_datasource.dataset.normalization = self.generator_datasets[idx].normalization
+                distilled_datasource.dataset.transform = self.generator_datasets[idx].transform
+                distilled_datasource.dataset.config.normalization = self.generator_datasets[idx].config.normalization
+
+            elif isinstance(distilled_datasource, WeightedDataloaderList):
+                for j in range(len(distilled_datasource.dataloaders)):
+                    distilled_datasource.dataloaders[j].dataset.normalization = self.generator_datasets[idx].normalization
+                    distilled_datasource.dataloaders[j].dataset.transform = self.generator_datasets[idx].transform
+                    distilled_datasource.dataloaders[j].dataset.config.normalization = self.generator_datasets[idx].config.normalization
+
+            else:
+                distilled_datasource.normalization = self.generator_datasets[idx].normalization
+                distilled_datasource.transform = self.generator_datasets[idx].transform
+                distilled_datasource.config.normalization = self.generator_datasets[idx].config.normalization
+
+            distilled_datasources.append(distilled_datasource)
+
         if not explainer_config.distilled_predictor is None:
             # assert explainer_config.distilled_predictor.task.output_channels == 1
-            distilled_path = os.path.join(base_path, "explainer", "distilled_predictor", "model.cpl")
+            distilled_path = os.path.join(
+                base_path, "explainer", "distilled_predictor", "model.cpl"
+            )
             if not os.path.exists(distilled_path):
                 self.gradient_predictor = distill_predictor(
-                    explainer_config.distilled_predictor,
-                    os.path.join(base_path, "explainer"),
-                    predictor,
-                    self.generator_datasets,
+                    predictor_distillation=explainer_config.distilled_predictor,
+                    base_path=os.path.join(base_path, "explainer"),
+                    predictor=lambda x: predictor(generator_to_classifier(x)),
+                    predictor_datasource=distilled_datasources,
                     predictor_distilled=nn.Sequential(
                         *[
                             self.model.ema_model.encoder,
                             nn.Linear(self.config.encoder_dimensions, 1, bias=False),
                         ]
-                    ),  # TODO fix this!
+                    ),
                     only_last_layer=True,
                     continue_training=True,
                 )
 
             else:
-                self.gradient_predictor = torch.load(distilled_path, map_location=self.device)
+                self.gradient_predictor = torch.load(
+                    distilled_path, map_location=self.device
+                )
 
         else:
             self.gradient_predictor = predictor
 
-        classifier_to_generator = lambda x: self.generator_dataset.project_from_pytorch_default(
-            self.predictor_dataset.project_to_pytorch_default(x)
-        )
-        generator_to_classifier = lambda x: self.predictor_dataset.project_from_pytorch_default(
-            self.generator_dataset.project_to_pytorch_default(x)
-        )
         print("[x_in.min(), x_in.max()]")
         print([x_in.min(), x_in.max()])
         print([x_in.min(), x_in.max()])
@@ -233,14 +372,20 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         print([x_generator.min(), x_generator.max()])
         z_sem, xT = self.encode(x_generator.to(self.device))
         w = list(self.gradient_predictor.children())[-1].weight[0]
-        dot_ab = torch.tensor(torch.sum(z_sem * w, dim=-1, keepdim=True) > 0, dtype=torch.uint8)
+        dot_ab = torch.tensor(
+            torch.sum(z_sem * w, dim=-1, keepdim=True) > 0, dtype=torch.uint8
+        )
         print("dot_ab before editing:", dot_ab.squeeze().detach().cpu().numpy())
         z_sem2 = self._calculate_z_counterfactuals(z_sem)
-        dot_ab2 = torch.tensor(torch.sum(z_sem2 * w, dim=-1, keepdim=True) > 0, dtype=torch.uint8)
+        dot_ab2 = torch.tensor(
+            torch.sum(z_sem2 * w, dim=-1, keepdim=True) > 0, dtype=torch.uint8
+        )
         print("dot_ab after editing:", dot_ab2.squeeze().detach().cpu().numpy())
         x_counterfactuals_generator = self.decode((z_sem2, xT))
         z_sem3, _ = self.encode(x_counterfactuals_generator.to(self.device))
-        dot_ab3 = torch.tensor(torch.sum(z_sem3 * w, dim=-1, keepdim=True) > 0, dtype=torch.uint8)
+        dot_ab3 = torch.tensor(
+            torch.sum(z_sem3 * w, dim=-1, keepdim=True) > 0, dtype=torch.uint8
+        )
         print("dot_ab3:", dot_ab3.squeeze().detach().cpu().numpy())
         # x_counterfactuals_generator = x_generator
         print("[x_counterfactuals_generator.min(), x_counterfactuals_generator.max()]")
@@ -254,7 +399,9 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         print([x_counterfactuals.min(), x_counterfactuals.max()])
         print([x_counterfactuals.min(), x_counterfactuals.max()])
 
-        preds = torch.nn.Softmax(dim=-1)(predictor(x_counterfactuals.to(device)).detach().cpu())
+        preds = torch.nn.Softmax(dim=-1)(
+            predictor(x_counterfactuals.to(device)).detach().cpu()
+        )
         y_target_end_confidence = torch.zeros([x_in.shape[0]])
         for i in range(x_in.shape[0]):
             y_target_end_confidence[i] = preds[i, target_classes[i]]
@@ -288,3 +435,13 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         reflected = a - 2 * proj
         # import pdb; pdb.set_trace()
         return reflected
+
+
+class NormalizationModule(nn.Module):
+    def __init__(self, mean, std):
+        super().__init__()
+        self.mean = torch.tensor(mean)
+        self.std = torch.tensor(std)
+
+    def forward(self, x):
+        return (x - self.mean.to(x.device)) / self.std.to(x.device)

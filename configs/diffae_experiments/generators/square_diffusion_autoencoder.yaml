@@ -4,7 +4,9 @@ category : generator
 base_path : $PEAL_RUNS/square/diffusion_autoencoder
 data: <PEAL_BASE>/configs/sce_experiments/data/square_generator.yaml
 image_size: 64
-batch_size: 196
-save_interval: 1000
-max_steps: 10000
+batch_size: 100
+save_every_samples: 20000
+total_samples: 40000000
 encoder_dimensions : 512
+encoder_path: $PEAL_RUNS/square/colora_confounding_colorb/classifier_all_attributes_resnet18/model.cpl
+is_torchvision_resnet: true

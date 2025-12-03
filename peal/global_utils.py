@@ -507,13 +507,7 @@ def get_predictions(args):
             img_file = tuple(img_file)
 
         img = img.to(device)
-        try:
-            lab = lab.to(device)
-
-        except:
-            import pdb
-
-            pdb.set_trace()
+        lab = lab.to(device)
 
         logits = classifier(img)
         if len(logits.shape) > 1:
@@ -522,20 +516,20 @@ def get_predictions(args):
         else:
             pred = (logits > 0).int()
 
-        acc += (pred == lab).float().sum().item()
+        try:
+            acc += (pred == lab).float().sum().item()
+
+        except:
+            import pdb; pdb.set_trace()
         n += lab.size(0)
 
         d["prediction"] += [p.item() for p in pred]
         d["idx"] += list(img_file)
 
-    print(acc / n)
-    try:
-        df = pd.DataFrame(data=d)
-
-    except Exception:
-        import pdb
-
-        pdb.set_trace()
+    print("distilled accuracy: " + str(acc / n))
+    print("distilled accuracy: " + str(acc / n))
+    print("distilled accuracy: " + str(acc / n))
+    df = pd.DataFrame(data=d)
 
     df.to_csv(
         args.label_path,

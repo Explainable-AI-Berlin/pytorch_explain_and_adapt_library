@@ -6,18 +6,17 @@ tracking_level                       :  4
 min_train_samples                    :  800
 finetune_iterations                  :  1
 max_validation_samples               :  200
-continuous_learning                  :  "finetune"
+continuous_learning                  :  "deep_feature_reweighting"
 calculate_group_accuracies           :  True
 calculate_explainer_stats            :  False
 explainer                            :  <PEAL_BASE>/configs/diffae_experiments/explainers/dae_distill.yaml
 training                             :  <PEAL_BASE>/configs/cfkd_experiments/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/cfkd_experiments/data/camelyon1k_poisoned098.yaml
 test_data                            :  <PEAL_BASE>/configs/cfkd_experiments/data/camelyon_unpoisoned.yaml
-student                              :  $PEAL_RUNS/camelyon1k/colora_confounding_colorb/torchvision/classifier_poisoned098/model.cpl
-teacher                              :  $PEAL_RUNS/camelyon/colora_confounding_colorb/torchvision/classifier_unpoisoned/model.cpl
-#generator                            :  $PEAL_RUNS/camelyon1k/diffae/config.yaml
-generator                            :  <PEAL_BASE>/configs/diffae_experiments/generators/camelyon_diffusion_autoencoder.yaml
-base_dir                             :  $PEAL_RUNS/camelyon1k/colora_confounding_colorb/torchvision/classifier_poisoned098/dae_cfkd
+student                              :  $PEAL_RUNS/camelyon17_1k/dinov2_linear_poisoned098/model.cpl
+teacher                              :  $PEAL_RUNS/camelyon17/classifier_unpoisoned/model.cpl
+generator                            :  $PEAL_RUNS/camelyon/diffusion_autoencoder/config.yaml
+base_dir                             :  $PEAL_RUNS/camelyon17_1k/dinov2_linear_poisoned098/dae_cfkd
 task:
   criterions:
     ce     : 1.0

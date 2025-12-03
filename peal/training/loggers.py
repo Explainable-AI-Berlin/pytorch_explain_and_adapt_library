@@ -127,14 +127,14 @@ class Logger:
 
             predictions_one_hot = torch.nn.functional.one_hot(
                 torch.cat(self.predicted_classes).to(torch.int64), self.output_channels
-            ).to(torch.float32)
+            ).to(torch.float32).cpu()
             self.correct = torch.cat(self.correct)
 
         if "bce" in self.config.task.criterions.keys() and not isinstance(
             self.model, InvertibleGenerator
         ):
             targets_one_hot = torch.cat(self.targets)
-            predictions_one_hot = torch.cat(self.predicted_classes)
+            predictions_one_hot = torch.cat(self.predicted_classes).cpu()
             correct_per_class = torch.cat(self.correct).mean(0)
             if not pbar is None:
                 pbar.stored_values["correct_per_class"] = correct_per_class
@@ -147,7 +147,7 @@ class Logger:
             self.correct = torch.cat(self.correct)
 
         if "mixed" in self.config.task.criterions.keys():
-            targets_one_hot = torch.cat(self.targets)
+            targets_one_hot = torch.cat(self.targets).cpu()
             self.predictions = torch.cat(self.predictions)
             class_preds = torch.tensor(
                 nn.Sigmoid()(
@@ -188,24 +188,33 @@ class Logger:
                 self.config.training.epoch,
             )
             for channel in range(self.output_channels):
-                self.writer.add_scalar(
-                    "z_epoch_" + mode + "_predicted_classes" + str(channel),
-                    predictions_one_hot.mean(0)[channel],
-                    self.config.training.epoch,
-                )
+                try:
+                    self.writer.add_scalar(
+                        "z_epoch_" + mode + "_predicted_classes" + str(channel),
+                        predictions_one_hot.mean(0)[channel],
+                        self.config.training.epoch,
+                    )
+
+                except Exception as exp:
+                    import pdb; pdb.set_trace()
+
                 if mode[: len("validation")] == "validation":
                     prefix = "0_"
 
                 else:
                     prefix = "z_"
 
-                self.writer.add_scalar(
-                    prefix + "epoch_" + mode + "_classes_difference" + str(channel),
-                    torch.abs(predictions_one_hot - targets_one_hot)
-                    .mean(0)
-                    .cpu()[channel],
-                    self.config.training.epoch,
-                )
+                try:
+                    self.writer.add_scalar(
+                        prefix + "epoch_" + mode + "_classes_difference" + str(channel),
+                        torch.abs(predictions_one_hot.cpu() - targets_one_hot)
+                        .mean(0)
+                        .cpu()[channel],
+                        self.config.training.epoch,
+                    )
+
+                except:
+                    import pdb; pdb.set_trace()
             if not pbar is None:
                 pbar.stored_values[mode + "_accuracy"] = accuracy
                 pbar.stored_values[
