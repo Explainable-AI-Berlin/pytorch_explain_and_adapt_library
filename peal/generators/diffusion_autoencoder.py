@@ -345,6 +345,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
                     ),
                     only_last_layer=True,
                     continue_training=True,
+                    task_config=TaskConfig(**explainer_config.distilled_predictor['task']),
                 )
 
             else:
@@ -364,7 +365,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         print("preds_before: " + str(preds.argmax(dim=-1)))
 
         x_generator = classifier_to_generator(x_in)
-        x_generator = 2 * x_generator
+        #x_generator = 2 * x_generator
         # x_generator = x_in
         print("[x_generator.min(), x_generator.max()]")
         print([x_generator.min(), x_generator.max()])
@@ -372,9 +373,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         print([x_generator.min(), x_generator.max()])
         z_sem, xT = self.encode(x_generator.to(self.device))
         w = list(self.gradient_predictor.children())[-1].weight[0]
-        dot_ab = torch.tensor(
-            torch.sum(z_sem * w, dim=-1, keepdim=True) > 0, dtype=torch.uint8
-        )
+        dot_ab = torch.tensor(torch.sum(z_sem * w, dim=-1, keepdim=True) > 0.5, dtype=torch.uint8)
         print("dot_ab before editing:", dot_ab.squeeze().detach().cpu().numpy())
         z_sem2 = self._calculate_z_counterfactuals(z_sem)
         dot_ab2 = torch.tensor(
@@ -382,7 +381,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         )
         print("dot_ab after editing:", dot_ab2.squeeze().detach().cpu().numpy())
         x_counterfactuals_generator = self.decode((z_sem2, xT))
-        z_sem3, _ = self.encode(x_counterfactuals_generator.to(self.device))
+        z_sem3, _ = self.encode(classifier_to_generator(x_counterfactuals_generator.to(self.device)))
         dot_ab3 = torch.tensor(
             torch.sum(z_sem3 * w, dim=-1, keepdim=True) > 0, dtype=torch.uint8
         )
@@ -407,9 +406,6 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             y_target_end_confidence[i] = preds[i, target_classes[i]]
 
         print("preds_after:", preds.argmax(dim=-1))
-        import pdb
-
-        pdb.set_trace()
 
         return (
             list(x_counterfactuals.cpu()),

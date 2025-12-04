@@ -113,7 +113,7 @@ def latent_convexity_criterion(model, y_pred, y_target, latent_code=None):
 available_criterions = {
     "ce": cross_entropy_criterion,
     "bce": lambda model, y_pred, y_target, latent_code: nn.BCEWithLogitsLoss()(
-        y_pred, y_target
+        y_pred, y_target.float()
     ),
     "mse": lambda model, y_pred, y_target, latent_code: nn.MSELoss()(y_pred, y_target),
     "mae": lambda model, y_pred, y_target, latent_code: nn.L1Loss()(y_pred, y_target),
