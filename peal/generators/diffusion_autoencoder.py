@@ -211,6 +211,9 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
                 # remove the head
                 encoder.model.fc = nn.Identity()
 
+            else:
+                encoder.fc = nn.Identity()
+
         else:
             encoder = None
 
@@ -241,7 +244,6 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         conf.embed_channels = self.config.encoder_dimensions
         conf.enc_out_channels = self.config.encoder_dimensions
         conf.encoder = self.encoder
-        #import pdb; pdb.set_trace()
 
     def train_model(
         self,
@@ -429,7 +431,6 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         proj = dot_ab / dot_bb * b  # shape (batch, n)
         # reflected = 2 * proj - a
         reflected = a - 2 * proj
-        # import pdb; pdb.set_trace()
         return reflected
 
 
