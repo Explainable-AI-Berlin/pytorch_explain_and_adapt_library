@@ -1,3 +1,13 @@
+from typing import Union
+
+from pydantic import BaseModel
+
+
+class SparseDictionaryConfig(BaseModel):
+    n_components: Union[int, None]
+    sparse_dictionary_type: str
+    ending: str
+
 class SparseDictionary:
     def fit(self, X):
         raise NotImplementedError("Subclasses should implement this method.")

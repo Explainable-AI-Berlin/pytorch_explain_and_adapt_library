@@ -5,13 +5,13 @@ import torch
 from peal.sparse_dictionaries.interfaces import SparseDictionary, SparseDictionaryConfig
 
 
-class SVDDictionaryConfig(SparseDictionaryConfig):
+class MatryoshkaSAEConfig(SparseDictionaryConfig):
     n_components: Union[int, None] = 100
     sparse_dictionary_type: str = 'SVDDictionary'
     ending: str = '.npz'
 
-class SVDDictionary(SparseDictionary):
-    def __init__(self, config=SVDDictionaryConfig()):
+class MatryoshkaSAE(SparseDictionary):
+    def __init__(self, config=MatryoshkaSAEConfig()):
         self.config = config
         self.U = None
         self.S = None
