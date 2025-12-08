@@ -398,7 +398,12 @@ class SquareDataset(Image2MixedDataset):
         self.hints_enabled = hints_enabled_buffer
 
         path = filename.split("/")[:-1] + ["decision_boundary.npy"]
-        decision_boundary = np.load("/" + str(os.path.join(*path)))
+        if os.path.exists("/" + str(os.path.join(*path))):
+            decision_boundary = np.load("/" + str(os.path.join(*path)))
+
+        else:
+             decision_boundary = np.load(str(os.path.join(*path)))
+
         decision_boundary = np.transpose(decision_boundary, (1, 0))
 
         plot_latents_with_arrows(
