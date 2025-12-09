@@ -1,5 +1,4 @@
-import transformer_lens.utils as utils
-import torch 
+import torch
 
 def get_default_cfg():
     default_cfg = {
@@ -34,7 +33,7 @@ def get_default_cfg():
         "top_k": 32,
         "top_k_aux": 512,
         "aux_penalty": (1/32),
-        
+
         # for jumprelu
         "bandwidth": 0.001,
     }
@@ -42,6 +41,7 @@ def get_default_cfg():
     return default_cfg
 
 def post_init_cfg(cfg):
+    import transformer_lens.utils as utils
     cfg["hook_point"] = utils.get_act_name(cfg["site"], cfg["layer"])
     cfg["name"] = f"{cfg['model_name']}_{cfg['hook_point']}_{cfg['dict_size']}_{cfg['sae_type']}_{cfg['top_k']}_{cfg['lr']}"
     return cfg

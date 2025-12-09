@@ -30,10 +30,12 @@ from peal.global_utils import load_yaml_config, save_yaml_config
 from peal.generators.interfaces import GeneratorConfig
 from peal.data.interfaces import DataConfig
 from peal.architectures.interfaces import TaskConfig
+from peal.sparse_dictionaries.interfaces import SparseDictionaryConfig, SparseDictionary
 from peal.sparse_dictionaries.singular_value_decomposition import (
     SVDDictionary,
     SVDDictionaryConfig,
 )
+from peal.sparse_dictionaries.sparse_dictionary_factory import get_sparse_dictionary
 from peal.training.trainers import distill_predictor
 
 
@@ -304,15 +306,25 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             self.latent_model = None
 
     def fit_sparse_dictionary(self):
-        self.sparse_dictionary = SVDDictionary()
+        self.sparse_dictionary = get_sparse_dictionary(self.config.sparse_dictionary)
         self.sparse_dictionary.fit_from_dataloaders(
             [torch.utils.data.DataLoader(self.generator_datasets[1], batch_size=10)], self.model.ema_model.encoder
         )
         self.sparse_dictionary.save_on_disk(self.sparse_dictionary_path)
 
-    def explain_all_components(self):
-        if self.sparse_dictionary is None:
-            self.fit_sparse_dictionary()
+    def explain_all_components(self, sparse_dictionary=None):
+        if self.sparse_dictionary is None or not sparse_dictionary is None:
+            if isinstance(sparse_dictionary, SparseDictionary):
+                self.sparse_dictionary = sparse_dictionary
+                self.config.sparse_dictionary = copy.deepcopy(sparse_dictionary.config)
+
+            else:
+                if isinstance(sparse_dictionary, SparseDictionaryConfig):
+                    self.config.sparse_dictionary = sparse_dictionary
+
+                self.fit_sparse_dictionary()
+
+            #save_yaml_config(self.config, os.path.join(self.config.base_path, "config.yaml"))
 
         if not self.latent_model is None:
             explanation_path = os.path.join(self.config.base_path, self.config.sparse_dictionary.sparse_dictionary_type)
@@ -385,6 +397,11 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         proj_factors_after = (z_sem_after - self.sparse_dictionary.mu.to(self.device)) @ w
         print("proj_factors_after:" + str(list(proj_factors_after.cpu().numpy())))
         x_counterfactuals_generator = self.decode((z_sem_after, xT))
+        print("[x_counterfactuals_generator.min(), x_counterfactuals_generator.max()]")
+        print([x_counterfactuals_generator.min(), x_counterfactuals_generator.max()])
+        print([x_counterfactuals_generator.min(), x_counterfactuals_generator.max()])
+        print([x_counterfactuals_generator.min(), x_counterfactuals_generator.max()])
+        x_counterfactuals_generator = self.generator_datasets[1].project_from_pytorch_default(x_counterfactuals_generator)
         print("[x_counterfactuals_generator.min(), x_counterfactuals_generator.max()]")
         print([x_counterfactuals_generator.min(), x_counterfactuals_generator.max()])
         print([x_counterfactuals_generator.min(), x_counterfactuals_generator.max()])

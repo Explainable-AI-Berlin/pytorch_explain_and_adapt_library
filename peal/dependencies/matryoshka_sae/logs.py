@@ -1,8 +1,13 @@
-import wandb
 import torch
 from functools import partial
 import os
 import json
+
+try:
+    import wandb
+
+except:
+    wandb = None
 
 def init_wandb(cfg):
     return wandb.init(project=cfg["wandb_project"], name=cfg["name"], config=cfg, reinit=True)

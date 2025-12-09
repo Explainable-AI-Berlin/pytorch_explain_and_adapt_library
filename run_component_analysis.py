@@ -8,6 +8,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, required=True)
     parser.add_argument("--is_loaded", type=bool, default=True)
+    parser.add_argument("--sd_config", type=str, default=None)
     # add_class_arguments(parser, ModelConfig)
     args = parser.parse_args()
 
@@ -15,10 +16,16 @@ def main():
     if hasattr(generator_config, "is_loaded"):
         generator_config.is_loaded = args.is_loaded
 
+    if not args.sd_config is None:
+        sparse_dictionary_config = load_yaml_config(args.sd_config)
+
+    else:
+        sparse_dictionary_config = None
+
     set_random_seed(generator_config.seed)
 
     generator = get_generator(generator_config)
-    generator.explain_all_components()
+    generator.explain_all_components(sparse_dictionary_config)
 
 
 if __name__ == "__main__":

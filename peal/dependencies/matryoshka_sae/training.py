@@ -1,31 +1,64 @@
 import torch
 import tqdm
-from logs import init_wandb, log_wandb, log_model_performance, save_checkpoint
 import multiprocessing as mp
-from queue import Empty
-import wandb
 import json
 import os
 
+from queue import Empty
+
+from .logs import log_model_performance, save_checkpoint
+
+try:
+    import wandb
+    from .logs import init_wandb, log_wandb
+
+except:
+    wandb = None
+
+
 def train_sae(sae, activation_store, model, cfg):
     num_batches = cfg["num_tokens"] // cfg["batch_size"]
-    optimizer = torch.optim.Adam(sae.parameters(), lr=cfg["lr"], betas=(cfg["beta1"], cfg["beta2"]))
+    if "no_bias" in cfg.keys() and not cfg["no_bias"]:
+        parameters = [sae.W_enc, sae.W_dec]
+
+    else:
+        parameters = sae.parameters()
+
+    optimizer = torch.optim.Adam(
+        parameters, lr=cfg["lr"], betas=(cfg["beta1"], cfg["beta2"])
+    )
     pbar = tqdm.trange(num_batches)
 
-    wandb_run = init_wandb(cfg)
-    
+    if not wandb is None:
+        wandb_run = init_wandb(cfg)
+
+    else:
+        wandb_run = None
+
     for i in pbar:
         batch = activation_store.next_batch()
         sae_output = sae(batch)
-        log_wandb(sae_output, i, wandb_run)
-        if i % cfg["perf_log_freq"]  == 0:
+
+        if not wandb is None:
+            log_wandb(sae_output, i, wandb_run)
+        if i % cfg["perf_log_freq"] == 0 and hasattr(
+            activation_store, "get_batch_tokens"
+        ):
             log_model_performance(wandb_run, i, model, activation_store, sae)
 
         if i % cfg["checkpoint_freq"] == 0:
             save_checkpoint(wandb_run, sae, cfg, i)
 
         loss = sae_output["loss"]
-        pbar.set_postfix({"Loss": f"{loss.item():.4f}", "L0": f"{sae_output['l0_norm']:.4f}", "L2": f"{sae_output['l2_loss']:.4f}", "L1": f"{sae_output['l1_loss']:.4f}", "L1_norm": f"{sae_output['l1_norm']:.4f}"})
+        pbar.set_postfix(
+            {
+                "Loss": f"{loss.item():.4f}",
+                "L0": f"{sae_output['l0_norm']:.4f}",
+                "L2": f"{sae_output['l2_loss']:.4f}",
+                "L1": f"{sae_output['l1_loss']:.4f}",
+                "L1_norm": f"{sae_output['l1_norm']:.4f}",
+            }
+        )
         loss.backward()
         torch.nn.utils.clip_grad_norm_(sae.parameters(), cfg["max_grad_norm"])
         sae.make_decoder_weights_and_grad_unit_norm()
@@ -33,16 +66,26 @@ def train_sae(sae, activation_store, model, cfg):
         optimizer.zero_grad()
 
     save_checkpoint(wandb_run, sae, cfg, i)
-    
+
 
 def train_sae_group(saes, activation_store, model, cfgs):
     num_batches = cfgs[0]["num_tokens"] // cfgs[0]["batch_size"]
-    optimizers = [torch.optim.Adam(sae.parameters(), lr=cfg["lr"], betas=(cfg["beta1"], cfg["beta2"])) for sae, cfg in zip(saes, cfgs)]
+    optimizers = [
+        torch.optim.Adam(
+            sae.parameters(), lr=cfg["lr"], betas=(cfg["beta1"], cfg["beta2"])
+        )
+        for sae, cfg in zip(saes, cfgs)
+    ]
     pbar = tqdm.trange(num_batches)
 
-    wandb_run = init_wandb(cfgs[0])
+    if not wandb is None:
+        wandb_run = init_wandb(cfgs[0])
 
-    batch_tokens = activation_store.get_batch_tokens()
+    else:
+        wandb_run = None
+
+    if hasattr(activation_store, "get_batch_tokens"):
+        batch_tokens = activation_store.get_batch_tokens()
 
     for i in pbar:
         batch = activation_store.next_batch()
@@ -50,21 +93,40 @@ def train_sae_group(saes, activation_store, model, cfgs):
         for sae, cfg, optimizer in zip(saes, cfgs, optimizers):
             sae_output = sae(batch)
             loss = sae_output["loss"]
-            log_wandb(sae_output, i, wandb_run, index=counter)
-            if i % cfg["perf_log_freq"]  == 0:
-                log_model_performance(wandb_run, i, model, activation_store, sae, index=counter, batch_tokens=batch_tokens)
+            if not wandb is None:
+                log_wandb(sae_output, i, wandb_run, index=counter)
+            if i % cfg["perf_log_freq"] == 0 and hasattr(
+                activation_store, "get_batch_tokens"
+            ):
+                log_model_performance(
+                    wandb_run,
+                    i,
+                    model,
+                    activation_store,
+                    sae,
+                    index=counter,
+                    batch_tokens=batch_tokens,
+                )
 
             if i % cfg["checkpoint_freq"] == 0:
                 save_checkpoint(wandb_run, sae, cfg, i)
 
-            pbar.set_postfix({"Loss": f"{loss.item():.4f}", "L0": f"{sae_output['l0_norm']:.4f}", "L2": f"{sae_output['l2_loss']:.4f}", "L1": f"{sae_output['l1_loss']:.4f}", "L1_norm": f"{sae_output['l1_norm']:.4f}"})
+            pbar.set_postfix(
+                {
+                    "Loss": f"{loss.item():.4f}",
+                    "L0": f"{sae_output['l0_norm']:.4f}",
+                    "L2": f"{sae_output['l2_loss']:.4f}",
+                    "L1": f"{sae_output['l1_loss']:.4f}",
+                    "L1_norm": f"{sae_output['l1_norm']:.4f}",
+                }
+            )
             loss.backward()
             torch.nn.utils.clip_grad_norm_(sae.parameters(), cfg["max_grad_norm"])
             sae.make_decoder_weights_and_grad_unit_norm()
             optimizer.step()
             optimizer.zero_grad()
             counter += 1
-   
+
     for sae, cfg, optimizer in zip(saes, cfgs, optimizers):
         save_checkpoint(wandb_run, sae, cfg, i)
 
@@ -99,24 +161,22 @@ def save_checkpoint_mp(sae, cfg, step):
     print(f"Model and config saved at step {step} in {save_dir}")
     return save_dir, sae_path, config_path
 
+
 def train_sae_group_seperate_wandb(saes, activation_store, model, cfgs):
     def new_wandb_process(config, log_queue, entity, project):
         run = wandb.init(
-            entity=entity, 
-            project=project, 
-            config=config, 
-            name=config["name"]
+            entity=entity, project=project, config=config, name=config["name"]
         )
-        
+
         while True:
             try:
                 # Wait up to 1 second for new data
                 log = log_queue.get(timeout=1)
-                
+
                 # Check for termination signal
                 if log == "DONE":
                     break
-                
+
                 # Check if this is a checkpoint signal
                 if isinstance(log, dict) and log.get("checkpoint"):
                     # Create and log artifact
@@ -134,62 +194,72 @@ def train_sae_group_seperate_wandb(saes, activation_store, model, cfgs):
                     wandb.log(log)
             except Empty:
                 continue
-                
+
         wandb.finish()
-    
+
     num_batches = int(cfgs[0]["num_tokens"] // cfgs[0]["batch_size"])
     print(f"Number of batches: {num_batches}")
-    optimizers = [torch.optim.Adam(sae.parameters(), lr=cfg["lr"], betas=(cfg["beta1"], cfg["beta2"])) 
-                 for sae, cfg in zip(saes, cfgs)]
+    optimizers = [
+        torch.optim.Adam(
+            sae.parameters(), lr=cfg["lr"], betas=(cfg["beta1"], cfg["beta2"])
+        )
+        for sae, cfg in zip(saes, cfgs)
+    ]
     pbar = tqdm.trange(num_batches)
 
     # Initialize wandb processes and queues
     wandb_processes = []
     log_queues = []
-    
+
     for i, cfg in enumerate(cfgs):
         log_queue = mp.Queue()
         log_queues.append(log_queue)
-        wandb_config = cfg
-        wandb_process = mp.Process(
-            target=new_wandb_process,
-            args=(wandb_config, log_queue, cfg.get("wandb_entity", ""), cfg["wandb_project"]),
-        )
-        wandb_process.start()
-        wandb_processes.append(wandb_process)
-
+        if not wandb is None:
+            wandb_config = cfg
+            wandb_process = mp.Process(
+                target=new_wandb_process,
+                args=(
+                    wandb_config,
+                    log_queue,
+                    cfg.get("wandb_entity", ""),
+                    cfg["wandb_project"],
+                ),
+            )
+            wandb_process.start()
+            wandb_processes.append(wandb_process)
 
     for i in pbar:
         batch = activation_store.next_batch()
-        
+
         for idx, (sae, cfg, optimizer) in enumerate(zip(saes, cfgs, optimizers)):
             sae_output = sae(batch)
             loss = sae_output["loss"]
-            
+
             # Log metrics to appropriate wandb process
             log_dict = {
                 k: v.item() if isinstance(v, torch.Tensor) and v.dim() == 0 else v
-                for k, v in sae_output.items() if isinstance(v, (int, float)) or 
-                (isinstance(v, torch.Tensor) and v.dim() == 0)
+                for k, v in sae_output.items()
+                if isinstance(v, (int, float))
+                or (isinstance(v, torch.Tensor) and v.dim() == 0)
             }
             log_queues[idx].put(log_dict)
 
             if i % cfg["checkpoint_freq"] == 0:
                 # Save checkpoint and send artifact info to wandb process
                 save_dir, _, _ = save_checkpoint_mp(sae, cfg, i)
-                log_queues[idx].put({
-                    "checkpoint": True,
-                    "step": i,
-                    "save_dir": save_dir
-                })
+                log_queues[idx].put(
+                    {"checkpoint": True, "step": i, "save_dir": save_dir}
+                )
 
-            pbar.set_postfix({
-                f"Loss_{idx}": f"{loss.item():.4f}", 
-                f"L0_{idx}": f"{sae_output['l0_norm']:.4f}",
-                f"L2_{idx}": f"{sae_output['l2_loss']:.4f}", 
-                f"L1_{idx}": f"{sae_output['l1_loss']:.4f}",
-            })
-            
+            pbar.set_postfix(
+                {
+                    f"Loss_{idx}": f"{loss.item():.4f}",
+                    f"L0_{idx}": f"{sae_output['l0_norm']:.4f}",
+                    f"L2_{idx}": f"{sae_output['l2_loss']:.4f}",
+                    f"L1_{idx}": f"{sae_output['l1_loss']:.4f}",
+                }
+            )
+
             loss.backward()
             torch.nn.utils.clip_grad_norm_(sae.parameters(), cfg["max_grad_norm"])
             sae.make_decoder_weights_and_grad_unit_norm()
@@ -199,11 +269,7 @@ def train_sae_group_seperate_wandb(saes, activation_store, model, cfgs):
     # Final checkpoints
     for idx, (sae, cfg) in enumerate(zip(saes, cfgs)):
         save_dir, _, _ = save_checkpoint_mp(sae, cfg, i)
-        log_queues[idx].put({
-            "checkpoint": True,
-            "step": i,
-            "save_dir": save_dir
-        })
+        log_queues[idx].put({"checkpoint": True, "step": i, "save_dir": save_dir})
 
     # Clean up wandb processes
     for queue in log_queues:

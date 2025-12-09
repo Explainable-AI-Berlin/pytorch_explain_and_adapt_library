@@ -1,5 +1,5 @@
 # python train_generator.py --config "<PEAL_BASE>/configs/diffae_experiments/generators/square_diffusion_autoencoder.yaml"
-# python run_component_analysis.py --config $PEAL_RUNS/square/diffusion_autoencoder/config.yaml
+# python run_component_analysis.py --config $PEAL_RUNS/square/diffusion_autoencoder/config.yaml --sd_config configs/diffae_experiments/sparse_dictionaries/matryoshka_sae_default.yaml
 generator_type : DiffusionAutoencoder
 category : generator
 base_path : $PEAL_RUNS/square/diffusion_autoencoder_new
@@ -11,3 +11,4 @@ total_samples: 400001
 encoder_dimensions : 512
 encoder_path: $PEAL_RUNS/square/colora_confounding_colorb/classifier_all_attributes_resnet18/model.cpl
 is_torchvision_resnet: true
+sparse_dictionary: <PEAL_BASE>/configs/diffae_experiments/sparse_dictionaries/matryoshka_sae_default.yaml

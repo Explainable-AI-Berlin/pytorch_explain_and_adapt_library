@@ -1,0 +1,3 @@
+ending: .npz
+n_components: 100
+sparse_dictionary_type: MatryoshkaSAE

@@ -9,13 +9,8 @@ class SparseDictionaryConfig(BaseModel):
     ending: str
 
 class SparseDictionary:
+    config : SparseDictionaryConfig
     def fit(self, X):
-        raise NotImplementedError("Subclasses should implement this method.")
-
-    def transform(self, X):
-        raise NotImplementedError("Subclasses should implement this method.")
-
-    def fit_transform(self, X):
         raise NotImplementedError("Subclasses should implement this method.")
 
     def fit_from_dataloaders(self, dataloaders):

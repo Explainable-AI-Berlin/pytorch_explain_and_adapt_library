@@ -12,7 +12,6 @@ from peal.global_utils import (
     find_subclasses,
     get_project_resource_dir,
 )
-from peal.training.trainers import ModelTrainer
 
 
 def get_explainer(
@@ -25,15 +24,10 @@ def get_explainer(
 
     Args:
         explainer (Union[Invertibleexplainer, str, dict]): The explainer to use.
-        data_config (Union[str, dict]): The data config.
-        predictor_train_dataloader (torch.utils.data.DataLoader): The train dataloader of the predictor.
-        dataloaders_val (torch.utils.data.DataLoader): The validation dataloader.
-        base_dir (str): The base directory.
-        gigabyte_vram (float): The amount of VRAM to use.
         device (Union[str, torch.device]): The device to use.
-
+        predictor_datasets: The datasets to use for the predictor.
     Returns:
-        Invertibleexplainer: The explainer.
+        ExplainerInterface: The explainer.
     """
     if not isinstance(explainer, ExplainerInterface):
         explainer_config = load_yaml_config(explainer)

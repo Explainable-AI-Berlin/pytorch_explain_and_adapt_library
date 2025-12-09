@@ -31,16 +31,6 @@ class SVDDictionary(SparseDictionary):
         self.S = S[:n_components]
         self.Vt = Vt[:n_components, :]
 
-    def transform(self, X):
-        # Project the data onto the learned components
-        if self.U is None or self.S is None or self.Vt is None:
-            raise ValueError("The model has not been fitted yet.")
-        return torch.matmul(X, self.Vt.T)
-
-    def fit_transform(self, X):
-        self.fit(X)
-        return self.transform(X)
-
     def fit_from_dataloaders(self, dataloaders, feature_extractor):
         X_list = []
         # derive which device to use from feature extractor
