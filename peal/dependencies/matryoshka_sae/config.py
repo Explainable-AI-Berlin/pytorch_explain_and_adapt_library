@@ -41,7 +41,11 @@ def get_default_cfg():
     return default_cfg
 
 def post_init_cfg(cfg):
-    import transformer_lens.utils as utils
-    cfg["hook_point"] = utils.get_act_name(cfg["site"], cfg["layer"])
-    cfg["name"] = f"{cfg['model_name']}_{cfg['hook_point']}_{cfg['dict_size']}_{cfg['sae_type']}_{cfg['top_k']}_{cfg['lr']}"
+    try:
+        import transformer_lens.utils as utils
+        cfg["hook_point"] = utils.get_act_name(cfg["site"], cfg["layer"])
+        cfg["name"] = f"{cfg['model_name']}_{cfg['hook_point']}_{cfg['dict_size']}_{cfg['sae_type']}_{cfg['top_k']}_{cfg['lr']}"
+
+    except:
+        cfg["name"] = f"{cfg['model_name']}_{cfg['dict_size']}_{cfg['sae_type']}_{cfg['top_k']}_{cfg['lr']}"
     return cfg

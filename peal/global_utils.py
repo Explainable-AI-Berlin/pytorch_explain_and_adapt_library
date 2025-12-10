@@ -289,8 +289,11 @@ def get_config_model(config_data):
 
         module_path = os.path.join(
             "peal",
-            config_data["category"] + "s",
+            config_data["category"],
         )
+        if not module_path[-1] == "s":
+             module_path = module_path + "s"
+
         superclass_dir = os.path.join(module_path, "interfaces")
         superclass_module_name = superclass_dir.replace("/", ".")
         module = importlib.import_module(superclass_module_name)

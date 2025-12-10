@@ -1,115 +1,95 @@
-import torch
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
+import torch
 
-def analyze_and_plot_svd_correlations(data, ground_truth, feature_names=None):
+def plot_component_ground_truth_correlations(filename, components, ground_truth_attributes):
     """
+    Calculates the correlation between extracted components and ground truth attributes
+    and saves a heatmap visualization to the specified filename.
+
     Args:
-        data: torch.Tensor of shape (n_samples, n_features)
-        ground_truth: torch.Tensor of shape (n_samples, N_sources_of_variation)
-                      (Values should be between 0 and 1)
-        feature_names: List of strings (optional) names for your ground truths
+        filename (str): Path to save the image (e.g., 'correlation_matrix.png')
+        components (array-like): Shape (n_samples, n_components). The extracted component values.
+        ground_truth_attributes (array-like): Shape (n_samples, n_attributes). The ground truth metadata.
     """
 
-    # 1. Pre-processing: Center the data (Standard for PCA/SVD analysis)
-    # SVD on centered data is equivalent to PCA
-    data_mean = torch.mean(data, dim=0)
-    data_centered = data - data_mean
+    # 1. Convert Inputs to Numpy if they are PyTorch Tensors
+    if torch.is_tensor(components):
+        components = components.detach().cpu().numpy()
+    if torch.is_tensor(ground_truth_attributes):
+        ground_truth_attributes = ground_truth_attributes.detach().cpu().numpy()
 
-    # 2. Perform SVD
-    # torch.linalg.svd is preferred over torch.svd in newer PyTorch versions
-    # U: Unitary matrix, S: Singular values, Vh: Conjugate transpose of V (Vt)
-    U, S, Vh = torch.linalg.svd(data_centered, full_matrices=False)
+    # Ensure inputs are numpy arrays
+    components = np.array(components)
+    ground_truth_attributes = np.array(ground_truth_attributes)
 
-    # Transpose Vh to get V (columns are principal components)
-    V = Vh.T
+    n_features = ground_truth_attributes.shape[1]
+    n_components = components.shape[1]
 
-    # 3. Get Component Values (Projections/Scores)
-    # We project the data onto the singular vectors.
-    # This gives us the coordinate of each data point in the "SVD space".
-    # We only care about the first N components corresponding to the N ground truths
-    num_vars = ground_truth.shape[1]
+    # 2. Compute Correlation Matrix
+    # Matrix shape: (n_ground_truths, n_components)
+    corr_matrix = np.zeros((n_features, n_components))
 
-    # Select top N components. Shape: (n_samples, num_vars)
-    component_scores = data_centered @ V[:, :num_vars]
-
-    # Convert to numpy for easier plotting/math
-    scores_np = component_scores.detach().cpu().numpy()
-    gt_np = ground_truth.detach().cpu().numpy()
-
-    # 4. Correlation Analysis
-    # We calculate a correlation matrix between every Component and every Ground Truth
-    n_components = scores_np.shape[1]
-    n_gt = gt_np.shape[1]
-
-    # Matrix to store correlation coefficients
-    corr_matrix = np.zeros((n_gt, n_components))
-
-    for i in range(n_gt): # For each ground truth
-        for j in range(n_components): # For each SVD component
+    for i in range(n_features):
+        for j in range(n_components):
             # Calculate Pearson correlation
-            corr = np.corrcoef(gt_np[:, i], scores_np[:, j])[0, 1]
+            # Handle edge case where standard deviation is 0 (constant value)
+            if np.std(ground_truth_attributes[:, i]) == 0 or np.std(components[:, j]) == 0:
+                corr = 0.0
+            else:
+                corr = np.corrcoef(ground_truth_attributes[:, i], components[:, j])[0, 1]
             corr_matrix[i, j] = corr
 
-    # 5. Plotting
-    fig, axes = plt.subplots(1, n_gt, figsize=(5 * n_gt, 5), constrained_layout=True)
-    if n_gt == 1: axes = [axes] # Handle single plot case
+    # 3. Plotting with Matplotlib (No Seaborn)
+    fig, ax = plt.subplots(figsize=(10, 8))
 
-    print(f"{'Ground Truth':<20} | {'Best Component':<15} | {'Correlation':<10}")
-    print("-" * 55)
+    # Create the heatmap
+    # cmap='coolwarm' or 'bwr' gives a nice Blue-White-Red divergence
+    im = ax.imshow(corr_matrix, cmap='coolwarm', vmin=-1, vmax=1)
 
-    for i in range(n_gt):
-        gt_name = feature_names[i] if feature_names else f"GT Annotation {i+1}"
+    # Add Colorbar
+    cbar = ax.figure.colorbar(im, ax=ax)
+    cbar.ax.set_ylabel("Pearson Correlation", rotation=-90, va="bottom")
 
-        # Find the component with the highest MAGNITUDE correlation
-        # (SVD sign is arbitrary, so -0.9 is just as good as 0.9)
-        best_comp_idx = np.argmax(np.abs(corr_matrix[i, :]))
-        best_corr = corr_matrix[i, best_comp_idx]
+    # Show all ticks and label them
+    ax.set_xticks(np.arange(n_components))
+    ax.set_yticks(np.arange(n_features))
 
-        # Print stats
-        print(f"{gt_name:<20} | Component {best_comp_idx+1:<14} | {best_corr:.4f}")
+    ax.set_xticklabels([f"Comp {j+1}" for j in range(n_components)])
+    ax.set_yticklabels([f"Attr {i+1}" for i in range(n_features)])
 
-        # Scatter Plot
-        ax = axes[i]
+    # Rotate the tick labels and set their alignment.
+    plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
 
-        # Optional: Add a regression line for visual aid
-        sns.regplot(x=gt_np[:, i], y=scores_np[:, best_comp_idx],
-                    ax=ax, scatter_kws={'alpha':0.5}, line_kws={'color':'red'})
+    # Loop over data dimensions and create text annotations.
+    # This manually recreates the 'annot=True' feature of seaborn
+    for i in range(n_features):
+        for j in range(n_components):
+            val = corr_matrix[i, j]
+            # Choose text color based on background intensity for readability
+            text_color = "white" if abs(val) > 0.5 else "black"
+            ax.text(j, i, f"{val:.2f}",
+                    ha="center", va="center", color=text_color, fontsize=9)
 
-        ax.set_title(f"Correlation: {best_corr:.2f}")
-        ax.set_xlabel(f"{gt_name} (0-1)")
-        ax.set_ylabel(f"SVD Component {best_comp_idx+1} Score")
-        ax.grid(True, linestyle='--', alpha=0.6)
+    ax.set_title("Correlation: Components vs Ground Truth Attributes")
+    fig.tight_layout()
 
-    plt.suptitle("Analysis: Ground Truth vs. Strongest SVD Components", fontsize=16)
-    plt.show()
+    # 4. Save and Close
+    plt.savefig(filename, dpi=300)
+    plt.close()
+    print(f"Correlation plot saved to {filename}")
 
-# ==========================================
-# MOCK DATA GENERATION (To test the script)
-# ==========================================
+# --- Example Usage ---
 if __name__ == "__main__":
-    # Create synthetic data with N=3 sources of variation
-    N_SAMPLES = 500
-    N_FEATURES = 50
-    N_SOURCES = 3
+    # Mock data
+    N_SAMPLES = 100
+    N_COMPS = 5
+    N_ATTRS = 3
 
-    # 1. Generate Ground Truths (latent factors) between 0 and 1
-    # Example: Size, Opacity, Rotation
-    gt = torch.rand(N_SAMPLES, N_SOURCES)
+    comps = np.random.randn(N_SAMPLES, N_COMPS)
+    attrs = np.random.rand(N_SAMPLES, N_ATTRS)
 
-    # 2. Create random projection matrix (mixing matrix)
-    # This simulates how latent factors manifest in high-dim features
-    mixing_matrix = torch.randn(N_SOURCES, N_FEATURES)
+    # Force a correlation for demonstration
+    comps[:, 0] = attrs[:, 0] * 0.9 + np.random.normal(0, 0.1, N_SAMPLES)
 
-    # 3. Create Data = GroundTruth * Mixing + Noise
-    data_clean = gt @ mixing_matrix
-    noise = torch.randn(N_SAMPLES, N_FEATURES) * 0.1
-    data = data_clean + noise
-
-    # Run the analysis
-    analyze_and_plot_svd_correlations(
-        data,
-        gt,
-        feature_names=["Size", "Opacity", "Rotation"]
-    )
+    plot_component_ground_truth_correlations("my_analysis.png", comps, attrs)

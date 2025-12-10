@@ -40,10 +40,10 @@ def get_sparse_dictionary(
             for sparse_dictionary_class in sparse_dictionary_class_list
         }
         if (
-            hasattr(sparse_dictionary_config, "sparse_dictionary_type")
-            and sparse_dictionary_config.sparse_dictionary_type in sparse_dictionary_class_dict.keys()
+            hasattr(sparse_dictionary_config, "sparse_dictionaries_type")
+            and sparse_dictionary_config.sparse_dictionaries_type in sparse_dictionary_class_dict.keys()
         ):
-            sparse_dictionary_out = sparse_dictionary_class_dict[sparse_dictionary_config.sparse_dictionary_type](
+            sparse_dictionary_out = sparse_dictionary_class_dict[sparse_dictionary_config.sparse_dictionaries_type](
                 config=sparse_dictionary_config,
             )
 

@@ -7,7 +7,7 @@ from peal.sparse_dictionaries.interfaces import SparseDictionary, SparseDictiona
 
 class SVDDictionaryConfig(SparseDictionaryConfig):
     n_components: Union[int, None] = 100
-    sparse_dictionary_type: str = 'SVDDictionary'
+    sparse_dictionaries_type: str = 'SVDDictionary'
     ending: str = '.npz'
 
 class SVDDictionary(SparseDictionary):

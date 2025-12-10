@@ -1,4 +1,4 @@
 ending: .npz
 n_components: 100
-sparse_dictionaries_type: MatryoshkaSAE
+sparse_dictionaries_type: SVDDictionary
 category: sparse_dictionaries
