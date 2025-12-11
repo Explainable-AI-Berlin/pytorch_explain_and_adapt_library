@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 class SparseDictionaryConfig(BaseModel):
     category: str = "sparse_dictionaries"
+    act_size: int = 512
     n_components: Union[int, None]
     sparse_dictionaries_type: str
     ending: str

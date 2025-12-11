@@ -6,7 +6,7 @@ from peal.sparse_dictionaries.interfaces import SparseDictionary, SparseDictiona
 
 
 class SVDDictionaryConfig(SparseDictionaryConfig):
-    n_components: Union[int, None] = 100
+    n_components: Union[int, None] = 10
     sparse_dictionaries_type: str = 'SVDDictionary'
     ending: str = '.npz'
 
@@ -44,7 +44,7 @@ class SVDDictionary(SparseDictionary):
         self.fit(X - self.mu)
 
     def get_components(self):
-        return self.Vt
+        return self.Vt.transpose(0, 1)
 
     def save_on_disk(self, path):
         torch.save({

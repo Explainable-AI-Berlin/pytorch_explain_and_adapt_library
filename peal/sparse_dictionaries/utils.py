@@ -2,94 +2,129 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 
-def plot_component_ground_truth_correlations(filename, components, ground_truth_attributes):
+def plot_component_ground_truth_correlations(
+    filename,
+    components,
+    ground_truth_attributes,
+    data,
+    component_names=None,
+    attribute_names=None
+):
     """
-    Calculates the correlation between extracted components and ground truth attributes
-    and saves a heatmap visualization to the specified filename.
+    Plots a correlation heatmap (Top) and a Full Cumulative Explained Variance plot (Bottom).
 
     Args:
-        filename (str): Path to save the image (e.g., 'correlation_matrix.png')
-        components (array-like): Shape (n_samples, n_components). The extracted component values.
-        ground_truth_attributes (array-like): Shape (n_samples, n_attributes). The ground truth metadata.
+        filename (str): Path to save the image.
+        components (array-like): Shape (n_samples, M). Extracted component scores (X-axis of heatmap).
+        ground_truth_attributes (array-like): Shape (n_samples, K). Ground truth values (Y-axis of heatmap).
+        data (array-like): Shape (n_samples, D). Original data used for full variance calculation.
+        component_names (list): Optional labels for components.
+        attribute_names (list): Optional labels for attributes.
     """
 
-    # 1. Convert Inputs to Numpy if they are PyTorch Tensors
-    if torch.is_tensor(components):
-        components = components.detach().cpu().numpy()
-    if torch.is_tensor(ground_truth_attributes):
-        ground_truth_attributes = ground_truth_attributes.detach().cpu().numpy()
+    # --- 1. Data Standardization ---
+    def process_input(x):
+        arr = x.detach().cpu().numpy() if torch.is_tensor(x) else np.array(x)
+        if arr.ndim == 1: arr = arr[:, np.newaxis]
+        return arr
 
-    # Ensure inputs are numpy arrays
-    components = np.array(components)
-    ground_truth_attributes = np.array(ground_truth_attributes)
+    comps = process_input(components)
+    attrs = process_input(ground_truth_attributes)
+    data_raw = process_input(data)
 
-    n_features = ground_truth_attributes.shape[1]
-    n_components = components.shape[1]
+    n_samples = data_raw.shape[0]
 
-    # 2. Compute Correlation Matrix
-    # Matrix shape: (n_ground_truths, n_components)
-    corr_matrix = np.zeros((n_features, n_components))
+    # Basic shape checks
+    if comps.shape[0] != n_samples:
+        raise ValueError(f"Shape Mismatch: Data has {n_samples} samples, Components has {comps.shape[0]}.")
+    if attrs.shape[0] != n_samples:
+        raise ValueError(f"Shape Mismatch: Data has {n_samples} samples, Attributes has {attrs.shape[0]}.")
 
-    for i in range(n_features):
-        for j in range(n_components):
-            # Calculate Pearson correlation
-            # Handle edge case where standard deviation is 0 (constant value)
-            if np.std(ground_truth_attributes[:, i]) == 0 or np.std(components[:, j]) == 0:
-                corr = 0.0
+    M = comps.shape[1]      # Number of Components to Plot
+    K = attrs.shape[1]      # Number of Attributes
+    D = data_raw.shape[1]   # Total Data Dimensions
+
+    # --- 2. Calculations ---
+
+    # A. Correlation Matrix
+    corr_matrix = np.zeros((K, M))
+    for i in range(K):
+        for j in range(M):
+            if np.std(attrs[:, i]) == 0 or np.std(comps[:, j]) == 0:
+                c = 0.0
             else:
-                corr = np.corrcoef(ground_truth_attributes[:, i], components[:, j])[0, 1]
-            corr_matrix[i, j] = corr
+                c = np.corrcoef(attrs[:, i], comps[:, j])[0, 1]
+            corr_matrix[i, j] = c
 
-    # 3. Plotting with Matplotlib (No Seaborn)
-    fig, ax = plt.subplots(figsize=(10, 8))
+    # B. True Variance Spectrum (SVD on full data)
+    data_centered = data_raw - np.mean(data_raw, axis=0)
+    try:
+        # Use simple numpy svd (S are singular values)
+        # We only need S, so we don't compute U or Vh to save memory/time
+        S = np.linalg.svd(data_centered, full_matrices=False, compute_uv=False)
+        eigenvalues = S**2 / (n_samples - 1)
+        total_variance = np.sum(eigenvalues)
+        explained_variance_ratio = eigenvalues / total_variance
+        cumulative_variance = np.cumsum(explained_variance_ratio)
+    except np.linalg.LinAlgError:
+        print("SVD Convergence failed. Plotting flat variance.")
+        cumulative_variance = np.zeros(D)
 
-    # Create the heatmap
-    # cmap='coolwarm' or 'bwr' gives a nice Blue-White-Red divergence
-    im = ax.imshow(corr_matrix, cmap='coolwarm', vmin=-1, vmax=1)
+    # --- 3. Plotting (Vertical Stack) ---
+    # figsize=(width, height). We make it tall (e.g., 10x16)
+    # height_ratios=[2, 1] gives the Heatmap 2x the vertical space of the Variance plot
+    fig, (ax_corr, ax_var) = plt.subplots(2, 1, figsize=(12, 16), gridspec_kw={'height_ratios': [2, 1]})
 
-    # Add Colorbar
-    cbar = ax.figure.colorbar(im, ax=ax)
+    # === TOP PLOT: Heatmap ===
+    im = ax_corr.imshow(corr_matrix, cmap='coolwarm', vmin=-1, vmax=1, aspect='auto')
+
+    # Labels
+    x_labels = component_names if component_names else [f"Comp {j+1}" for j in range(M)]
+    y_labels = attribute_names if attribute_names else [f"Attr {i+1}" for i in range(K)]
+
+    ax_corr.set_xticks(np.arange(M))
+    ax_corr.set_yticks(np.arange(K))
+    ax_corr.set_xticklabels(x_labels, rotation=45, ha="right")
+    ax_corr.set_yticklabels(y_labels)
+
+    ax_corr.set_xlabel(f"Components (Top {M} Visualized)")
+    ax_corr.set_ylabel("Ground Truth Attributes")
+    ax_corr.set_title("Correlation Heatmap: Attributes vs Components")
+
+    # Annotate Heatmap
+    for i in range(K):
+        for j in range(M):
+            val = corr_matrix[i, j]
+            color = "white" if abs(val) > 0.5 else "black"
+            ax_corr.text(j, i, f"{val:.2f}", ha="center", va="center", color=color, fontsize=9)
+
+    # Colorbar (attached to the heatmap axes)
+    cbar = fig.colorbar(im, ax=ax_corr, pad=0.02)
     cbar.ax.set_ylabel("Pearson Correlation", rotation=-90, va="bottom")
 
-    # Show all ticks and label them
-    ax.set_xticks(np.arange(n_components))
-    ax.set_yticks(np.arange(n_features))
+    # === BOTTOM PLOT: Variance ===
+    # Plot all components available in the data
+    x_indices = np.arange(1, len(cumulative_variance) + 1)
 
-    ax.set_xticklabels([f"Comp {j+1}" for j in range(n_components)])
-    ax.set_yticklabels([f"Attr {i+1}" for i in range(n_features)])
+    ax_var.plot(x_indices, cumulative_variance, marker='.', linestyle='-', color='b', linewidth=1.5)
+    ax_var.fill_between(x_indices, cumulative_variance, alpha=0.1, color='b')
 
-    # Rotate the tick labels and set their alignment.
-    plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
+    # Highlight the specific cutoff M used in the heatmap
+    if M <= len(cumulative_variance):
+        current_explained = cumulative_variance[M-1]
+        ax_var.axvline(x=M, color='red', linestyle='--', alpha=0.7)
+        ax_var.scatter([M], [current_explained], color='red', s=100, zorder=5,
+                       label=f'Heatmap Cutoff (Comp {M}: {current_explained:.2%} var)')
+        ax_var.legend(loc='lower right')
 
-    # Loop over data dimensions and create text annotations.
-    # This manually recreates the 'annot=True' feature of seaborn
-    for i in range(n_features):
-        for j in range(n_components):
-            val = corr_matrix[i, j]
-            # Choose text color based on background intensity for readability
-            text_color = "white" if abs(val) > 0.5 else "black"
-            ax.text(j, i, f"{val:.2f}",
-                    ha="center", va="center", color=text_color, fontsize=9)
+    ax_var.set_title(f"True Cumulative Variance Spectrum (Total Dimensions: {D})")
+    ax_var.set_xlabel("Component Index")
+    ax_var.set_ylabel("Fraction of Total Data Variance")
+    ax_var.set_ylim(0, 1.05)
+    ax_var.grid(True, linestyle='--', alpha=0.6)
 
-    ax.set_title("Correlation: Components vs Ground Truth Attributes")
-    fig.tight_layout()
-
-    # 4. Save and Close
+    # Final Layout Adjustments
+    plt.tight_layout()
     plt.savefig(filename, dpi=300)
     plt.close()
-    print(f"Correlation plot saved to {filename}")
-
-# --- Example Usage ---
-if __name__ == "__main__":
-    # Mock data
-    N_SAMPLES = 100
-    N_COMPS = 5
-    N_ATTRS = 3
-
-    comps = np.random.randn(N_SAMPLES, N_COMPS)
-    attrs = np.random.rand(N_SAMPLES, N_ATTRS)
-
-    # Force a correlation for demonstration
-    comps[:, 0] = attrs[:, 0] * 0.9 + np.random.normal(0, 0.1, N_SAMPLES)
-
-    plot_component_ground_truth_correlations("my_analysis.png", comps, attrs)
+    print(f"Analysis saved to {filename}")

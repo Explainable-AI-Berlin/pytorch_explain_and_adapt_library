@@ -29,7 +29,7 @@ class MatryoshkaSAE(SparseDictionary):
         self.config.cfg["dict_size"] = 32 # 36864
         self.config.cfg['wandb_project'] = 'batch-topk-matryoshka'
         self.config.cfg['l1_coeff'] = 0.
-        self.config.cfg['act_size'] = 1024 #512 #2304
+        self.config.cfg['act_size'] = self.config.act_size #1024 #512 #2304
         self.config.cfg['device'] = 'cuda'
         self.config.cfg['bandwidth'] = 0.001
         self.config.cfg["top_k_matryoshka"] = [4] #[10, 10, 10, 10, 10]
@@ -94,7 +94,7 @@ class MatryoshkaSAE(SparseDictionary):
         self.fit(ActivationStore(self.config, X - self.mu))
 
     def get_components(self):
-        return self.sae.W_enc.transpose(0, 1)
+        return self.sae.W_enc
 
     def save_on_disk(self, path):
         torch.save({

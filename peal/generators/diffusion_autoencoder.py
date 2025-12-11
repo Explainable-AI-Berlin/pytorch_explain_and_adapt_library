@@ -35,7 +35,7 @@ from peal.sparse_dictionaries.singular_value_decomposition import (
     SVDDictionaryConfig,
 )
 from peal.sparse_dictionaries.sparse_dictionary_factory import get_sparse_dictionary
-#from peal.sparse_dictionaries.utils import plot_component_ground_truth_correlations
+from peal.sparse_dictionaries.utils import plot_component_ground_truth_correlations
 from peal.training.trainers import distill_predictor
 
 
@@ -129,7 +129,11 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         return z_sem, xT
 
     def sample_x(self, batch_size=1):
-        return self.latent_model.sample(N=batch_size, device=self.device)
+        if not self.latent_model is None:
+            return self.latent_model.sample(N=batch_size, device=self.device)
+
+        else:
+            return torch.randn([batch_size] + self.config.data.input_size).to(self.device)
 
     def encode(self, x, t=1.0):
         z_sem: torch.Tensor = self.model.encode(x)
@@ -354,50 +358,58 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
                 if isinstance(sparse_dictionary, SparseDictionaryConfig):
                     self.config.sparse_dictionary = sparse_dictionary
 
+                self.config.sparse_dictionary.act_size = self.config.encoder_dimensions
                 self.load_sparse_dictionary()
                 if self.sparse_dictionary is None:
                     self.fit_sparse_dictionary()
 
             # save_yaml_config(self.config, os.path.join(self.config.base_path, "config.yaml"))
 
-        if not self.latent_model is None:
-            explanation_path = os.path.join(
+        explanation_path = os.path.join(
+            self.config.base_path,
+            self.config.sparse_dictionary.sparse_dictionaries_type,
+        )
+        Path(explanation_path).mkdir(parents=True, exist_ok=True)
+
+        task_config_buffer = self.generator_datasets[1].task_config if hasattr(
+            self.generator_datasets[1], "task_config"
+        ) else None
+        self.generator_datasets[1].task_config = None
+        y_list = []
+        c_list = []
+        z_list = []
+        for batch in torch.utils.data.DataLoader(
+            self.generator_datasets[1], batch_size=10
+        ):
+            x, y = batch
+            z, _ = self.encode(x.to(self.device))
+            c =  z @ self.sparse_dictionary.get_components().to(self.device)
+            y_list.append(y)
+            c_list.append(c.detach().cpu())
+            z_list.append(z.detach().cpu())
+
+        y_stack = torch.cat(y_list)
+        c_stack = torch.cat(c_list)
+        z_stack = torch.cat(z_list)
+        plot_component_ground_truth_correlations(
+            filename=os.path.join(
                 self.config.base_path,
                 self.config.sparse_dictionary.sparse_dictionaries_type,
-            )
-            Path(explanation_path).mkdir(parents=True, exist_ok=True)
+                "correlations.png",
+            ),
+            components=c_stack,
+            ground_truth_attributes=y_stack,
+            data=z_stack,
+        )
+        self.generator_datasets[1].task_config = task_config_buffer
+
+        if not self.latent_model is None:
             sampled_x = self.sample_x(self.config.batch_size).detach().cpu()
             torchvision.utils.save_image(
                 sampled_x,
                 os.path.join(explanation_path, "samples.png"),
                 nrow=int(math.sqrt(self.config.batch_size)),
             )
-
-        """task_config_buffer = self.generator_datasets[1].task_config
-        self.generator_datasets[1].task_config["y_selection"] = []
-        y_list = []
-        c_list = []
-        for batch in torch.utils.data.DataLoader(
-            self.generator_datasets[1], batch_size=10
-        ):
-            x, y = batch
-            z, _ = self.encode(x.to(self.device))
-            c = self.sparse_dictionary.get_components() @ z
-            y_list.append(y)
-            c_list.append(c)
-
-        y_stack = torch.stack(y_list)
-        c_stack = torch.stack(c_list)
-        plot_component_ground_truth_correlations(
-            os.path.join(
-                self.base_dir,
-                self.config.sparse_dictionary.sparse_dictionaries_type,
-                "correlations.png",
-            ),
-            y_stack,
-            c_stack,
-        )
-        self.generator_datasets[1].task_config = task_config_buffer"""
 
         result_list = []
         for component_idx in range(self.config.sparse_dictionary.n_components):
@@ -458,7 +470,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         print([x_generator.min(), x_generator.max()])
         print([x_generator.min(), x_generator.max()])
         z_sem, xT = self.encode(x_generator.to(self.device))
-        w = self.sparse_dictionary.get_components()[component_idx].to(self.device)
+        w = self.sparse_dictionary.get_components()[:,component_idx].to(self.device)
         # z_sem2 = self._calculate_z_counterfactuals(z_sem, w)
         try:
             proj_factors = (z_sem - self.sparse_dictionary.mu.to(self.device)) @ w
