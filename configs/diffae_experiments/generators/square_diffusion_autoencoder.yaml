@@ -2,7 +2,7 @@
 # python run_component_analysis.py --config $PEAL_RUNS/square/diffusion_autoencoder/config.yaml --sd_config configs/diffae_experiments/sparse_dictionaries/matryoshka_sae_default.yaml
 generator_type : DiffusionAutoencoder
 category : generator
-base_path : $PEAL_RUNS/square/diffusion_autoencoder_new
+base_path : $PEAL_RUNS/square/diffusion_autoencoder
 data: <PEAL_BASE>/configs/sce_experiments/data/square_generator.yaml
 image_size: 64
 batch_size: 100

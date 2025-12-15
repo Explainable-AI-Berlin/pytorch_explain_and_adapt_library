@@ -472,13 +472,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         z_sem, xT = self.encode(x_generator.to(self.device))
         w = self.sparse_dictionary.get_components()[:,component_idx].to(self.device)
         # z_sem2 = self._calculate_z_counterfactuals(z_sem, w)
-        try:
-            proj_factors = (z_sem - self.sparse_dictionary.mu.to(self.device)) @ w
-
-        except Exception:
-            import pdb
-
-            pdb.set_trace()
+        proj_factors = (z_sem - self.sparse_dictionary.mu.to(self.device)) @ w
 
         print("proj_factors:" + str(list(proj_factors.detach().cpu().numpy())))
         z_sem_after = z_sem - 2 * proj_factors.unsqueeze(1) * w
@@ -622,19 +616,26 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             torch.sum(z_sem * w, dim=-1, keepdim=True) > 0.5, dtype=torch.uint8
         )
         print("dot_ab before editing:", dot_ab.squeeze().detach().cpu().numpy())
-        z_sem2 = self._calculate_z_counterfactuals(z_sem, w)
+        z_sem2, indices, distances = self._calculate_z_counterfactuals(z_sem, w, explainer_config)
+        z_sem2_list = []
+        xT_list = []
+        x_out = []
+        indices_list = []
+        for i in range(explainer_config.num_attempts):
+            z_sem2_list.append(z_sem2[:,i,:])
+            xT_list.append(xT)
+            x_out.append(x_in)
+            indices_list.append(indices)
+
+        z_sem2 = torch.cat(z_sem2_list, dim=0)
+        xT = torch.cat(xT_list, dim=0)
+        x_out = torch.cat(x_out, dim=0)
+        indices = torch.cat(indices_list, dim=0)
         dot_ab2 = torch.tensor(
             torch.sum(z_sem2 * w, dim=-1, keepdim=True) > 0, dtype=torch.uint8
         )
         print("dot_ab after editing:", dot_ab2.squeeze().detach().cpu().numpy())
         x_counterfactuals_generator = self.decode((z_sem2, xT))
-        z_sem3, _ = self.encode(
-            classifier_to_generator(x_counterfactuals_generator.to(self.device))
-        )
-        dot_ab3 = torch.tensor(
-            torch.sum(z_sem3 * w, dim=-1, keepdim=True) > 0, dtype=torch.uint8
-        )
-        print("dot_ab3:", dot_ab3.squeeze().detach().cpu().numpy())
         # x_counterfactuals_generator = x_generator
         print("[x_counterfactuals_generator.min(), x_counterfactuals_generator.max()]")
         print([x_counterfactuals_generator.min(), x_counterfactuals_generator.max()])
@@ -650,32 +651,99 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         preds = torch.nn.Softmax(dim=-1)(
             predictor(x_counterfactuals.to(device)).detach().cpu()
         )
-        y_target_end_confidence = torch.zeros([x_in.shape[0]])
-        for i in range(x_in.shape[0]):
-            y_target_end_confidence[i] = preds[i, target_classes[i]]
+        y_target_end_confidence = torch.zeros([x_out.shape[0]])
+        for i in range(x_out.shape[0]):
+            y_target_end_confidence[i] = preds[i, target_classes[i % target_classes.shape[0]]]
 
         print("preds_after:", preds.argmax(dim=-1))
 
         return (
             list(x_counterfactuals.cpu()),
-            list(x_in - x_counterfactuals.cpu()),
+            list(x_out - x_counterfactuals.cpu()),
             list(y_target_end_confidence),
             list(x_in),
             [],
+            list(indices.cpu()),
         )
 
-    def _calculate_z_counterfactuals(self, z_sem: torch.Tensor, w) -> torch.Tensor:
-        b = w
-        a = z_sem
-        #
-        dot_ab = torch.sum(a * b, dim=-1, keepdim=True)  # shape (batch, 1)
-        dot_bb = torch.sum(b * b)  # scalar
+    def _calculate_z_counterfactuals(self, z_sem: torch.Tensor, w, explainer_config=None):
+        if explainer_config is None or explainer_config.num_attempts == 1:
+            b = w
+            a = z_sem
+            #
+            dot_ab = torch.sum(a * b, dim=-1, keepdim=True)  # shape (batch, 1)
+            dot_bb = torch.sum(b * b)  # scalar
 
-        # projection and reflection
-        proj = dot_ab / dot_bb * b  # shape (batch, n)
-        # reflected = 2 * proj - a
-        reflected = a - 2 * proj
-        return reflected
+            # projection and reflection
+            proj = dot_ab / dot_bb * b  # shape (batch, n)
+            # reflected = 2 * proj - a
+            reflected = a - 2 * proj
+            return reflected, None, torch.norm(reflected - z_sem, p=2, dim=-1, keepdim=False)
+
+        else:
+            component_indices = range(explainer_config.num_attempts)
+            # 1. Retrieve the Dictionary Components (Directions)
+            # Shape: [Latent_Dim, Num_Components]
+            W_all = self.sparse_dictionary.get_components()[:,:explainer_config.num_attempts]
+
+            # If specific indices are provided, filter W_all
+            if component_indices is not None:
+                 # Assuming component_indices is a tensor or list of ints
+                W = W_all[:, component_indices].to(z_sem.device)
+
+            else:
+                W = W_all.to(z_sem.device)
+
+            # 2. Compute Projections (Batched)
+            # z_sem: [Batch, Dim]
+            # W:     [Dim, K] (where K is num components)
+
+            # Dot product of z with every component: z . w
+            # Shape: [Batch, K]
+            dot_ab = torch.matmul(z_sem, W)
+
+            # Dot product of component with itself (squared norm): w . w
+            # Shape: [K]
+            dot_bb = torch.sum(W ** 2, dim=0)
+
+            # Projection coefficients: (z . w) / (w . w)
+            # Shape: [Batch, K]
+            proj_factors = dot_ab / dot_bb
+
+            # Calculate Projection Vectors
+            # We need to broadcast:
+            # proj_factors [Batch, K] -> [Batch, K, 1]
+            # W.T          [K, Dim]   -> [1, K, Dim]
+            # Result       [Batch, K, Dim]
+            projections = proj_factors.unsqueeze(-1) * W.permute(1, 0).unsqueeze(0)
+
+            # 3. Compute Reflections
+            # Formula: Reflected = Original - 2 * Projection
+            # z_sem needs unsqueeze to broadcast: [Batch, 1, Dim]
+            z_expanded = z_sem.unsqueeze(1)
+            z_reflected = z_expanded - 2 * projections # Shape: [Batch, K, Dim]
+
+            # 4. Calculate Distances
+            # Euclidean distance between original z and reflected z
+            # Shape: [Batch, K]
+            distances = torch.norm(z_expanded - z_reflected, p=2, dim=-1)
+
+            # 5. Sort by Distance (Increasing)
+            # Get indices that sort the distances
+            sorted_indices = torch.argsort(distances, dim=1)
+
+            # Gather the sorted distances
+            sorted_distances = torch.gather(distances, 1, sorted_indices)
+
+            # Gather the sorted z_counterfactuals
+            # We need to expand sorted_indices to match the latent dimension
+            # sorted_indices: [Batch, K] -> [Batch, K, Dim]
+            idx_expanded = sorted_indices.unsqueeze(-1).expand(-1, -1, z_reflected.size(-1))
+            z_counterfactuals_sorted = torch.gather(z_reflected, 1, idx_expanded)
+
+            # Return latent vars, indices, and distances
+            # Note: Caller must decode z_counterfactuals_sorted to get 'x'
+            return z_counterfactuals_sorted, sorted_indices, sorted_distances
 
 
 class NormalizationModule(nn.Module):

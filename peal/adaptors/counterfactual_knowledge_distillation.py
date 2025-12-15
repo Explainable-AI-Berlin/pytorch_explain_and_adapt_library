@@ -379,6 +379,7 @@ class CFKD(Adaptor):
             "y_list",
             "x_attribution_list",
             "y_target_start_confidence_list",
+            "cluster_list",
         ]
 
         if self.adaptor_config.tracking_level >= 4:

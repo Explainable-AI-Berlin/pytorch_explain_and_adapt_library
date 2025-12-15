@@ -1169,6 +1169,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 batch["y_target_end_confidence_list"],
                 batch["x_list"],
                 batch["history_list"],
+                batch['cluster_list'],
             ) = self.generator.edit(
                 x_in=torch.tensor(batch["x_list"]),
                 target_confidence_goal=target_confidence_goal,
@@ -1330,7 +1331,24 @@ class CounterfactualExplainer(ExplainerInterface):
 
         cluster_lists = [[] for i in range(n_clusters)]
         collage_path_base = None
-        if self.explainer_config.clustering_strategy == "kmeans":
+        if self.explainer_config.clustering_strategy == "preclustered":
+            for idx, explanation in enumerate(explanations_list):
+                idx_cluster = explanation['cluster_list']
+                cluster_lists[idx_cluster].append(explanation)
+                collage_path = explanation["collage_path_list"]
+                cluster_collage_dir = collage_path_base + "_" + str(int(idx_cluster))
+                if not os.path.exists(cluster_collage_dir):
+                    os.makedirs(cluster_collage_dir)
+
+                collage_path_new = os.path.join(
+                    *[
+                        cluster_collage_dir,
+                        embed_numberstring(idx, 7) + ".png",
+                    ]
+                )
+                shutil.copy(collage_path, collage_path_new)
+
+        elif self.explainer_config.clustering_strategy == "kmeans":
             for sample_idx in range(len(explanations_list_by_source[0])):
                 feature_difference, cosine_similarities_list, norm_list, ratio_list = extract_feature_difference(
                     [e[sample_idx] for e in explanations_list_by_source]
@@ -1528,14 +1546,8 @@ class CounterfactualExplainer(ExplainerInterface):
         cluster_scores = []
         for cluster_idx in range(len(cluster_dicts)):
             sample_scores = []
-            try:
-                for sample_idx in range(len(cluster_dicts[cluster_idx]["x_list"])):
-                    sample_scores.append(cluster_dicts[cluster_idx]["y_target_end_confidence_list"][sample_idx])
-
-            except Exception:
-                import pdb
-
-                pdb.set_trace()
+            for sample_idx in range(len(cluster_dicts[cluster_idx]["x_list"])):
+                sample_scores.append(cluster_dicts[cluster_idx]["y_target_end_confidence_list"][sample_idx])
 
             cluster_scores.append(torch.mean(torch.tensor(sample_scores)))
 
@@ -1555,13 +1567,7 @@ class CounterfactualExplainer(ExplainerInterface):
         if self.explainer_config.merge_clusters == "concatenate":
             for cluster_idx in range(1, len(cluster_dicts)):
                 for key in cluster_dicts[sorted_cluster_idxs[cluster_idx]].keys():
-                    try:
-                        explanations_dict_out[key] += cluster_dicts[sorted_cluster_idxs[cluster_idx]][key]
-
-                    except Exception:
-                        import pdb
-
-                        pdb.set_trace()
+                    explanations_dict_out[key] += cluster_dicts[sorted_cluster_idxs[cluster_idx]][key]
 
         return explanations_dict_out
 
