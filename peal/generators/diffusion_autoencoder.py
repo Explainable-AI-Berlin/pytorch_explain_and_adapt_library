@@ -743,6 +743,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
 
             # Return latent vars, indices, and distances
             # Note: Caller must decode z_counterfactuals_sorted to get 'x'
+            #import pdb; pdb.set_trace()
             return z_counterfactuals_sorted, sorted_indices, sorted_distances
 
 
