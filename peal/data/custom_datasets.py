@@ -447,12 +447,12 @@ class SquareDataset(Image2MixedDataset):
                     for i in range(len(grid)):
                         current_batch.append(
                             ToTensor()(
-                                latent_to_square_image(
+                                self.project_from_pytorch_default(latent_to_square_image(
                                     255 * float(grid[i][0]),
                                     255 * float(grid[i][1]),
                                     position_x=x_pos,
                                     position_y=y_pos,
-                                )[0],
+                                )[0]),
                             )
                         )
                         if len(current_batch) == batch_size:

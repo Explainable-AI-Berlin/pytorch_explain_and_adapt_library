@@ -97,12 +97,8 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             self.model_dir = self.config.base_path
 
         self.set_encoder()
-        self.checkpoint_path = os.path.join(
-            self.config.base_path, "square64_ddim", "last.ckpt"
-        )
-        self.checkpoint_path_latent = os.path.join(
-            self.config.base_path, "square64_autoenc_latent", "last.ckpt"
-        )
+        self.checkpoint_path = os.path.join(self.config.base_path, "square64_ddim", "last.ckpt")
+        self.checkpoint_path_latent = os.path.join(self.config.base_path, "square64_autoenc_latent", "last.ckpt")
         self.load_models()
         self.load_sparse_dictionary()
 
@@ -110,16 +106,13 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         if not self.config.sparse_dictionary is None:
             self.sparse_dictionary_path = os.path.join(
                 self.config.base_path,
-                self.config.sparse_dictionary.sparse_dictionaries_type
-                + self.config.sparse_dictionary.ending,
+                self.config.sparse_dictionary.sparse_dictionaries_type + self.config.sparse_dictionary.ending,
             )
             if not os.path.exists(self.sparse_dictionary_path):
                 self.sparse_dictionary = None
 
             else:
-                self.sparse_dictionary = get_sparse_dictionary(
-                    self.config.sparse_dictionary
-                )
+                self.sparse_dictionary = get_sparse_dictionary(self.config.sparse_dictionary)
                 self.sparse_dictionary.load_from_disk(self.sparse_dictionary_path)
 
     def sample_z(self, batch_size=1):
@@ -152,21 +145,15 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             if self.config.model_type[: len("dino_v2")] == "dino_v2":
                 if self.config.model_type == "dino_v2_small":
                     model = AutoModel.from_pretrained("facebook/dinov2-small")
-                    processor = AutoImageProcessor.from_pretrained(
-                        "facebook/dinov2-small"
-                    )
+                    processor = AutoImageProcessor.from_pretrained("facebook/dinov2-small")
 
                 elif self.config.model_type == "dino_v2_base":
                     model = AutoModel.from_pretrained("facebook/dinov2-base")
-                    processor = AutoImageProcessor.from_pretrained(
-                        "facebook/dinov2-base"
-                    )
+                    processor = AutoImageProcessor.from_pretrained("facebook/dinov2-base")
 
                 elif self.config.model_type == "dino_v2":
                     model = AutoModel.from_pretrained("facebook/dinov2-large")
-                    processor = AutoImageProcessor.from_pretrained(
-                        "facebook/dinov2-large"
-                    )
+                    processor = AutoImageProcessor.from_pretrained("facebook/dinov2-large")
 
                 class DinoV2(nn.Module):
                     def __init__(self, model, processor):
@@ -176,17 +163,13 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
 
                     def forward(self, x):
                         cs = self.processor.crop_size
-                        x_resized = torchvision.transforms.Resize(
-                            [cs["height"], cs["width"]]
-                        )(x)
+                        x_resized = torchvision.transforms.Resize([cs["height"], cs["width"]])(x)
 
                         def pv(v):
                             v = torch.tensor(v).to(x_resized)[:, None, None]
                             return torch.tile(v, [1, cs["height"], cs["width"]])
 
-                        x_processed = (x_resized - pv(self.processor.image_mean)) / pv(
-                            self.processor.image_std
-                        )
+                        x_processed = (x_resized - pv(self.processor.image_mean)) / pv(self.processor.image_std)
                         latent_code = self.model(x_processed)["last_hidden_state"][:, 0]
                         return latent_code
 
@@ -208,9 +191,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
                     init_values=1e-5,
                     dynamic_img_size=True,
                 )
-                transform = create_transform(
-                    **resolve_data_config(model.pretrained_cfg, model=model)
-                )
+                transform = create_transform(**resolve_data_config(model.pretrained_cfg, model=model))
 
                 class UNI(nn.Module):
                     def __init__(self, model, transform):
@@ -276,9 +257,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             Path(self.config.base_path).mkdir(parents=True, exist_ok=True)
 
         self.config.is_loaded = True
-        save_yaml_config(
-            self.config, os.path.join(self.config.base_path, "config.yaml")
-        )
+        save_yaml_config(self.config, os.path.join(self.config.base_path, "config.yaml"))
         # finetune_args = types.SimpleNamespace(**self.config.__dict__)
         #
         conf = square64_autoenc()
@@ -289,9 +268,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         train(conf, mode="eval")
 
         # NOTE: a lot of gpus can speed up this process
-        latent_conf = square64_autoenc_latent(
-            os.path.join(self.config.base_path, "square64_ddim")
-        )
+        latent_conf = square64_autoenc_latent(os.path.join(self.config.base_path, "square64_ddim"))
         self.adjust_config(latent_conf)
         train(latent_conf)
 
@@ -317,17 +294,13 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             else:
                 shutil.move(
                     self.config.base_path,
-                    self.config.base_path
-                    + "_old_"
-                    + datetime.now().strftime("%Y%m%d_%H%M%S"),
+                    self.config.base_path + "_old_" + datetime.now().strftime("%Y%m%d_%H%M%S"),
                 )
 
         else:
             self.model = None  # LitModel(conf)
 
-        latent_conf = square64_autoenc_latent(
-            os.path.join(self.config.base_path, "square64_ddim")
-        )
+        latent_conf = square64_autoenc_latent(os.path.join(self.config.base_path, "square64_ddim"))
         self.adjust_config(latent_conf)
         if os.path.exists(self.checkpoint_path_latent):
             self.latent_model = LitModel.load_from_checkpoint(
@@ -371,19 +344,17 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         )
         Path(explanation_path).mkdir(parents=True, exist_ok=True)
 
-        task_config_buffer = self.generator_datasets[1].task_config if hasattr(
-            self.generator_datasets[1], "task_config"
-        ) else None
+        task_config_buffer = (
+            self.generator_datasets[1].task_config if hasattr(self.generator_datasets[1], "task_config") else None
+        )
         self.generator_datasets[1].task_config = None
         y_list = []
         c_list = []
         z_list = []
-        for batch in torch.utils.data.DataLoader(
-            self.generator_datasets[1], batch_size=10
-        ):
+        for batch in torch.utils.data.DataLoader(self.generator_datasets[1], batch_size=10):
             x, y = batch
             z, _ = self.encode(x.to(self.device))
-            c =  z @ self.sparse_dictionary.get_components().to(self.device)
+            c = z @ self.sparse_dictionary.get_components().to(self.device)
             y_list.append(y)
             c_list.append(c.detach().cpu())
             z_list.append(z.detach().cpu())
@@ -415,9 +386,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         for component_idx in range(self.config.sparse_dictionary.n_components):
             result_list.append(
                 self.explain_sparse_component(
-                    torch.utils.data.DataLoader(
-                        self.generator_datasets[1], batch_size=10
-                    ),
+                    torch.utils.data.DataLoader(self.generator_datasets[1], batch_size=10),
                     component_idx,
                 )
             )
@@ -470,25 +439,23 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         print([x_generator.min(), x_generator.max()])
         print([x_generator.min(), x_generator.max()])
         z_sem, xT = self.encode(x_generator.to(self.device))
-        w = self.sparse_dictionary.get_components()[:,component_idx].to(self.device)
+        w = self.sparse_dictionary.get_components()[:, component_idx].to(self.device)
         # z_sem2 = self._calculate_z_counterfactuals(z_sem, w)
         proj_factors = (z_sem - self.sparse_dictionary.mu.to(self.device)) @ w
 
         print("proj_factors:" + str(list(proj_factors.detach().cpu().numpy())))
         z_sem_after = z_sem - 2 * proj_factors.unsqueeze(1) * w
         # z_sem_after = z_sem - proj_factors.unsqueeze(1) * w
-        proj_factors_after = (
-            z_sem_after - self.sparse_dictionary.mu.to(self.device)
-        ) @ w
+        proj_factors_after = (z_sem_after - self.sparse_dictionary.mu.to(self.device)) @ w
         print("proj_factors_after:" + str(list(proj_factors_after.detach().cpu().numpy())))
         x_counterfactuals_generator = self.decode((z_sem_after, xT))
         print("[x_counterfactuals_generator.min(), x_counterfactuals_generator.max()]")
         print([x_counterfactuals_generator.min(), x_counterfactuals_generator.max()])
         print([x_counterfactuals_generator.min(), x_counterfactuals_generator.max()])
         print([x_counterfactuals_generator.min(), x_counterfactuals_generator.max()])
-        x_counterfactuals_generator = self.generator_datasets[
-            1
-        ].project_from_pytorch_default(x_counterfactuals_generator)
+        x_counterfactuals_generator = self.generator_datasets[1].project_from_pytorch_default(
+            x_counterfactuals_generator
+        )
         print("[x_counterfactuals_generator.min(), x_counterfactuals_generator.max()]")
         print([x_counterfactuals_generator.min(), x_counterfactuals_generator.max()])
         print([x_counterfactuals_generator.min(), x_counterfactuals_generator.max()])
@@ -513,61 +480,41 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
     ):
         device = [p for p in predictor.parameters()][0].device
 
-        classifier_to_generator = (
-            lambda x: self.generator_dataset.project_from_pytorch_default(
-                self.predictor_dataset.project_to_pytorch_default(x)
-            )
+        classifier_to_generator = lambda x: self.generator_dataset.project_from_pytorch_default(
+            self.predictor_dataset.project_to_pytorch_default(x)
         )
-        generator_to_classifier = (
-            lambda x: self.predictor_dataset.project_from_pytorch_default(
-                self.generator_dataset.project_to_pytorch_default(x)
-            )
+        generator_to_classifier = lambda x: self.predictor_dataset.project_from_pytorch_default(
+            self.generator_dataset.project_to_pytorch_default(x)
         )
 
         distilled_datasources = []
         for idx, predictor_dataset in enumerate(predictor_datasets):
             distilled_datasource = copy.deepcopy(predictor_dataset)
             if isinstance(distilled_datasource, torch.utils.data.DataLoader):
-                distilled_datasource.dataset.normalization = self.generator_datasets[
-                    idx
-                ].normalization
-                distilled_datasource.dataset.transform = self.generator_datasets[
-                    idx
-                ].transform
-                distilled_datasource.dataset.config.normalization = (
-                    self.generator_datasets[idx].config.normalization
-                )
+                distilled_datasource.dataset.normalization = self.generator_datasets[idx].normalization
+                distilled_datasource.dataset.transform = self.generator_datasets[idx].transform
+                distilled_datasource.dataset.config.normalization = self.generator_datasets[idx].config.normalization
 
             elif isinstance(distilled_datasource, WeightedDataloaderList):
                 for j in range(len(distilled_datasource.dataloaders)):
-                    distilled_datasource.dataloaders[
-                        j
-                    ].dataset.normalization = self.generator_datasets[idx].normalization
-                    distilled_datasource.dataloaders[
-                        j
-                    ].dataset.transform = self.generator_datasets[idx].transform
-                    distilled_datasource.dataloaders[
-                        j
-                    ].dataset.config.normalization = self.generator_datasets[
+                    distilled_datasource.dataloaders[j].dataset.normalization = self.generator_datasets[
+                        idx
+                    ].normalization
+                    distilled_datasource.dataloaders[j].dataset.transform = self.generator_datasets[idx].transform
+                    distilled_datasource.dataloaders[j].dataset.config.normalization = self.generator_datasets[
                         idx
                     ].config.normalization
 
             else:
-                distilled_datasource.normalization = self.generator_datasets[
-                    idx
-                ].normalization
+                distilled_datasource.normalization = self.generator_datasets[idx].normalization
                 distilled_datasource.transform = self.generator_datasets[idx].transform
-                distilled_datasource.config.normalization = self.generator_datasets[
-                    idx
-                ].config.normalization
+                distilled_datasource.config.normalization = self.generator_datasets[idx].config.normalization
 
             distilled_datasources.append(distilled_datasource)
 
         if not explainer_config.distilled_predictor is None:
             # assert explainer_config.distilled_predictor.task.output_channels == 1
-            distilled_path = os.path.join(
-                base_path, "explainer", "distilled_predictor", "model.cpl"
-            )
+            distilled_path = os.path.join(base_path, "explainer", "distilled_predictor", "model.cpl")
             if not os.path.exists(distilled_path):
                 self.gradient_predictor = distill_predictor(
                     predictor_distillation=explainer_config.distilled_predictor,
@@ -582,14 +529,30 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
                     ),
                     only_last_layer=True,
                     continue_training=True,
-                    task_config=TaskConfig(
-                        **explainer_config.distilled_predictor["task"]
-                    ),
+                    task_config=TaskConfig(**explainer_config.distilled_predictor["task"]),
                 )
 
             else:
-                self.gradient_predictor = torch.load(
-                    distilled_path, map_location=self.device
+                self.gradient_predictor = torch.load(distilled_path, map_location=self.device)
+
+            decision_boundary_path = os.path.join(
+                base_path, "explainer", "distilled_predictor", "decision_boundary.png"
+            )
+            if (
+                hasattr(
+                    self.generator_datasets[0],
+                    "visualize_decision_boundary",
+                )
+                and not os.path.exists(decision_boundary_path)
+            ):
+                self.generator_datasets[1].visualize_decision_boundary(
+                    self.gradient_predictor,
+                    100,
+                    self.device,
+                    decision_boundary_path,
+                    train_dataloader=torch.utils.data.DataLoader(self.generator_datasets[0], batch_size=100),
+                    val_dataloaders=[torch.utils.data.DataLoader(self.generator_datasets[1], batch_size=100)],
+                    val_weights=[1.0]
                 )
 
         else:
@@ -612,9 +575,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         print([x_generator.min(), x_generator.max()])
         z_sem, xT = self.encode(x_generator.to(self.device))
         w = list(self.gradient_predictor.children())[-1].weight[0]
-        dot_ab = torch.tensor(
-            torch.sum(z_sem * w, dim=-1, keepdim=True) > 0.5, dtype=torch.uint8
-        )
+        dot_ab = torch.tensor(torch.sum(z_sem * w, dim=-1, keepdim=True) > 0.5, dtype=torch.uint8)
         print("dot_ab before editing:", dot_ab.squeeze().detach().cpu().numpy())
         z_sem2, indices, distances = self._calculate_z_counterfactuals(z_sem, w, explainer_config)
         z_sem2_list = []
@@ -622,7 +583,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         x_out = []
         indices_list = []
         for i in range(explainer_config.num_attempts):
-            z_sem2_list.append(z_sem2[:,i,:])
+            z_sem2_list.append(z_sem2[:, i, :])
             xT_list.append(xT)
             x_out.append(x_in)
             indices_list.append(indices)
@@ -631,9 +592,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         xT = torch.cat(xT_list, dim=0)
         x_out = torch.cat(x_out, dim=0)
         indices = torch.cat(indices_list, dim=0)
-        dot_ab2 = torch.tensor(
-            torch.sum(z_sem2 * w, dim=-1, keepdim=True) > 0, dtype=torch.uint8
-        )
+        dot_ab2 = torch.tensor(torch.sum(z_sem2 * w, dim=-1, keepdim=True) > 0, dtype=torch.uint8)
         print("dot_ab after editing:", dot_ab2.squeeze().detach().cpu().numpy())
         x_counterfactuals_generator = self.decode((z_sem2, xT))
         # x_counterfactuals_generator = x_generator
@@ -648,9 +607,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         print([x_counterfactuals.min(), x_counterfactuals.max()])
         print([x_counterfactuals.min(), x_counterfactuals.max()])
 
-        preds = torch.nn.Softmax(dim=-1)(
-            predictor(x_counterfactuals.to(device)).detach().cpu()
-        )
+        preds = torch.nn.Softmax(dim=-1)(predictor(x_counterfactuals.to(device)).detach().cpu())
         y_target_end_confidence = torch.zeros([x_out.shape[0]])
         for i in range(x_out.shape[0]):
             y_target_end_confidence[i] = preds[i, target_classes[i % target_classes.shape[0]]]
@@ -684,11 +641,11 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             component_indices = range(explainer_config.num_attempts)
             # 1. Retrieve the Dictionary Components (Directions)
             # Shape: [Latent_Dim, Num_Components]
-            W_all = self.sparse_dictionary.get_components()[:,:explainer_config.num_attempts]
+            W_all = self.sparse_dictionary.get_components()[:, : explainer_config.num_attempts]
 
             # If specific indices are provided, filter W_all
             if component_indices is not None:
-                 # Assuming component_indices is a tensor or list of ints
+                # Assuming component_indices is a tensor or list of ints
                 W = W_all[:, component_indices].to(z_sem.device)
 
             else:
@@ -704,7 +661,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
 
             # Dot product of component with itself (squared norm): w . w
             # Shape: [K]
-            dot_bb = torch.sum(W ** 2, dim=0)
+            dot_bb = torch.sum(W**2, dim=0)
 
             # Projection coefficients: (z . w) / (w . w)
             # Shape: [Batch, K]
@@ -722,6 +679,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             # z_sem needs unsqueeze to broadcast: [Batch, 1, Dim]
             z_expanded = z_sem.unsqueeze(1)
             z_reflected = z_expanded - 2 * projections # Shape: [Batch, K, Dim]
+            #z_reflected = z_expanded - projections  # Shape: [Batch, K, Dim]
 
             # 4. Calculate Distances
             # Euclidean distance between original z and reflected z
@@ -742,9 +700,9 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             z_counterfactuals_sorted = torch.gather(z_reflected, 1, idx_expanded)
 
             # Return latent vars, indices, and distances
-            # Note: Caller must decode z_counterfactuals_sorted to get 'x'
-            #import pdb; pdb.set_trace()
-            return z_counterfactuals_sorted, sorted_indices, sorted_distances
+            # Note: Caller must decode z_counterfaz_counterfactuals_sortedctuals_sorted to get 'x'
+            component_indices = torch.arange(sorted_indices.shape[1]).unsqueeze(0).tile([sorted_indices.shape[0], 1])
+            return z_reflected, component_indices, distances
 
 
 class NormalizationModule(nn.Module):

@@ -7,6 +7,6 @@ data: <PEAL_BASE>/configs/sce_experiments/data/celeba_generator.yaml
 image_size: 64
 batch_size: 100
 save_every_samples: 20000
-total_samples: 4000001
+total_samples: 40000001
 encoder_dimensions : 1024
 encoder_path: $PEAL_RUNS/celeba1k/Blond_Hair/dinov2_linear_poisoned098/model.cpl
