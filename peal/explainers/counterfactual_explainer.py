@@ -65,6 +65,7 @@ class DAEdistillConfig(ExplainerConfig):
     The config for the predictor distillation.
     """
     distilled_predictor: Union[type(None), str, dict] = None
+    linesearch_factors: list = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
 
 class SCEConfig(ExplainerConfig):
     """

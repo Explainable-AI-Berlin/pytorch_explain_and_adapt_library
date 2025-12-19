@@ -402,7 +402,7 @@ class SquareDataset(Image2MixedDataset):
             decision_boundary = np.load("/" + str(os.path.join(*path)))
 
         else:
-             decision_boundary = np.load(str(os.path.join(*path)))
+            decision_boundary = np.load(str(os.path.join(*path)))
 
         decision_boundary = np.transpose(decision_boundary, (1, 0))
 
@@ -446,13 +446,15 @@ class SquareDataset(Image2MixedDataset):
 
                     for i in range(len(grid)):
                         current_batch.append(
-                            ToTensor()(
-                                self.project_from_pytorch_default(latent_to_square_image(
-                                    255 * float(grid[i][0]),
-                                    255 * float(grid[i][1]),
-                                    position_x=x_pos,
-                                    position_y=y_pos,
-                                )[0]),
+                            self.project_from_pytorch_default(
+                                ToTensor()(
+                                    latent_to_square_image(
+                                        255 * float(grid[i][0]),
+                                        255 * float(grid[i][1]),
+                                        position_x=x_pos,
+                                        position_y=y_pos,
+                                    )[0]
+                                ),
                             )
                         )
                         if len(current_batch) == batch_size:
@@ -467,7 +469,13 @@ class SquareDataset(Image2MixedDataset):
                         logits.append(predictor(torch.stack(current_batch).to(device)).detach())
 
                     logits = torch.cat(logits, dim=0).detach().cpu()
-                    prediction_grid = torch.nn.Softmax(dim=1)(logits / temperature)[:, 0].reshape(100, 100)
+                    if logits.shape[-1] == 1:
+                        probs = 1.0 - torch.sigmoid(logits / temperature).squeeze()
+
+                    else:
+                        probs = torch.nn.Softmax(dim=1)(logits / temperature)[:, 0]
+
+                    prediction_grid = probs.reshape(100, 100)
                     prediction_grids.append(prediction_grid)
 
             # Average the predictions across grids
@@ -604,11 +612,13 @@ class SquareDataset(Image2MixedDataset):
         print("visualize_decision_boundary saved under " + path)
 
     def check_foreground(self, x, hint):
-        intensity_foreground = torch.sum(hint[..., 0, :, :] * x[..., 0, :, :]) / torch.sum(hint[..., 0, :, :])
+        intensity_foreground = torch.sum(
+            hint[..., 0, :, :] * self.project_to_pytorch_default(x[..., 0, :, :])
+        ) / torch.sum(hint[..., 0, :, :])
         return intensity_foreground
 
     def check_background(self, x, hint):
-        intensity_background = torch.sum((1 - hint) * x) / torch.sum(1 - hint)
+        intensity_background = torch.sum((1 - hint) * self.project_to_pytorch_default(x)) / torch.sum(1 - hint)
         return intensity_background
 
     def sample_to_latent(self, x, hint):
@@ -955,9 +965,7 @@ class FollicleDataset(Image2MixedDataset):
 
                     # save the image in the label folder
                     image.save(
-                        os.path.join(
-                            config.dataset_path, "imgs_cut", attribute_values[attributes.index("imgs_cut")]
-                        ),
+                        os.path.join(config.dataset_path, "imgs_cut", attribute_values[attributes.index("imgs_cut")]),
                         "PNG",
                     )
 

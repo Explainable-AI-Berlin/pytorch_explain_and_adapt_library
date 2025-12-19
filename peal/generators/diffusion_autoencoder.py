@@ -478,7 +478,8 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         base_path: str = "",
         mode: str = "",
     ):
-        device = [p for p in predictor.parameters()][0].device
+        param_list = [p for p in predictor.parameters()]
+        device = param_list[0].device
 
         classifier_to_generator = lambda x: self.generator_dataset.project_from_pytorch_default(
             self.predictor_dataset.project_to_pytorch_default(x)
@@ -538,21 +539,15 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             decision_boundary_path = os.path.join(
                 base_path, "explainer", "distilled_predictor", "decision_boundary.png"
             )
-            if (
-                hasattr(
-                    self.generator_datasets[0],
-                    "visualize_decision_boundary",
-                )
-                and not os.path.exists(decision_boundary_path)
-            ):
+            if hasattr(
+                self.generator_datasets[0],
+                "visualize_decision_boundary",
+            ) and not os.path.exists(decision_boundary_path):
                 self.generator_datasets[1].visualize_decision_boundary(
                     self.gradient_predictor,
                     100,
                     self.device,
                     decision_boundary_path,
-                    train_dataloader=torch.utils.data.DataLoader(self.generator_datasets[0], batch_size=100),
-                    val_dataloaders=[torch.utils.data.DataLoader(self.generator_datasets[1], batch_size=100)],
-                    val_weights=[1.0]
                 )
 
         else:
@@ -577,18 +572,26 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         w = list(self.gradient_predictor.children())[-1].weight[0]
         dot_ab = torch.tensor(torch.sum(z_sem * w, dim=-1, keepdim=True) > 0.5, dtype=torch.uint8)
         print("dot_ab before editing:", dot_ab.squeeze().detach().cpu().numpy())
-        z_sem2, indices, distances = self._calculate_z_counterfactuals(z_sem, w, explainer_config)
+        num_attempts = int(explainer_config.num_attempts / len(explainer_config.linesearch_factors))
+        z_sem2, indices, distances = self._calculate_z_counterfactuals(z_sem, w, explainer_config, num_attempts)
         z_sem2_list = []
         xT_list = []
         x_out = []
         indices_list = []
-        for i in range(explainer_config.num_attempts):
-            z_sem2_list.append(z_sem2[:, i, :])
-            xT_list.append(xT)
-            x_out.append(x_in)
-            indices_list.append(indices)
+        for i in range(num_attempts):
+            for j in range(z_sem2.shape[2]):
+                z_sem2_list.append(z_sem2[:, i, j, :])
+                xT_list.append(xT)
+                x_out.append(x_in)
+                indices_list.append(indices)
 
-        z_sem2 = torch.cat(z_sem2_list, dim=0)
+        try:
+            z_sem2 = torch.cat(z_sem2_list, dim=0)
+
+        except Exception as exp:
+            print("Exception during torch.cat:", exp)
+            import pdb; pdb.set_trace()
+
         xT = torch.cat(xT_list, dim=0)
         x_out = torch.cat(x_out, dim=0)
         indices = torch.cat(indices_list, dim=0)
@@ -601,29 +604,33 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         print([x_counterfactuals_generator.min(), x_counterfactuals_generator.max()])
         print([x_counterfactuals_generator.min(), x_counterfactuals_generator.max()])
         # x_counterfactuals = generator_to_classifier(x_counterfactuals_generator.cpu())
-        x_counterfactuals = x_counterfactuals_generator
+        x_counterfactuals = x_counterfactuals_generator.detach()
         print("[x_counterfactuals.min(), x_counterfactuals.max()]")
         print([x_counterfactuals.min(), x_counterfactuals.max()])
         print([x_counterfactuals.min(), x_counterfactuals.max()])
         print([x_counterfactuals.min(), x_counterfactuals.max()])
 
         preds = torch.nn.Softmax(dim=-1)(predictor(x_counterfactuals.to(device)).detach().cpu())
-        y_target_end_confidence = torch.zeros([x_out.shape[0]])
-        for i in range(x_out.shape[0]):
+        y_target_end_confidence = torch.zeros([preds.shape[0]])
+        for i in range(preds.shape[0]):
             y_target_end_confidence[i] = preds[i, target_classes[i % target_classes.shape[0]]]
 
+        # TODO here i want you to select the best counterfactual of the line search
+
+        # keep only the linesearch attempt with highest target confidence
         print("preds_after:", preds.argmax(dim=-1))
+        x_out_final = x_out - x_counterfactuals.cpu()
 
         return (
             list(x_counterfactuals.cpu()),
-            list(x_out - x_counterfactuals.cpu()),
+            list(x_out_final),
             list(y_target_end_confidence),
             list(x_in),
             [],
             list(indices.cpu()),
         )
 
-    def _calculate_z_counterfactuals(self, z_sem: torch.Tensor, w, explainer_config=None):
+    def _calculate_z_counterfactuals(self, z_sem: torch.Tensor, w, explainer_config=None, num_attempts=1):
         if explainer_config is None or explainer_config.num_attempts == 1:
             b = w
             a = z_sem
@@ -638,10 +645,10 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             return reflected, None, torch.norm(reflected - z_sem, p=2, dim=-1, keepdim=False)
 
         else:
-            component_indices = range(explainer_config.num_attempts)
+            component_indices = range(num_attempts)
             # 1. Retrieve the Dictionary Components (Directions)
             # Shape: [Latent_Dim, Num_Components]
-            W_all = self.sparse_dictionary.get_components()[:, : explainer_config.num_attempts]
+            W_all = self.sparse_dictionary.get_components()[:, : num_attempts]
 
             # If specific indices are provided, filter W_all
             if component_indices is not None:
@@ -677,27 +684,26 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             # 3. Compute Reflections
             # Formula: Reflected = Original - 2 * Projection
             # z_sem needs unsqueeze to broadcast: [Batch, 1, Dim]
-            z_expanded = z_sem.unsqueeze(1)
-            z_reflected = z_expanded - 2 * projections # Shape: [Batch, K, Dim]
-            #z_reflected = z_expanded - projections  # Shape: [Batch, K, Dim]
+            line_search_factors = torch.tensor(explainer_config.linesearch_factors).to(z_sem.device)  # Shape: [K]
+            z_base = z_sem.unsqueeze(1).unsqueeze(1)
+            proj_expanded = projections.unsqueeze(2)
+            factors_expanded = line_search_factors.view(1, 1, -1, 1)
+
+            # Result: [Batch, K, S, Dim]
+            # We subtract because we want to move AWAY from the projection (reflection logic)
+            z_reflected = z_base - factors_expanded * proj_expanded
+            #z_reflected = z_expanded - 2 * projections  # Shape: [Batch, K, Dim]
+            #z_reflected = z_expanded - line_search_factors * projections  # Shape: [Batch, K, Dim]
+            # z_reflected = z_expanded - projections  # Shape: [Batch, K, Dim]
 
             # 4. Calculate Distances
             # Euclidean distance between original z and reflected z
             # Shape: [Batch, K]
-            distances = torch.norm(z_expanded - z_reflected, p=2, dim=-1)
+            distances = torch.norm(z_base - z_reflected, p=2, dim=-1)
 
             # 5. Sort by Distance (Increasing)
             # Get indices that sort the distances
             sorted_indices = torch.argsort(distances, dim=1)
-
-            # Gather the sorted distances
-            sorted_distances = torch.gather(distances, 1, sorted_indices)
-
-            # Gather the sorted z_counterfactuals
-            # We need to expand sorted_indices to match the latent dimension
-            # sorted_indices: [Batch, K] -> [Batch, K, Dim]
-            idx_expanded = sorted_indices.unsqueeze(-1).expand(-1, -1, z_reflected.size(-1))
-            z_counterfactuals_sorted = torch.gather(z_reflected, 1, idx_expanded)
 
             # Return latent vars, indices, and distances
             # Note: Caller must decode z_counterfaz_counterfactuals_sortedctuals_sorted to get 'x'
@@ -713,3 +719,118 @@ class NormalizationModule(nn.Module):
 
     def forward(self, x):
         return (x - self.mean.to(x.device)) / self.std.to(x.device)
+
+
+"""z_sem2_list = []
+        xT_list = []
+        x_out = []
+        indices_list = []
+        for i in range(explainer_config.num_attempts):
+            for j in range(z_sem2.shape[2]):
+                z_sem2_list.append(z_sem2[:, i, j, :])
+                xT_list.append(xT)
+
+            x_out.append(x_in)
+            indices_list.append(indices)
+
+        z_sem2 = torch.cat(z_sem2_list, dim=0)
+        xT = torch.cat(xT_list, dim=0)
+        x_out = torch.cat(x_out, dim=0)
+        indices = torch.cat(indices_list, dim=0)
+        dot_ab2 = torch.tensor(torch.sum(z_sem2 * w, dim=-1, keepdim=True) > 0, dtype=torch.uint8)
+        print("dot_ab after editing:", dot_ab2.squeeze().detach().cpu().numpy())
+        x_counterfactuals_generator = self.decode((z_sem2, xT))
+        # x_counterfactuals_generator = x_generator
+        print("[x_counterfactuals_generator.min(), x_counterfactuals_generator.max()]")
+        print([x_counterfactuals_generator.min(), x_counterfactuals_generator.max()])
+        print([x_counterfactuals_generator.min(), x_counterfactuals_generator.max()])
+        print([x_counterfactuals_generator.min(), x_counterfactuals_generator.max()])
+        # x_counterfactuals = generator_to_classifier(x_counterfactuals_generator.cpu())
+        x_counterfactuals = x_counterfactuals_generator.detach()
+        print("[x_counterfactuals.min(), x_counterfactuals.max()]")
+        print([x_counterfactuals.min(), x_counterfactuals.max()])
+        print([x_counterfactuals.min(), x_counterfactuals.max()])
+        print([x_counterfactuals.min(), x_counterfactuals.max()])
+
+        preds = torch.nn.Softmax(dim=-1)(predictor(x_counterfactuals.to(device)).detach().cpu())
+        y_target_end_confidence = torch.zeros([preds.shape[0]])
+        for i in range(preds.shape[0]):
+            y_target_end_confidence[i] = preds[i, target_classes[i % target_classes.shape[0]]]
+
+        # TODO here i want you to select the best counterfactual of the line search
+
+        # keep only the linesearch attempt with highest target confidence
+        print("preds_after:", preds.argmax(dim=-1))
+        x_out_final = x_out - x_counterfactuals.cpu()
+        """
+
+"""z_sem2_list = []
+        xT_list = []
+        x_out_list = []
+        # New list to track which component index corresponds to which candidate
+        component_indices_list = []
+
+        batch_size = x_in.shape[0]
+
+        # Flatten logic: We iterate K and S, creating a long list of Batch-sized tensors
+        # Total candidates = K * S * Batch
+        for i in range(num_attempts): # i is Component Index
+            for j in range(z_sem2.shape[2]):           # j is Line Search Step
+                z_sem2_list.append(z_sem2[:, i, j, :])
+                xT_list.append(xT)
+                x_out_list.append(x_in)
+
+                # Create a tensor [Batch] filled with the current component index 'i'
+                component_indices_list.append(torch.full((batch_size,), i, dtype=torch.long, device=device))
+
+        z_sem2_cat = torch.cat(z_sem2_list, dim=0)
+        xT_cat = torch.cat(xT_list, dim=0)
+        x_out_cat = torch.cat(x_out_list, dim=0)
+        indices_cat = torch.cat(component_indices_list, dim=0) # Tracked components
+
+        # Decode EVERYTHING (expensive but supports your structure)
+        x_counterfactuals_generator = self.decode((z_sem2_cat, xT_cat))
+        x_counterfactuals = x_counterfactuals_generator.detach()
+
+        # Predict on EVERYTHING
+        preds_all = torch.nn.Softmax(dim=-1)(predictor(x_counterfactuals.to(device)).detach().cpu())
+
+        # --- SELECTION LOGIC ---
+        # We need to select 1 best candidate per original batch item
+        # Structure of preds_all: [Total_Candidates * Batch, Num_Classes]
+        # The order is: [Cand0_Batch0, Cand0_Batch1, ... Cand1_Batch0, Cand1_Batch1, ...]
+
+        total_candidates = num_attempts * z_sem2.shape[2]
+
+        # 1. Reshape to [Total_Candidates, Batch, Num_Classes]
+        preds_reshaped = preds_all.view(total_candidates, batch_size, -1)
+
+        # 2. Permute to [Batch, Total_Candidates, Num_Classes]
+        preds_batch = preds_reshaped.permute(1, 0, 2)
+
+        # 3. Get Target Confidence for all candidates
+        # target_classes: [Batch] -> expand to [Batch, Total_Candidates, 1]
+        target_cls_expanded = target_classes.unsqueeze(1).unsqueeze(2).expand(-1, total_candidates, 1)
+
+        # Gather confidence: [Batch, Total_Candidates]
+        candidate_confs = torch.gather(preds_batch.cpu(), 2, target_cls_expanded.cpu()).squeeze(-1)
+
+        # 4. Find Best Candidate (Minimize distance to goal)
+        # [Batch, Total_Candidates]
+        diff = torch.abs(candidate_confs - target_confidence_goal)
+        best_candidate_indices = torch.argmin(diff, dim=1) # [Batch] (indices 0 to Total_Candidates-1)
+
+        # 5. Select the Data corresponding to best indices
+        # We need to compute the flat indices in the 'cat' tensors
+        # Flat Index = (Best_Candidate_Index * Batch_Size) + Batch_Index
+        flat_indices = best_candidate_indices * batch_size + torch.arange(batch_size)
+
+        # Gather the winners
+        x_counterfactuals_final = x_counterfactuals[flat_indices]
+        y_target_end_confidence = candidate_confs[torch.arange(batch_size), best_candidate_indices]
+        final_component_indices = indices_cat[flat_indices]
+
+        # Recalculate x_out diff (x_in - chosen_counterfactual)
+        x_out_final = x_in - x_counterfactuals_final.cpu()
+
+        print("preds_after:", preds_all[flat_indices].argmax(dim=-1))"""
