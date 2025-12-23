@@ -1,4 +1,4 @@
-import os
+'''import os
 import types
 import shutil
 import copy
@@ -495,3 +495,4 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             list(y_target_end_confidence),
             list(x_in),
         )
+'''

@@ -345,8 +345,11 @@ def load_yaml_config(config_path, config_model=None, return_namespace=True):
                 for idx in range(len(config_data[key])):
                     if isinstance(config_data[key][idx], dict):
                         config_data[key][idx] = load_yaml_config(config_data[key][idx])
+        try:
+            config = config_model(**config_data)
 
-        config = config_model(**config_data)
+        except Exception:
+            import pdb; pdb.set_trace()
 
     else:
         config = config_data

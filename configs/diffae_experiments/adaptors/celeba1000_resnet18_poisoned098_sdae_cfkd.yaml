@@ -1,4 +1,4 @@
-# python run_cfkd.py --config "<PEAL_BASE>/configs/diffae_experiments/adaptors/camelyon_1kx098_dae_cfkd.yaml"
+# python run_cfkd.py --config "<PEAL_BASE>/configs/diffae_experiments/adaptors/celeba1000_resnet18_poisoned098_sdae_cfkd.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  4
@@ -11,16 +11,16 @@ calculate_group_accuracies           :  True
 calculate_explainer_stats            :  False
 explainer                            :  <PEAL_BASE>/configs/diffae_experiments/explainers/dae_distill.yaml
 training                             :  <PEAL_BASE>/configs/cfkd_experiments/training/img_finetuning.yaml
-data                                 :  <PEAL_BASE>/configs/cfkd_experiments/data/camelyon17_1k_poisoned098.yaml
-test_data                            :  <PEAL_BASE>/configs/cfkd_experiments/data/camelyon17_unpoisoned.yaml
-student                              :  $PEAL_RUNS/camelyon17_1k/dinov2_linear_poisoned098/model.cpl
-teacher                              :  $PEAL_RUNS/camelyon17/classifier_unpoisoned/model.cpl
-generator                            :  $PEAL_RUNS/camelyon/diffusion_autoencoder/config.yaml
-base_dir                             :  $PEAL_RUNS/camelyon17_1k/dinov2_linear_poisoned098/dae_cfkd
+data                                 :  <PEAL_BASE>/configs/cfkd_experiments/data/celeba1k_Blond_Hair_confounding_Male_poisoned098.yaml
+test_data                            :  <PEAL_BASE>/configs/cfkd_experiments/data/celeba.yaml
+student                              :  $PEAL_RUNS/celeba1k/Blond_Hair/resnet18_poisoned098/model.cpl
+teacher                              :  $PEAL_RUNS/celeba/Blond_Hair/resnet18_unpoisoned/model.cpl
+generator                            :  $PEAL_RUNS/celeba/diffusion_autoencoder/config.yaml
+base_dir                             :  $PEAL_RUNS/celeba1k/Blond_Hair/resnet18_poisoned098/sdae_cfkd
 task:
   criterions:
     ce     : 1.0
     l2     : 100.0
   output_type             : singleclass
   output_channels         : 2
-  y_selection             : [tumor]
+  y_selection             : [Blond_Hair]

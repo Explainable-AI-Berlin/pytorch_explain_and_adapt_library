@@ -15,7 +15,7 @@ from PIL import Image
 from torchvision.transforms import ToTensor
 
 from peal.global_utils import get_project_resource_dir, embed_numberstring
-from peal.dependencies.ddpm_inversion.ddpm_inversion import DDPMInversion
+#from peal.dependencies.ddpm_inversion.ddpm_inversion import DDPMInversion
 
 
 class ArtificialConfounderTabularDatasetGenerator:

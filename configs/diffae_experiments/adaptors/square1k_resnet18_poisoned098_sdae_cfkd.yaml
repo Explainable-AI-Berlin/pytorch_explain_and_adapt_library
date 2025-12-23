@@ -1,8 +1,8 @@
-# python run_cfkd.py --config "<PEAL_BASE>/configs/diffae_experiments/adaptors/square1kx098_dae_cfkd.yaml"
+# python run_cfkd.py --config "<PEAL_BASE>/configs/diffae_experiments/adaptors/square1k_resnet18_poisoned098_sdae_cfkd.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  4
-tracking_level                       :  5
+tracking_level                       :  3
 min_train_samples                    :  800
 finetune_iterations                  :  1
 max_validation_samples               :  200
@@ -15,9 +15,8 @@ data                                 :  <PEAL_BASE>/configs/cfkd_experiments/dat
 test_data                            :  <PEAL_BASE>/configs/cfkd_experiments/data/square_unpoisoned.yaml
 student                              :  $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/classifier_poisoned098/model.cpl
 teacher                              :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_unpoisoned/model.cpl
-#generator                            :  $PEAL_RUNS/square1k/diffae/config.yaml
 generator                            :  $PEAL_RUNS/square/diffusion_autoencoder/config.yaml
-base_dir                             :  $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/classifier_poisoned098/dae_cfkd
+base_dir                             :  $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/classifier_poisoned098/sdae_cfkd
 task:
   criterions:
     ce     : 1.0
