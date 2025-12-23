@@ -351,7 +351,8 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         y_list = []
         c_list = []
         z_list = []
-        for batch in torch.utils.data.DataLoader(self.generator_datasets[1], batch_size=10):
+        for idx, batch in enumerate(torch.utils.data.DataLoader(self.generator_datasets[1], batch_size=10)):
+            print(str(10 * idx) + "/" + str(len(self.generator_datasets[1])))
             x, y = batch
             z, _ = self.encode(x.to(self.device))
             c = z @ self.sparse_dictionary.get_components().to(self.device)
