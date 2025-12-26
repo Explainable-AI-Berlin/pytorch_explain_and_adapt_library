@@ -8,7 +8,7 @@ import torch.nn as nn
 from typing import Union
 
 from peal.adaptors.interfaces import AdaptorConfig, Adaptor
-from peal.sparse_dictionaries.interfaces import SparseDictionary
+from peal.sparse_dictionaries.interfaces import SparseDictionaryConfig
 from peal.sparse_dictionaries.sparse_dictionary_factory import get_sparse_dictionary
 from peal.architectures.interfaces import TaskConfig
 from peal.data.interfaces import DataConfig
@@ -27,7 +27,7 @@ class ProjectionAdaptorConfig(AdaptorConfig):
     test_data: Union[DataConfig, type(None)] = None
     training: Union[TrainingConfig, type(None)] = None
     task: Union[TaskConfig, type(None)] = None
-    sparse_dictionary: Union[SparseDictionary, type(None)] = None
+    sparse_dictionary: Union[SparseDictionaryConfig, type(None)] = None
     projected_component_index_list: list = []
 
 

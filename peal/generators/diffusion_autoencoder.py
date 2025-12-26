@@ -142,6 +142,61 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
 
     def set_encoder(self):
         if not self.config.model_type is None:
+            # --- Existing DINOv2 Logic ---
+            if self.config.model_type[: len("dino_v2")] == "dino_v2":
+                # ... (your existing DINO code) ...
+                pass
+
+            # --- New OpenCLIP Logic ---
+            elif "open_clip" in self.config.model_type:
+                import open_clip
+
+                # Expecting config.model_type format: "open_clip:ViT-B-32:laion2b_s34b_b79k"
+                # Defaulting to ViT-B-32 if only "open_clip" is provided
+                parts = self.config.model_type.split(":")
+                model_name = parts[1] if len(parts) > 1 else "ViT-B-32"
+                pretrained = parts[2] if len(parts) > 2 else "laion2b_s34b_b79k"
+
+                model, _, preprocess = open_clip.create_model_and_transforms(
+                    model_name,
+                    pretrained=pretrained
+                )
+
+                class OpenCLIPEncoder(nn.Module):
+                    def __init__(self, model, preprocess):
+                        super().__init__()
+                        self.model = model
+                        # Convert the Compose transform to an nn.Module-like flow if possible,
+                        # or keep as is if input is PIL. If input is Tensor, use torchvision.
+                        self.preprocess = preprocess
+
+                    def forward(self, x):
+                        # OpenCLIP preprocess usually expects PIL or Tensors.
+                        # If x is already a batch of Tensors, we apply the transforms.
+                        # Note: OpenCLIP's preprocess often includes ToTensor() and Normalize().
+                        # If your input x is already a normalized tensor, you might need to
+                        # bypass parts of self.preprocess.
+                        x_processed = self.preprocess(x)
+
+                        # Ensure batch dimension if single image
+                        if x_processed.ndim == 3:
+                            x_processed = x_processed.unsqueeze(0)
+
+                        # Extract visual features
+                        latent_code = self.model.encode_image(x_processed)
+                        return latent_code
+
+                encoder = OpenCLIPEncoder(model, preprocess)
+
+            # --- Existing UNI Logic ---
+            elif self.config.model_type == "UNI":
+                # ... (your existing UNI code) ...
+                pass
+
+        # ... (rest of your existing logic for encoder_path and normalization) ...
+
+    def set_encoder(self):
+        if not self.config.model_type is None:
             if self.config.model_type[: len("dino_v2")] == "dino_v2":
                 if self.config.model_type == "dino_v2_small":
                     model = AutoModel.from_pretrained("facebook/dinov2-small")
@@ -174,6 +229,53 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
                         return latent_code
 
                 encoder = DinoV2(model, processor)
+
+            elif "open_clip" in self.config.model_type:
+                print("use open clip!!!")
+                print("use open clip!!!")
+                print("use open clip!!!")
+                print("use open clip!!!")
+                print("use open clip!!!")
+                import pdb; pdb.set_trace()
+                # --- New OpenCLIP Logic ---
+                import open_clip
+
+                # Expecting config.model_type format: "open_clip:ViT-B-32:laion2b_s34b_b79k"
+                # Defaulting to ViT-B-32 if only "open_clip" is provided
+                parts = self.config.model_type.split(":")
+                model_name = parts[1] if len(parts) > 1 else "ViT-B-32"
+                pretrained = parts[2] if len(parts) > 2 else "laion2b_s34b_b79k"
+
+                model, _, preprocess = open_clip.create_model_and_transforms(
+                    model_name,
+                    pretrained=pretrained
+                )
+
+                class OpenCLIPEncoder(nn.Module):
+                    def __init__(self, model, preprocess):
+                        super().__init__()
+                        self.model = model
+                        # Convert the Compose transform to an nn.Module-like flow if possible,
+                        # or keep as is if input is PIL. If input is Tensor, use torchvision.
+                        self.preprocess = preprocess
+
+                    def forward(self, x):
+                        # OpenCLIP preprocess usually expects PIL or Tensors.
+                        # If x is already a batch of Tensors, we apply the transforms.
+                        # Note: OpenCLIP's preprocess often includes ToTensor() and Normalize().
+                        # If your input x is already a normalized tensor, you might need to
+                        # bypass parts of self.preprocess.
+                        x_processed = self.preprocess(x)
+
+                        # Ensure batch dimension if single image
+                        if x_processed.ndim == 3:
+                            x_processed = x_processed.unsqueeze(0)
+
+                        # Extract visual features
+                        latent_code = self.model.encode_image(x_processed)
+                        return latent_code
+
+                encoder = OpenCLIPEncoder(model, preprocess)
 
             elif self.config.model_type == "UNI":
                 import timm

@@ -131,3 +131,4 @@ class PredictorConfig(BaseModel):
     tracking_level: int = 4
     only_last_layer: bool = False
     generator: Union[type(None), GeneratorConfig] = None
+    base_model: Union[type(None), str] = None
