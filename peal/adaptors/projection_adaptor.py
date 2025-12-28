@@ -18,16 +18,15 @@ from peal.data.dataloaders import create_dataloaders_from_datasource
 from peal.global_utils import load_yaml_config
 from peal.training.trainers import calculate_test_accuracy
 
-
+# dict_keys(['adaptor_type', 'category', 'data', 'test_data', 'model_path', 'base_dir'])
 class ProjectionAdaptorConfig(AdaptorConfig):
+    adaptor_type: str = "ProjectionAdaptor"
     category: str = "adaptor"
-    model_path: str
+    model_config: Union[PredictorConfig, dict, str]
     base_dir: str
-    data: DataConfig
-    test_data: Union[DataConfig, type(None)] = None
-    training: Union[TrainingConfig, type(None)] = None
-    task: Union[TaskConfig, type(None)] = None
-    sparse_dictionary: Union[SparseDictionaryConfig, type(None)] = None
+    data: Union[DataConfig, dict, type(None)]
+    test_data: Union[DataConfig, dict, type(None)]
+    sparse_dictionary: Union[SparseDictionaryConfig, dict, type(None)] = None
     projected_component_index_list: list = []
 
 
@@ -40,7 +39,7 @@ class ProjectionAdaptor(Adaptor):
 
     def run(self):
         # TODO this can't be done properly before bug is fixed...
-        model_config = load_yaml_config(self.model_config)
+        model_config = load_yaml_config(self.config.model_config)
     
         if not isinstance(model_config.training, TrainingConfig):
             model_config.training = TrainingConfig(**model_config.training)
@@ -48,8 +47,8 @@ class ProjectionAdaptor(Adaptor):
         if not isinstance(model_config.task, TaskConfig):
             model_config.task = TaskConfig(**model_config.task)
     
-        if not self.data_config is None:
-            model_config.data = load_yaml_config(self.data_config)
+        if not self.config.test_data is None:
+            model_config.data = load_yaml_config(self.config.test_data)
     
         if not isinstance(model_config.data, DataConfig):
             if type(model_config.data) == types.SimpleNamespace:
@@ -57,11 +56,7 @@ class ProjectionAdaptor(Adaptor):
             model_config.data = DataConfig(**model_config.data)
     
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        if not self.model_path is None:
-            model_path = self.model_path
-    
-        else:
-            model_path = os.path.join(model_config.model_path, "model.cpl")
+        model_path = os.path.join(model_config.model_path, "model.cpl")
     
         model = torch.load(model_path, map_location=device)
         if not isinstance(model, torch.nn.Module):

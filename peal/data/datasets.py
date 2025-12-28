@@ -14,7 +14,7 @@ from matplotlib import pyplot as plt
 
 from peal.data.interfaces import PealDataset
 from peal.data.dataset_utils import parse_csv
-from peal.global_utils import embed_numberstring, high_contrast_heatmap
+from peal.global_utils import embed_numberstring, high_contrast_heatmap, DINOEvaluator
 from peal.generators.interfaces import Generator
 
 matplotlib.use("Agg")
@@ -365,7 +365,34 @@ class ImageDataset(PealDataset):
         )
         fid_score = float(self.fid.compute())
 
-        return {"fid": fid_score}
+        if not hasattr(self, "dino_eval"):
+            self.dino_eval = DINOEvaluator()
+            self.dino_eval.fit(torch.utils.data.DataLoader(self, batch_size=batch_size))
+
+        dino_fid = self.dino_eval.compute_fid(generated_images)
+        output_dict = {"fid": fid_score, "dino_fid": dino_fid}
+
+        if hasattr(self, "reference_fid") and not self.reference_fid is None:
+            quality_score = self.reference_fid / (dino_fid + 1e-8)
+            output_dict["quality_score"] = quality_score
+
+        return output_dict
+
+    def calculate_outlier_score(self, x):
+        if not hasattr(self, "dino_eval"):
+            self.dino_eval = DINOEvaluator()
+            self.dino_eval.fit(
+                torch.utils.data.DataLoader(self, batch_size=x.shape[0])
+            )
+
+        outlier_scores = {"absolute" : self.dino_eval.compute_outlier_score(x)}
+
+        if hasattr(self, "reference_outlier_scores") and self.reference_outlier_scores is not None:
+            outlier_scores["relative"] = outlier_scores["absolute"] / (
+                self.reference_outlier_scores + 1e-8
+            )
+
+        return outlier_scores
 
     def _initialize_performance_metrics(self):
         # self.lpips = torchmetrics.image.lpips.LPIPS(net="vgg", spatial=False).to('cuda')

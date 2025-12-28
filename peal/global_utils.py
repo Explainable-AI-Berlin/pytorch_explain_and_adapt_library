@@ -697,3 +697,166 @@ def set_random_seed(seed: int):
         False  # Disable the optimization for specific architectures.
     )
     os.environ["PYTHONHASHSEED"] = str(seed)
+
+
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader
+from transformers import AutoImageProcessor, AutoModel
+from tqdm import tqdm
+
+class DINOEvaluator:
+    def __init__(self, model_name='facebook/dinov2-small', device='cuda'):
+        self.device = device if torch.cuda.is_available() else 'cpu'
+        print(f"Loading {model_name} on {self.device}...")
+
+        # We use the base model (no classification head) as we only need embeddings
+        self.processor = AutoImageProcessor.from_pretrained(model_name)
+        self.model = AutoModel.from_pretrained(model_name).to(self.device)
+        self.model.eval()
+
+        # Storage for distribution statistics (PyTorch Tensors)
+        self.mu_real = None
+        self.sigma_real = None
+        self.sigma_inv_real = None # For Mahalanobis
+        self.fitted = False
+
+    @torch.no_grad()
+    def _get_features(self, inputs):
+        """
+        Internal helper to extract [CLS] token embeddings.
+        inputs: can be a DataLoader or a Tensor (B, C, H, W) or List of Tensors
+        """
+        # If inputs is a dataloader, we iterate and concatenate
+        if isinstance(inputs, DataLoader):
+            features_list = []
+            for batch in tqdm(inputs, desc="Extracting features"):
+                # Handle standard Tuple (img, label) or just img
+                if isinstance(batch, (list, tuple)):
+                    imgs = batch[0]
+                else:
+                    imgs = batch
+
+                imgs = imgs.to(self.device)
+                outputs = self.model(pixel_values=imgs)
+                # DINOv2: The [CLS] token is usually the first token or pooled output
+                # transformers implementation usually puts pooled_output in .pooler_output
+                # or we take last_hidden_state[:, 0]
+                if hasattr(outputs, 'pooler_output') and outputs.pooler_output is not None:
+                    feats = outputs.pooler_output
+                else:
+                    feats = outputs.last_hidden_state[:, 0, :]
+
+                features_list.append(feats)
+            return torch.cat(features_list, dim=0)
+
+        # If inputs is a direct tensor batch
+        else:
+            inputs = inputs.to(self.device)
+            outputs = self.model(pixel_values=inputs)
+            if hasattr(outputs, 'pooler_output') and outputs.pooler_output is not None:
+                return outputs.pooler_output
+            else:
+                return outputs.last_hidden_state[:, 0, :]
+
+    def fit(self, real_dataloader):
+        """
+        Step 1: Precompute statistics for the Real (Training) distribution.
+        Run this once at the beginning.
+        """
+        print("Fitting evaluator to real data...")
+        real_feats = self._get_features(real_dataloader) # (N, D)
+
+        # 1. Compute Mean
+        self.mu_real = torch.mean(real_feats, dim=0)
+
+        # 2. Compute Covariance
+        # torch.cov requires shape (Variables, Observations), so we transpose
+        self.sigma_real = torch.cov(real_feats.T)
+
+        # 3. Compute Inverse Covariance for Mahalanobis
+        # We add a small epsilon to diagonal for numerical stability (regularization)
+        D = self.sigma_real.shape[0]
+        epsilon = 1e-6
+        reg_sigma = self.sigma_real + torch.eye(D, device=self.device) * epsilon
+
+        # Use pseudo-inverse or inverse (cholesky is faster if positive definite)
+        try:
+            self.sigma_inv_real = torch.linalg.inv(reg_sigma)
+        except torch.linalg.LinAlgError:
+            print("Warning: Covariance matrix singular, using pseudo-inverse.")
+            self.sigma_inv_real = torch.linalg.pinv(reg_sigma)
+
+        self.fitted = True
+        print(f"Fitted on {len(real_feats)} samples. Feature Dim: {D}")
+
+    def compute_fid(self, fake_inputs):
+        """
+        Calculates FID score between the fitted real distribution and the provided fake inputs.
+        """
+        if not self.fitted:
+            raise ValueError("Please run .fit(real_dataloader) before computing FID.")
+
+        fake_feats = self._get_features(fake_inputs)
+
+        mu_fake = torch.mean(fake_feats, dim=0)
+        sigma_fake = torch.cov(fake_feats.T)
+
+        # --- FID Formula in PyTorch ---
+        # FID = ||mu_r - mu_g||^2 + Tr(Sigma_r + Sigma_g - 2*(Sigma_r * Sigma_g)^(1/2))
+
+        # 1. Diff squared term
+        diff = self.mu_real - mu_fake
+        diff_sq = diff.dot(diff)
+
+        # 2. Trace term
+        # Matrix square root of product
+        covmean = self.sigma_real @ sigma_fake
+
+        # Calculating matrix square root in PyTorch
+        # We use SVD for stability: M = U S V*, sqrt(M) approx via eigen decomp
+        # Or usually eigenvalues: M = V L V^{-1}, M^{1/2} = V L^{1/2} V^{-1}
+        vals, vecs = torch.linalg.eig(covmean)
+
+        # Suppress complex parts (numerical noise)
+        vals = vals.real
+        vecs = vecs.real
+
+        # sqrt of eigenvalues
+        sqrt_vals = torch.sqrt(torch.clamp(vals, min=0)) # clamp to avoid nan
+
+        # Reconstruct sqrt matrix
+        # This part can be tricky in pure PyTorch without scipy.linalg.sqrtm
+        # Approximation: Tr((Sigma_r * Sigma_g)^(1/2)) = sum(sqrt(eigenvalues))
+        # strictly true if matrices effectively commute or via trace properties
+
+        trace_sqrt_product = torch.sum(sqrt_vals)
+
+        trace_term = torch.trace(self.sigma_real) + torch.trace(sigma_fake) - 2 * trace_sqrt_product
+
+        fid = diff_sq + trace_term
+        return fid.item()
+
+    def compute_mahalanobis(self, single_image_or_batch):
+        """
+        Calculates Mahalanobis distance for specific samples against the real distribution.
+        Returns a tensor of distances (one per image).
+        """
+        if not self.fitted:
+            raise ValueError("Please run .fit(real_dataloader) first.")
+
+        # Ensure inputs are tensor (preprocess if needed before passing here)
+        feats = self._get_features(single_image_or_batch) # (B, D)
+
+        # Distance = sqrt( (x - mu) * Sigma^-1 * (x - mu)^T )
+        # Centering
+        diff = feats - self.mu_real.unsqueeze(0) # Broadcasting (B, D) - (1, D)
+
+        # Matrix multiplication: (B, D) @ (D, D) -> (B, D)
+        left = diff @ self.sigma_inv_real
+
+        # Dot product: sum(left * diff, dim=1)
+        # This is effectively doing the row-wise dot product
+        mahalanobis_sq = torch.sum(left * diff, dim=1)
+
+        return torch.sqrt(torch.clamp(mahalanobis_sq, min=0))
