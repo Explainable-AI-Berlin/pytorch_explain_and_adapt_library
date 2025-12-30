@@ -10,6 +10,7 @@ import torch
 from pathlib import Path
 
 import torchvision
+import yaml
 from torch import nn
 from typing import Union
 
@@ -68,7 +69,7 @@ class DiffusionAutoencoderConfig(GeneratorConfig):
     is_loaded: bool = True
     model_type: Union[str, None] = None
     sparse_dictionary: Union[str, SparseDictionaryConfig, None] = SVDDictionaryConfig()
-    visualizations_per_component: Union[int, None] = 100
+    visualizations_per_component: Union[int, None] = 10
 
 
 class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
@@ -104,16 +105,19 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
 
     def load_sparse_dictionary(self):
         if not self.config.sparse_dictionary is None:
-            self.sparse_dictionary_path = os.path.join(
+            self.config.sparse_dictionary.base_path = os.path.join(
                 self.config.base_path,
-                self.config.sparse_dictionary.sparse_dictionaries_type + self.config.sparse_dictionary.ending,
+                self.config.sparse_dictionary.sparse_dictionaries_type,
             )
-            if not os.path.exists(self.sparse_dictionary_path):
+            self.config.sparse_dictionary.weights_path = os.path.join(
+                self.config.sparse_dictionary.base_path, self.config.sparse_dictionary.weights_name
+            )
+            if not os.path.exists(self.config.sparse_dictionary.weights_path):
                 self.sparse_dictionary = None
 
             else:
                 self.sparse_dictionary = get_sparse_dictionary(self.config.sparse_dictionary)
-                self.sparse_dictionary.load_from_disk(self.sparse_dictionary_path)
+                self.sparse_dictionary.load_from_disk(self.config.sparse_dictionary.weights_path)
 
     def sample_z(self, batch_size=1):
         # TODO this has to be done properly with the learned prior!!!
@@ -157,10 +161,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
                 model_name = parts[1] if len(parts) > 1 else "ViT-B-32"
                 pretrained = parts[2] if len(parts) > 2 else "laion2b_s34b_b79k"
 
-                model, _, preprocess = open_clip.create_model_and_transforms(
-                    model_name,
-                    pretrained=pretrained
-                )
+                model, _, preprocess = open_clip.create_model_and_transforms(model_name, pretrained=pretrained)
 
                 class OpenCLIPEncoder(nn.Module):
                     def __init__(self, model, preprocess):
@@ -236,7 +237,9 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
                 print("use open clip!!!")
                 print("use open clip!!!")
                 print("use open clip!!!")
-                import pdb; pdb.set_trace()
+                import pdb
+
+                pdb.set_trace()
                 # --- New OpenCLIP Logic ---
                 import open_clip
 
@@ -246,10 +249,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
                 model_name = parts[1] if len(parts) > 1 else "ViT-B-32"
                 pretrained = parts[2] if len(parts) > 2 else "laion2b_s34b_b79k"
 
-                model, _, preprocess = open_clip.create_model_and_transforms(
-                    model_name,
-                    pretrained=pretrained
-                )
+                model, _, preprocess = open_clip.create_model_and_transforms(model_name, pretrained=pretrained)
 
                 class OpenCLIPEncoder(nn.Module):
                     def __init__(self, model, preprocess):
@@ -421,7 +421,10 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             [torch.utils.data.DataLoader(self.generator_datasets[1], batch_size=10)],
             self.model.ema_model.encoder,
         )
-        self.sparse_dictionary.save_on_disk(self.sparse_dictionary_path)
+        self.sparse_dictionary.save_on_disk(self.config.sparse_dictionary.weights_path)
+        save_yaml_config(
+            self.config.sparse_dictionary, os.path.join(self.config.sparse_dictionary.base_path, "config.yaml")
+        )
 
     def explain_all_components(self, sparse_dictionary=None):
         if self.sparse_dictionary is None or not sparse_dictionary is None:
@@ -489,7 +492,9 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         for component_idx in range(self.config.sparse_dictionary.n_components):
             result_list.append(
                 self.explain_sparse_component(
-                    torch.utils.data.DataLoader(self.generator_datasets[1], batch_size=10),
+                    torch.utils.data.DataLoader(
+                        self.generator_datasets[1], batch_size=self.config.visualizations_per_component
+                    ),
                     component_idx,
                 )
             )
@@ -675,32 +680,26 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         w = list(self.gradient_predictor.children())[-1].weight[0]
         dot_ab = torch.tensor(torch.sum(z_sem * w, dim=-1, keepdim=True) > 0.5, dtype=torch.uint8)
         print("dot_ab before editing:", dot_ab.squeeze().detach().cpu().numpy())
-        num_attempts = int(explainer_config.num_attempts / len(explainer_config.linesearch_factors))
-        z_sem2, indices, distances = self._calculate_z_counterfactuals(z_sem, w, explainer_config, num_attempts)
-        z_sem2_list = []
+        # num_attempts = int(explainer_config.num_attempts / len(explainer_config.linesearch_factors))
+        z_sem_before, indices, distances = self._calculate_z_counterfactuals(
+            z_sem, w, explainer_config, explainer_config.num_attempts
+        )
+        """z_sem2_list = []
         xT_list = []
-        x_out = []
-        indices_list = []
-        for i in range(num_attempts):
-            for j in range(z_sem2.shape[2]):
-                z_sem2_list.append(z_sem2[:, i, j, :])
+        for i in range(explainer_config.num_attempts):
+            for j in range(z_sem_before.shape[2]):
+                z_sem2_list.append(z_sem_before[:, i, j, :])
                 xT_list.append(xT)
-                x_out.append(x_in)
-                indices_list.append(indices)
+        torch.cat(z_sem2_list, dim=0)
+        """
 
-        try:
-            z_sem2 = torch.cat(z_sem2_list, dim=0)
-
-        except Exception as exp:
-            print("Exception during torch.cat:", exp)
-            import pdb; pdb.set_trace()
-
-        xT = torch.cat(xT_list, dim=0)
-        x_out = torch.cat(x_out, dim=0)
-        indices = torch.cat(indices_list, dim=0)
+        z_sem2 = z_sem_before.reshape([-1, z_sem_before.shape[-1]])
+        xT_decoding = xT.unsqueeze(1).unsqueeze(1)
+        xT_decoding = xT_decoding.tile(1, explainer_config.num_attempts, len(explainer_config.linesearch_factors), 1, 1, 1)
+        xT_decoding = xT_decoding.reshape([-1] + list(xT.shape[1:]))
         dot_ab2 = torch.tensor(torch.sum(z_sem2 * w, dim=-1, keepdim=True) > 0, dtype=torch.uint8)
         print("dot_ab after editing:", dot_ab2.squeeze().detach().cpu().numpy())
-        x_counterfactuals_generator = self.decode((z_sem2, xT))
+        x_counterfactuals_generator = self.decode((z_sem2, xT_decoding))
         # x_counterfactuals_generator = x_generator
         print("[x_counterfactuals_generator.min(), x_counterfactuals_generator.max()]")
         print([x_counterfactuals_generator.min(), x_counterfactuals_generator.max()])
@@ -718,15 +717,35 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         for i in range(preds.shape[0]):
             y_target_end_confidence[i] = preds[i, target_classes[i % target_classes.shape[0]]]
 
-        # TODO here i want you to select the best counterfactual of the line search
-
-        # keep only the linesearch attempt with highest target confidence
         print("preds_after:", preds.argmax(dim=-1))
-        x_out_final = x_out - x_counterfactuals.cpu()
+        # TODO here i want you to select the best counterfactual of the line search
+        # keep only the linesearch attempt with highest target confidence
+        x_counterfactuals = torch.reshape(
+            x_counterfactuals, list(z_sem_before.shape[:3]) + list(x_counterfactuals.shape[1:])
+        )
+        y_target_end_confidence = torch.reshape(y_target_end_confidence, z_sem_before.shape[:3])
+        x_counterfactuals_out_list = []
+        y_target_end_confidence_list = []
+        x_out_list = []
+        indices_list = []
+        for i in range(explainer_config.num_attempts):
+            j = torch.argmax(y_target_end_confidence[:, i, :], dim=-1)
+            for k in range(j.shape[0]):
+                x_counterfactuals_out_list.append(x_counterfactuals[k, i, j[k], :])
+                y_target_end_confidence_list.append(float(y_target_end_confidence[k, i, j[k]]))
+
+            x_out_list.append(x_in)
+            indices_list.append(indices)
+
+        x_counterfactuals = torch.stack(x_counterfactuals_out_list, dim=0)
+        x_out = torch.cat(x_out_list, dim=0)
+        y_target_end_confidence = torch.tensor(y_target_end_confidence_list)
+        indices = torch.cat(indices_list, dim=0)
+        x_difference = x_out - x_counterfactuals.cpu()
 
         return (
             list(x_counterfactuals.cpu()),
-            list(x_out_final),
+            list(x_difference),
             list(y_target_end_confidence),
             list(x_in),
             [],
@@ -751,7 +770,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             component_indices = range(num_attempts)
             # 1. Retrieve the Dictionary Components (Directions)
             # Shape: [Latent_Dim, Num_Components]
-            W_all = self.sparse_dictionary.get_components()[:, : num_attempts]
+            W_all = self.sparse_dictionary.get_components()[:, :num_attempts]
 
             # If specific indices are provided, filter W_all
             if component_indices is not None:
@@ -795,8 +814,8 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             # Result: [Batch, K, S, Dim]
             # We subtract because we want to move AWAY from the projection (reflection logic)
             z_reflected = z_base - factors_expanded * proj_expanded
-            #z_reflected = z_expanded - 2 * projections  # Shape: [Batch, K, Dim]
-            #z_reflected = z_expanded - line_search_factors * projections  # Shape: [Batch, K, Dim]
+            # z_reflected = z_expanded - 2 * projections  # Shape: [Batch, K, Dim]
+            # z_reflected = z_expanded - line_search_factors * projections  # Shape: [Batch, K, Dim]
             # z_reflected = z_expanded - projections  # Shape: [Batch, K, Dim]
 
             # 4. Calculate Distances

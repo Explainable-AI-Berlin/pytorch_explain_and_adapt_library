@@ -50,4 +50,7 @@ def get_sparse_dictionary(
     else:
         sparse_dictionary_out = sparse_dictionary
 
+    if not sparse_dictionary_out.config.weights_path is None and os.path.exists(sparse_dictionary_out.config.weights_path):
+        sparse_dictionary_out.load_from_disk(sparse_dictionary_out.config.weights_path)
+
     return sparse_dictionary_out

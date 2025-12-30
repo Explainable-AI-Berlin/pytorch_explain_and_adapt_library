@@ -22,12 +22,13 @@ from peal.training.trainers import calculate_test_accuracy
 class ProjectionAdaptorConfig(AdaptorConfig):
     adaptor_type: str = "ProjectionAdaptor"
     category: str = "adaptor"
-    model_config: Union[PredictorConfig, dict, str]
+    base_model_config: Union[PredictorConfig, dict, str]
     base_dir: str
     data: Union[DataConfig, dict, type(None)]
     test_data: Union[DataConfig, dict, type(None)]
     sparse_dictionary: Union[SparseDictionaryConfig, dict, type(None)] = None
     projected_component_index_list: list = []
+    partition: int = 2
 
 
 class ProjectionAdaptor(Adaptor):
@@ -35,12 +36,11 @@ class ProjectionAdaptor(Adaptor):
         pathlib.Path(adaptor_config.base_dir).mkdir(exist_ok=True)
         self.config = adaptor_config
         self.sparse_dictionary = get_sparse_dictionary(self.config.sparse_dictionary)
-        self.sparse_dictionary.load_from_disk(self.sparse_dictionary_path)
 
     def run(self):
         # TODO this can't be done properly before bug is fixed...
-        model_config = load_yaml_config(self.config.model_config)
-    
+        model_config = load_yaml_config(self.config.base_model_config)
+
         if not isinstance(model_config.training, TrainingConfig):
             model_config.training = TrainingConfig(**model_config.training)
     
@@ -60,20 +60,20 @@ class ProjectionAdaptor(Adaptor):
     
         model = torch.load(model_path, map_location=device)
         if not isinstance(model, torch.nn.Module):
-            predictor_config = load_yaml_config(self.model_config, PredictorConfig)
+            predictor_config = load_yaml_config(model_config, PredictorConfig)
             model_weights = model
             model = ModelTrainer(predictor_config).model
             model.load_state_dict(model_weights)
     
         model.eval()
-        test_dataloader = create_dataloaders_from_datasource(model_config)[self.partition]
+        test_dataloader = create_dataloaders_from_datasource(model_config)[self.config.partition]
         components = self.sparse_dictionary.get_components()
-        model = projection_wrap_model(model.fc, components, self.config.projected_component_index_list)
+        model_handle = projection_wrap_model(model.model.model.fc, components.t(), self.config.projected_component_index_list)
         correct, group_accuracies, group_distribution, groups, worst_group_accuracy = (
             calculate_test_accuracy(model, test_dataloader, device, True)
         )
         partitions = ["Training", "Validation", "Test"]
-        print(partitions[self.partition] + " accuracy: " + str(correct))
+        print(partitions[self.config.partition] + " accuracy: " + str(correct))
         print("Group accuracies: " + str(group_accuracies))
         print("Group distribution: " + str(group_distribution))
         print("Samples per Group: " + str(groups))

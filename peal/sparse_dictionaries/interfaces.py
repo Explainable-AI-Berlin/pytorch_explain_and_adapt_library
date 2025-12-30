@@ -4,11 +4,13 @@ from pydantic import BaseModel
 
 
 class SparseDictionaryConfig(BaseModel):
-    category: str = "sparse_dictionaries"
-    act_size: int = 512
     n_components: Union[int, None]
     sparse_dictionaries_type: str
-    ending: str
+    category: str = "sparse_dictionaries"
+    base_path: Union[str, None] = None
+    weights_path: Union[str, None] = None
+    act_size: int = 512
+    weights_name: str = "weights.npz"
 
 class SparseDictionary:
     config : SparseDictionaryConfig

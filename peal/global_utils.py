@@ -337,19 +337,14 @@ def load_yaml_config(config_path, config_model=None, return_namespace=True):
     elif not config_model is None and isinstance(config_data, dict):
         for key in config_data.keys():
             if isinstance(config_data[key], dict):
-                config_data[key] = load_yaml_config(
-                    config_data[key], return_namespace=False
-                )
+                config_data[key] = load_yaml_config(config_data[key], return_namespace=False)
 
             elif isinstance(config_data[key], list):
                 for idx in range(len(config_data[key])):
                     if isinstance(config_data[key][idx], dict):
                         config_data[key][idx] = load_yaml_config(config_data[key][idx])
-        try:
-            config = config_model(**config_data)
 
-        except Exception:
-            import pdb; pdb.set_trace()
+        config = config_model(**config_data)
 
     else:
         config = config_data
