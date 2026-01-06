@@ -4,6 +4,6 @@ category                             :  "adaptor"
 test_data                            :  <PEAL_BASE>/configs/cfkd_experiments/data/celeba.yaml
 student                              :  $PEAL_RUNS/celeba1k/Blond_Hair/dinov2_poisoned098/model.cpl
 base_dir                             :  $PEAL_RUNS/celeba1k/Blond_Hair/dinov2_poisoned098/sdae_projection
-projected_component_index_list       :  [0]
-sparse_dictionary                    :  $PEAL_RUNS/celeba/diffusion_autoencoder/matryoshka_sae/config.yaml
+projected_component_index_list       :  [1]
+sparse_dictionary                    :  $PEAL_RUNS/celeba/diffusion_autoencoder/OrthogonalProcrustesDictionary/config.yaml
 

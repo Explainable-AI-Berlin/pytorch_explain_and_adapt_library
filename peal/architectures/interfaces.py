@@ -17,7 +17,7 @@ class TaskConfig(BaseModel):
     """
     The criterions used for training the model.
     """
-    criterions: dict = {"ce": 1.0, "l2": 1.0}
+    criterions: dict = {"ce": 1.0, "l2": 100.0}
     """
     The output_type that either can just be the output_type of the dataset or could be some
     possible subtype.

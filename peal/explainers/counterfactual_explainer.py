@@ -1575,6 +1575,17 @@ class CounterfactualExplainer(ExplainerInterface):
     def calculate_latent_difference_stats(self, explanations_dict):
         tracked_stats = {}
         latent_differences = None
+        # TODO is this correct??
+        if not "clusters0" in explanations_dict.keys():
+            for cluster_idx in range(self.explainer_config.num_attempts):
+                explanations_dict["clusters" + str(cluster_idx)] = []
+                for i in range(int(len(explanations_dict["x_list"]) / self.explainer_config.num_attempts)):
+                    explanations_dict["clusters" + str(cluster_idx)].append(
+                        explanations_dict["x_counterfactual_list"][
+                            i * self.explainer_config.num_attempts + cluster_idx
+                        ]
+                    )
+
         if hasattr(self.val_dataset, "sample_to_latent"):
             latents_original = []
             for i, e in enumerate(explanations_dict["x_list"][: len(explanations_dict["clusters0"])]):

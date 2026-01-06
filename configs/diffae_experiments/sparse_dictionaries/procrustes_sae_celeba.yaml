@@ -1,0 +1,11 @@
+ending: .npz
+n_components: 2
+sparse_dictionaries_type: OrthogonalProcrustesDictionary
+category: sparse_dictionaries
+task:
+  y_selection: [Blond_Hair, Male]
+  output_type: multiclass
+  output_channels: 2
+  criterions:
+    bce: 1.0
+    l2: 100.0

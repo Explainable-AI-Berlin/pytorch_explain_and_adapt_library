@@ -35,18 +35,14 @@ def get_predictor(predictor, device="cuda"):
             import onnxruntime as ort
 
             # Load the ONNX model
-            session = ort.InferenceSession(
-                predictor, providers=["CUDAExecutionProvider"]
-            )
+            session = ort.InferenceSession(predictor, providers=["CUDAExecutionProvider"])
 
             # Get input name for the model
             input_name = session.get_inputs()[0].name
 
             # Run inference
             def onnx_model(input_data):
-                session_output = session.run(
-                    None, {input_name: input_data.cpu().numpy()}
-                )
+                session_output = session.run(None, {input_name: input_data.cpu().numpy()})
                 return torch.from_numpy(session_output[0]).to(device)
 
             # onnx_model = lambda input_data: torch.randint(0, 1, (input_data.shape[0])).to(device)
@@ -131,20 +127,12 @@ class SequentialModel(torch.nn.Sequential):
         num_neurons_previous = input_channels
         for layer_config in architecture_config.layers:
             if isinstance(layer_config, ResnetConfig):
-                layers.append(
-                    create_cnn_layer(
-                        ResnetBlock, layer_config, num_neurons_previous, activation
-                    )
-                )
+                layers.append(create_cnn_layer(ResnetBlock, layer_config, num_neurons_previous, activation))
                 num_neurons_previous = layer_config.num_neurons
                 tensor_dim = layer_config.tensor_dim
 
             elif isinstance(layer_config, VGGConfig):
-                layers.append(
-                    create_cnn_layer(
-                        VGGBlock, layer_config, num_neurons_previous, activation
-                    )
-                )
+                layers.append(create_cnn_layer(VGGBlock, layer_config, num_neurons_previous, activation))
                 num_neurons_previous = layer_config.num_neurons
                 tensor_dim = layer_config.tensor_dim
 
@@ -154,9 +142,7 @@ class SequentialModel(torch.nn.Sequential):
                 tensor_dim = layer_config.tensor_dim
 
             elif isinstance(layer_config, TransformerConfig):
-                layers.append(
-                    TransformerBlock(layer_config, num_neurons_previous, activation)
-                )
+                layers.append(TransformerBlock(layer_config, num_neurons_previous, activation))
                 num_neurons_previous = layer_config.num_neurons
                 tensor_dim = layer_config.tensor_dim
 
@@ -174,12 +160,8 @@ class SequentialModel(torch.nn.Sequential):
             layers.append(torch.nn.Dropout(dropout))
 
         if not output_channels is None:
-            last_layer_config = FCConfig(
-                num_neurons=output_channels, tensor_dim=tensor_dim
-            )
-            layers.append(
-                FCBlock(last_layer_config, num_neurons_previous)
-            )  # , activation))
+            last_layer_config = FCConfig(num_neurons=output_channels, tensor_dim=tensor_dim)
+            layers.append(FCBlock(last_layer_config, num_neurons_previous))  # , activation))
             num_neurons_previous = output_channels
 
         self.output_channels = num_neurons_previous
@@ -400,6 +382,7 @@ class SequentialModel(torch.nn.Sequential):
 
             return x'''
 
+
 class TorchvisionModel(torch.nn.Module):
     def __init__(self, model, num_classes, input_size=None, config=None):
         super(TorchvisionModel, self).__init__()
@@ -409,30 +392,30 @@ class TorchvisionModel(torch.nn.Module):
         # --- Standard ResNet ---
         if model == "resnet18":
             self.model = torchvision.models.resnet18(pretrained=True)
-            self.model.fc = torch.nn.Linear(self.model.fc.in_features, num_classes)
+            self.model.fc = torch.nn.Linear(self.model.fc.in_features, num_classes, bias=False)
 
         elif model == "resnet50":
             self.model = torchvision.models.resnet50(pretrained=True)
-            self.model.fc = torch.nn.Linear(self.model.fc.in_features, num_classes)
+            self.model.fc = torch.nn.Linear(self.model.fc.in_features, num_classes, bias=False)
 
         elif model == "resnet_loaded":
             self.model = torch.load(self.config.base_model, map_location="cpu")
-            self.model.model.fc = torch.nn.Linear(self.model.model.fc.in_features, num_classes)
+            self.model.model.fc = torch.nn.Linear(self.model.model.fc.in_features, num_classes, bias=False)
 
         # --- DINOv2 ---
         elif model == "dino_v2_small":
             self.model = AutoModel.from_pretrained("facebook/dinov2-small")
             self.processor = AutoImageProcessor.from_pretrained("facebook/dinov2-small")
-            self.fc = torch.nn.Linear(384, num_classes)
+            self.fc = torch.nn.Linear(384, num_classes, bias=False)
 
         elif model == "dino_v2_base":
             self.model = AutoModel.from_pretrained("facebook/dinov2-base")
             self.processor = AutoImageProcessor.from_pretrained("facebook/dinov2-base")
-            self.fc = torch.nn.Linear(768, num_classes)
+            self.fc = torch.nn.Linear(768, num_classes, bias=False)
 
         elif model == "dino_v2":
             self.model = AutoModel.from_pretrained("facebook/dinov2-large")
-            self.fc = torch.nn.Linear(1024, num_classes)
+            self.fc = torch.nn.Linear(1024, num_classes, bias=False)
             self.processor = AutoImageProcessor.from_pretrained("facebook/dinov2-large")
 
         # --- OpenCLIP Integration ---
@@ -451,17 +434,15 @@ class TorchvisionModel(torch.nn.Module):
                 pretrained = "laion2b_s34b_b79k"
 
             # Load model and transforms
-            self.model, _, self.preprocess = open_clip.create_model_and_transforms(
-                model_name, pretrained=pretrained
-            )
+            self.model, _, self.preprocess = open_clip.create_model_and_transforms(model_name, pretrained=pretrained)
 
             # Determine embedding dimension and input size
             # OpenCLIP visual models usually have an 'output_dim' or we can infer it
             if hasattr(self.model.visual, "output_dim"):
-                 embed_dim = self.model.visual.output_dim
+                embed_dim = self.model.visual.output_dim
             else:
-                 # Fallback: simple inference to get shape
-                 with torch.no_grad():
+                # Fallback: simple inference to get shape
+                with torch.no_grad():
                     # Default to 224 if unknown, though many are different
                     dummy = torch.zeros(1, 3, 224, 224)
                     embed_dim = self.model.encode_image(dummy).shape[1]
@@ -479,7 +460,14 @@ class TorchvisionModel(torch.nn.Module):
                     if isinstance(t, torchvision.transforms.Normalize):
                         self.clip_mean = t.mean
                         self.clip_std = t.std
-                    if isinstance(t, (torchvision.transforms.Resize, torchvision.transforms.CenterCrop, torchvision.transforms.RandomResizedCrop)):
+                    if isinstance(
+                        t,
+                        (
+                            torchvision.transforms.Resize,
+                            torchvision.transforms.CenterCrop,
+                            torchvision.transforms.RandomResizedCrop,
+                        ),
+                    ):
                         if isinstance(t.size, int):
                             self.clip_size = (t.size, t.size)
                         else:
@@ -495,7 +483,7 @@ class TorchvisionModel(torch.nn.Module):
                 self.clip_std = (0.26862954, 0.26130258, 0.27577711)
                 self.clip_size = (224, 224)
 
-            self.fc = torch.nn.Linear(embed_dim, num_classes)
+            self.fc = torch.nn.Linear(embed_dim, num_classes, bias=False)
 
         # --- UNI ---
         elif model == "UNI":
@@ -512,10 +500,8 @@ class TorchvisionModel(torch.nn.Module):
                 init_values=1e-5,
                 dynamic_img_size=True,
             )
-            self.transform = create_transform(
-                **resolve_data_config(self.model.pretrained_cfg, model=self.model)
-            )
-            self.fc = torch.nn.Linear(1024, num_classes)
+            self.transform = create_transform(**resolve_data_config(self.model.pretrained_cfg, model=self.model))
+            self.fc = torch.nn.Linear(1024, num_classes, bias=False)
 
         # --- ViT ---
         elif model == "vit_b_16":
@@ -530,18 +516,12 @@ class TorchvisionModel(torch.nn.Module):
                     )
                 else:
                     self.model.encoder.pos_embedding = torch.nn.Parameter(
-                        torch.zeros(
-                            1, num_patches, self.model.encoder.pos_embedding.shape[2]
-                        )
+                        torch.zeros(1, num_patches, self.model.encoder.pos_embedding.shape[2])
                     )
-                    torch.nn.init.trunc_normal_(
-                        self.model.encoder.pos_embedding, std=0.02
-                    )
+                    torch.nn.init.trunc_normal_(self.model.encoder.pos_embedding, std=0.02)
 
             if num_classes != 1000:
-                self.model.heads.head = torch.nn.Linear(
-                    self.model.heads.head.in_features, num_classes
-                )
+                self.model.heads.head = torch.nn.Linear(self.model.heads.head.in_features, num_classes, bias=False)
 
         else:
             raise ValueError("Unknown model: {}".format(model))
@@ -559,10 +539,7 @@ class TorchvisionModel(torch.nn.Module):
         return x
 
     def feature_extractor(self, x):
-        if (
-            not hasattr(self, "model_type")
-            or self.model_type[: len("resnet")] == "resnet"
-        ):
+        if not hasattr(self, "model_type") or self.model_type[: len("resnet")] == "resnet":
             submodules = list(self.children())
             while len(submodules) == 1:
                 submodules = list(submodules[0].children())
@@ -570,7 +547,7 @@ class TorchvisionModel(torch.nn.Module):
             feature_extractor = torch.nn.Sequential(*submodules[:-1])
             return feature_extractor(x)
 
-        elif self.model_type[:len("dino_v2")] == "dino_v2":
+        elif self.model_type[: len("dino_v2")] == "dino_v2":
             cs = self.processor.crop_size
             x_resized = torchvision.transforms.Resize([cs["height"], cs["width"]])(x)
 
@@ -578,9 +555,7 @@ class TorchvisionModel(torch.nn.Module):
                 v = torch.tensor(v).to(x_resized)[:, None, None]
                 return torch.tile(v, [1, cs["height"], cs["width"]])
 
-            x_processed = (x_resized - pv(self.processor.image_mean)) / pv(
-                self.processor.image_std
-            )
+            x_processed = (x_resized - pv(self.processor.image_mean)) / pv(self.processor.image_std)
             latent_code = self.model(x_processed)["last_hidden_state"][:, 0]
             return latent_code
 
@@ -611,7 +586,9 @@ class TorchvisionModel(torch.nn.Module):
             try:
                 x = self._process_input(x)
             except:
-                import pdb; pdb.set_trace()
+                import pdb
+
+                pdb.set_trace()
             n = x.shape[0]
 
             batch_class_token = self.model.class_token.expand(n, -1, -1)
@@ -621,10 +598,7 @@ class TorchvisionModel(torch.nn.Module):
             return x
 
     def get_last_layer(self):
-        if (
-            not hasattr(self, "model_type")
-            or self.model_type[: len("resnet")] == "resnet"
-        ):
+        if not hasattr(self, "model_type") or self.model_type[: len("resnet")] == "resnet":
             return self.model.fc
 
         # Added open_clip check here
@@ -632,10 +606,7 @@ class TorchvisionModel(torch.nn.Module):
             return self.fc
 
     def forward(self, x: torch.Tensor, return_latents: bool = False):
-        if (
-            not hasattr(self, "model_type")
-            or self.model_type[: len("resnet")] == "resnet"
-        ):
+        if not hasattr(self, "model_type") or self.model_type[: len("resnet")] == "resnet":
             if return_latents:
                 latent_code = self.feature_extractor(x)
                 latent_code = latent_code.squeeze(-1).squeeze(-1)
@@ -645,7 +616,12 @@ class TorchvisionModel(torch.nn.Module):
                 return self.model(x)
 
         # Grouped open_clip with other transformer-like backbones
-        elif self.model_type.startswith("open_clip") or self.model_type in ["dino_v2", "UNI", "dino_v2_small", "dino_v2_base"]:
+        elif self.model_type.startswith("open_clip") or self.model_type in [
+            "dino_v2",
+            "UNI",
+            "dino_v2_small",
+            "dino_v2_base",
+        ]:
             latent_code = self.feature_extractor(x)
             x_out = self.fc(latent_code)
             if return_latents:

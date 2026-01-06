@@ -421,6 +421,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             [torch.utils.data.DataLoader(self.generator_datasets[1], batch_size=10)],
             self.model.ema_model.encoder,
         )
+        Path(self.config.sparse_dictionary.base_path).mkdir(parents=True, exist_ok=True)
         self.sparse_dictionary.save_on_disk(self.config.sparse_dictionary.weights_path)
         save_yaml_config(
             self.config.sparse_dictionary, os.path.join(self.config.sparse_dictionary.base_path, "config.yaml")
@@ -547,7 +548,10 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         print([x_generator.min(), x_generator.max()])
         print([x_generator.min(), x_generator.max()])
         z_sem, xT = self.encode(x_generator.to(self.device))
-        w = self.sparse_dictionary.get_components()[:, component_idx].to(self.device)
+        #w = self.sparse_dictionary.get_components()[:, component_idx].to(self.device)
+        w_raw = self.sparse_dictionary.get_components()[:, component_idx].to(self.device)
+        # Normalize w to ensure it is a unit vector
+        w = w_raw / torch.norm(w_raw, p=2)
         # z_sem2 = self._calculate_z_counterfactuals(z_sem, w)
         proj_factors = (z_sem - self.sparse_dictionary.mu.to(self.device)) @ w
 
@@ -695,7 +699,9 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
 
         z_sem2 = z_sem_before.reshape([-1, z_sem_before.shape[-1]])
         xT_decoding = xT.unsqueeze(1).unsqueeze(1)
-        xT_decoding = xT_decoding.tile(1, explainer_config.num_attempts, len(explainer_config.linesearch_factors), 1, 1, 1)
+        xT_decoding = xT_decoding.tile(
+            1, explainer_config.num_attempts, len(explainer_config.linesearch_factors), 1, 1, 1
+        )
         xT_decoding = xT_decoding.reshape([-1] + list(xT.shape[1:]))
         dot_ab2 = torch.tensor(torch.sum(z_sem2 * w, dim=-1, keepdim=True) > 0, dtype=torch.uint8)
         print("dot_ab after editing:", dot_ab2.squeeze().detach().cpu().numpy())
@@ -733,14 +739,14 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             for k in range(j.shape[0]):
                 x_counterfactuals_out_list.append(x_counterfactuals[k, i, j[k], :])
                 y_target_end_confidence_list.append(float(y_target_end_confidence[k, i, j[k]]))
+                indices_list.append(indices[k])
 
             x_out_list.append(x_in)
-            indices_list.append(indices)
 
         x_counterfactuals = torch.stack(x_counterfactuals_out_list, dim=0)
         x_out = torch.cat(x_out_list, dim=0)
         y_target_end_confidence = torch.tensor(y_target_end_confidence_list)
-        indices = torch.cat(indices_list, dim=0)
+        indices = torch.cat(indices_list, dim=1)
         x_difference = x_out - x_counterfactuals.cpu()
 
         return (

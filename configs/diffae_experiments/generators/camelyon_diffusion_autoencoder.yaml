@@ -1,5 +1,6 @@
 # python train_generator.py --config "<PEAL_BASE>/configs/diffae_experiments/generators/camelyon_diffusion_autoencoder.yaml"
-# python run_component_analysis.py --config $PEAL_RUNS/ccamelyon/diffusion_autoencoder/config.yaml --sd_config configs/diffae_experiments/sparse_dictionaries/matryoshka_sae_default.yaml
+# python run_component_analysis.py --config $PEAL_RUNS/camelyon/diffusion_autoencoder/config.yaml --sd_config configs/diffae_experiments/sparse_dictionaries/matryoshka_sae_default.yaml
+# python run_component_analysis.py --config $PEAL_RUNS/camelyon/diffusion_autoencoder/config.yaml --sd_config configs/diffae_experiments/sparse_dictionaries/procrustes_sae_camelyon.yaml
 generator_type : DiffusionAutoencoder
 category : generator
 base_path : $PEAL_RUNS/camelyon/diffusion_autoencoder

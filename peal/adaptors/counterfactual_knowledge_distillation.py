@@ -18,6 +18,8 @@ from typing import Union
 
 from peal.architectures.predictors import TorchvisionModel, get_predictor
 from peal.global_utils import load_yaml_config, save_yaml_config, cprint
+from peal.sparse_dictionaries.interfaces import SparseDictionaryConfig
+from peal.sparse_dictionaries.sparse_dictionary_factory import get_sparse_dictionary
 from peal.training.loggers import log_images_to_writer
 from peal.data.dataloaders import (
     DataStack,
@@ -222,6 +224,7 @@ class CFKDConfig(AdaptorConfig):
     The clustering strategy used by the counterfactual explainer
     """
     clustering_strategy: Union[str, type(None)] = None
+    sparse_dictionary: Union[SparseDictionaryConfig, dict, type(None)] = None
 
 
 class CFKD(Adaptor):
@@ -351,6 +354,11 @@ class CFKD(Adaptor):
             predictor_dataset=self.val_dataloader.dataset,
             timestep_respacing=timestep_respacing,
         )
+        if not self.adaptor_config.sparse_dictionary is None:
+            print('load sparse dictionary!!!')
+            print('load sparse dictionary!!!')
+            print('load sparse dictionary!!!')
+            self.generator.sparse_dictionary = get_sparse_dictionary(self.adaptor_config.sparse_dictionary)
 
         self.output_size = (
             self.adaptor_config.task.output_channels
@@ -1191,19 +1199,15 @@ class CFKD(Adaptor):
                 )
 
             # calculate distilled flip rate
-            flipped_samples = list(
-                filter(
-                    lambda x, y: x > 0.5,
-                    list(
-                        zip(
-                            tracked_values["y_target_end_confidence_distilled_list"][
-                                :num_samples
-                            ],
-                            tracked_values["x_counterfactual_list"][:num_samples],
-                        )
-                    ),
+            zipped_list = list(
+                zip(
+                    tracked_values["y_target_end_confidence_distilled_list"][
+                        :num_samples
+                    ],
+                    tracked_values["x_counterfactual_list"][:num_samples],
                 )
             )
+            flipped_samples = list(filter(lambda x: x[0] > 0.5, zipped_list))
             flip_rate_distilled = len(flipped_samples) / flip_rate_reference
             feedback_stats["flip_rate_distilled"] = float(flip_rate_distilled)
             cprint(
@@ -1289,12 +1293,23 @@ class CFKD(Adaptor):
             x_counterfactuals_non_adversarial_flips = torch.stack(
                 [x[1] for x in flipped_samples]
             )
+            validation_samples = []
+            for idx in range(
+                min(
+                    self.adaptor_config.max_validation_samples,
+                    len(self.val_dataloader.dataset),
+                )
+            ):
+                x, y = self.val_dataloader.dataset[idx]
+                validation_samples.append(x.unsqueeze(0))
+
+            validation_samples = torch.cat(validation_samples, dim=0)
             self.train_dataloader.dataset.reference_fid = (
-                self.train_dataloader.track_generator_performance(self.val_dataloader)[
+                self.train_dataloader.dataset.track_generator_performance(validation_samples)[
                     "dino_fid"
                 ]
             )
-            counterfactual_quality = self.train_dataloader.tracke_generator_performance(
+            counterfactual_quality = self.train_dataloader.dataset.track_generator_performance(
                 x_counterfactuals_non_adversarial_flips
             )["quality_score"]
             feedback_stats["counterfactual_quality"] = float(counterfactual_quality)

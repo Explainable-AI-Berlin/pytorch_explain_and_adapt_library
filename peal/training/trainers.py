@@ -449,13 +449,9 @@ class ModelTrainer:
             loss = torch.tensor(0.0).to(self.device)
             loss_logs = {}
             for criterion in self.config.task.criterions.keys():
-                try:
-                    criterion_loss = self.config.task.criterions[criterion] * self.criterions[criterion](self.model, pred, y.to(self.device), latent_code)
-
-                except Exception as exp:
-                    import pdb
-
-                    pdb.set_trace()
+                criterion_loss = self.config.task.criterions[criterion] * self.criterions[criterion](
+                    self.model, pred, y.to(self.device), latent_code
+                )
 
                 if criterion in ["l1", "l2", "orthogonality"]:
                     criterion_loss *= self.regularization_level
@@ -652,9 +648,9 @@ class ModelTrainer:
                     torch.save(self.model.to("cpu"), os.path.join(self.model_path, "model.cpl"))
 
                 except Exception:
-                    print('model could not be serialized!!!')
-                    print('model could not be serialized!!!')
-                    print('model could not be serialized!!!')
+                    print("model could not be serialized!!!")
+                    print("model could not be serialized!!!")
+                    print("model could not be serialized!!!")
                     pass
 
                 val_accuracy_max = val_accuracy
