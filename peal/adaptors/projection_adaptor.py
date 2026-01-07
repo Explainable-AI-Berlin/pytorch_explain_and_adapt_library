@@ -67,8 +67,36 @@ class ProjectionAdaptor(Adaptor):
     
         model.eval()
         test_dataloader = create_dataloaders_from_datasource(model_config)[self.config.partition]
+
+
+        print('before projection:')
+        print('before projection:')
+        print('before projection:')
+        correct, group_accuracies, group_distribution, groups, worst_group_accuracy = (
+            calculate_test_accuracy(model, test_dataloader, device, True)
+        )
+        partitions = ["Training", "Validation", "Test"]
+        print(partitions[self.config.partition] + " accuracy: " + str(correct))
+        print("Group accuracies: " + str(group_accuracies))
+        print("Group distribution: " + str(group_distribution))
+        print("Samples per Group: " + str(groups))
+        print("Worst group accuracy: " + str(worst_group_accuracy))
+        print(
+            "Average group accuracy: " + str(float(np.sum(np.array(group_accuracies))) / 4)
+        )
+
         components = self.sparse_dictionary.get_components()
-        model_handle = projection_wrap_model(model.model.model.fc, components.t(), self.config.projected_component_index_list)
+        if hasattr(model, "fc"):
+            fc = model.fc
+
+        else:
+            fc = model.model.model.fc
+
+        model_handle = projection_wrap_model(fc, components.t(), self.config.projected_component_index_list)
+
+        print('after projection:')
+        print('after projection:')
+        print('after projection:')
         correct, group_accuracies, group_distribution, groups, worst_group_accuracy = (
             calculate_test_accuracy(model, test_dataloader, device, True)
         )

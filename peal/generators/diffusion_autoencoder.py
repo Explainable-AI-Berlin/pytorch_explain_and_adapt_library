@@ -746,7 +746,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         x_counterfactuals = torch.stack(x_counterfactuals_out_list, dim=0)
         x_out = torch.cat(x_out_list, dim=0)
         y_target_end_confidence = torch.tensor(y_target_end_confidence_list)
-        indices = torch.cat(indices_list, dim=1)
+        indices = torch.cat(indices_list, dim=0)
         x_difference = x_out - x_counterfactuals.cpu()
 
         return (
