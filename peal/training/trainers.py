@@ -874,7 +874,10 @@ def distill_predictor(
         raise Exception("Either distill from dataset or use available dataset type for relabeling")
 
     if predictor_distilled is None:
-        if isinstance(predictor, torch.nn.Module):
+        if not predictor_distillation.architecture is None:
+            predictor_distilled = get_predictor(predictor_distillation)
+
+        elif isinstance(predictor, torch.nn.Module):
             predictor_distilled = copy.deepcopy(predictor)
 
         else:
