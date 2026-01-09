@@ -13,10 +13,11 @@ explainer                            :  <PEAL_BASE>/configs/diffae_experiments/e
 training                             :  <PEAL_BASE>/configs/cfkd_experiments/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/cfkd_experiments/data/camelyon17_1k_poisoned098.yaml
 test_data                            :  <PEAL_BASE>/configs/cfkd_experiments/data/camelyon17_unpoisoned.yaml
-student                              :  $PEAL_RUNS/camelyon17_1k/resnet18_poisoned098/model.cpl
+student                              :  $PEAL_RUNS/camelyon17_1k/classifier_poisoned098/model.cpl
 teacher                              :  $PEAL_RUNS/camelyon17/classifier_unpoisoned/model.cpl
 generator                            :  $PEAL_RUNS/camelyon/diffusion_autoencoder/config.yaml
-base_dir                             :  $PEAL_RUNS/camelyon17_1k/resnet18_poisoned098/sdae_cfkd
+sparse_dictionary                    :  $PEAL_RUNS/camelyon/diffusion_autoencoder/OrthogonalProcrustesDictionary/config.yaml
+base_dir                             :  $PEAL_RUNS/camelyon17_1k/classifier_poisoned098/sdae_cfkd
 task:
   criterions:
     ce     : 1.0
