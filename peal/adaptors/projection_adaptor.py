@@ -68,7 +68,6 @@ class ProjectionAdaptor(Adaptor):
         model.eval()
         test_dataloader = create_dataloaders_from_datasource(model_config)[self.config.partition]
 
-
         print('before projection:')
         print('before projection:')
         print('before projection:')

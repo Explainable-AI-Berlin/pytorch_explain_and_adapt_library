@@ -3,4 +3,4 @@ explainer_type: DAEdistill
 distilled_predictor: <PEAL_BASE>/configs/diffae_experiments/predictors/dae_distill_predictor.yaml
 use_clustering: false
 num_attempts: 2
-linesearch_factors: [2.0]
+linesearch_factors: [1.0, 1.5, 2.0]

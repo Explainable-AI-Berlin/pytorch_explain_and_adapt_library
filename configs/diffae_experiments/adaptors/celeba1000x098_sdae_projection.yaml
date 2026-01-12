@@ -3,8 +3,8 @@ adaptor_type                         :  "ProjectionAdaptor"
 category                             :  "adaptor"
 data                                 :  <PEAL_BASE>/configs/cfkd_experiments/data/celeba1k_Blond_Hair_confounding_Male_poisoned098.yaml
 test_data                            :  <PEAL_BASE>/configs/cfkd_experiments/data/celeba.yaml
-base_model_config                    :  $PEAL_RUNS/celeba1k/Blond_Hair/dinov2_linear_poisoned098/config.yaml
-base_dir                             :  $PEAL_RUNS/celeba1k/Blond_Hair/dinov2_linear_poisoned098/sdae_projection
+base_model_config                    :  $PEAL_RUNS/celeba1k/Blond_Hair/openclip_linear_poisoned098/config.yaml
+base_dir                             :  $PEAL_RUNS/celeba1k/Blond_Hair/openclip_linear_poisoned098/sdae_projection
 projected_component_index_list       :  [1]
 sparse_dictionary                    :  $PEAL_RUNS/celeba/diffusion_autoencoder/OrthogonalProcrustesDictionary/config.yaml
 

@@ -17,7 +17,7 @@ student                              :  $PEAL_RUNS/camelyon17_1k/dinov2_linear_p
 teacher                              :  $PEAL_RUNS/camelyon17/classifier_unpoisoned/model.cpl
 generator                            :  $PEAL_RUNS/camelyon/diffusion_autoencoder/config.yaml
 sparse_dictionary                    :  $PEAL_RUNS/camelyon/diffusion_autoencoder/OrthogonalProcrustesDictionary/config.yaml
-base_dir                             :  $PEAL_RUNS/camelyon17_1k/dinov2_linear_poisoned098/dae_cfkd
+base_dir                             :  $PEAL_RUNS/camelyon17_1k/dinov2_linear_poisoned098/sdae_cfkd
 task:
   criterions:
     ce     : 1.0

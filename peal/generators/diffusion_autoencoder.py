@@ -548,7 +548,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         print([x_generator.min(), x_generator.max()])
         print([x_generator.min(), x_generator.max()])
         z_sem, xT = self.encode(x_generator.to(self.device))
-        #w = self.sparse_dictionary.get_components()[:, component_idx].to(self.device)
+        # w = self.sparse_dictionary.get_components()[:, component_idx].to(self.device)
         w_raw = self.sparse_dictionary.get_components()[:, component_idx].to(self.device)
         # Normalize w to ensure it is a unit vector
         w = w_raw / torch.norm(w_raw, p=2)
@@ -682,29 +682,24 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         print([x_generator.min(), x_generator.max()])
         z_sem, xT = self.encode(x_generator.to(self.device))
         w = list(self.gradient_predictor.children())[-1].weight[0]
-        dot_ab = torch.tensor(torch.sum(z_sem * w, dim=-1, keepdim=True) > 0.5, dtype=torch.uint8)
+        dot_ab = torch.clone(torch.sum(z_sem * w, dim=-1, keepdim=True))
         print("dot_ab before editing:", dot_ab.squeeze().detach().cpu().numpy())
+        pred_before = torch.tensor(torch.sum(z_sem * w, dim=-1, keepdim=True) > 0, dtype=torch.uint8)
+        print("pred before editing:", pred_before.squeeze().detach().cpu().numpy())
         # num_attempts = int(explainer_config.num_attempts / len(explainer_config.linesearch_factors))
         z_sem_before, indices, distances = self._calculate_z_counterfactuals(
             z_sem, w, explainer_config, explainer_config.num_attempts
         )
-        """z_sem2_list = []
-        xT_list = []
-        for i in range(explainer_config.num_attempts):
-            for j in range(z_sem_before.shape[2]):
-                z_sem2_list.append(z_sem_before[:, i, j, :])
-                xT_list.append(xT)
-        torch.cat(z_sem2_list, dim=0)
-        """
-
         z_sem2 = z_sem_before.reshape([-1, z_sem_before.shape[-1]])
         xT_decoding = xT.unsqueeze(1).unsqueeze(1)
         xT_decoding = xT_decoding.tile(
             1, explainer_config.num_attempts, len(explainer_config.linesearch_factors), 1, 1, 1
         )
         xT_decoding = xT_decoding.reshape([-1] + list(xT.shape[1:]))
-        dot_ab2 = torch.tensor(torch.sum(z_sem2 * w, dim=-1, keepdim=True) > 0, dtype=torch.uint8)
+        dot_ab2 = torch.clone(torch.sum(z_sem2 * w, dim=-1, keepdim=True))
         print("dot_ab after editing:", dot_ab2.squeeze().detach().cpu().numpy())
+        pred_after = torch.tensor(torch.sum(z_sem2 * w, dim=-1, keepdim=True) > 0, dtype=torch.uint8)
+        print("pred after editing:", pred_after.squeeze().detach().cpu().numpy())
         x_counterfactuals_generator = self.decode((z_sem2, xT_decoding))
         # x_counterfactuals_generator = x_generator
         print("[x_counterfactuals_generator.min(), x_counterfactuals_generator.max()]")
@@ -773,7 +768,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             return reflected, None, torch.norm(reflected - z_sem, p=2, dim=-1, keepdim=False)
 
         else:
-            component_indices = range(num_attempts)
+            '''component_indices = range(num_attempts)
             # 1. Retrieve the Dictionary Components (Directions)
             # Shape: [Latent_Dim, Num_Components]
             W_all = self.sparse_dictionary.get_components()[:, :num_attempts]
@@ -836,7 +831,63 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             # Return latent vars, indices, and distances
             # Note: Caller must decode z_counterfaz_counterfactuals_sortedctuals_sorted to get 'x'
             component_indices = torch.arange(sorted_indices.shape[1]).unsqueeze(0).tile([sorted_indices.shape[0], 1])
-            return z_reflected, component_indices, distances
+            return z_reflected, component_indices, distances'''
+            component_indices = range(num_attempts)
+        W_all = self.sparse_dictionary.get_components()[:, :num_attempts]
+
+        if component_indices is not None:
+            W = W_all[:, component_indices].to(z_sem.device)
+        else:
+            W = W_all.to(z_sem.device)
+
+        # --- CHANGED: Calculate "Cross-Projection" to target Classifier Flip ---
+
+        # 1. Alignment of current Z with Classifier (z . w)
+        # z_sem: [Batch, Dim] | w: [Dim] -> Result: [Batch, 1]
+        dot_zw = torch.sum(z_sem * w, dim=-1, keepdim=True)
+
+        # 2. Alignment of Components with Classifier (u . w)
+        # w: [Dim] | W: [Dim, K] -> Result: [K]
+        # This tells us how much moving along a component 'u' affects the class score
+        dot_uw = torch.matmul(w, W)
+
+        # Safety: If a component is orthogonal to the classifier (dot_uw ~ 0),
+        # moving along it won't change the class. We prevent division by zero.
+        eps = 1e-6
+        dot_uw_safe = dot_uw.clone()
+        dot_uw_safe[torch.abs(dot_uw_safe) < eps] = eps
+
+        # 3. Calculate Projection Factor
+        # We want a step `s` such that (z - s*u).w = -z.w
+        # This requires s = 2 * (z.w) / (u.w)
+        # The '2' is applied later by linesearch_factors (assuming it contains 2.0)
+        # Shape: [Batch, K]
+        proj_factors = dot_zw / dot_uw_safe.unsqueeze(0)
+
+        # 4. Create Projection Vectors
+        # Expand factors to: [Batch, K, 1]
+        # Expand W to: [1, K, Dim]
+        # Result: [Batch, K, Dim]
+        projections = proj_factors.unsqueeze(-1) * W.permute(1, 0).unsqueeze(0)
+
+        # --- END CHANGES ---
+
+        # 5. Compute Reflections using Linesearch
+        line_search_factors = torch.tensor(explainer_config.linesearch_factors).to(z_sem.device)
+        z_base = z_sem.unsqueeze(1).unsqueeze(1)
+        proj_expanded = projections.unsqueeze(2)
+        factors_expanded = line_search_factors.view(1, 1, -1, 1)
+
+        # Apply the update
+        z_reflected = z_base - factors_expanded * proj_expanded
+
+        # 6. Calculate Distances & Sort
+        distances = torch.norm(z_base - z_reflected, p=2, dim=-1)
+        sorted_indices = torch.argsort(distances, dim=1)
+
+        component_indices = torch.arange(sorted_indices.shape[1]).unsqueeze(0).tile([sorted_indices.shape[0], 1])
+
+        return z_reflected, component_indices, distances
 
 
 class NormalizationModule(nn.Module):
