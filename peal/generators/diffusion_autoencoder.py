@@ -69,7 +69,7 @@ class DiffusionAutoencoderConfig(GeneratorConfig):
     is_loaded: bool = True
     model_type: Union[str, None] = None
     sparse_dictionary: Union[str, SparseDictionaryConfig, None] = SVDDictionaryConfig()
-    visualizations_per_component: Union[int, None] = 10
+    visualizations_per_component: Union[int, None] = 100
 
 
 class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):

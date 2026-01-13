@@ -1,11 +1,11 @@
 ending: .npz
-n_components: 2
+n_components: 20
 sparse_dictionaries_type: OrthogonalProcrustesDictionary
 category: sparse_dictionaries
 task:
-  y_selection: [tumor, hospital]
+  y_selection: [tumor, tumor, tumor, tumor, tumor, tumor, tumor, tumor, tumor, tumor, hospital, hospital, hospital, hospital, hospital, hospital, hospital, hospital, hospital, hospital]
   output_type: multiclass
-  output_channels: 2
+  output_channels: 20
   criterions:
     bce: 1.0
     l2: 100.0

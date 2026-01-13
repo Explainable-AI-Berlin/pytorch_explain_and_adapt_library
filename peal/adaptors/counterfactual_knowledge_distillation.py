@@ -1100,25 +1100,6 @@ class CFKD(Adaptor):
         ood_rate = (
             len(list(filter(lambda sample: sample == "ood", feedback))) / num_samples
         )
-        flipped_samples_tensor = torch.cat(
-            [
-                torch.ones(len(flipped_samples)),
-                torch.zeros(num_samples - len(flipped_samples)),
-            ]
-        )
-        cprint(
-            "flip_rate_tensor: " + str(flipped_samples_tensor.mean()),
-            self.adaptor_config.tracking_level,
-            2,
-        )
-        flip_rate_var = flipped_samples_tensor.std() / math.sqrt(
-            len(flipped_samples_tensor)
-        )
-        cprint(
-            "flip_rate_var: " + str(flip_rate_var),
-            self.adaptor_config.tracking_level,
-            2,
-        )
 
         num_true_1sided = len(
             list(
@@ -1150,12 +1131,12 @@ class CFKD(Adaptor):
             "flip_rate": flip_rate,
             "ood_rate": ood_rate,
             "feedback_accuracy": fa_1sided,
+            "counterfactuals_per_second": self.explainer.counterfactuals_per_second,
         }
-        feedback_stats["flip_rate_tensor"] = float(flipped_samples_tensor.mean())
-        feedback_stats["flip_rate_var"] = float(flip_rate_var)
+        cprint("flip_rate: " + str(self.explainer.counterfactuals_per_second), self.adaptor_config.tracking_level, 2)
         cprint("flip_rate: " + str(flip_rate), self.adaptor_config.tracking_level, 2)
 
-        if self.adaptor_config.calculate_explainer_stats:
+        if self.adaptor_config.calculate_explainer_stats and finetune_iteration == 0:
             # this is only for scientific experiments and could also be sourced out into another file!
             # distill into equivalent model
             predictor_distillation = load_yaml_config(
@@ -1215,36 +1196,12 @@ class CFKD(Adaptor):
                 self.adaptor_config.tracking_level,
                 2,
             )
-            flipped_samples_tensor = torch.cat(
-                [
-                    torch.ones(len(flipped_samples)),
-                    torch.zeros(num_samples - len(flipped_samples)),
-                ]
-            )
-            feedback_stats["flip_rate_distilled_tensor"] = float(
-                flipped_samples_tensor.mean()
-            )
-            cprint(
-                "flip_rate_distilled_tensor: "
-                + str(feedback_stats["flip_rate_distilled_tensor"]),
-                self.adaptor_config.tracking_level,
-                2,
-            )
-            flip_rate_distilled_var = flipped_samples_tensor.std() / math.sqrt(
-                len(flipped_samples_tensor)
-            )
-            feedback_stats["flip_rate_distilled_var"] = float(flip_rate_distilled_var)
-            cprint(
-                "flip_rate_distilled_var: " + str(flip_rate_distilled_var),
-                self.adaptor_config.tracking_level,
-                2,
-            )
             feedback_stats["non_adversarial_rate"] = (
                 float(
-                    feedback_stats["flip_rate_distilled_tensor"]
-                    / feedback_stats["flip_rate_tensor"]
+                    feedback_stats["flip_rate_distilled"]
+                    / feedback_stats["flip_rate"]
                 )
-                if feedback_stats["flip_rate_tensor"] > 0
+                if feedback_stats["flip_rate"] > 0
                 else 0.0
             )
             cprint(
@@ -1354,28 +1311,6 @@ class CFKD(Adaptor):
                         torch.zeros(num_true_1sided_distilled),
                         torch.ones(num_false_1sided_distilled),
                     ]
-                )
-                unbiasedness_tensor = (
-                    (r_actual_tensor / r_dominant)
-                    if r_dominant > 0
-                    else torch.zeros(len(r_actual_tensor))
-                )
-                feedback_stats["unbiasedness_tensor"] = float(
-                    unbiasedness_tensor.mean()
-                )
-                cprint(
-                    "unbiasedness_tensor: " + str(unbiasedness_tensor.mean()),
-                    self.adaptor_config.tracking_level,
-                    2,
-                )
-                unbiasedness_var = unbiasedness_tensor.std() / math.sqrt(
-                    len(unbiasedness_tensor)
-                )
-                feedback_stats["unbiasedness_var"] = float(unbiasedness_var)
-                cprint(
-                    "unbiasedness_var: " + str(unbiasedness_var),
-                    self.adaptor_config.tracking_level,
-                    2,
                 )
 
             tracked_stats = self.explainer.calculate_latent_difference_stats(

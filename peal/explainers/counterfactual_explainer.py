@@ -505,6 +505,8 @@ class CounterfactualExplainer(ExplainerInterface):
                 inverse_test_config.dataset_path += "_inverse"
                 self.inverse_datasets["test"] = get_datasets(inverse_test_config)[-1]
 
+        self.counterfactuals_per_second = None
+
     def perfect_false_counterfactuals(self, x_in, target_classes, idx_list, mode):
         """
         This function generates a counterfactual for a given batch of inputs.
@@ -1129,6 +1131,9 @@ class CounterfactualExplainer(ExplainerInterface):
         else:
             target_confidence_goal = y_target_goal_confidence_in
 
+        if self.counterfactuals_per_second is None:
+            start_time = time.perf_counter()
+
         if isinstance(self.explainer_config, PerfectFalseCounterfactualConfig):
             (
                 batch["x_counterfactual_list"],
@@ -1183,6 +1188,14 @@ class CounterfactualExplainer(ExplainerInterface):
                 predictor_datasets=self.predictor_datasources,
                 base_path=explainer_path,
             )
+
+        if self.counterfactuals_per_second is None:
+            end_time = time.perf_counter()
+            total_time = end_time - start_time
+            self.counterfactuals_per_second = len(batch["x_counterfactual_list"]) / total_time
+            print(f"Explainer speed: {self.counterfactuals_per_second:.2f} counterfactuals per second.")
+            print(f"Explainer speed: {self.counterfactuals_per_second:.2f} counterfactuals per second.")
+            print(f"Explainer speed: {self.counterfactuals_per_second:.2f} counterfactuals per second.")
 
         if len(batch["x_list"]) < len(batch["x_counterfactual_list"]):
             n_reps = len(batch["x_counterfactual_list"]) // len(batch["x_list"])
@@ -1668,7 +1681,6 @@ class CounterfactualExplainer(ExplainerInterface):
                     latent_sparsities.append(latent_sparsity)
 
                 latent_sparsity = 1.0 - float(torch.mean(torch.tensor(latent_sparsities)))
-                latent_sparsity_var = torch.std(torch.tensor(latent_sparsities)) / math.sqrt(len(latent_sparsities))
                 if self.explainer_config.num_attempts >= 2:
                     cosine_similiarities_list = [
                         torch.abs(
@@ -1681,13 +1693,9 @@ class CounterfactualExplainer(ExplainerInterface):
                     ]
                     cosine_similiarities = torch.tensor(cosine_similiarities_list)
                     latent_diversity = 1.0 - float(torch.mean(cosine_similiarities))
-                    latent_diversity_var = torch.std(torch.tensor(cosine_similiarities)) / math.sqrt(
-                        len(cosine_similiarities)
-                    )
 
                 else:
                     latent_diversity = 0.0
-                    latent_diversity_var = 0.0
 
             tracked_stats["latent_sparsity"] = latent_sparsity
             cprint(
@@ -1695,21 +1703,9 @@ class CounterfactualExplainer(ExplainerInterface):
                 self.explainer_config.tracking_level,
                 2,
             )
-            tracked_stats["latent_sparsity_var"] = latent_sparsity_var
-            cprint(
-                "latent_sparsity_var: " + str(latent_sparsity_var),
-                self.explainer_config.tracking_level,
-                2,
-            )
             tracked_stats["latent_diversity"] = latent_diversity
             cprint(
                 "latent_diversity: " + str(latent_diversity),
-                self.explainer_config.tracking_level,
-                2,
-            )
-            tracked_stats["latent_diversity_var"] = latent_diversity_var
-            cprint(
-                "latent_diversity_var: " + str(latent_diversity_var),
                 self.explainer_config.tracking_level,
                 2,
             )

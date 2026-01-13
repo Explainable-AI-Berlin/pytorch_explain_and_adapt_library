@@ -629,4 +629,5 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
             list(y_target_end_confidence),
             list(x_in),
             list(histories),
+            [0] * len(x_counterfactuals)
         )
