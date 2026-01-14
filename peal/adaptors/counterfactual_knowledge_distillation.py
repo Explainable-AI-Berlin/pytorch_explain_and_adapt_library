@@ -1247,34 +1247,44 @@ class CFKD(Adaptor):
                 self.adaptor_config.tracking_level,
                 2,
             )
-            x_counterfactuals_non_adversarial_flips = torch.stack(
-                [x[1] for x in flipped_samples]
-            )
-            validation_samples = []
-            for idx in range(
-                min(
-                    self.adaptor_config.max_validation_samples,
-                    len(self.val_dataloader.dataset),
+            if len(flipped_samples) > 0:
+                x_counterfactuals_non_adversarial_flips = torch.stack(
+                    [x[1] for x in flipped_samples]
                 )
-            ):
-                x, y = self.val_dataloader.dataset[idx]
-                validation_samples.append(x.unsqueeze(0))
+                validation_samples = []
+                for idx in range(
+                    min(
+                        self.adaptor_config.max_validation_samples,
+                        len(self.val_dataloader.dataset),
+                    )
+                ):
+                    x, y = self.val_dataloader.dataset[idx]
+                    validation_samples.append(x.unsqueeze(0))
 
-            validation_samples = torch.cat(validation_samples, dim=0)
-            self.train_dataloader.dataset.reference_fid = (
-                self.train_dataloader.dataset.track_generator_performance(validation_samples)[
-                    "dino_fid"
-                ]
-            )
-            counterfactual_quality = self.train_dataloader.dataset.track_generator_performance(
-                x_counterfactuals_non_adversarial_flips
-            )["quality_score"]
-            feedback_stats["counterfactual_quality"] = float(counterfactual_quality)
-            cprint(
-                "counterfactual_quality: " + str(counterfactual_quality),
-                self.adaptor_config.tracking_level,
-                2,
-            )
+                validation_samples = torch.cat(validation_samples, dim=0)
+                self.train_dataloader.dataset.reference_fid = (
+                    self.train_dataloader.dataset.track_generator_performance(validation_samples)[
+                        "dino_fid"
+                    ]
+                )
+                counterfactual_quality = self.train_dataloader.dataset.track_generator_performance(
+                    x_counterfactuals_non_adversarial_flips
+                )["quality_score"]
+                feedback_stats["counterfactual_quality"] = float(counterfactual_quality)
+                cprint(
+                    "counterfactual_quality: " + str(counterfactual_quality),
+                    self.adaptor_config.tracking_level,
+                    2,
+                )
+
+            else:
+                feedback_stats["counterfactual_quality"] = 0.0
+                cprint(
+                    "counterfactual_quality: 0.0",
+                    self.adaptor_config.tracking_level,
+                    2,
+                )
+
             if len(self.adaptor_config.group_accuracies) > 0:
                 group_accuracies = torch.tensor(
                     self.adaptor_config.group_accuracies[-1]
