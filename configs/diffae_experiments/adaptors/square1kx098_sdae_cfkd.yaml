@@ -1,7 +1,7 @@
 # python run_cfkd.py --config "<PEAL_BASE>/configs/diffae_experiments/adaptors/square1kx098_sdae_cfkd.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
-batch_size                           :  4
+batch_size                           :  100
 tracking_level                       :  3
 min_train_samples                    :  800
 finetune_iterations                  :  1

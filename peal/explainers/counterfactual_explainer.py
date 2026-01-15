@@ -1131,7 +1131,7 @@ class CounterfactualExplainer(ExplainerInterface):
         else:
             target_confidence_goal = y_target_goal_confidence_in
 
-        if self.counterfactuals_per_second is None:
+        if self.counterfactuals_per_second is None and start_idx != 0:
             start_time = time.perf_counter()
 
         if isinstance(self.explainer_config, PerfectFalseCounterfactualConfig):
@@ -1189,7 +1189,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 base_path=explainer_path,
             )
 
-        if self.counterfactuals_per_second is None:
+        if self.counterfactuals_per_second is None and start_idx != 0:
             end_time = time.perf_counter()
             total_time = end_time - start_time
             self.counterfactuals_per_second = len(batch["x_counterfactual_list"]) / total_time

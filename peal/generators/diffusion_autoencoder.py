@@ -665,28 +665,11 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         else:
             self.gradient_predictor = predictor
 
-        print("[x_in.min(), x_in.max()]")
-        print([x_in.min(), x_in.max()])
-        print([x_in.min(), x_in.max()])
-        print([x_in.min(), x_in.max()])
-
-        preds = torch.nn.Softmax(dim=-1)(predictor(x_in.to(device)).detach().cpu())
-        print("preds_before: " + str(preds.argmax(dim=-1)))
-
         x_generator = classifier_to_generator(x_in)
         # x_generator = 2 * x_generator
         # x_generator = x_in
-        print("[x_generator.min(), x_generator.max()]")
-        print([x_generator.min(), x_generator.max()])
-        print([x_generator.min(), x_generator.max()])
-        print([x_generator.min(), x_generator.max()])
         z_sem, xT = self.encode(x_generator.to(self.device))
         w = list(self.gradient_predictor.children())[-1].weight[0]
-        dot_ab = torch.clone(torch.sum(z_sem * w, dim=-1, keepdim=True))
-        print("dot_ab before editing:", dot_ab.squeeze().detach().cpu().numpy())
-        pred_before = torch.tensor(torch.sum(z_sem * w, dim=-1, keepdim=True) > 0, dtype=torch.uint8)
-        print("pred before editing:", pred_before.squeeze().detach().cpu().numpy())
-        # num_attempts = int(explainer_config.num_attempts / len(explainer_config.linesearch_factors))
         z_sem_before, indices, distances = self._calculate_z_counterfactuals(
             z_sem, w, explainer_config, explainer_config.num_attempts
         )
@@ -696,31 +679,14 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             1, explainer_config.num_attempts, len(explainer_config.linesearch_factors), 1, 1, 1
         )
         xT_decoding = xT_decoding.reshape([-1] + list(xT.shape[1:]))
-        dot_ab2 = torch.clone(torch.sum(z_sem2 * w, dim=-1, keepdim=True))
-        print("dot_ab after editing:", dot_ab2.squeeze().detach().cpu().numpy())
-        pred_after = torch.tensor(torch.sum(z_sem2 * w, dim=-1, keepdim=True) > 0, dtype=torch.uint8)
-        print("pred after editing:", pred_after.squeeze().detach().cpu().numpy())
         x_counterfactuals_generator = self.decode((z_sem2, xT_decoding))
-        # x_counterfactuals_generator = x_generator
-        print("[x_counterfactuals_generator.min(), x_counterfactuals_generator.max()]")
-        print([x_counterfactuals_generator.min(), x_counterfactuals_generator.max()])
-        print([x_counterfactuals_generator.min(), x_counterfactuals_generator.max()])
-        print([x_counterfactuals_generator.min(), x_counterfactuals_generator.max()])
-        # x_counterfactuals = generator_to_classifier(x_counterfactuals_generator.cpu())
         x_counterfactuals = x_counterfactuals_generator.detach()
-        print("[x_counterfactuals.min(), x_counterfactuals.max()]")
-        print([x_counterfactuals.min(), x_counterfactuals.max()])
-        print([x_counterfactuals.min(), x_counterfactuals.max()])
-        print([x_counterfactuals.min(), x_counterfactuals.max()])
 
         preds = torch.nn.Softmax(dim=-1)(predictor(x_counterfactuals.to(device)).detach().cpu())
         y_target_end_confidence = torch.zeros([preds.shape[0]])
         for i in range(preds.shape[0]):
             y_target_end_confidence[i] = preds[i, target_classes[i % target_classes.shape[0]]]
 
-        print("preds_after:", preds.argmax(dim=-1))
-        # TODO here i want you to select the best counterfactual of the line search
-        # keep only the linesearch attempt with highest target confidence
         x_counterfactuals = torch.reshape(
             x_counterfactuals, list(z_sem_before.shape[:3]) + list(x_counterfactuals.shape[1:])
         )

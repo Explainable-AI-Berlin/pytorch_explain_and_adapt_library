@@ -1819,17 +1819,21 @@ class CFKD(Adaptor):
                 ) as f:
                     tracked_values_file = {}
                     for key in self.tracked_keys:
-                        if isinstance(validation_tracked_values[key][0], torch.Tensor):
-                            tracked_values_file[key] = torch.stack(
-                                validation_tracked_values[key], dim=0
-                            ).numpy()
+                        try:
+                            if isinstance(validation_tracked_values[key][0], torch.Tensor):
+                                tracked_values_file[key] = torch.stack(
+                                    validation_tracked_values[key], dim=0
+                                ).numpy()
 
-                        elif isinstance(
-                            validation_tracked_values[key][0], int
-                        ) or isinstance(validation_tracked_values[key][0], float):
-                            tracked_values_file[key] = np.array(
-                                validation_tracked_values[key]
-                            )
+                            elif isinstance(
+                                validation_tracked_values[key][0], int
+                            ) or isinstance(validation_tracked_values[key][0], float):
+                                tracked_values_file[key] = np.array(
+                                    validation_tracked_values[key]
+                                )
+
+                        except Exception:
+                            import pdb; pdb.set_trace()
 
                     np.savez(f, **tracked_values_file)
 
