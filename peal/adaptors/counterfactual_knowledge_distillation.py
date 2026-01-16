@@ -311,7 +311,7 @@ class CFKD(Adaptor):
 
         # kind of dirty, but also very confusing if not done this way since validation batches are fed directly
         # into the explainer and thereby potentially causing VRAM overflows otherwise
-        self.adaptor_config.training.val_batch_size = self.adaptor_config.batch_size
+        # self.adaptor_config.training.val_batch_size = self.adaptor_config.batch_size
 
         (
             self.train_dataloader,
@@ -1531,9 +1531,23 @@ class CFKD(Adaptor):
                 for val_dataloader in self.joint_validation_dataloader.dataloaders:
                     val_dataloader.dataset.disable_idx()
 
-            finetune_trainer.fit(
-                continue_training=True
-            )  # bool(self.adaptor_config.continuous_learning != "retrain"))
+            try:
+                finetune_trainer.fit(
+                    continue_training=True
+                )  # bool(self.adaptor_config.continuous_learning != "retrain"))
+
+            except StopIteration:
+                print("Stopping finetune early due to little data!!!")
+                print("Stopping finetune early due to little data!!!")
+                print("Stopping finetune early due to little data!!!")
+                open(
+                    os.path.join(
+                        self.adaptor_config.base_dir,
+                        "error_iteration_" + str(finetune_iteration) + ".txt",
+                    ),
+                    "w",
+                ).write("dataloader_val in " + str(finetune_iteration) + " is too empty!")
+                return
 
             if self.hints_enabled:
                 self.dataloader_mixer.enable_hints()
@@ -1820,7 +1834,10 @@ class CFKD(Adaptor):
                     tracked_values_file = {}
                     for key in self.tracked_keys:
                         try:
-                            if isinstance(validation_tracked_values[key][0], torch.Tensor):
+                            if len(validation_tracked_values[key]) == 0:
+                                continue
+
+                            elif isinstance(validation_tracked_values[key][0], torch.Tensor):
                                 tracked_values_file[key] = torch.stack(
                                     validation_tracked_values[key], dim=0
                                 ).numpy()

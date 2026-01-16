@@ -40,7 +40,7 @@ python run_component_analysis.py --config $PEAL_RUNS/square/diffusion_autoencode
 python train_predictor.py --config "<PEAL_BASE>/configs/diffae_experiments/predictors/square1k_foundation_linear_poisoned098_dfr.yaml"
 python evaluate_predictor.py --model_path $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/foundation_linear_poisoned098/dfr/model.cpl --data_config configs/cfkd_experiments/data/square_unpoisoned.yaml --model_config configs/cfkd_experiments/predictors/square1k_classifier_poisoned098.yaml
 # run GroupDRO
-python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/group_dro/square_1k_foundation_linear_poisoned098_group_dro.yaml"
+python run_adaptor.py --config "<PEAL_BASE>/configs/diffae_experiments/adaptors/square_1k_foundation_linear_poisoned098_group_dro.yaml"
 python evaluate_predictor.py --model_path $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/foundation_linear_poisoned098/group_dro/model.cpl --data_config configs/cfkd_experiments/data/square_unpoisoned.yaml --model_config configs/cfkd_experiments/predictors/square1k_classifier_poisoned098.yaml
 # run SDAE projection
 python run_adaptor.py --config "<PEAL_BASE>/configs/diffae_experiments/adaptors/square1kx098_sdae_projection.yaml"
@@ -89,7 +89,7 @@ python run_component_analysis.py --config $PEAL_RUNS/celeba/diffusion_autoencode
 python train_predictor.py --config "<PEAL_BASE>/configs/diffae_experiments/predictors/celeba1k_foundation_linear_poisoned098_dfr.yaml"
 python evaluate_predictor.py --model_path $PEAL_RUNS/celeba1k/colora_confounding_colorb/torchvision/foundation_linear_poisoned098/dfr/model.cpl --data_config configs/cfkd_experiments/data/celeba_unpoisoned.yaml --model_config configs/cfkd_experiments/predictors/celeba1k_classifier_poisoned098.yaml
 # run GroupDRO
-python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/group_dro/celeba_1k_foundation_linear_poisoned098_group_dro.yaml"
+python run_adaptor.py --config "<PEAL_BASE>/configs/diffae_experiments/adaptors/celeba_1k_foundation_linear_poisoned098_group_dro.yaml"
 python evaluate_predictor.py --model_path $PEAL_RUNS/celeba1k/colora_confounding_colorb/torchvision/foundation_linear_poisoned098/group_dro/model.cpl --data_config configs/cfkd_experiments/data/celeba_unpoisoned.yaml --model_config configs/cfkd_experiments/predictors/celeba1k_classifier_poisoned098.yaml
 # run SDAE projection
 python run_adaptor.py --config "<PEAL_BASE>/configs/diffae_experiments/adaptors/celeba1kx098_sdae_projection.yaml"
@@ -138,7 +138,7 @@ python run_component_analysis.py --config $PEAL_RUNS/camelyon/diffusion_autoenco
 python train_predictor.py --config configs/cfkd_experiments/predictors/camelyon17_1k_dinov2_finetuned_poisoned098_dfr.yaml
 python evaluate_predictor.py --model_path $PEAL_RUNS/camelyon17_1k/dinov2_finetuned_poisoned098/dfr/model.cpl --data_config configs/cfkd_experiments/data/camelyon17_unpoisoned.yaml --model_config configs/cfkd_experiments/predictors/camelyon17_1k_dinov2_finetuned_poisoned098_dfr.yaml
 # run GroupDRO
-python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/group_dro/camelyon_1k_foundation_linear_poisoned098_group_dro.yaml"
+python run_adaptor.py --config "<PEAL_BASE>/configs/diffae_experiments/camelyon_1k_foundation_linear_poisoned098_group_dro.yaml"
 python evaluate_predictor.py --model_path $PEAL_RUNS/camelyon1k/colora_confounding_colorb/torchvision/foundation_linear_poisoned098/group_dro/model.cpl --data_config configs/cfkd_experiments/data/camelyon_unpoisoned.yaml --model_config configs/cfkd_experiments/predictors/camelyon1k_classifier_poisoned098.yaml
 # run SDAE projection
 python run_adaptor.py --config "<PEAL_BASE>/configs/diffae_experiments/adaptors/camelyon1kx098_sdae_projection.yaml"

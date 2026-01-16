@@ -3,7 +3,7 @@ n_components: 8
 sparse_dictionaries_type: OrthogonalProcrustesDictionary
 category: sparse_dictionaries
 task:
-  y_selection: [Blond_Hair, Male, Male, Male, Male, Male, Wearing_Hat, Eyeglasses]
+  y_selection: [Blond_Hair, Male, Heavy_Makeup, Wearing_Lipstick, Wearing_Necktie, Attractive, Wearing_Hat, Eyeglasses]
   output_type: multiclass
   output_channels: 8
   criterions:

@@ -3,7 +3,7 @@ n_components: 20
 sparse_dictionaries_type: OrthogonalProcrustesDictionary
 category: sparse_dictionaries
 task:
-  y_selection: [tumor, tumor, tumor, tumor, tumor, tumor, tumor, tumor, tumor, tumor, hospital, hospital, hospital, hospital, hospital, hospital, hospital, hospital, hospital, hospital]
+  y_selection: [tumor, hospital]
   output_type: multiclass
   output_channels: 20
   criterions:
