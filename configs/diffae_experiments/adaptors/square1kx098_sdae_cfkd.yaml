@@ -2,11 +2,11 @@
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  100
-tracking_level                       :  3
+tracking_level                       :  5
 min_train_samples                    :  800
 finetune_iterations                  :  1
 max_validation_samples               :  200
-continuous_learning                  :  "finetune"
+continuous_learning                  :  "deep_feature_reweighting"
 calculate_group_accuracies           :  True
 calculate_explainer_stats            :  True
 explainer                            :  <PEAL_BASE>/configs/diffae_experiments/explainers/dae_distill.yaml
@@ -14,10 +14,10 @@ training                             :  <PEAL_BASE>/configs/cfkd_experiments/tra
 data                                 :  <PEAL_BASE>/configs/cfkd_experiments/data/square1k_poisoned098.yaml
 test_data                            :  <PEAL_BASE>/configs/cfkd_experiments/data/square_unpoisoned.yaml
 student                              :  $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/foundation_poisoned098/model.cpl
-teacher                              :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_unpoisoned/model.cpl
+teacher                              :  preclustered
 generator                            :  $PEAL_RUNS/square/diffusion_autoencoder/config.yaml
 sparse_dictionary                    :  $PEAL_RUNS/square/diffusion_autoencoder/OrthogonalProcrustesDictionary/config.yaml
-base_dir                             :  $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/foundation_poisoned098/sdae_cfkd
+base_dir                             :  $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/foundation_poisoned098/sdae_cfkd_preclustered
 task:
   criterions:
     ce     : 1.0

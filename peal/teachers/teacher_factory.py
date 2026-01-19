@@ -9,6 +9,8 @@ from peal.teachers.cluster_teacher import ClusterTeacher
 from peal.teachers.interfaces import TeacherInterface
 from peal.teachers.model2model_teacher import Model2ModelTeacher
 from peal.teachers.human2model_teacher import Human2ModelTeacher
+
+from peal.teachers.preclustered_teacher import PreclusteredTeacher
 from peal.teachers.segmentation_mask_teacher import SegmentationMaskTeacher
 from peal.data.interfaces import PealDataset
 from peal.teachers.virelay_teacher import VirelayTeacher
@@ -44,6 +46,14 @@ def get_teacher(
         teacher = Model2ModelTeacher(
             teacher,
             dataset,
+            tracking_level=tracking_level,
+            counterfactual_type=counterfactual_type,
+        )
+
+    elif teacher == "preclustered":
+        teacher = PreclusteredTeacher(
+            dataset=dataset,
+            correct_clusters=adaptor_config.correct_clusters,
             tracking_level=tracking_level,
             counterfactual_type=counterfactual_type,
         )

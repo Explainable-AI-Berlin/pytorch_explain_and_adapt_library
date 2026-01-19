@@ -385,7 +385,7 @@ class ImageDataset(PealDataset):
                 torch.utils.data.DataLoader(self, batch_size=x.shape[0])
             )
 
-        outlier_scores = {"absolute" : self.dino_eval.compute_outlier_score(x)}
+        outlier_scores = {"absolute" : self.dino_eval.compute_mahalanobis(x)}
 
         if hasattr(self, "reference_outlier_scores") and self.reference_outlier_scores is not None:
             outlier_scores["relative"] = outlier_scores["absolute"] / (
