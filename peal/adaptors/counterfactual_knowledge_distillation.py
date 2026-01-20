@@ -940,13 +940,34 @@ class CFKD(Adaptor):
         return tracked_values
 
     def retrieve_feedback(self, tracked_values, finetune_iteration, mode):
+        # this is only for scientific experiments and could also be sourced out into another file!
+        # distill into equivalent model
+        predictor_distillation = load_yaml_config(
+            "<PEAL_BASE>/configs/sce_experiments/predictors/simple_distillation.yaml",
+            PredictorConfig,
+        )
+        distillation_path = os.path.join(self.base_dir, str(self.adaptor_config.current_iteration), "distilled_predictor")
+        distilled_predictor_final = os.path.join(distillation_path, "distilled_predictor", "model.cpl")
+        if not os.path.exists(distilled_predictor_final):
+            self.distilled_predictor = distill_predictor(
+                predictor_distillation,
+                distillation_path,
+                self.student,
+                [self.train_dataloader.dataset, self.val_dataloader.dataset],
+                replace_with_activation="leakysoftplus",
+                tracking_level=self.adaptor_config.tracking_level,
+            )
+
+        else:
+            self.distilled_predictor = torch.load(distilled_predictor_final, map_location=self.device)
+
         if self.overwrite or not os.path.exists(
             os.path.join(self.base_dir, str(finetune_iteration), mode + "_feedback.txt")
         ):
             cprint("retrieve feedback!", self.adaptor_config.tracking_level, 2)
             feedback = self.teacher.get_feedback(
                 base_dir=os.path.join(self.base_dir, str(finetune_iteration), mode + "_teacher"),
-                student=self.student,
+                student=self.distilled_predictor,
                 num_clusters=self.adaptor_config.explainer.num_attempts
                 * self.adaptor_config.explainer.parallel_attempts,
                 mode=mode,
@@ -983,12 +1004,16 @@ class CFKD(Adaptor):
         else:
             flip_rate_reference = num_samples
 
-        flipped_samples = list(
-            filter(
-                lambda x: x >= 0.51,
-                tracked_values["y_target_end_confidence_list"][:num_samples],
+        try:
+            flipped_samples = list(
+                filter(
+                    lambda x: x >= 0.51,
+                    tracked_values["y_target_end_confidence_list"][:num_samples],
+                )
             )
-        )
+
+        except Exception:
+            import pdb; pdb.set_trace()
 
         flip_rate = len(flipped_samples) / flip_rate_reference
         ood_rate = len(list(filter(lambda sample: sample == "ood", feedback))) / num_samples
@@ -1027,34 +1052,13 @@ class CFKD(Adaptor):
         cprint("flip_rate: " + str(flip_rate), self.adaptor_config.tracking_level, 2)
 
         if self.adaptor_config.calculate_explainer_stats and finetune_iteration == 0:
-            # this is only for scientific experiments and could also be sourced out into another file!
-            # distill into equivalent model
-            predictor_distillation = load_yaml_config(
-                "<PEAL_BASE>/configs/sce_experiments/predictors/simple_distillation.yaml",
-                PredictorConfig,
-            )
-            distillation_path = os.path.join(self.base_dir, str(finetune_iteration), "distilled_predictor")
-            distilled_predictor_final = os.path.join(distillation_path, "distilled_predictor", "model.cpl")
-            if not os.path.exists(distilled_predictor_final):
-                distilled_predictor = distill_predictor(
-                    predictor_distillation,
-                    distillation_path,
-                    self.student,
-                    [self.train_dataloader.dataset, self.val_dataloader.dataset],
-                    replace_with_activation="leakysoftplus",
-                    tracking_level=self.adaptor_config.tracking_level,
-                )
-
-            else:
-                distilled_predictor = torch.load(distilled_predictor_final, map_location=self.device)
-
             # add y_target_end_confidence_distilled_list
             tracked_values["y_target_end_confidence_distilled_list"] = []
             for idx in range(len(tracked_values["x_counterfactual_list"])):
                 x = tracked_values["x_counterfactual_list"][idx]
                 y = tracked_values["y_target_list"][idx]
                 y_target_end_confidence = (
-                    distilled_predictor(x.to(self.device).unsqueeze(0)).squeeze(0).detach().cpu()[y]
+                    self.distilled_predictor(x.to(self.device).unsqueeze(0)).squeeze(0).detach().cpu()[y]
                 )
                 tracked_values["y_target_end_confidence_distilled_list"].append(y_target_end_confidence)
 

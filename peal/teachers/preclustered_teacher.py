@@ -36,7 +36,7 @@ class PreclusteredTeacher(TeacherInterface):
             elif y_target_end_confidence_list[idx] < 0.5:
                 feedback.append("student not swapped!")
 
-            elif outlier_score > 2.0:
+            elif outlier_score > 1.5:
                 feedback.append("ood_" + str(round(outlier_score, 2)))
 
             else:

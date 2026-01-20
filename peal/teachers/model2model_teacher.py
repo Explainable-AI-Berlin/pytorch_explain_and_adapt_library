@@ -44,21 +44,26 @@ class Model2ModelTeacher(TeacherInterface):
                 .cpu()
                 .argmax(-1)
             )
+            outlier_score = float(self.dataset.calculate_outlier_score(counterfactual.unsqueeze(0))['relative'])
+            student_pred = student(counterfactual.unsqueeze(0).to(self.device)).cpu().argmax(-1).item()
 
-            # TODO here has to be somehing added for OOD e.g. with FID score
-            # TODO this will be a problem for multiclass
-            # TODO is this a numerical problem???
             if (
                 self.counterfactual_type == "1sided"
                 and y_list[idx] != y_source_list[idx]
             ):
                 feedback.append("student originally wrong!")
 
+                """elif student_pred != y_target_list[idx]:
+                    feedback.append("adversarial counterfactual!")"""
+
             elif pred_original != y_list[idx]:
                 feedback.append("teacher originally wrong!")
 
             elif y_target_end_confidence_list[idx] < 0.5:
                 feedback.append("student not swapped!")
+
+            elif outlier_score > 1.3:
+                feedback.append("ood_" + str(round(outlier_score, 2)))
 
             else:
                 if pred_original != pred_counterfactual:
