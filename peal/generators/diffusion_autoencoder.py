@@ -592,6 +592,19 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
     ):
         param_list = [p for p in predictor.parameters()]
         device = param_list[0].device
+        pred_original = (
+            torch.nn.functional.softmax(predictor(x_in.to(self.device)))
+            .detach()
+            .cpu()
+        )
+        target_confidences = [pred_original[i][target_classes[i]] for i in range(len(target_classes))]
+        target_confidence_goal = 1 - torch.tensor(target_confidences)
+
+        if isinstance(predictor_datasets[1], WeightedDataloaderList):
+            validation_dataset = predictor_datasets[1].dataloaders[0].dataset
+
+        else:
+            validation_dataset = predictor_datasets[1]
 
         classifier_to_generator = lambda x: self.generator_dataset.project_from_pytorch_default(
             self.predictor_dataset.project_to_pytorch_default(x)
@@ -695,8 +708,19 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         y_target_end_confidence_list = []
         x_out_list = []
         indices_list = []
+        print("x_counterfactuals: " + str(x_counterfactuals.min()) + " to " + str(x_counterfactuals.max()))
+        print("x_counterfactuals: " + str(x_counterfactuals.min()) + " to " + str(x_counterfactuals.max()))
+        print("x_counterfactuals: " + str(x_counterfactuals.min()) + " to " + str(x_counterfactuals.max()))
         for i in range(explainer_config.num_attempts):
-            j = torch.argmax(y_target_end_confidence[:, i, :], dim=-1)
+            y_target_diff = torch.clone(y_target_end_confidence)
+            for b in range(y_target_end_confidence.shape[0]):
+                outlier_scores = validation_dataset.calculate_outlier_score(x_counterfactuals[b, i])['relative'].cpu()
+                mask = torch.logical_and(outlier_scores < 1.3, outlier_scores > 0.1)
+                masked_difference = y_target_diff[b, i] * mask
+                y_target_diff[b, i] = torch.abs(masked_difference - target_confidence_goal[b])
+
+            #j = torch.argmax(y_target_end_confidence[:, i, :], dim=-1)
+            j = torch.argmin(y_target_diff[:, i, :], dim=-1)
             for k in range(j.shape[0]):
                 x_counterfactuals_out_list.append(x_counterfactuals[k, i, j[k], :])
                 y_target_end_confidence_list.append(float(y_target_end_confidence[k, i, j[k]]))

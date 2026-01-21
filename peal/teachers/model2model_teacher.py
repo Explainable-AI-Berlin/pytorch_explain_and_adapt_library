@@ -45,6 +45,7 @@ class Model2ModelTeacher(TeacherInterface):
                 .argmax(-1)
             )
             outlier_score = float(self.dataset.calculate_outlier_score(counterfactual.unsqueeze(0))['relative'])
+            student_pred_original = student(x_list[idx].unsqueeze(0).to(self.device)).cpu().argmax(-1).item()
             student_pred = student(counterfactual.unsqueeze(0).to(self.device)).cpu().argmax(-1).item()
 
             if (
@@ -64,6 +65,9 @@ class Model2ModelTeacher(TeacherInterface):
 
             elif outlier_score > 1.3:
                 feedback.append("ood_" + str(round(outlier_score, 2)))
+
+            elif student_pred_original == y_source_list[idx] and student_pred != y_target_list[idx]:
+                feedback.append("adversarial counterfactual!")
 
             else:
                 if pred_original != pred_counterfactual:

@@ -296,9 +296,7 @@ class CFKD(Adaptor):
 
         teacher = teacher if not teacher is None else self.adaptor_config.teacher
 
-        # kind of dirty, but also very confusing if not done this way since validation batches are fed directly
-        # into the explainer and thereby potentially causing VRAM overflows otherwise
-        # self.adaptor_config.training.val_batch_size = self.adaptor_config.batch_size
+        self.adaptor_config.training.val_batch_size = self.adaptor_config.batch_size
 
         (
             self.train_dataloader,
@@ -433,6 +431,7 @@ class CFKD(Adaptor):
         self.validation_data_config.data.x_selection = "imgs"
         self.validation_data_config.data.num_samples = self.adaptor_config.max_validation_samples
         self.validation_data_config.data.split = [0.0, 1.0]
+        self.validation_data_config.training.val_batch_size = 2
 
     def initialize_run(self):
         cprint("initialize run!!!", self.adaptor_config.tracking_level, 2)

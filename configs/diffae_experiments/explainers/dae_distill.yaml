@@ -4,4 +4,4 @@ distilled_predictor: <PEAL_BASE>/configs/diffae_experiments/predictors/dae_disti
 use_clustering: true
 clustering_strategy: highest_activation
 num_attempts: 2
-linesearch_factors: [2.0]
+linesearch_factors: [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0]
