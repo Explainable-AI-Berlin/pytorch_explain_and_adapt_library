@@ -15,8 +15,8 @@ data                                 :  <PEAL_BASE>/configs/cfkd_experiments/dat
 test_data                            :  <PEAL_BASE>/configs/cfkd_experiments/data/square_unpoisoned.yaml
 student                              :  $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/classifier_poisoned098/model.cpl
 teacher                              :  $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_unpoisoned/model.cpl
-generator                            :  $PEAL_RUNS/square/diffusion_autoencoder/config.yaml
-sparse_dictionary                    :  $PEAL_RUNS/square/diffusion_autoencoder/OrthogonalProcrustesDictionary/config.yaml
+generator                            :  $PEAL_RUNS/square/diffusion_autoencoder_dinov2/config.yaml
+sparse_dictionary                    :  $PEAL_RUNS/square/diffusion_autoencoder_dinov2/OrthogonalProcrustesDictionary/config.yaml
 base_dir                             :  $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/classifier_poisoned098/didae_svd_cfkd
 task:
   criterions:

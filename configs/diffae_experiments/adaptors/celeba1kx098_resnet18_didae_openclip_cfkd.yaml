@@ -1,4 +1,4 @@
-# python run_cfkd.py --config "<PEAL_BASE>/configs/diffae_experiments/adaptors/celeba1kx098_resnet18_openclip_didae_cfkd.yaml"
+# python run_cfkd.py --config "<PEAL_BASE>/configs/diffae_experiments/adaptors/celeba1kx098_resnet18_didae_openclip_cfkd.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  4
