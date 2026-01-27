@@ -10,6 +10,7 @@ class SparseDictionaryConfig(BaseModel):
     base_path: Union[str, None] = None
     weights_path: Union[str, None] = None
     act_size: int = 512
+    visualizations_per_component: int = 100
     weights_name: str = "weights.npz"
 
 class SparseDictionary:

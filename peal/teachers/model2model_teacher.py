@@ -63,7 +63,7 @@ class Model2ModelTeacher(TeacherInterface):
             elif y_target_end_confidence_list[idx] < 0.5:
                 feedback.append("student not swapped!")
 
-            elif outlier_score > 1.3:
+            elif outlier_score > 2.5:
                 feedback.append("ood_" + str(round(outlier_score, 2)))
 
             elif student_pred_original == y_source_list[idx] and student_pred != y_target_list[idx]:

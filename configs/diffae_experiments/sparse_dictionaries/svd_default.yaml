@@ -1,4 +1,5 @@
 ending: .npz
-n_components: 100
+n_components: 4
 sparse_dictionaries_type: SVDDictionary
 category: sparse_dictionaries
+visualizations_per_component: 1000

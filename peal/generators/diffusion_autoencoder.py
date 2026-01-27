@@ -494,7 +494,8 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             result_list.append(
                 self.explain_sparse_component(
                     torch.utils.data.DataLoader(
-                        self.generator_datasets[1], batch_size=self.config.visualizations_per_component
+                        self.generator_datasets[1],
+                        batch_size=self.config.sparse_dictionary.visualizations_per_component,
                     ),
                     component_idx,
                 )
@@ -592,11 +593,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
     ):
         param_list = [p for p in predictor.parameters()]
         device = param_list[0].device
-        pred_original = (
-            torch.nn.functional.softmax(predictor(x_in.to(self.device)))
-            .detach()
-            .cpu()
-        )
+        pred_original = torch.nn.functional.softmax(predictor(x_in.to(self.device))).detach().cpu()
         target_confidences = [pred_original[i][target_classes[i]] for i in range(len(target_classes))]
         target_confidence_goal = 1 - torch.tensor(target_confidences)
 
@@ -714,12 +711,12 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         for i in range(explainer_config.num_attempts):
             y_target_diff = torch.clone(y_target_end_confidence)
             for b in range(y_target_end_confidence.shape[0]):
-                outlier_scores = validation_dataset.calculate_outlier_score(x_counterfactuals[b, i])['relative'].cpu()
+                outlier_scores = validation_dataset.calculate_outlier_score(x_counterfactuals[b, i])["relative"].cpu()
                 mask = torch.logical_and(outlier_scores < 1.3, outlier_scores > 0.1)
                 masked_difference = y_target_diff[b, i] * mask
                 y_target_diff[b, i] = torch.abs(masked_difference - target_confidence_goal[b])
 
-            #j = torch.argmax(y_target_end_confidence[:, i, :], dim=-1)
+            # j = torch.argmax(y_target_end_confidence[:, i, :], dim=-1)
             j = torch.argmin(y_target_diff[:, i, :], dim=-1)
             for k in range(j.shape[0]):
                 x_counterfactuals_out_list.append(x_counterfactuals[k, i, j[k], :])
@@ -758,7 +755,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             return reflected, None, torch.norm(reflected - z_sem, p=2, dim=-1, keepdim=False)
 
         else:
-            '''component_indices = range(num_attempts)
+            """component_indices = range(num_attempts)
             # 1. Retrieve the Dictionary Components (Directions)
             # Shape: [Latent_Dim, Num_Components]
             W_all = self.sparse_dictionary.get_components()[:, :num_attempts]
@@ -821,7 +818,7 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             # Return latent vars, indices, and distances
             # Note: Caller must decode z_counterfaz_counterfactuals_sortedctuals_sorted to get 'x'
             component_indices = torch.arange(sorted_indices.shape[1]).unsqueeze(0).tile([sorted_indices.shape[0], 1])
-            return z_reflected, component_indices, distances'''
+            return z_reflected, component_indices, distances"""
             component_indices = range(num_attempts)
         W_all = self.sparse_dictionary.get_components()[:, :num_attempts]
 

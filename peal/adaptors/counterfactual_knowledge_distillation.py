@@ -267,6 +267,9 @@ class CFKD(Adaptor):
                 The visualization function that is used for the run. Defaults to lambda x: x.
         """
         self.adaptor_config = load_yaml_config(adaptor_config, AdaptorConfig)
+        self.adaptor_config.min_train_samples = (
+            self.adaptor_config.explainer.num_attempts * self.adaptor_config.min_train_samples
+        )
         if self.adaptor_config.test_data is None:
             self.adaptor_config.test_data = self.adaptor_config.data
 
@@ -945,7 +948,9 @@ class CFKD(Adaptor):
             "<PEAL_BASE>/configs/sce_experiments/predictors/simple_distillation.yaml",
             PredictorConfig,
         )
-        distillation_path = os.path.join(self.base_dir, str(self.adaptor_config.current_iteration), "distilled_predictor")
+        distillation_path = os.path.join(
+            self.base_dir, str(self.adaptor_config.current_iteration), "distilled_predictor"
+        )
         distilled_predictor_final = os.path.join(distillation_path, "distilled_predictor", "model.cpl")
         if not os.path.exists(distilled_predictor_final):
             self.distilled_predictor = distill_predictor(
@@ -1012,7 +1017,9 @@ class CFKD(Adaptor):
             )
 
         except Exception:
-            import pdb; pdb.set_trace()
+            import pdb
+
+            pdb.set_trace()
 
         flip_rate = len(flipped_samples) / flip_rate_reference
         ood_rate = len(list(filter(lambda sample: sample == "ood", feedback))) / num_samples
