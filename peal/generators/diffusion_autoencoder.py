@@ -709,15 +709,20 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         print("x_counterfactuals: " + str(x_counterfactuals.min()) + " to " + str(x_counterfactuals.max()))
         print("x_counterfactuals: " + str(x_counterfactuals.min()) + " to " + str(x_counterfactuals.max()))
         for i in range(explainer_config.num_attempts):
-            y_target_diff = torch.clone(y_target_end_confidence)
-            for b in range(y_target_end_confidence.shape[0]):
-                outlier_scores = validation_dataset.calculate_outlier_score(x_counterfactuals[b, i])["relative"].cpu()
-                mask = torch.logical_and(outlier_scores < 1.3, outlier_scores > 0.1)
-                masked_difference = y_target_diff[b, i] * mask
-                y_target_diff[b, i] = torch.abs(masked_difference - target_confidence_goal[b])
+            if x_counterfactuals.shape[2] >= 2:
+                y_target_diff = torch.clone(y_target_end_confidence)
+                for b in range(y_target_end_confidence.shape[0]):
+                    outlier_scores = validation_dataset.calculate_outlier_score(x_counterfactuals[b, i])["relative"].cpu()
+                    mask = torch.logical_and(outlier_scores < 1.3, outlier_scores > 0.1)
+                    masked_difference = y_target_diff[b, i] * mask
+                    y_target_diff[b, i] = torch.abs(masked_difference - target_confidence_goal[b])
 
-            # j = torch.argmax(y_target_end_confidence[:, i, :], dim=-1)
-            j = torch.argmin(y_target_diff[:, i, :], dim=-1)
+                # j = torch.argmax(y_target_end_confidence[:, i, :], dim=-1)
+                j = torch.argmin(y_target_diff[:, i, :], dim=-1)
+
+            else:
+                j = torch.zeros([x_counterfactuals.shape[0]], dtype=torch.long)
+
             for k in range(j.shape[0]):
                 x_counterfactuals_out_list.append(x_counterfactuals[k, i, j[k], :])
                 y_target_end_confidence_list.append(float(y_target_end_confidence[k, i, j[k]]))
@@ -755,126 +760,62 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             return reflected, None, torch.norm(reflected - z_sem, p=2, dim=-1, keepdim=False)
 
         else:
-            """component_indices = range(num_attempts)
-            # 1. Retrieve the Dictionary Components (Directions)
-            # Shape: [Latent_Dim, Num_Components]
+            component_indices = range(num_attempts)
             W_all = self.sparse_dictionary.get_components()[:, :num_attempts]
 
-            # If specific indices are provided, filter W_all
             if component_indices is not None:
-                # Assuming component_indices is a tensor or list of ints
                 W = W_all[:, component_indices].to(z_sem.device)
-
             else:
                 W = W_all.to(z_sem.device)
 
-            # 2. Compute Projections (Batched)
-            # z_sem: [Batch, Dim]
-            # W:     [Dim, K] (where K is num components)
+            # --- CHANGED: Calculate "Cross-Projection" to target Classifier Flip ---
 
-            # Dot product of z with every component: z . w
+            # 1. Alignment of current Z with Classifier (z . w)
+            # z_sem: [Batch, Dim] | w: [Dim] -> Result: [Batch, 1]
+            dot_zw = torch.sum(z_sem * w, dim=-1, keepdim=True)
+
+            # 2. Alignment of Components with Classifier (u . w)
+            # w: [Dim] | W: [Dim, K] -> Result: [K]
+            # This tells us how much moving along a component 'u' affects the class score
+            dot_uw = torch.matmul(w, W)
+
+            # Safety: If a component is orthogonal to the classifier (dot_uw ~ 0),
+            # moving along it won't change the class. We prevent division by zero.
+            eps = 1e-6
+            dot_uw_safe = dot_uw.clone()
+            dot_uw_safe[torch.abs(dot_uw_safe) < eps] = eps
+
+            # 3. Calculate Projection Factor
+            # We want a step `s` such that (z - s*u).w = -z.w
+            # This requires s = 2 * (z.w) / (u.w)
+            # The '2' is applied later by linesearch_factors (assuming it contains 2.0)
             # Shape: [Batch, K]
-            dot_ab = torch.matmul(z_sem, W)
+            proj_factors = dot_zw / dot_uw_safe.unsqueeze(0)
 
-            # Dot product of component with itself (squared norm): w . w
-            # Shape: [K]
-            dot_bb = torch.sum(W**2, dim=0)
-
-            # Projection coefficients: (z . w) / (w . w)
-            # Shape: [Batch, K]
-            proj_factors = dot_ab / dot_bb
-
-            # Calculate Projection Vectors
-            # We need to broadcast:
-            # proj_factors [Batch, K] -> [Batch, K, 1]
-            # W.T          [K, Dim]   -> [1, K, Dim]
-            # Result       [Batch, K, Dim]
+            # 4. Create Projection Vectors
+            # Expand factors to: [Batch, K, 1]
+            # Expand W to: [1, K, Dim]
+            # Result: [Batch, K, Dim]
             projections = proj_factors.unsqueeze(-1) * W.permute(1, 0).unsqueeze(0)
 
-            # 3. Compute Reflections
-            # Formula: Reflected = Original - 2 * Projection
-            # z_sem needs unsqueeze to broadcast: [Batch, 1, Dim]
-            line_search_factors = torch.tensor(explainer_config.linesearch_factors).to(z_sem.device)  # Shape: [K]
+            # --- END CHANGES ---
+
+            # 5. Compute Reflections using Linesearch
+            line_search_factors = torch.tensor(explainer_config.linesearch_factors).to(z_sem.device)
             z_base = z_sem.unsqueeze(1).unsqueeze(1)
             proj_expanded = projections.unsqueeze(2)
             factors_expanded = line_search_factors.view(1, 1, -1, 1)
 
-            # Result: [Batch, K, S, Dim]
-            # We subtract because we want to move AWAY from the projection (reflection logic)
+            # Apply the update
             z_reflected = z_base - factors_expanded * proj_expanded
-            # z_reflected = z_expanded - 2 * projections  # Shape: [Batch, K, Dim]
-            # z_reflected = z_expanded - line_search_factors * projections  # Shape: [Batch, K, Dim]
-            # z_reflected = z_expanded - projections  # Shape: [Batch, K, Dim]
 
-            # 4. Calculate Distances
-            # Euclidean distance between original z and reflected z
-            # Shape: [Batch, K]
+            # 6. Calculate Distances & Sort
             distances = torch.norm(z_base - z_reflected, p=2, dim=-1)
-
-            # 5. Sort by Distance (Increasing)
-            # Get indices that sort the distances
             sorted_indices = torch.argsort(distances, dim=1)
 
-            # Return latent vars, indices, and distances
-            # Note: Caller must decode z_counterfaz_counterfactuals_sortedctuals_sorted to get 'x'
             component_indices = torch.arange(sorted_indices.shape[1]).unsqueeze(0).tile([sorted_indices.shape[0], 1])
-            return z_reflected, component_indices, distances"""
-            component_indices = range(num_attempts)
-        W_all = self.sparse_dictionary.get_components()[:, :num_attempts]
 
-        if component_indices is not None:
-            W = W_all[:, component_indices].to(z_sem.device)
-        else:
-            W = W_all.to(z_sem.device)
-
-        # --- CHANGED: Calculate "Cross-Projection" to target Classifier Flip ---
-
-        # 1. Alignment of current Z with Classifier (z . w)
-        # z_sem: [Batch, Dim] | w: [Dim] -> Result: [Batch, 1]
-        dot_zw = torch.sum(z_sem * w, dim=-1, keepdim=True)
-
-        # 2. Alignment of Components with Classifier (u . w)
-        # w: [Dim] | W: [Dim, K] -> Result: [K]
-        # This tells us how much moving along a component 'u' affects the class score
-        dot_uw = torch.matmul(w, W)
-
-        # Safety: If a component is orthogonal to the classifier (dot_uw ~ 0),
-        # moving along it won't change the class. We prevent division by zero.
-        eps = 1e-6
-        dot_uw_safe = dot_uw.clone()
-        dot_uw_safe[torch.abs(dot_uw_safe) < eps] = eps
-
-        # 3. Calculate Projection Factor
-        # We want a step `s` such that (z - s*u).w = -z.w
-        # This requires s = 2 * (z.w) / (u.w)
-        # The '2' is applied later by linesearch_factors (assuming it contains 2.0)
-        # Shape: [Batch, K]
-        proj_factors = dot_zw / dot_uw_safe.unsqueeze(0)
-
-        # 4. Create Projection Vectors
-        # Expand factors to: [Batch, K, 1]
-        # Expand W to: [1, K, Dim]
-        # Result: [Batch, K, Dim]
-        projections = proj_factors.unsqueeze(-1) * W.permute(1, 0).unsqueeze(0)
-
-        # --- END CHANGES ---
-
-        # 5. Compute Reflections using Linesearch
-        line_search_factors = torch.tensor(explainer_config.linesearch_factors).to(z_sem.device)
-        z_base = z_sem.unsqueeze(1).unsqueeze(1)
-        proj_expanded = projections.unsqueeze(2)
-        factors_expanded = line_search_factors.view(1, 1, -1, 1)
-
-        # Apply the update
-        z_reflected = z_base - factors_expanded * proj_expanded
-
-        # 6. Calculate Distances & Sort
-        distances = torch.norm(z_base - z_reflected, p=2, dim=-1)
-        sorted_indices = torch.argsort(distances, dim=1)
-
-        component_indices = torch.arange(sorted_indices.shape[1]).unsqueeze(0).tile([sorted_indices.shape[0], 1])
-
-        return z_reflected, component_indices, distances
+            return z_reflected, component_indices, distances
 
 
 class NormalizationModule(nn.Module):
