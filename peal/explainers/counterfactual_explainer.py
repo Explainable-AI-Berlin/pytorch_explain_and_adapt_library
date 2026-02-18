@@ -1196,7 +1196,6 @@ class CounterfactualExplainer(ExplainerInterface):
             print(f"Explainer speed: {self.counterfactuals_per_second:.2f} counterfactuals per second.")
             print(f"Explainer speed: {self.counterfactuals_per_second:.2f} counterfactuals per second.")
             print(f"Explainer speed: {self.counterfactuals_per_second:.2f} counterfactuals per second.")
-            #import pdb; pdb.set_trace()
 
         if len(batch["x_list"]) < len(batch["x_counterfactual_list"]):
             n_reps = len(batch["x_counterfactual_list"]) // len(batch["x_list"])
