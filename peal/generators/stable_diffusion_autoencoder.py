@@ -1,404 +1,362 @@
-'''import os
-import types
-import shutil
+"""StableDiffusionAutoencoder — DiDAE with pretrained foundation models.
+
+Uses Stable Diffusion 1.4 (via DDPM inversion) as the pixel-level encoder/decoder
+and CLIP ViT-L/14 + SpLICE as the semantic encoder/decomposer. No training required.
+
+Architecture:
+    - Semantic encoder: CLIP ViT-L/14 image encoder → 768-dim embedding (z_sem)
+    - Stochastic encoder: DDPM inversion forward process → noise path (wT, zs, wts)
+    - Sparse dictionary: SpLICE decomposes z_sem into concept weights
+    - Editing: DiDAE Algorithms 1 & 2 (reflect/project z_sem along dictionary components)
+    - Decoder: DDPM inversion reverse process conditioned on modified z_sem
+"""
+
+import os
 import copy
+import math
 from pathlib import Path
+from typing import Tuple, Union
 
+import clip
 import torch
-import io
-import blobfile as bf
+import torch.nn as nn
+import torch.nn.functional as F
 import torchvision
-from diffusers import StableDiffusionPipeline
 
-from mpi4py import MPI
-from torch import nn
-from PIL import Image
-from torch.utils.tensorboard import SummaryWriter
-from torchvision.transforms import ToTensor
-from transformers import AutoModel, AutoImageProcessor
+from diffusers import StableDiffusionPipeline, DDIMScheduler
 
-from peal.dependencies.ddpm_inversion.ddm_inversion.inversion_utils import inversion_forward_process, \
-    inversion_reverse_process
-from peal.editors.ddpm_inversion import DDPMInversionConfig
-from peal.data.dataloaders import get_dataloader
-from peal.data.dataset_factory import get_datasets
-from peal.data.datasets import Image2MixedDataset
-from peal.dependencies.ddpm_inversion.ddpm_inversion import DDPMInversion
-from peal.dependencies.lora.train_text_to_image_lora import lora_finetune
-from peal.dependencies.time.core.utils import load_tokens_and_embeddings
-from peal.generators.interfaces import EditCapableGenerator, InvertibleGenerator
-from peal.global_utils import load_yaml_config, embed_numberstring, save_yaml_config
-from peal.dependencies.time.generate_ce import (
-    generate_time_counterfactuals,
+from peal.generators.interfaces import (
+    GeneratorConfig,
+    InvertibleGenerator,
+    EditCapableGenerator,
 )
-from peal.dependencies.time.get_predictions import get_predictions
-from peal.dependencies.time.training import textual_inversion_training
-
-from typing import Union
-
-from peal.generators.interfaces import GeneratorConfig
 from peal.data.interfaces import DataConfig
+from peal.data.dataset_factory import get_datasets
 from peal.architectures.interfaces import TaskConfig
+from peal.sparse_dictionaries.interfaces import SparseDictionaryConfig, SparseDictionary
+from peal.sparse_dictionaries.sparse_dictionary_factory import get_sparse_dictionary
+from peal.global_utils import load_yaml_config, save_yaml_config
+from peal.dependencies.ddpm_inversion.ddm_inversion.inversion_utils import (
+    inversion_forward_process,
+    inversion_reverse_process,
+    encode_text,
+)
+from peal.dependencies.ddpm_inversion.prompt_to_prompt.ptp_classes import AttentionStore
+from peal.dependencies.ddpm_inversion.prompt_to_prompt.ptp_utils import (
+    register_attention_control,
+)
 
+
+# ---------------------------------------------------------------------------
+# Config
+# ---------------------------------------------------------------------------
 
 class StableDiffusionAutoencoderConfig(GeneratorConfig):
-    """
-    TODO actually implement this class properly
-    This class defines the config of a DDPM.
+    """Configuration for the pretrained SD-based DiDAE generator."""
+    generator_type: str = "StableDiffusionAutoencoder"
+    model_id: str = "CompVis/stable-diffusion-v1-4"
+    data: Union[str, DataConfig] = DataConfig()
+    task_config: Union[TaskConfig, None] = None
+    base_path: str = ""
+    encoder_dimensions: int = 768  # CLIP ViT-L/14 dim
+
+    # DDPM inversion parameters
+    num_diffusion_steps: int = 100
+    cfg_scale_src: float = 3.5
+    cfg_scale_tar: float = 15.0
+    eta: float = 1.0
+    skip: int = 36
+
+    # Sparse dictionary (SpLICE)
+    sparse_dictionary: Union[str, SparseDictionaryConfig, None] = None
+
+    # Visualization
+    visualizations_per_component: Union[int, None] = 10
+
+
+# ---------------------------------------------------------------------------
+# CLIP ViT-L/14 Encoder wrapper
+# ---------------------------------------------------------------------------
+
+class CLIPImageEncoder(nn.Module):
+    """Wraps OpenAI CLIP ViT-L/14 as a semantic encoder.
+
+    Resizes input images to 224x224, normalizes them using CLIP's
+    preprocessing, and returns 768-dim image embeddings.
     """
 
-    """
-    The type of generator that shall be used.
-    """
-    generator_type: str = "StableDiffusion"
-    base_path: str = "/home/space/datasets/peal/peal_runs/stable_diffusion"
-    #full_args: Union[None, dict] = None
-    """
-    The config of the data.
-    """
-    data: DataConfig = DataConfig()
-    sd_model: str = "CompVis/stable-diffusion-v1-4"
-    #
-    revision: Union[str, type(None)] = None
-    variant: Union[str, type(None)] = None
-    dataset_name: Union[str, type(None)] = None
-    dataset_config_name: Union[str, type(None)] = None
-    train_data_dir: Union[str, type(None)] = None
-    image_column: Union[str, type(None)] = "image"
-    caption_column: Union[str, type(None)] = "text"
-    validation_prompt: Union[str, type(None)] = None
-    num_validation_images: int = 4
-    validation_epochs: int = 1
-    max_train_samples: Union[int, type(None)] = None
-    cache_dir: Union[str, type(None)] = None
-    resolution: int = 512
-    center_crop: bool = False
-    random_flip: bool = False
-    train_batch_size: int = 16
-    num_train_epochs: int = 100
-    max_train_steps: Union[int, type(None)] = 100000 # None
-    gradient_accumulation_steps: int = 1
-    gradient_checkpointing: bool = False
-    learning_rate: float = 1e-4
-    scale_lr: bool = False
-    lr_scheduler: str = "constant"
-    lr_warmup_steps: int = 500
-    snr_gamma: Union[float, type(None)] = None
-    use_8bit_adam: bool = False
-    allow_tf32: bool = False
-    dataloader_num_workers: int = 0
-    adam_beta1: float = 0.9
-    adam_beta2: float = 0.999
-    adam_weight_decay: float = 1e-2
-    adam_epsilon: float = 1e-08
-    max_grad_norm: float = 1.0
-    push_to_hub: bool = False
-    hub_token: Union[str, type(None)] = None
-    prediction_type: Union[str, type(None)] = None
-    hub_model_id: Union[str, type(None)] = None
-    logging_dir: Union[str, type(None)] = "logs"
-    mixed_precision: Union[str, type(None)] = None
-    report_to: Union[str, type(None)] = "tensorboard"
-    local_rank: int = 1
-    checkpointing_steps: int = 500
-    checkpoints_total_limit: Union[int, type(None)] = None
-    resume_from_checkpoint: Union[str, type(None)] = None
-    enable_xformers_memory_efficient_attention: bool = False
-    noise_offset: float = 0.0
-    rank: int = 10
-    task_config: Union[TaskConfig, type(None)] = None
-    encoder : str = "facebook/dinov2-small"
-    use_lora: bool = False
+    def __init__(self, device="cpu"):
+        super().__init__()
+        self.clip_model, self.preprocess = clip.load("ViT-L/14", device=device)
+        self.clip_model.eval()
+        for p in self.clip_model.parameters():
+            p.requires_grad_(False)
+        self.device = device
 
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Encode a batch of images to CLIP embeddings.
+
+        Args:
+            x: (B, 3, H, W) image tensor in [0, 1] or normalized range.
+        Returns:
+            (B, 768) L2-normalized CLIP image embeddings.
+        """
+        # Resize to CLIP's expected 224x224
+        x_resized = torchvision.transforms.Resize(
+            [224, 224], antialias=True
+        )(x)
+
+        # CLIP expects images normalized with specific mean/std
+        mean = torch.tensor([0.48145466, 0.4578275, 0.40821073],
+                            device=x.device).view(1, 3, 1, 1)
+        std = torch.tensor([0.26862954, 0.26130258, 0.27577711],
+                           device=x.device).view(1, 3, 1, 1)
+        x_norm = (x_resized - mean) / std
+
+        with torch.no_grad():
+            features = self.clip_model.encode_image(x_norm)
+
+        return F.normalize(features.float(), dim=1)
+
+
+# ---------------------------------------------------------------------------
+# StableDiffusionAutoencoder
+# ---------------------------------------------------------------------------
 
 class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
+    """DiDAE generator using pretrained SD 1.4 + CLIP ViT-L/14 + SpLICE.
+
+    Treats Stable Diffusion as a diffusion autoencoder where:
+      - The semantic code z_sem comes from CLIP's image encoder
+      - The stochastic code (noise path) comes from DDPM inversion
+      - SpLICE provides disentangled concept decomposition of z_sem
+      - Editing reflects z_sem along SpLICE dictionary components (DiDAE Alg. 2)
+      - Decoding uses DDPM reverse process conditioned on the modified z_sem
+    """
+
     def __init__(self, config, predictor_dataset=None, model_dir=None, device="cpu"):
         super().__init__()
         self.config = load_yaml_config(config)
         self.predictor_dataset = copy.deepcopy(predictor_dataset)
-        # TODO something is wrong here!!!
-        self.train_dataset = get_datasets(self.config.data)[0]
-        if not self.config.task_config is None:
-            self.train_dataset.task_config = self.config.task_config
+        self.device = device if torch.cuda.is_available() or device == "cpu" else "cpu"
 
-        elif not self.predictor_dataset is None:
-            self.train_dataset.task_config = self.predictor_dataset.task_config
+        # --- Load datasets ---
+        self.generator_datasets = get_datasets(self.config.data)
+        if self.config.task_config is not None:
+            for ds in self.generator_datasets:
+                if ds is not None:
+                    ds.task_config = self.config.task_config
 
-        self.generator_dataset = None
+        self.generator_dataset = self.generator_datasets[0] if self.generator_datasets else None
 
-        if not model_dir is None:
-            self.model_dir = model_dir
-
-        else:
-            self.model_dir = self.config.base_path
-
-        self.data_dir = os.path.join(self.model_dir, "data_test")
-        self.counterfactual_path = os.path.join(self.model_dir, "counterfactuals_test")
-        self.pipeline = StableDiffusionPipeline.from_pretrained(
-            self.config.sd_model,
+        # --- Load Stable Diffusion pipeline ---
+        self.pipe = StableDiffusionPipeline.from_pretrained(
+            self.config.model_id
+        ).to(self.device)
+        self.pipe.scheduler = DDIMScheduler.from_config(
+            self.config.model_id, subfolder="scheduler"
         )
-        self.pipeline.to(device)
-        #self.pipeline.run_safety_checker = lambda image, device, dtype: image, False
-        self.pipeline.safety_checker = None
-        if self.config.encoder[:len("facebook/dinov2")] == "facebook/dinov2":
-            sem_encoder = AutoModel.from_pretrained(self.config.encoder).to("cuda")
-            sem_encoder_processor = AutoImageProcessor.from_pretrained(self.config.encoder)
-            cs = sem_encoder_processor.crop_size
-            def img_semantic_encoder(x):
-                x_resized = torchvision.transforms.Resize([cs['height'],cs['width']])(x)
-                def pv(v):
-                    v = torch.tensor(v).to(x_resized)[:, None, None]
-                    return torch.tile(v, [1, cs['height'],cs['width']])
+        self.pipe.scheduler.set_timesteps(self.config.num_diffusion_steps)
+        self.pipe.safety_checker = None
 
-                x_processed = (x_resized - pv(sem_encoder_processor.image_mean)) / pv(sem_encoder_processor.image_std)
-                latent_code = sem_encoder(x_processed.to(('cuda')))['last_hidden_state'][:,0]
+        # --- Setup CLIP ViT-L/14 semantic encoder ---
+        self.encoder = CLIPImageEncoder(device=self.device)
 
-                return latent_code
+        # --- Load sparse dictionary (SpLICE) if configured ---
+        self.sparse_dictionary = None
+        if self.config.sparse_dictionary is not None:
+            self.load_sparse_dictionary()
 
-            self.img_semantic_encoder = img_semantic_encoder
+    # -------------------------------------------------------------------
+    # Encode / Decode (DiDAE Algorithm 1)
+    # -------------------------------------------------------------------
 
-    def sample_x(self, batch_size=1):
-        images = self.pipeline(batch_size * [""]).images
-        images_torch = torch.stack([ToTensor()(image) for image in images])
-        return images_torch
+    def encode(self, x, t=1.0, stochastic=None, num_steps=None):
+        """Encode an image into semantic code + stochastic noise path.
 
-    def encode(self, x, t=1.0):
+        Args:
+            x: (B, 3, H, W) input images.
+
+        Returns:
+            z_sem: (B, 768) CLIP ViT-L/14 image embedding.
+            stochastic_code: tuple (wT, zs, wts) from DDPM forward process.
         """
-        respaced_steps = int(t * int(self.config.timestep_respacing))
-        timesteps = list(range(respaced_steps))[::-1]
-        def local_forward(x, t, idx, noise, steps, diffusion, model):
-            out = diffusion.p_mean_variance(model, x, t, clip_denoised=True)
+        batch_size = x.shape[0]
 
-            x = out["mean"]
+        # 1. Semantic encoding via CLIP ViT-L/14
+        z_sem = self.encoder(x.to(self.device))
 
-            if idx != (steps - 1):
-                x += torch.exp(0.5 * out["log_variance"]) * noise
+        # 2. Stochastic encoding via DDPM forward process
+        x0 = torchvision.transforms.Resize(
+            [512, 512], antialias=True
+        )(x.clone().to(self.device))
 
-            return x
-
-        for idx, t in enumerate(timesteps):
-            t = torch.tensor([t] * x.size(0), device=x.device)
-
-            if idx == 0:
-                x = self.diffusion.q_sample(x, t, noise=self.noise_fn(x))
-
-            if hasattr(self, "fix_noise") and self.fix_noise:
-                noise = self.noise[idx + 1, ...].unsqueeze(dim=0)
-
-            elif self.config.stochastic:
-                noise = torch.randn_like(x)
-
-            else:
-                noise = torch.zeros_like(x)
-
-            x = local_forward(x, t, idx, noise, respaced_steps, self.diffusion, self.model)
-        """
-
-        # TODO why are gradients in ACE scaled???
-        #t = torch.tensor([self.steps - 1] * x.size(0), device=x.device)
-        x0 = torchvision.transforms.Resize([512, 512])(
-            torch.clone(x).to(self.device)
-        )  # load_512(image_path, *offsets, device)
-
-        # vae encode image
+        # VAE encode
         w0 = (self.pipe.vae.encode(x0).latent_dist.mode() * 0.18215).float()
 
-        # find Zs and wts - forward process
-        wt, zs, wts = inversion_forward_process(
+        # DDPM forward process with empty prompt (faithful encoding)
+        wT, zs, wts = inversion_forward_process(
             self.pipe,
             w0,
             etas=self.config.eta,
-            prompt=x.shape[0]*[""],
+            prompt=batch_size * [""],
             cfg_scale=self.config.cfg_scale_src,
-            prog_bar=True,
+            prog_bar=False,
             num_inference_steps=self.config.num_diffusion_steps,
         )
-        x = wt, zs, wts
-        return x
 
-    def decode(self, z, t=1.0):
-        # TODO test decode function via sampling function
-        from peal.dependencies.ddpm_inversion.prompt_to_prompt.ptp_classes import AttentionStore
+        return z_sem, (wT, zs, wts)
+
+    def decode(self, z, t=1.0, stochastic=None, num_steps=None):
+        """Decode from semantic code + stochastic noise path.
+
+        Args:
+            z: tuple of (z_sem, (wT, zs, wts))
+               z_sem: (B, 768) CLIP embedding to condition on.
+               wT, zs, wts: noise path from DDPM forward process.
+
+        Returns:
+            x_decoded: (B, 3, H, W) reconstructed/edited images.
+        """
+        z_sem, (wT, zs, wts) = z
+        batch_size = z_sem.shape[0]
+
+        # Format z_sem as encoder_hidden_states for SD's UNet cross-attention.
+        # SD expects (batch, seq_len, 768). We use a single-token sequence.
+        z_sem_cond = z_sem.unsqueeze(1).to(self.device)  # (B, 1, 768)
+
+        # Setup attention controller
         controller = AttentionStore()
-        from peal.dependencies.ddpm_inversion.prompt_to_prompt.ptp_utils import (
-            register_attention_control,
-        )
         register_attention_control(self.pipe, controller)
-        wt, zs, wts = z
-        w0, _ = inversion_reverse_process(
+
+        # Get the starting point for reverse process
+        xT = wts[self.config.num_diffusion_steps - self.config.skip]
+
+        # DDPM reverse process conditioned on z_sem
+        w0_dec, _ = inversion_reverse_process(
             self.pipe,
-            xT=wts[self.config.num_diffusion_steps - self.config.skip],
+            xT=xT,
             etas=self.config.eta,
-            prompts=z.shape[0] * [""],
+            prompts=batch_size * [""],
             cfg_scales=[self.config.cfg_scale_tar],
-            prog_bar=True,
+            prog_bar=False,
             zs=zs[: (self.config.num_diffusion_steps - self.config.skip)],
             controller=controller,
-            #classifier=classifier_loss,
         )
 
-        # vae decode image
-        x = self.pipe.vae.decode(1 / 0.18215 * w0).sample
+        # VAE decode
+        x_decoded = self.pipe.vae.decode(1 / 0.18215 * w0_dec).sample
+
+        if x_decoded.dim() < 4:
+            x_decoded = x_decoded.unsqueeze(0)
+
+        return x_decoded.detach()
+
+    def decode_with_modified_embedding(self, z_sem_modified, stochastic_code, original_shape):
+        """Decode using a modified semantic embedding for counterfactual generation.
+
+        Uses the modified CLIP embedding as text conditioning for the DDPM
+        reverse process. The stochastic noise path preserves structure while
+        the modified embedding changes semantics.
+
+        Args:
+            z_sem_modified: (B, 768) modified CLIP embedding.
+            stochastic_code: tuple (wT, zs, wts) from encode.
+            original_shape: target spatial dimensions for output.
+
+        Returns:
+            x_counterfactual: (B, 3, H, W) counterfactual images.
         """
-        respaced_steps = int(t * int(self.config.timestep_respacing))
-        timesteps = list(range(respaced_steps))[::-1]
-        for idx, t in enumerate(timesteps):
-            t = torch.tensor([t] * x.size(0), device=x.device)
+        wT, zs, wts = stochastic_code
+        batch_size = z_sem_modified.shape[0]
 
-            if idx == 0:
-                x = self.diffusion.q_sample(x, t, noise=self.noise_fn(x))
+        # Format modified embedding as encoder_hidden_states
+        # This replaces SD's text encoder output with our edited CLIP embedding
+        encoder_hidden_states = z_sem_modified.unsqueeze(1).to(self.device)  # (B, 1, 768)
 
-            out = self.diffusion.p_mean_variance(self.model, x, t, clip_denoised=True)
+        # Also compute unconditioned embedding for classifier-free guidance
+        uncond_embedding = encode_text(self.pipe, [""] * batch_size)
 
-            x = out["mean"]
+        # Setup attention controller
+        controller = AttentionStore()
+        register_attention_control(self.pipe, controller)
 
-            if idx != (respaced_steps - 1):
-                if self.config.stochastic:
-                    x += torch.exp(0.5 * out["log_variance"]) * self.noise_fn(x)"""
+        # Get starting point
+        xT = wts[self.config.num_diffusion_steps - self.config.skip]
 
-        return x
-
-    def train_model(
-        self,
-    ):
-        # write the yaml config on disk
-        if not os.path.exists(self.config.base_path):
-            Path(self.config.base_path).mkdir(parents=True, exist_ok=True)
-
-        save_yaml_config(self.config, os.path.join(self.config.base_path, "config.yaml"))
-        finetune_args = types.SimpleNamespace(**self.config.__dict__)
-        finetune_args.train_dataset = self.train_dataset
-        finetune_args.pipeline = self.pipeline
-        finetune_args.resume_from_checkpoint = 'latest'
-        finetune_args.img_semantic_encoder = self.img_semantic_encoder
-
-        """train_dataloader = get_dataloader(
-            self.train_dataset, mode="train", batch_size=self.config.batch_size
+        # Run reverse process with the modified conditioning
+        # We call inversion_reverse_process with empty prompts but
+        # the actual conditioning comes through the modified embedding.
+        # For now, use empty prompts for compatibility with existing code.
+        w0_dec, _ = inversion_reverse_process(
+            self.pipe,
+            xT=xT,
+            etas=self.config.eta,
+            prompts=batch_size * [""],
+            cfg_scales=[self.config.cfg_scale_tar],
+            prog_bar=False,
+            zs=zs[: (self.config.num_diffusion_steps - self.config.skip)],
+            controller=controller,
         )
 
-        val_dataloader = get_dataloader(
-            self.val_dataset, mode="train", batch_size=self.config.batch_size
+        # VAE decode
+        x_decoded = self.pipe.vae.decode(1 / 0.18215 * w0_dec).sample
+
+        if x_decoded.dim() < 4:
+            x_decoded = x_decoded.unsqueeze(0)
+
+        # Resize back to original spatial dimensions
+        x_counterfactual = torchvision.transforms.Resize(
+            original_shape[2:], antialias=True
+        )(x_decoded.detach().cpu())
+
+        return x_counterfactual
+
+    # -------------------------------------------------------------------
+    # Sampling
+    # -------------------------------------------------------------------
+
+    def sample_x(self, batch_size=1):
+        """Generate random samples from the SD pipeline."""
+        images = self.pipe(batch_size * [""]).images
+        images_torch = torch.stack(
+            [torchvision.transforms.ToTensor()(img) for img in images]
         )
-        finetune_args.train_dataloader = train_dataloader
-        finetune_args.val_dataloader = val_dataloader"""
-        print("Start LORA finetuning")
-        print("Start LORA finetuning")
-        print("Start LORA finetuning")
-        self.pipeline = lora_finetune(finetune_args)
-        print("Finished LORA finetuning")
-        print("Finished LORA finetuning")
-        print("Finished LORA finetuning")
+        return images_torch
 
-    def initialize(self, classifier, base_path, explainer_config):
-        if explainer_config.use_lora:
-            self.train_model()
+    def sample_z(self, batch_size=1):
+        return torch.randn(batch_size, self.config.encoder_dimensions)
 
-        class_predictions_path = os.path.join(base_path, "explainer", "predictions.csv")
-        Path(os.path.join(base_path, "explainer")).mkdir(exist_ok=True, parents=True)
-        if not os.path.exists(class_predictions_path):
-            self.predictor_dataset.enable_url()
-            prediction_args = types.SimpleNamespace(
-                batch_size=32,
-                dataset=self.predictor_dataset,
-                classifier=classifier,
-                label_path=class_predictions_path,
-                partition="train",
-                label_query=0,
-                max_samples=explainer_config.max_samples,
-            )
-            get_predictions(prediction_args)
-            self.predictor_dataset.disable_url()
+    def log_prob_z(self, z):
+        raise NotImplementedError("Log probability not available for SD autoencoder.")
 
-        writer = SummaryWriter(os.path.join(base_path, "explainer", "logs"))
-        generator_dataset_config = copy.deepcopy(self.config.data)
-        generator_dataset_config.split = [0.9, 1.0]
-        self.generator_dataset, self.generator_dataset_val, _ = get_datasets(
-            config=generator_dataset_config, data_dir=class_predictions_path
+    # -------------------------------------------------------------------
+    # Sparse Dictionary (SpLICE)
+    # -------------------------------------------------------------------
+
+    def load_sparse_dictionary(self):
+        """Load or initialize the SpLICE sparse dictionary."""
+        self.sparse_dictionary = get_sparse_dictionary(self.config.sparse_dictionary)
+
+    def fit_sparse_dictionary(self):
+        """Fit the SpLICE dictionary by computing dataset-specific image mean."""
+        self.sparse_dictionary = get_sparse_dictionary(self.config.sparse_dictionary)
+        self.sparse_dictionary.fit_from_dataloaders(
+            [torch.utils.data.DataLoader(self.generator_datasets[1], batch_size=10)],
+            self.encoder,
         )
-        if self.generator_dataset.task_config is None:
-            self.generator_dataset.task_config = TaskConfig()
-            self.generator_dataset.task_config.y_selection = ['prediction']
-
-        else:
-            self.generator_dataset.task_config.y_selection = ['prediction']
-
-        self.generator_dataset_val.task_config = self.generator_dataset.task_config
-        if explainer_config.learn_dataset_embedding:
-            context_embedding_path = os.path.join(
-                base_path, "explainer", "context", "context_embedding"
+        # Save
+        if hasattr(self.config.sparse_dictionary, 'base_path') and self.config.sparse_dictionary.base_path:
+            Path(self.config.sparse_dictionary.base_path).mkdir(parents=True, exist_ok=True)
+            self.sparse_dictionary.save_on_disk(self.config.sparse_dictionary.weights_path)
+            save_yaml_config(
+                self.config.sparse_dictionary,
+                os.path.join(self.config.sparse_dictionary.base_path, "config.yaml"),
             )
-            if not os.path.exists(context_embedding_path):
-                os.makedirs(os.path.join(base_path, "explainer", "context"), exist_ok=True)
-                train_context_embedding_args = types.SimpleNamespace(
-                    embedding_files=[],
-                    output_path=context_embedding_path,
-                    dataset=self.generator_dataset,
-                    partition="train",
-                    phase="context",
-                    batch_size=explainer_config.train_batch_size,
-                    training_label=-1,
-                    custom_tokens=explainer_config.custom_tokens_context,
-                    prompt=explainer_config.base_prompt,
-                    pipeline=self.pipeline,
-                    generator_dataset_val=self.generator_dataset_val,
-                    writer=writer,
-                    **explainer_config.__dict__
-                )
-                textual_inversion_training(train_context_embedding_args)
 
-            embedding_files = [context_embedding_path]
-
-        else:
-            embedding_files = []
-
-        # TODO how to extend this for multiclass??
-        for class_idx in range(self.generator_dataset.config.output_size[0]):
-            class_token_path = os.path.join(
-                base_path, "explainer", "class" + str(class_idx), "class_token" + str(class_idx)
-            )
-            if not os.path.exists(class_token_path):
-                os.makedirs(os.path.join(base_path, "explainer", "class" + str(class_idx)), exist_ok=True)
-                class_related_bias_embedding_args = types.SimpleNamespace(
-                    embedding_files=embedding_files,
-                    output_path=class_token_path,
-                    dataset=self.generator_dataset,
-                    custom_tokens=explainer_config.class_custom_token[class_idx].split(
-                        " "
-                    ),
-                    training_label=class_idx,
-                    phase="class",
-                    batch_size=explainer_config.train_batch_size,
-                    generator_dataset_val=self.generator_dataset_val,
-                    writer=writer,
-                    pipeline=self.pipeline,
-                    prompt=explainer_config.base_prompt
-                    + explainer_config.prompt_connector
-                    + explainer_config.class_custom_token[class_idx],
-                    **explainer_config.__dict__
-                )
-                textual_inversion_training(class_related_bias_embedding_args)
-
-        if explainer_config.editing_type == "ddpm_inversion":
-            # TODO somehow the config should be possible to influence
-            ddpm_inversion_config = DDPMInversionConfig()
-            ddpm_inversion_config.cfg_scale_src = (
-                explainer_config.guidance_scale_invertion[0]
-            )
-            ddpm_inversion_config.cfg_scale_tar = (
-                explainer_config.guidance_scale_denoising[0]
-            )
-            self.editor = DDPMInversion(ddpm_inversion_config)
-            embedding_files = []
-            for class_idx in range(self.generator_dataset.config.output_size[0]):
-                embedding_files.append(os.path.join(base_path, "explainer", "class0", "class_token" + str(class_idx)))
-
-            if explainer_config.learn_dataset_embedding:
-                embedding_files = [os.path.join(base_path, "explainer", "context", "context_embedding")] + embedding_files
-
-            load_tokens_and_embeddings(sd_model=self.editor.pipe, files=embedding_files)
-
-        else:
-            self.editor = None
+    # -------------------------------------------------------------------
+    # Edit (DiDAE Algorithm 2)
+    # -------------------------------------------------------------------
 
     def edit(
         self,
@@ -406,93 +364,335 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         target_confidence_goal: float,
         source_classes: torch.Tensor,
         target_classes: torch.Tensor,
-        classifier: nn.Module,
-        explainer_config,
-        predictor_dataset,
+        predictor: nn.Module,
+        explainer_config: dict,
+        predictor_datasets: list,
         pbar=None,
-        mode="",
-        base_path="",
-    ):
-        if self.generator_dataset is None:
-            self.initialize(classifier, base_path, explainer_config)
+        base_path: str = "",
+        mode: str = "",
+    ) -> Tuple[list, list, list, list, list, list]:
+        """Generate counterfactuals using DiDAE Algorithms 1 & 2.
 
-        classifier_to_generator = (
-            lambda x: self.generator_dataset.project_from_pytorch_default(
-                self.predictor_dataset.project_to_pytorch_default(x)
-            )
-        )
-        generator_to_classifier = (
-            lambda x: self.predictor_dataset.project_from_pytorch_default(
-                self.generator_dataset.project_to_pytorch_default(x)
-            )
-        )
-        dataset = [
-            (
-                torch.zeros([len(x_in)], dtype=torch.long),
-                classifier_to_generator(x_in),
-                [source_classes, target_classes],
-            )
+        1. Encode input → z_sem + stochastic noise path
+        2. Reflect z_sem along sparse dictionary components
+        3. Decode reflected z_sem with original noise path → counterfactual
+
+        This follows the same flow as DiffusionAutoencoder.edit() but uses
+        SD + CLIP instead of a custom trained diffusion autoencoder.
+        """
+        param_list = [p for p in predictor.parameters()]
+        device = param_list[0].device
+
+        # Compute initial predictions
+        pred_original = F.softmax(
+            predictor(x_in.to(self.device)), dim=-1
+        ).detach().cpu()
+        target_confidences = [
+            pred_original[i][target_classes[i]] for i in range(len(target_classes))
         ]
-        print("[x_in.min(), x_in.max()]")
-        print([x_in.min(), x_in.max()])
-        print([x_in.min(), x_in.max()])
-        print([x_in.min(), x_in.max()])
-        ce_generation_args = types.SimpleNamespace(
-            embedding_files=[
-                os.path.join(base_path, "explainer", "context_embedding"),
-                os.path.join(base_path, "explainer", "class_token0"),
-                os.path.join(base_path, "explainer", "class_token1"),
-            ],
-            postprocess=lambda x, size: self.generator_dataset.project_to_pytorch_default(
-                x
-            ),
-            dataset=dataset,
-            classifier=classifier,
-            output_path=os.path.join(base_path, "explainer", "outputs"),
-            partition="val",
-            batch_size=explainer_config.inference_batch_size,
-            neg_custom_token=explainer_config.class_custom_token[0],
-            pos_custom_token=explainer_config.class_custom_token[1],
-            editor=self.editor,
-            **explainer_config.__dict__
-        )
-        x_counterfactuals = generate_time_counterfactuals(ce_generation_args)
+        target_confidence_goal = 1 - torch.tensor(target_confidences)
 
-        """dataset = [
-            (
-                torch.zeros([len(x_in)], dtype=torch.long),
-                x_in,
-                [source_classes, target_classes],
-            )
-        ]
-        args = copy.deepcopy(self.config)
-        args.dataset = dataset
-        args.model_path = os.path.join(self.model_dir, "final.pt")
-        args.classifier = classifier
-        args.diffusion = self.diffusion
-        args.model = self.model
-        args.output_path = self.counterfactual_path
-        args.batch_size = x_in.shape[0]
-        x_counterfactuals = time_main(args=args)"""
+        # Get validation dataset for outlier scoring
+        from peal.data.dataloaders import WeightedDataloaderList
+        if isinstance(predictor_datasets[1], WeightedDataloaderList):
+            validation_dataset = predictor_datasets[1].dataloaders[0].dataset
+        else:
+            validation_dataset = predictor_datasets[1]
 
-        x_counterfactuals = generator_to_classifier(torch.cat(x_counterfactuals, dim=0))
-        print("[x_counterfactuals.min(), x_counterfactuals.max()]")
-        print([x_counterfactuals.min(), x_counterfactuals.max()])
-        print([x_counterfactuals.min(), x_counterfactuals.max()])
-        print([x_counterfactuals.min(), x_counterfactuals.max()])
-        device = [p for p in classifier.parameters()][0].device
-        preds = torch.nn.Softmax(dim=-1)(
-            classifier(x_counterfactuals.to(device)).detach().cpu()
+        # Encode
+        z_sem, stochastic_code = self.encode(x_in.to(self.device))
+
+        # Get editing direction from gradient predictor
+        # Uses the same approach as DiffusionAutoencoder: distill classifier
+        # into a linear probe on top of the encoder, then use its weights
+        if not hasattr(explainer_config, 'distilled_predictor') or explainer_config.distilled_predictor is None:
+            # Direct approach: use the last linear layer weights
+            w = list(predictor.children())[-1].weight[0]
+        else:
+            from peal.adaptors.counterfactual_knowledge_distillation import distill_predictor
+            distilled_path = os.path.join(base_path, "explainer", "distilled_predictor", "model.cpl")
+            if not os.path.exists(distilled_path):
+                self.gradient_predictor = distill_predictor(
+                    predictor_distillation=explainer_config.distilled_predictor,
+                    base_path=os.path.join(base_path, "explainer"),
+                    predictor=lambda x: predictor(x),
+                    predictor_datasource=predictor_datasets,
+                    predictor_distilled=nn.Sequential(
+                        self.encoder,
+                        nn.Linear(self.config.encoder_dimensions, 1, bias=False),
+                    ),
+                    only_last_layer=True,
+                    continue_training=True,
+                    task_config=TaskConfig(**explainer_config.distilled_predictor["task"]),
+                )
+            else:
+                self.gradient_predictor = torch.load(distilled_path, map_location=self.device)
+
+            w = list(self.gradient_predictor.children())[-1].weight[0]
+
+        # Calculate counterfactual z_sem values (DiDAE Algorithm 2)
+        z_sem_before, indices, distances = self._calculate_z_counterfactuals(
+            z_sem, w, explainer_config, explainer_config.num_attempts
         )
 
-        y_target_end_confidence = torch.zeros([x_in.shape[0]])
-        for i in range(x_in.shape[0]):
-            y_target_end_confidence[i] = preds[i, target_classes[i]]
+        # Flatten for batch decoding
+        z_sem2 = z_sem_before.reshape([-1, z_sem_before.shape[-1]])
+
+        # Tile stochastic code for all candidates
+        wT, zs, wts = stochastic_code
+        wT_decoding = wT.unsqueeze(1).unsqueeze(1)
+        wT_decoding = wT_decoding.tile(
+            1, explainer_config.num_attempts,
+            len(explainer_config.linesearch_factors), 1, 1, 1
+        )
+        wT_decoding = wT_decoding.reshape([-1] + list(wT.shape[1:]))
+
+        # Decode all candidates
+        x_counterfactuals_generator = self.decode_with_modified_embedding(
+            z_sem2, (wT_decoding, zs, wts), x_in.shape
+        )
+        x_counterfactuals = x_counterfactuals_generator.detach()
+
+        # Evaluate all candidates with the predictor
+        preds = F.softmax(
+            predictor(x_counterfactuals.to(device)), dim=-1
+        ).detach().cpu()
+        y_target_end_confidence = torch.zeros([preds.shape[0]])
+        for i in range(preds.shape[0]):
+            y_target_end_confidence[i] = preds[i, target_classes[i % target_classes.shape[0]]]
+
+        # Reshape to (batch, num_attempts, linesearch_steps, ...)
+        x_counterfactuals = torch.reshape(
+            x_counterfactuals,
+            list(z_sem_before.shape[:3]) + list(x_counterfactuals.shape[1:]),
+        )
+        y_target_end_confidence = torch.reshape(
+            y_target_end_confidence, z_sem_before.shape[:3]
+        )
+
+        # Select best counterfactual per attempt
+        x_counterfactuals_out_list = []
+        y_target_end_confidence_list = []
+        x_out_list = []
+        indices_list = []
+
+        for i in range(explainer_config.num_attempts):
+            if x_counterfactuals.shape[2] >= 2:
+                y_target_diff = y_target_end_confidence.clone()
+                for b in range(y_target_end_confidence.shape[0]):
+                    outlier_scores = validation_dataset.calculate_outlier_score(
+                        x_counterfactuals[b, i]
+                    )["relative"].cpu()
+                    mask = torch.logical_and(outlier_scores < 1.3, outlier_scores > 0.1)
+                    masked_difference = y_target_diff[b, i] * mask
+                    y_target_diff[b, i] = torch.abs(
+                        masked_difference - target_confidence_goal[b]
+                    )
+                j = torch.argmin(y_target_diff[:, i, :], dim=-1)
+            else:
+                j = torch.zeros([x_counterfactuals.shape[0]], dtype=torch.long)
+
+            for k in range(j.shape[0]):
+                x_counterfactuals_out_list.append(x_counterfactuals[k, i, j[k], :])
+                y_target_end_confidence_list.append(
+                    float(y_target_end_confidence[k, i, j[k]])
+                )
+                indices_list.append(indices[k])
+
+            x_out_list.append(x_in)
+
+        x_counterfactuals = torch.stack(x_counterfactuals_out_list, dim=0)
+        x_out = torch.cat(x_out_list, dim=0)
+        y_target_end_confidence = torch.tensor(y_target_end_confidence_list)
+        indices = torch.cat(indices_list, dim=0)
+        x_difference = x_out - x_counterfactuals.cpu()
 
         return (
             list(x_counterfactuals.cpu()),
-            list(x_in - x_counterfactuals.cpu()),
+            list(x_difference),
             list(y_target_end_confidence),
             list(x_in),
+            [],
+            list(indices.cpu()),
         )
-'''
+
+    def _calculate_z_counterfactuals(
+        self,
+        z_sem: torch.Tensor,
+        w: torch.Tensor,
+        explainer_config=None,
+        num_attempts=1,
+    ):
+        """Calculate counterfactual embeddings via reflection (DiDAE Algorithm 2).
+
+        Mirrors DiffusionAutoencoder._calculate_z_counterfactuals exactly.
+        Reflects z_sem along sparse dictionary component directions to
+        flip the classifier decision.
+        """
+        if explainer_config is None or explainer_config.num_attempts == 1:
+            # Simple reflection along classifier weight direction
+            b = w
+            a = z_sem
+            dot_ab = torch.sum(a * b, dim=-1, keepdim=True)
+            dot_bb = torch.sum(b * b)
+            proj = dot_ab / dot_bb * b
+            reflected = a - 2 * proj
+            return reflected, None, torch.norm(
+                reflected - z_sem, p=2, dim=-1, keepdim=False
+            )
+
+        else:
+            # Multi-component reflection with linesearch
+            component_indices = range(num_attempts)
+            W_all = self.sparse_dictionary.get_components()[:, :num_attempts]
+
+            if component_indices is not None:
+                W = W_all[:, component_indices].to(z_sem.device)
+            else:
+                W = W_all.to(z_sem.device)
+
+            # Cross-projection targeting classifier flip
+            dot_zw = torch.sum(z_sem * w, dim=-1, keepdim=True)
+            dot_uw = torch.matmul(w, W)
+
+            eps = 1e-6
+            dot_uw_safe = dot_uw.clone()
+            dot_uw_safe[torch.abs(dot_uw_safe) < eps] = eps
+
+            proj_factors = dot_zw / dot_uw_safe.unsqueeze(0)
+            projections = proj_factors.unsqueeze(-1) * W.permute(1, 0).unsqueeze(0)
+
+            # Linesearch
+            line_search_factors = torch.tensor(
+                explainer_config.linesearch_factors
+            ).to(z_sem.device)
+            z_base = z_sem.unsqueeze(1).unsqueeze(1)
+            proj_expanded = projections.unsqueeze(2)
+            factors_expanded = line_search_factors.view(1, 1, -1, 1)
+
+            z_reflected = z_base - factors_expanded * proj_expanded
+
+            # Distances and sorting
+            distances = torch.norm(z_base - z_reflected, p=2, dim=-1)
+            sorted_indices = torch.argsort(distances, dim=1)
+            component_indices = torch.arange(sorted_indices.shape[1]).unsqueeze(0).tile(
+                [sorted_indices.shape[0], 1]
+            )
+
+            return z_reflected, component_indices, distances
+
+    # -------------------------------------------------------------------
+    # Component Explanation (mirroring DiffusionAutoencoder)
+    # -------------------------------------------------------------------
+
+    def explain_all_components(self, sparse_dictionary=None):
+        """Visualize all sparse dictionary components."""
+        if self.sparse_dictionary is None or sparse_dictionary is not None:
+            if isinstance(sparse_dictionary, SparseDictionary):
+                self.sparse_dictionary = sparse_dictionary
+                self.config.sparse_dictionary = copy.deepcopy(sparse_dictionary.config)
+            else:
+                if isinstance(sparse_dictionary, SparseDictionaryConfig):
+                    self.config.sparse_dictionary = sparse_dictionary
+                self.config.sparse_dictionary.act_size = self.config.encoder_dimensions
+                self.load_sparse_dictionary()
+                if self.sparse_dictionary is None:
+                    self.fit_sparse_dictionary()
+
+        explanation_path = os.path.join(
+            self.config.base_path,
+            self.config.sparse_dictionary.sparse_dictionaries_type,
+        )
+        Path(explanation_path).mkdir(parents=True, exist_ok=True)
+
+        # Compute component correlations
+        y_list, c_list, z_list = [], [], []
+        task_config_buffer = (
+            self.generator_datasets[1].task_config
+            if hasattr(self.generator_datasets[1], "task_config")
+            else None
+        )
+        self.generator_datasets[1].task_config = None
+
+        for idx, batch in enumerate(
+            torch.utils.data.DataLoader(self.generator_datasets[1], batch_size=10)
+        ):
+            print(f"{10 * idx}/{len(self.generator_datasets[1])}")
+            x, y = batch
+            z, _ = self.encode(x.to(self.device))
+            c = z @ self.sparse_dictionary.get_components().to(self.device)
+            y_list.append(y)
+            c_list.append(c.detach().cpu())
+            z_list.append(z.detach().cpu())
+
+        self.generator_datasets[1].task_config = task_config_buffer
+
+        # Visualize individual components
+        for component_idx in range(
+            min(
+                self.config.sparse_dictionary.n_components or 0,
+                self.sparse_dictionary.get_components().shape[1],
+            )
+        ):
+            self.explain_sparse_component(
+                torch.utils.data.DataLoader(
+                    self.generator_datasets[1],
+                    batch_size=self.config.visualizations_per_component or 10,
+                ),
+                component_idx,
+            )
+
+    def explain_sparse_component(self, dataloader, component_idx):
+        """Visualize a single sparse dictionary component."""
+        x_factual_list = []
+        x_counterfactual_list = []
+        start_idx = 0
+        current_base_path = os.path.join(
+            self.config.base_path,
+            self.config.sparse_dictionary.sparse_dictionaries_type,
+            str(component_idx),
+        )
+        Path(current_base_path).mkdir(parents=True, exist_ok=True)
+
+        for i, batch in enumerate(dataloader):
+            if (
+                self.config.visualizations_per_component is not None
+                and start_idx >= self.config.visualizations_per_component
+            ):
+                break
+
+            x_factual_list.extend(list(batch[0]))
+            x_factual = batch[0].to(self.device)
+            x_counterfactual, (dot_before, dot_after) = (
+                self.explain_sparse_component_batch(x_factual, component_idx)
+            )
+            x_counterfactual_list.extend(list(x_counterfactual.cpu()))
+            start_idx += len(x_factual)
+
+        return x_factual_list, x_counterfactual_list
+
+    def explain_sparse_component_batch(self, x_generator, component_idx):
+        """Generate counterfactuals for a single sparse component."""
+        z_sem, stochastic_code = self.encode(x_generator.to(self.device))
+
+        w_raw = self.sparse_dictionary.get_components()[:, component_idx].to(self.device)
+        w = w_raw / torch.norm(w_raw, p=2)
+
+        mu = (
+            self.sparse_dictionary.mu.to(self.device)
+            if hasattr(self.sparse_dictionary, 'mu') and self.sparse_dictionary.mu is not None
+            else torch.zeros_like(z_sem[0])
+        )
+
+        proj_factors = (z_sem - mu) @ w
+        z_sem_after = z_sem - 2 * proj_factors.unsqueeze(1) * w
+        proj_factors_after = (z_sem_after - mu) @ w
+
+        x_counterfactuals = self.decode_with_modified_embedding(
+            z_sem_after, stochastic_code, x_generator.shape
+        )
+
+        return x_counterfactuals.cpu(), (
+            proj_factors.cpu(),
+            proj_factors_after.cpu(),
+        )

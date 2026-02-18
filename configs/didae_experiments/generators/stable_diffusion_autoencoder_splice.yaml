@@ -1,0 +1,13 @@
+# python train_generator.py --config "<PEAL_BASE>/configs/didae_experiments/generators/stable_diffusion_autoencoder_splice.yaml"
+category: generator
+generator_type: StableDiffusionAutoencoder
+model_id: "CompVis/stable-diffusion-v1-4"
+data: "<PEAL_BASE>/configs/didae_experiments/data/celeba_stable_diffusion.yaml"
+base_path: $PEAL_RUNS/celeba/stable_diffusion_autoencoder_splice
+num_diffusion_steps: 100
+cfg_scale_src: 3.5
+cfg_scale_tar: 15.0
+eta: 1.0
+skip: 36
+encoder_dimensions: 768
+sparse_dictionary: "<PEAL_BASE>/configs/didae_experiments/sparse_dictionaries/splice_clip_vit_l_14.yaml"

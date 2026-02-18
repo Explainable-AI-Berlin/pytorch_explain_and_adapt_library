@@ -24,6 +24,7 @@ peal/dependencies/ace/outputs
 environment.yaml
 $PEAL_DATA
 plots
+.agent
 
 !peal/dependencies/dive/src/datasets
 peal/dependencies/rrclarc/data

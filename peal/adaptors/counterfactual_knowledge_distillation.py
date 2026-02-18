@@ -226,6 +226,7 @@ class CFKDConfig(AdaptorConfig):
     clustering_strategy: Union[str, type(None)] = None
     sparse_dictionary: Union[SparseDictionaryConfig, dict, type(None)] = None
     correct_clusters: list = [0]
+    use_true_counterfactuals: bool = False
 
 
 class CFKD(Adaptor):
@@ -1226,22 +1227,21 @@ class CFKD(Adaptor):
         y_counterfactual_list = []
         sample_names = []
         for sample_idx in range(len(feedback)):
-            """if feedback[sample_idx] == "true":
-            sample_name = (
-                "true_"
-                + str(int(y_source_list[sample_idx]))
-                + "_to_"
-                + str(int(y_target_list[sample_idx]))
-                + "_"
-                + str(sample_idx)
-            )
-            x_list.append(x_counterfactual_list[sample_idx])
-            if not hint_list is None:
-                hint_list_dataset.append(hint_list[sample_idx])
+            if self.adaptor_config.use_true_counterfactuals and feedback[sample_idx] == "true":
+                sample_name = (
+                    "true_"
+                    + str(int(y_source_list[sample_idx]))
+                    + "_to_"
+                    + str(int(y_target_list[sample_idx]))
+                    + "_"
+                    + str(sample_idx)
+                )
+                x_list.append(x_counterfactual_list[sample_idx])
+                if not hint_list is None:
+                    hint_list_dataset.append(hint_list[sample_idx])
 
-            y_counterfactual_list.append(int(y_target_list[sample_idx]))
-            sample_names.append(sample_name)
-            """
+                y_counterfactual_list.append(int(y_target_list[sample_idx]))
+                sample_names.append(sample_name)
 
             if feedback[sample_idx] == "false":
                 sample_name = (
