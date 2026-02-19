@@ -2,6 +2,7 @@ import copy
 from typing import Union
 import torch
 import torch.nn.functional as F
+from tqdm import tqdm
 
 from peal.sparse_dictionaries.interfaces import SparseDictionary, SparseDictionaryConfig
 
@@ -69,6 +70,20 @@ class SpLICEDecomposition(SparseDictionary):
         # Set n_components from the actual dictionary size
         self.config.n_components = self.splice_model.dictionary.shape[0]
 
+    def set_clip_model(self, clip_model):
+        """Inject an external CLIP model to ensure identity with the generator.
+        
+        Args:
+            clip_model: The loaded CLIP model instance (must be ViT-L/14)
+        """
+        if self.splice_model is None:
+            self._load_splice_model()
+            
+        # SpLICE holds the CLIP model in its 'clip' attribute
+        # We replace it with the external one to guarantee weight identity
+        self.splice_model.clip = clip_model.to(self.device)
+        self.splice_model.clip.eval()
+
     def fit(self, X: torch.Tensor, y: torch.Tensor = None):
         """No-op — SpLICE uses a pretrained dictionary, not learned from data.
         
@@ -100,7 +115,7 @@ class SpLICEDecomposition(SparseDictionary):
 
         with torch.no_grad():
             for dataloader in dataloaders:
-                for batch in dataloader:
+                for batch in tqdm(dataloader, desc="Computing dataset CLIP mean"):
                     try:
                         inputs, _ = batch
                     except (ValueError, TypeError):

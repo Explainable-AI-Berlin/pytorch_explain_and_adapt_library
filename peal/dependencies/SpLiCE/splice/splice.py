@@ -127,14 +127,22 @@ def load(name: str, vocabulary: str, vocabulary_size: int = -1, device = "cuda" 
             
             concepts = torch.nn.functional.normalize(torch.stack(concepts).squeeze(), dim=1)
             concepts = torch.nn.functional.normalize(concepts-torch.mean(concepts, dim=0), dim=1)
+            os.makedirs(os.path.dirname(concept_path), exist_ok=True)
             torch.save(concepts, concept_path)
     else:
         raise RuntimeError(f"Vocabulary {vocabulary} not supported.")
     
     
     model_path = model_name.replace("/","-")
-    mean_path = _download(os.path.join(GITHUB_HOST_LINK, "means", f"{library}_{model_path}_image.pt"), download_root or os.path.expanduser("~/.cache/splice/"), "means")
-    image_mean = torch.load(mean_path, map_location=torch.device(device))
+    try:
+        mean_path = _download(os.path.join(GITHUB_HOST_LINK, "means", f"{library}_{model_path}_image.pt"), download_root or os.path.expanduser("~/.cache/splice/"), "means")
+        image_mean = torch.load(mean_path, map_location=torch.device(device))
+    except Exception as e:
+        print(f"Warning: Could not download/load pretrained mean for {name}: {e}. Using zero mean fallback.")
+        # Fallback to zero mean (size 768 for ViT-L/14, 512 for ViT-B)
+        dim = 768 if "ViT-L" in model_name else 512
+        image_mean = torch.zeros(dim).to(device)
+
     splice = SPLICE(
         image_mean=image_mean,
         dictionary=concepts,

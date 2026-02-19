@@ -1,3 +1,4 @@
+category: sparse_dictionaries
 sparse_dictionaries_type: SpLICEDecomposition
 clip_model: "clip:ViT-L/14"
 vocabulary: laion

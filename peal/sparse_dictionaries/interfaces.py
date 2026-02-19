@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 
 class SparseDictionaryConfig(BaseModel):
-    n_components: Union[int, None]
+    n_components: Union[int, None] = None
     sparse_dictionaries_type: str
     category: str = "sparse_dictionaries"
     base_path: Union[str, None] = None

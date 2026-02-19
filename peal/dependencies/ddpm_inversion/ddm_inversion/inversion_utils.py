@@ -27,7 +27,7 @@ def mu_tilde(model, xt, x0, timestep):
     prev_timestep = (
         timestep
         - model.scheduler.config.num_train_timesteps
-        // model.scheduler.num_inference_steps
+        // len(model.scheduler.timesteps)
     )
     alpha_prod_t_prev = (
         model.scheduler.alphas_cumprod[prev_timestep]
@@ -60,10 +60,10 @@ def sample_xts_from_x0(model, x0, num_inference_steps=50):
 
     timesteps = model.scheduler.timesteps.to(model.device)
     t_to_idx = {int(v): k for k, v in enumerate(timesteps)}
-    xts = torch.zeros([num_inference_steps + 1] + list(x0.shape)).to(x0.device)
+    xts = torch.zeros([len(timesteps) + 1] + list(x0.shape)).to(x0.device)
     xts[0] = x0
     for t in reversed(timesteps):
-        idx = num_inference_steps - t_to_idx[int(t)]
+        idx = len(timesteps) - t_to_idx[int(t)]
         xts[idx] = (
             x0 * (alpha_bar[t] ** 0.5)
             + torch.randn_like(x0) * sqrt_one_minus_alpha_bar[t]
@@ -116,7 +116,7 @@ def get_variance(model, timestep):  # , prev_timestep):
     prev_timestep = (
         timestep
         - model.scheduler.config.num_train_timesteps
-        // model.scheduler.num_inference_steps
+        // len(model.scheduler.timesteps)
     )
     alpha_prod_t = model.scheduler.alphas_cumprod[timestep]
     alpha_prod_t_prev = (
@@ -159,7 +159,8 @@ def inversion_forward_process(
     else:
         eta_is_zero = False
         if type(etas) in [int, float]:
-            etas = [etas] * model.scheduler.num_inference_steps
+            # Use len(timesteps) to ensure consistency with the loop
+            etas = [etas] * len(timesteps)
         xts = sample_xts_from_x0(model, x0, num_inference_steps=num_inference_steps)
         alpha_bar = model.scheduler.alphas_cumprod
         zs = torch.zeros(size=variance_noise_shape, device=model.device)
@@ -207,7 +208,7 @@ def inversion_forward_process(
             prev_timestep = (
                 t
                 - model.scheduler.config.num_train_timesteps
-                // model.scheduler.num_inference_steps
+                // len(model.scheduler.timesteps)
             )
             alpha_prod_t_prev = (
                 model.scheduler.alphas_cumprod[prev_timestep]
@@ -243,7 +244,7 @@ def reverse_step(model, model_output, timestep, sample, eta=0, variance_noise=No
     prev_timestep = (
         timestep
         - model.scheduler.config.num_train_timesteps
-        // model.scheduler.num_inference_steps
+        // len(model.scheduler.timesteps)
     )
     # 2. compute alphas, betas
     alpha_prod_t = model.scheduler.alphas_cumprod[timestep]
@@ -311,10 +312,13 @@ def inversion_reverse_process(
 
     if etas is None:
         etas = 0
-    if type(etas) in [int, float]:
-        etas = [etas] * model.scheduler.num_inference_steps
-    assert len(etas) == model.scheduler.num_inference_steps
+    
     timesteps = model.scheduler.timesteps.to(model.device)
+    
+    if type(etas) in [int, float]:
+        # Use len(timesteps) to ensure consistency with the loop
+        etas = [etas] * len(timesteps)
+    assert len(etas) == len(timesteps)
 
     xt = xT.expand(batch_size, -1, -1, -1)
     op = tqdm(timesteps[-zs.shape[0] :]) if prog_bar else timesteps[-zs.shape[0] :]
@@ -323,9 +327,9 @@ def inversion_reverse_process(
 
     for t in op:
         idx = (
-            model.scheduler.num_inference_steps
+            len(timesteps)
             - t_to_idx[int(t)]
-            - (model.scheduler.num_inference_steps - zs.shape[0] + 1)
+            - (len(timesteps) - zs.shape[0] + 1)
         )
         ## Unconditional embedding
         with torch.no_grad():

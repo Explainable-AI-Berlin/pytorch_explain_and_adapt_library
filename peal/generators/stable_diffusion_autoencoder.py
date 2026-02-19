@@ -166,6 +166,43 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         self.sparse_dictionary = None
         if self.config.sparse_dictionary is not None:
             self.load_sparse_dictionary()
+            
+            # Check if it was actually loaded from disk (has image_mean)
+            # If not, it means the (default) weights file didn't exist yet, so we fit.
+            if getattr(self.sparse_dictionary, "image_mean", None) is None:
+                self.fit_sparse_dictionary()
+                
+            # Ensure CLIP weight identity by sharing the model instance
+            if self.sparse_dictionary is not None and hasattr(self.sparse_dictionary, 'set_clip_model'):
+                self.sparse_dictionary.set_clip_model(self.encoder.clip_model)
+
+    def __setattr__(self, name, value):
+        """Override __setattr__ to ensure dictionary consistency.
+        
+        If a new sparse_dictionary is assigned (e.g., by CFKD), we ensure
+        it inherits the correctly resolved weights_path from our config
+        if one was already established.
+        """
+        if name == "sparse_dictionary" and value is not None:
+            # If we already have a weights_path resolved in our config,
+            # ensure the new dictionary uses it.
+            if (
+                hasattr(self, "config") 
+                and self.config.sparse_dictionary is not None
+                and self.config.sparse_dictionary.weights_path
+            ):
+                if getattr(value.config, 'weights_path', None) is None:
+                    value.config.weights_path = self.config.sparse_dictionary.weights_path
+                    # If the file exists, load it immediately to avoid re-fitting or using internet mean
+                    if os.path.exists(value.config.weights_path):
+                        if getattr(value, 'image_mean', None) is None:
+                            value.load_from_disk(value.config.weights_path)
+            
+            # Also ensure weight identity for the new dictionary
+            if hasattr(self, 'encoder') and hasattr(value, 'set_clip_model'):
+                value.set_clip_model(self.encoder.clip_model)
+
+        super().__setattr__(name, value)
 
     # -------------------------------------------------------------------
     # Encode / Decode (DiDAE Algorithm 1)
@@ -336,17 +373,34 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
 
     def load_sparse_dictionary(self):
         """Load or initialize the SpLICE sparse dictionary."""
+        # Ensure dictionary has a base_path if not provided by the user
+        # We store it relative to the generator's base_path for organization
+        if (
+            self.config.sparse_dictionary is not None
+            and hasattr(self.config.sparse_dictionary, "base_path")
+            and self.config.sparse_dictionary.base_path is None
+            and self.config.base_path
+        ):
+            self.config.sparse_dictionary.base_path = os.path.join(
+                self.config.base_path, "sparse_dictionaries", self.config.sparse_dictionary.sparse_dictionaries_type
+            )
+            # weights_path is usually base_path + weights.ending
+            ending = getattr(self.config.sparse_dictionary, 'ending', '.pt')
+            self.config.sparse_dictionary.weights_path = os.path.join(
+                self.config.sparse_dictionary.base_path, "weights" + ending
+            )
+
         self.sparse_dictionary = get_sparse_dictionary(self.config.sparse_dictionary)
 
     def fit_sparse_dictionary(self):
         """Fit the SpLICE dictionary by computing dataset-specific image mean."""
-        self.sparse_dictionary = get_sparse_dictionary(self.config.sparse_dictionary)
+        self.load_sparse_dictionary()
         self.sparse_dictionary.fit_from_dataloaders(
-            [torch.utils.data.DataLoader(self.generator_datasets[1], batch_size=10)],
+            [torch.utils.data.DataLoader(self.generator_datasets[1], batch_size=64)],
             self.encoder,
         )
-        # Save
-        if hasattr(self.config.sparse_dictionary, 'base_path') and self.config.sparse_dictionary.base_path:
+        # Save results to disk
+        if self.config.sparse_dictionary.base_path:
             Path(self.config.sparse_dictionary.base_path).mkdir(parents=True, exist_ok=True)
             self.sparse_dictionary.save_on_disk(self.config.sparse_dictionary.weights_path)
             save_yaml_config(
@@ -531,7 +585,7 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         """
         if explainer_config is None or explainer_config.num_attempts == 1:
             # Simple reflection along classifier weight direction
-            b = w
+            b = w.to(z_sem.dtype)
             a = z_sem
             dot_ab = torch.sum(a * b, dim=-1, keepdim=True)
             dot_bb = torch.sum(b * b)
@@ -547,13 +601,14 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             W_all = self.sparse_dictionary.get_components()[:, :num_attempts]
 
             if component_indices is not None:
-                W = W_all[:, component_indices].to(z_sem.device)
+                W = W_all[:, component_indices].to(z_sem.device).to(z_sem.dtype)
             else:
-                W = W_all.to(z_sem.device)
+                W = W_all.to(z_sem.device).to(z_sem.dtype)
 
             # Cross-projection targeting classifier flip
-            dot_zw = torch.sum(z_sem * w, dim=-1, keepdim=True)
-            dot_uw = torch.matmul(w, W)
+            w_cast = w.to(z_sem.dtype)
+            dot_zw = torch.sum(z_sem * w_cast, dim=-1, keepdim=True)
+            dot_uw = torch.matmul(w_cast, W)
 
             eps = 1e-6
             dot_uw_safe = dot_uw.clone()
