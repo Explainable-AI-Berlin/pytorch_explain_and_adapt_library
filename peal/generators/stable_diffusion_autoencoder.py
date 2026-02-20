@@ -231,7 +231,13 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         # VAE encode
         w0 = (self.pipe.vae.encode(x0).latent_dist.mode() * 0.18215).float()
 
+        # Balanced Conditioning: Inject z_sem into a 77-token null sequence.
+        uncond_embedding = encode_text(self.pipe, [""] * batch_size)
+        z_sem_cond = uncond_embedding.clone()
+        z_sem_cond[:, 1, :] = z_sem
+
         # DDPM forward process with empty prompt (faithful encoding)
+        # Pass z_sem as encoder_hidden_states for consistency
         wT, zs, wts = inversion_forward_process(
             self.pipe,
             w0,
@@ -240,6 +246,7 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             cfg_scale=self.config.cfg_scale_src,
             prog_bar=False,
             num_inference_steps=self.config.num_diffusion_steps,
+            encoder_hidden_states=z_sem_cond,
         )
 
         return z_sem, (wT, zs, wts)
@@ -258,9 +265,11 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         z_sem, (wT, zs, wts) = z
         batch_size = z_sem.shape[0]
 
-        # Format z_sem as encoder_hidden_states for SD's UNet cross-attention.
-        # SD expects (batch, seq_len, 768). We use a single-token sequence.
-        z_sem_cond = z_sem.unsqueeze(1).to(self.device)  # (B, 1, 768)
+        # Balanced Conditioning: Inject z_sem into a 77-token null sequence.
+        # This prevents attention saturation and stabilizes CFG at high scales.
+        uncond_embedding = encode_text(self.pipe, [""] * batch_size)
+        z_sem_cond = uncond_embedding.clone()
+        z_sem_cond[:, 1, :] = z_sem
 
         # Setup attention controller
         controller = AttentionStore()
@@ -275,10 +284,11 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             xT=xT,
             etas=self.config.eta,
             prompts=batch_size * [""],
-            cfg_scales=[self.config.cfg_scale_tar],
+            cfg_scales=[self.config.cfg_scale_src],
             prog_bar=False,
             zs=zs[: (self.config.num_diffusion_steps - self.config.skip)],
             controller=controller,
+            encoder_hidden_states=z_sem_cond,
         )
 
         # VAE decode
@@ -307,12 +317,10 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         wT, zs, wts = stochastic_code
         batch_size = z_sem_modified.shape[0]
 
-        # Format modified embedding as encoder_hidden_states
-        # This replaces SD's text encoder output with our edited CLIP embedding
-        encoder_hidden_states = z_sem_modified.unsqueeze(1).to(self.device)  # (B, 1, 768)
-
-        # Also compute unconditioned embedding for classifier-free guidance
+        # Balanced Conditioning for modified embedding
         uncond_embedding = encode_text(self.pipe, [""] * batch_size)
+        encoder_hidden_states = uncond_embedding.clone()
+        encoder_hidden_states[:, 1, :] = z_sem_modified
 
         # Setup attention controller
         controller = AttentionStore()
@@ -322,9 +330,6 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         xT = wts[self.config.num_diffusion_steps - self.config.skip]
 
         # Run reverse process with the modified conditioning
-        # We call inversion_reverse_process with empty prompts but
-        # the actual conditioning comes through the modified embedding.
-        # For now, use empty prompts for compatibility with existing code.
         w0_dec, _ = inversion_reverse_process(
             self.pipe,
             xT=xT,
@@ -334,6 +339,7 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             prog_bar=False,
             zs=zs[: (self.config.num_diffusion_steps - self.config.skip)],
             controller=controller,
+            encoder_hidden_states=encoder_hidden_states,
         )
 
         # VAE decode
@@ -496,7 +502,7 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         wT, zs, wts = stochastic_code
         wT_decoding = wT.unsqueeze(1).unsqueeze(1)
         wT_decoding = wT_decoding.tile(
-            1, explainer_config.num_attempts,
+            1, z_sem_before.shape[1],
             len(explainer_config.linesearch_factors), 1, 1, 1
         )
         wT_decoding = wT_decoding.reshape([-1] + list(wT.shape[1:]))
@@ -591,17 +597,59 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             dot_bb = torch.sum(b * b)
             proj = dot_ab / dot_bb * b
             reflected = a - 2 * proj
+            
             return reflected, None, torch.norm(
                 reflected - z_sem, p=2, dim=-1, keepdim=False
             )
 
         else:
             # Multi-component reflection with linesearch
-            component_indices = range(num_attempts)
-            W_all = self.sparse_dictionary.get_components()[:, :num_attempts]
+            
+            # Allow targeted edits via predefined component strings/indices
+            component_indices = None
+            if hasattr(self.sparse_dictionary.config, "component_strings") and self.sparse_dictionary.config.component_strings is not None:
+                # Resolve base path and read vocabulary
+                base_path = os.environ.get("PEAL_BASE", "")
+                if not base_path:
+                    base_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
+                vocab_path = os.path.join(base_path, "peal", "dependencies", "SpLiCE", "data", "vocab", "laion.txt")
+
+                if os.path.exists(vocab_path):
+                    with open(vocab_path, "r") as f:
+                        vocab_list = [line.strip().lower() for line in f.readlines()]
+                    
+                    component_indices = []
+                    for search_term in self.sparse_dictionary.config.component_strings:
+                        
+                        # Find exact match first
+                        try:
+                            found_idx = vocab_list.index(search_term)
+                            component_indices.append(found_idx)
+                        except ValueError:
+                            # Fallback to substring matching
+                            found = False
+                            for i, v in enumerate(vocab_list):
+                                if search_term in v:
+                                    component_indices.append(i)
+                                    found = True
+                                    break
+                            if not found:
+                                print(f"Warning: Could not find match for {search_term} in SpLICE vocab")
+                else:
+                    print(f"Warning: SpLICE vocab not found at {vocab_path}")
+
+            if component_indices is None or len(component_indices) == 0:
+                if hasattr(explainer_config, "component_indices") and explainer_config.component_indices is not None:
+                    component_indices = explainer_config.component_indices
+                else:
+                    component_indices = range(num_attempts)
+                
+            W_all = self.sparse_dictionary.get_components()
 
             if component_indices is not None:
                 W = W_all[:, component_indices].to(z_sem.device).to(z_sem.dtype)
+                if explainer_config is not None and hasattr(explainer_config, "num_attempts"):
+                    explainer_config.num_attempts = min(len(component_indices), W.shape[1])
             else:
                 W = W_all.to(z_sem.device).to(z_sem.dtype)
 
@@ -626,7 +674,7 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             factors_expanded = line_search_factors.view(1, 1, -1, 1)
 
             z_reflected = z_base - factors_expanded * proj_expanded
-
+            
             # Distances and sorting
             distances = torch.norm(z_base - z_reflected, p=2, dim=-1)
             sorted_indices = torch.argsort(distances, dim=1)
@@ -660,32 +708,54 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         )
         Path(explanation_path).mkdir(parents=True, exist_ok=True)
 
-        # Compute component correlations
-        y_list, c_list, z_list = [], [], []
-        task_config_buffer = (
-            self.generator_datasets[1].task_config
-            if hasattr(self.generator_datasets[1], "task_config")
-            else None
-        )
-        self.generator_datasets[1].task_config = None
+        # Cache paths
+        y_list_path = os.path.join(explanation_path, "y_list.pt")
+        c_list_path = os.path.join(explanation_path, "c_list.pt")
+        z_list_path = os.path.join(explanation_path, "z_list.pt")
 
-        for idx, batch in enumerate(
-            torch.utils.data.DataLoader(self.generator_datasets[1], batch_size=10)
-        ):
-            print(f"{10 * idx}/{len(self.generator_datasets[1])}")
-            x, y = batch
-            z, _ = self.encode(x.to(self.device))
-            c = z @ self.sparse_dictionary.get_components().to(self.device)
-            y_list.append(y)
-            c_list.append(c.detach().cpu())
-            z_list.append(z.detach().cpu())
+        # Compute or load component correlations
+        if os.path.exists(y_list_path) and os.path.exists(c_list_path) and os.path.exists(z_list_path):
+            print(f"Loading cached component correlations from {explanation_path}...")
+            y_list = torch.load(y_list_path)
+            c_list = torch.load(c_list_path)
+            z_list = torch.load(z_list_path)
+        else:
+            print("Calculating component correlations (this may take a while)...")
+            y_list, c_list, z_list = [], [], []
+            task_config_buffer = (
+                self.generator_datasets[1].task_config
+                if hasattr(self.generator_datasets[1], "task_config")
+                else None
+            )
+            self.generator_datasets[1].task_config = None
 
-        self.generator_datasets[1].task_config = task_config_buffer
+            for idx, batch in enumerate(
+                torch.utils.data.DataLoader(self.generator_datasets[1], batch_size=10)
+            ):
+                print(f"{10 * idx}/{len(self.generator_datasets[1])}")
+                x, y = batch
+                z, _ = self.encode(x.to(self.device))
+                c = z @ self.sparse_dictionary.get_components().to(self.device).to(z.dtype)
+                y_list.append(y)
+                c_list.append(c.detach().cpu())
+                z_list.append(z.detach().cpu())
+
+            self.generator_datasets[1].task_config = task_config_buffer
+            
+            print(f"Saving computed correlations to {explanation_path}...")
+            torch.save(y_list, y_list_path)
+            torch.save(c_list, c_list_path)
+            torch.save(z_list, z_list_path)
 
         # Visualize individual components
+        # Default to all components if n_components is not specified or <= 0
+        n_comps = self.config.sparse_dictionary.n_components
+        if n_comps is None or n_comps <= 0:
+            n_comps = self.sparse_dictionary.get_components().shape[1]
+            
         for component_idx in range(
             min(
-                self.config.sparse_dictionary.n_components or 0,
+                n_comps,
                 self.sparse_dictionary.get_components().shape[1],
             )
         ):

@@ -139,9 +139,16 @@ def inversion_forward_process(
     cfg_scale=3.5,
     num_inference_steps=50,
     eps=None,
+    encoder_hidden_states=None,
 ):
-    if not prompt == "":
+    if not encoder_hidden_states is None:
+        text_embeddings = encoder_hidden_states
+    
+    elif not prompt == "":
         text_embeddings = encode_text(model, prompt)
+    
+    else:
+        text_embeddings = None
 
     uncond_embedding = encode_text(model, [""] * x0.shape[0])
     timesteps = model.scheduler.timesteps.to(model.device)
@@ -182,12 +189,12 @@ def inversion_forward_process(
             out = model.unet.forward(
                 xt, timestep=t, encoder_hidden_states=uncond_embedding
             )
-            if not prompt == "":
+            if not text_embeddings is None:
                 cond_out = model.unet.forward(
                     xt, timestep=t, encoder_hidden_states=text_embeddings
                 )
 
-        if not prompt == "":
+        if not text_embeddings is None:
             ## classifier free guidance
             noise_pred = out.sample + cfg_scale * (cond_out.sample - out.sample)
         else:
@@ -298,13 +305,17 @@ def inversion_reverse_process(
     classifier=None,
     classifier_scale=0.0,
     asyrp=False,
+    encoder_hidden_states=None,
 ):
     batch_size = len(prompts)
 
     cfg_scales_tensor = torch.Tensor(cfg_scales).view(-1, 1, 1, 1).to(model.device)
 
     uncond_embedding = encode_text(model, [""] * batch_size)
-    if prompts == "":
+    if not encoder_hidden_states is None:
+        text_embeddings = encoder_hidden_states
+    
+    elif prompts == "":
         text_embeddings = uncond_embedding
 
     else:

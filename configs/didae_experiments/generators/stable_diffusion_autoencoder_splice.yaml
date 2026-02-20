@@ -1,4 +1,6 @@
 # python train_generator.py --config "<PEAL_BASE>/configs/didae_experiments/generators/stable_diffusion_autoencoder_splice.yaml"
+# python run_component_analysis.py --config $PEAL_RUNS/celeba/stable_diffusion_autoencoder_splice/config.yaml --sd_config configs/didae_experiments/sparse_dictionaries/splice_clip_vit_l_14.yaml
+# python run_component_analysis.py --config "<PEAL_BASE>/configs/didae_experiments/generators/stable_diffusion_autoencoder_splice.yaml" --sd_config configs/didae_experiments/sparse_dictionaries/splice_clip_vit_l_14.yaml
 category: generator
 generator_type: StableDiffusionAutoencoder
 model_id: "CompVis/stable-diffusion-v1-4"
