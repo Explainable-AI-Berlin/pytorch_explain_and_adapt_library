@@ -1,0 +1,19 @@
+# python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/clarc/skincon_1k_poisoned098_pclarc.yaml"
+adaptor_type                         :  "ClarC"
+category                             :  "adaptor"
+batch_size                           :  100
+tracking_level                       :  1
+calculate_group_accuracies           :  True
+data                                 :  <PEAL_BASE>/configs/cfkd_experiments/data/skincon_1k_poisoned098.yaml
+test_data                            :  <PEAL_BASE>/configs/cfkd_experiments/data/skincon_unpoisoned.yaml
+student                              :  $PEAL_RUNS/skincon_1k/classifier_poisoned098/model.cpl
+generator                            :  $PEAL_RUNS/skincon_1k/ddpm/config.yaml
+base_dir                             :  $PEAL_RUNS/skincon_1k/classifier_poisoned098/pclarc
+method                               :  "pclarc"
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [label]
