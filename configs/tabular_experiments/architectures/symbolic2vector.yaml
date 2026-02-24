@@ -1,0 +1,10 @@
+config_name : ArchitectureConfig
+layers : [
+  {config_name: FCConfig, num_neurons: 512, dropout: 0.25},
+  {config_name: FCConfig, num_neurons: 512, dropout: 0.5},
+]
+#layers : [
+#  [fc, 512, 0.25],
+#  [fc, 512, 0.5]
+#]
+activation              : ReLU

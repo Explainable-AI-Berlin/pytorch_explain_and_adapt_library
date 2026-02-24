@@ -68,9 +68,9 @@ class BasicDiscreteTimeModel(nn.Module):
         return self.score_network(x, time_embed)
 
 
-class CircleDiffusionAdaptor(EditCapableGenerator):
+class TabularDDPM(EditCapableGenerator):
     def __init__(self, config, dataset, model_dir=None, device="cpu"):
-        super(CircleDiffusionAdaptor, self).__init__()
+        super(TabularDDPM, self).__init__()
         # self.config = load_yaml_config(config)
         self.config = config
 
@@ -170,7 +170,7 @@ class CircleDiffusionAdaptor(EditCapableGenerator):
 
         return denoised_x
 
-    def train_and_load_diffusion(self, model_name="diffusion.pt", mode=None):
+    def train_model(self, model_name="diffusion.pt", mode=None):
         self.model_path = os.path.join(self.model_dir, model_name)
         model = BasicDiscreteTimeModel(
             input_dim=self.config.input_dim,

@@ -1,0 +1,5 @@
+# python train_generator.py --config configs/tabular_experiments/generators/circle_diffusion.yaml
+generator_type : TabularDDPM
+category : generator
+base_path : $PEAL_RUNS/circle/ddpm
+data              : <PEAL_BASE>/configs/tabular_experiments/data/circle_dataset_diffusion_poisoned.yaml

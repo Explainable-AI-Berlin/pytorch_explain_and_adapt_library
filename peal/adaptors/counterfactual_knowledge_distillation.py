@@ -953,7 +953,10 @@ class CFKD(Adaptor):
             self.base_dir, str(self.adaptor_config.current_iteration), "distilled_predictor"
         )
         distilled_predictor_final = os.path.join(distillation_path, "distilled_predictor", "model.cpl")
-        if not os.path.exists(distilled_predictor_final):
+        if not self.adaptor_config.calculate_explainer_stats:
+            self.distilled_predictor = self.student
+
+        elif not os.path.exists(distilled_predictor_final):
             self.distilled_predictor = distill_predictor(
                 predictor_distillation,
                 distillation_path,
@@ -972,7 +975,7 @@ class CFKD(Adaptor):
             cprint("retrieve feedback!", self.adaptor_config.tracking_level, 2)
             feedback = self.teacher.get_feedback(
                 base_dir=os.path.join(self.base_dir, str(finetune_iteration), mode + "_teacher"),
-                student=self.distilled_predictor,
+                student=self.distilled_predictor, # TODO including this introduces some inconsistencies that should be tracked!
                 num_clusters=self.adaptor_config.explainer.num_attempts
                 * self.adaptor_config.explainer.parallel_attempts,
                 mode=mode,
@@ -1009,18 +1012,12 @@ class CFKD(Adaptor):
         else:
             flip_rate_reference = num_samples
 
-        try:
-            flipped_samples = list(
-                filter(
-                    lambda x: x >= 0.51,
-                    tracked_values["y_target_end_confidence_list"][:num_samples],
-                )
+        flipped_samples = list(
+            filter(
+                lambda x: x >= 0.51,
+                tracked_values["y_target_end_confidence_list"][:num_samples],
             )
-
-        except Exception:
-            import pdb
-
-            pdb.set_trace()
+        )
 
         flip_rate = len(flipped_samples) / flip_rate_reference
         ood_rate = len(list(filter(lambda sample: sample == "ood", feedback))) / num_samples

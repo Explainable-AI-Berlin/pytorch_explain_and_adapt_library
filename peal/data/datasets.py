@@ -27,7 +27,6 @@ class SymbolicDataset(PealDataset):
 
     def __init__(
         self,
-        data_dir,
         mode,
         config,
         transform=ToTensor(),
@@ -47,8 +46,7 @@ class SymbolicDataset(PealDataset):
         self.config = config
         self.transform = transform
         self.task_config = task_config
-        if data_dir[-4:] != ".csv":
-            data_dir = data_dir + ".csv"
+        data_dir = os.path.join(config.dataset_path, "data.csv")
 
         self.attributes, self.data, self.keys = parse_csv(
             data_dir=data_dir,

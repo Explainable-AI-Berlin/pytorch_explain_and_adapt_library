@@ -716,13 +716,15 @@ class CircleDatasetGenerator:
 
     def __init__(
         self,
-        dataset_name,
+        config=None,
+        dataset_name=None,
         dataset_origin_path="datasets",
         num_samples=1024,
         radius=1,
         noise_scale=0.0,
         # false_confounder_percentage=0.0,
         seed=0,
+        **kwargs,
     ):
         """
         Initiates the dataset parameters
@@ -737,24 +739,33 @@ class CircleDatasetGenerator:
         """
 
         self.data = None
-        self.dataset_name = dataset_name
-        self.dataset_origin_path = dataset_origin_path
-        self.dataset_dir = os.path.join(self.dataset_origin_path, self.dataset_name)
+        if config is None:
+            self.dataset_dir = config.dataset_path
+
+        else:
+            if dataset_name is None:
+                dataset_name = (
+                    "size_"
+                    + str(self.num_samples)
+                    + "_"
+                    + "radius_"
+                    + str(round(radius, 1))
+                    + "_"
+                    + "seed_"
+                    + str(seed)
+                )
+            
+            else:
+                self.dataset_name = dataset_name
+
+            self.dataset_origin_path = dataset_origin_path
+            self.dataset_dir = os.path.join(self.dataset_origin_path, self.dataset_name)
+
         self.num_samples = num_samples
         self.radius = radius
         self.noise_scale = noise_scale
         self.seed = seed
-        name = (
-            "size_"
-            + str(self.num_samples)
-            + "_"
-            + "radius_"
-            + str(round(radius, 1))
-            + "_"
-            + "seed_"
-            + str(seed)
-        )
-        self.label_dir = os.path.join(self.dataset_dir, name + ".csv")
+        self.label_dir = os.path.join(self.dataset_dir, "data.csv")
 
     def generate_dataset(self):
         """

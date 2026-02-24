@@ -173,6 +173,18 @@ python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/cl
 cat ${PEAL_RUNS}/nico_plus_plus_1k/classifier_poisoned098/rrclarc/best_model_result.txt
 
 
+# Experiments on tabular datasets
+# Circle dataset
+python train_predictor.py --config configs/tabular_experiments/models/symbolic_circle_classifier_unpoisoned.yaml
+python train_generator.py --config configs/tabular_experiments/generators/circle_diffusion.yaml
+python train_predictor.py --config configs/tabular_experiments/models/symbolic_circle_classifier_poisoned.yaml
+python run_cfkd.py --config configs/tabular_experiments/adaptors/circle_cfkd.yaml
+
+
+
+
+
+
 # Experiments over different poisoning levels
 # on Square dataset
 # for 50% poisoning (corresponds to 0.0 correlation)
