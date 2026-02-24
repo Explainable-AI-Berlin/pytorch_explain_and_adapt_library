@@ -1,3 +1,4 @@
+explainer_type                       :   SCEConfig
 explanation_style                    :   counterfactual
 learning_rate                        :   0.001 # [0.01, 0.001]
 gradient_steps                       :   31 # [31, 51]

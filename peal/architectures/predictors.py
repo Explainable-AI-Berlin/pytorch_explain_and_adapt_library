@@ -29,7 +29,10 @@ def get_predictor(predictor, device="cuda"):
 
     elif isinstance(predictor, str):
         if predictor[-4:] == ".cpl":
-            return torch.load(predictor, map_location=device), None
+            try:
+                return torch.load(predictor, map_location=device), None
+            except Exception:
+                return torch.load(predictor, map_location=device, weights_only=False), None
 
         elif predictor[-5:] == ".onnx":
             import onnxruntime as ort
@@ -63,7 +66,11 @@ def get_predictor(predictor, device="cuda"):
 
         else:
             model_path = os.path.join(predictor_config.model_path, "model.cpl")
-            predictor_out = torch.load(model_path, map_location=device)
+            try:
+                predictor_out = torch.load(model_path, map_location=device)
+            except Exception:
+                # Fallback for PyTorch 2.6+ defaults that block loading custom objects
+                predictor_out = torch.load(model_path, map_location=device, weights_only=False)
 
         return predictor_out, predictor_config
 
@@ -88,10 +95,17 @@ def load_model(
         The loaded model.
     """
     model = SequentialModel(model_config, input_channels, output_channels)
-    checkpoint = torch.load(
-        os.path.join(model_path, "checkpoints", "final.cpl"),
-        map_location=torch.device(device),
-    )
+    try:
+        checkpoint = torch.load(
+            os.path.join(model_path, "checkpoints", "final.cpl"),
+            map_location=torch.device(device),
+        )
+    except Exception:
+        checkpoint = torch.load(
+            os.path.join(model_path, "checkpoints", "final.cpl"),
+            map_location=torch.device(device),
+            weights_only=False
+        )
     model.load_state_dict(checkpoint)
 
     return model.to(device)
@@ -169,220 +183,6 @@ class SequentialModel(torch.nn.Sequential):
         super(SequentialModel, self).__init__(*layers)
 
 
-'''class TorchvisionModel(torch.nn.Module):
-    def __init__(self, model, num_classes, input_size=None, config=None):
-        super(TorchvisionModel, self).__init__()
-        self.config = config
-        self.model_type = model
-        if model == "resnet18":
-            self.model = torchvision.models.resnet18(pretrained=True)
-            self.model.fc = torch.nn.Linear(self.model.fc.in_features, num_classes)
-
-        elif model == "resnet50":
-            self.model = torchvision.models.resnet50(pretrained=True)
-            self.model.fc = torch.nn.Linear(self.model.fc.in_features, num_classes)
-
-        elif model == "dino_v2_small":
-            self.model = AutoModel.from_pretrained("facebook/dinov2-small")
-            self.processor = AutoImageProcessor.from_pretrained("facebook/dinov2-small")
-            self.fc = torch.nn.Linear(384, num_classes)
-
-        elif model == "dino_v2_base":
-            self.model = AutoModel.from_pretrained("facebook/dinov2-base")
-            self.processor = AutoImageProcessor.from_pretrained("facebook/dinov2-base")
-            self.fc = torch.nn.Linear(768, num_classes)
-
-        elif model == "dino_v2":
-            self.model = AutoModel.from_pretrained("facebook/dinov2-large")
-            self.fc = torch.nn.Linear(1024, num_classes)
-            self.processor = AutoImageProcessor.from_pretrained("facebook/dinov2-large")
-
-        elif model == "UNI":
-            import timm
-            from timm.data import resolve_data_config
-            from timm.data.transforms_factory import create_transform
-            from huggingface_hub import login
-
-            login()  # login with your User Access Token, found at https://huggingface.co/settings/tokens
-
-            # pretrained=True needed to load UNI weights (and download weights for the first time)
-            # init_values need to be passed in to successfully load LayerScale parameters (e.g. - block.0.ls1.gamma)
-            self.model = timm.create_model(
-                "hf-hub:MahmoodLab/uni",
-                pretrained=True,
-                init_values=1e-5,
-                dynamic_img_size=True,
-            )
-            self.transform = create_transform(
-                **resolve_data_config(self.model.pretrained_cfg, model=self.model)
-            )
-            self.fc = torch.nn.Linear(1024, num_classes)
-
-        elif model == "vit_b_16":
-            self.model = torchvision.models.vit_b_16()
-            # Modify the patch embedding layer
-            kernel_size = 16
-            """
-                kernel_size = min(16, input_size // 8)
-                self.model.conv_proj = torch.nn.Conv2d(
-                    in_channels=3,
-                    out_channels=self.model.conv_proj.out_channels,
-                    kernel_size=kernel_size,  # changed from 16 to 8
-                    stride=kernel_size,  # changed from 16 to 8
-                    padding=0,
-                    bias=False,
-                )"""
-
-            if input_size and not input_size == 224:
-                # Modify the positional embedding
-                num_patches = (
-                    input_size // kernel_size
-                ) ** 2 + 1  # 64 patches + class token
-                if num_patches < self.model.encoder.pos_embedding.shape[1]:
-                    self.model.encoder.pos_embedding = torch.nn.Parameter(
-                        self.model.encoder.pos_embedding[:, :num_patches]
-                    )
-                else:
-                    self.model.encoder.pos_embedding = torch.nn.Parameter(
-                        torch.zeros(
-                            1, num_patches, self.model.encoder.pos_embedding.shape[2]
-                        )
-                    )
-                    # reinitialize the positional embedding to random values.
-                    torch.nn.init.trunc_normal_(
-                        self.model.encoder.pos_embedding, std=0.02
-                    )
-
-            if num_classes != 1000:
-                self.model.heads.head = torch.nn.Linear(
-                    self.model.heads.head.in_features, num_classes
-                )
-
-        else:
-            raise ValueError("Unknown model: {}".format(model))
-
-    def _process_input(self, x: torch.Tensor) -> torch.Tensor:
-        n, c, h, w = x.shape
-        p = self.model.patch_size
-        n_h = h // p
-        n_w = w // p
-
-        # (n, c, h, w) -> (n, hidden_dim, n_h, n_w)
-        x = self.model.conv_proj(x)
-        # (n, hidden_dim, n_h, n_w) -> (n, hidden_dim, (n_h * n_w))
-        x = x.reshape(n, self.model.hidden_dim, n_h * n_w)
-
-        # (n, hidden_dim, (n_h * n_w)) -> (n, (n_h * n_w), hidden_dim)
-        # The self attention layer expects inputs in the format (N, S, E)
-        # where S is the source sequence length, N is the batch size, E is the
-        # embedding dimension
-        x = x.permute(0, 2, 1)
-
-        return x
-
-    def feature_extractor(self, x):
-        if (
-            not hasattr(self, "model_type")
-            or self.model_type[: len("resnet")] == "resnet"
-        ):
-            submodules = list(self.children())
-            while len(submodules) == 1:
-                submodules = list(submodules[0].children())
-
-            feature_extractor = torch.nn.Sequential(*submodules[:-1])
-            return feature_extractor(x)
-
-        elif self.model_type[:len("dino_v2")] == "dino_v2":
-            cs = self.processor.crop_size
-            x_resized = torchvision.transforms.Resize([cs["height"], cs["width"]])(x)
-
-            def pv(v):
-                v = torch.tensor(v).to(x_resized)[:, None, None]
-                return torch.tile(v, [1, cs["height"], cs["width"]])
-
-            x_processed = (x_resized - pv(self.processor.image_mean)) / pv(
-                self.processor.image_std
-            )
-            latent_code = self.model(x_processed)["last_hidden_state"][:, 0]
-            return latent_code
-
-        elif self.model_type == "UNI":
-            x_processed = self.transform(x)
-            latent_code = self.model(x_processed)
-            return latent_code
-
-        else:
-            # Reshape and permute the input tensor
-            try:
-                x = self._process_input(x)
-            except:
-                import pdb; pdb.set_trace()
-            n = x.shape[0]
-
-            # Expand the class token to the full batch
-            batch_class_token = self.model.class_token.expand(n, -1, -1)
-            x = torch.cat([batch_class_token, x], dim=1)
-            # torch.Size([128, 197, 768])
-            x = self.model.encoder(x)
-
-            # Classifier "token" as used by standard language architectures
-            x = x[:, 0]
-
-            return x
-
-    def get_last_layer(self):
-        if (
-            not hasattr(self, "model_type")
-            or self.model_type[: len("resnet")] == "resnet"
-        ):
-            return self.model.fc
-
-        elif self.model_type in ["dino_v2", "UNI"]:
-            return self.fc
-
-    def forward(self, x: torch.Tensor, return_latents: bool = False):
-        if (
-            not hasattr(self, "model_type")
-            or self.model_type[: len("resnet")] == "resnet"
-        ):
-            if return_latents:
-                latent_code = self.feature_extractor(x)
-                latent_code = latent_code.squeeze(-1).squeeze(-1)
-                x_out = self.model.fc(latent_code)
-                return latent_code, x_out
-
-            else:
-                return self.model(x)
-
-        elif self.model_type in ["dino_v2", "UNI", "dino_v2_small", "dino_v2_base"]:
-            # xt = self.processor(x)['pixel_values']
-            latent_code = self.feature_extractor(x)
-            x_out = self.fc(latent_code)
-            if return_latents:
-                return latent_code, x_out
-
-            else:
-                return x_out
-
-        else:
-            # Reshape and permute the input tensor
-            x = self._process_input(x)
-            n = x.shape[0]
-
-            # Expand the class token to the full batch
-            batch_class_token = self.model.class_token.expand(n, -1, -1)
-            x = torch.cat([batch_class_token, x], dim=1)
-            # torch.Size([128, 197, 768])
-            x = self.model.encoder(x)
-
-            # Classifier "token" as used by standard language architectures
-            x = x[:, 0]
-
-            x = self.model.heads(x)
-
-            return x'''
-
-
 class TorchvisionModel(torch.nn.Module):
     def __init__(self, model, num_classes, input_size=None, config=None):
         super(TorchvisionModel, self).__init__()
@@ -399,7 +199,10 @@ class TorchvisionModel(torch.nn.Module):
             self.model.fc = torch.nn.Linear(self.model.fc.in_features, num_classes, bias=False)
 
         elif model == "resnet_loaded":
-            self.model = torch.load(self.config.base_model, map_location="cpu")
+            try:
+                self.model = torch.load(self.config.base_model, map_location="cpu")
+            except Exception:
+                self.model = torch.load(self.config.base_model, map_location="cpu", weights_only=False)
             self.model.model.fc = torch.nn.Linear(self.model.model.fc.in_features, num_classes, bias=False)
 
         # --- DINOv2 ---
@@ -637,4 +440,4 @@ class TorchvisionModel(torch.nn.Module):
             x = self.model.encoder(x)
             x = x[:, 0]
             x = self.model.heads(x)
-            return x
+        # --- ViT ---

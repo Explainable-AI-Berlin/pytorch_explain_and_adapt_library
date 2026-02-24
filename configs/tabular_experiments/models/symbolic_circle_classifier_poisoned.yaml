@@ -1,5 +1,5 @@
 # python train_predictor.py --config configs/tabular_experiments/models/symbolic_circle_classifier_poisoned.yaml
-base_path         : $PEAL_RUNS/circle/classifier_poisoned
+model_path        : $PEAL_RUNS/circle/classifier_poisoned
 data              : <PEAL_BASE>/configs/tabular_experiments/data/circle_dataset_diffusion_poisoned.yaml
 training          : <PEAL_BASE>/configs/tabular_experiments/training/symbolic_classifier.yaml
 architecture      : <PEAL_BASE>/configs/tabular_experiments/architectures/symbolic2vector.yaml

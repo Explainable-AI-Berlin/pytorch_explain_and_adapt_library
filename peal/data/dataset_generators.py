@@ -739,32 +739,33 @@ class CircleDatasetGenerator:
         """
 
         self.data = None
-        if config is None:
+        if config is not None:
             self.dataset_dir = config.dataset_path
-
+            self.num_samples = config.num_samples
+            self.radius = getattr(config, "radius", radius)
+            self.noise_scale = getattr(config, "noise_scale", noise_scale)
+            self.seed = getattr(config, "seed", seed)
         else:
+            self.num_samples = num_samples
+            self.radius = radius
+            self.noise_scale = noise_scale
+            self.seed = seed
+            
             if dataset_name is None:
                 dataset_name = (
                     "size_"
                     + str(self.num_samples)
                     + "_"
                     + "radius_"
-                    + str(round(radius, 1))
+                    + str(round(self.radius, 1))
                     + "_"
                     + "seed_"
-                    + str(seed)
+                    + str(self.seed)
                 )
-            
-            else:
-                self.dataset_name = dataset_name
-
+            self.dataset_name = dataset_name
             self.dataset_origin_path = dataset_origin_path
             self.dataset_dir = os.path.join(self.dataset_origin_path, self.dataset_name)
 
-        self.num_samples = num_samples
-        self.radius = radius
-        self.noise_scale = noise_scale
-        self.seed = seed
         self.label_dir = os.path.join(self.dataset_dir, "data.csv")
 
     def generate_dataset(self):

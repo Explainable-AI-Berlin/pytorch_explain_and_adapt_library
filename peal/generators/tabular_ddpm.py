@@ -11,7 +11,24 @@ from typing import Tuple
 import logging
 from torch.utils.data import DataLoader
 import math
-from peal.generators.interfaces import EditCapableGenerator
+from peal.generators.interfaces import EditCapableGenerator, GeneratorConfig
+from peal.data.interfaces import DataConfig
+import typing
+
+class TabularDDPMConfig(GeneratorConfig):
+    generator_type: str = "TabularDDPM"
+    input_dim: int = 2
+    embed_dim: int = 64
+    num_timesteps: int = 1000
+    model_name: str = "diffusion.pt"
+    var_schedule: str = "linear"
+    base_path: str = ""
+    num_epochs: int = 100
+    learning_rate: float = 1e-3
+    grad_scales: typing.List[float] = [1.0]
+    noise_steps_for_counterfactuals: typing.List[int] = [100]
+    attack_iterations: int = 1
+    data: DataConfig = DataConfig()
 
 logging.getLogger().setLevel(logging.INFO)
 
@@ -69,7 +86,7 @@ class BasicDiscreteTimeModel(nn.Module):
 
 
 class TabularDDPM(EditCapableGenerator):
-    def __init__(self, config, dataset, model_dir=None, device="cpu"):
+    def __init__(self, config, dataset=None, model_dir=None, device="cpu", **kwargs):
         super(TabularDDPM, self).__init__()
         # self.config = load_yaml_config(config)
         self.config = config
@@ -93,6 +110,10 @@ class TabularDDPM(EditCapableGenerator):
         except KeyError:
             pass
 
+        if dataset is None:
+            from peal.data.dataset_factory import get_datasets
+            dataset = get_datasets(config.data)[0]
+
         self.dataset = dataset
         self.input_idx = [
             idx
@@ -107,7 +128,7 @@ class TabularDDPM(EditCapableGenerator):
         # data = torch.zeros([len(dataset.data),len(dataset.attributes)], dtype=torch.float16)
         # for idx, key in enumerate(dataset.data):
         #    data[idx] = dataset.data[key]
-        self.train_and_load_diffusion(model_name=config.model_name)
+
 
         def schedules(num_timesteps: int, type: str = "linear"):
             scale = 1000 / num_timesteps
@@ -136,14 +157,16 @@ class TabularDDPM(EditCapableGenerator):
         self.register_buffer("alpha", 1 - self.beta)
         self.register_buffer("alpha_bar", self.alpha.cumprod(0))
 
+        self.train_model(model_name=config.model_name)
+
     def forward_diffusion(
         self, clean_x: torch.Tensor, noise: torch.tensor, timestep: torch.Tensor
     ):
         if isinstance(timestep, int):
             timestep = torch.tensor([timestep])
-            alpha_bar_t = self.alpha_bar[timestep].repeat(clean_x.shape[0])[:, None]
+            alpha_bar_t = self.alpha_bar[timestep].repeat(clean_x.shape[0])[:, None].to(clean_x.device)
         else:
-            alpha_bar_t = self.alpha_bar[timestep][:, None]
+            alpha_bar_t = self.alpha_bar[timestep][:, None].to(clean_x.device)
         mu = torch.sqrt(alpha_bar_t)
         std = torch.sqrt(1 - alpha_bar_t)
         noisy_x = mu * clean_x + std * noise
@@ -152,8 +175,8 @@ class TabularDDPM(EditCapableGenerator):
     def reverse_diffusion_ddpm(
         self, noisy_x: torch.Tensor, model: nn.Module, timestep: torch.Tensor
     ):
-        alpha_t = self.alpha[timestep].repeat(noisy_x.shape[0])[:, None]
-        alpha_bar_t = self.alpha_bar[timestep].repeat(noisy_x.shape[0])[:, None]
+        alpha_t = self.alpha[timestep].repeat(noisy_x.shape[0])[:, None].to(noisy_x.device)
+        alpha_bar_t = self.alpha_bar[timestep].repeat(noisy_x.shape[0])[:, None].to(noisy_x.device)
         beta_t = 1 - alpha_t
         eps_hat = model(x=noisy_x, t=timestep)
         posterior_mean = (1 / torch.sqrt(alpha_t)) * (
@@ -170,13 +193,15 @@ class TabularDDPM(EditCapableGenerator):
 
         return denoised_x
 
-    def train_model(self, model_name="diffusion.pt", mode=None):
+    def train_model(self, model_name="diffusion.pt", mode="train"):
         self.model_path = os.path.join(self.model_dir, model_name)
         model = BasicDiscreteTimeModel(
             input_dim=self.config.input_dim,
             embed_dim=self.config.embed_dim,
             num_timesteps=self.config.num_timesteps,
         )
+        if not os.path.exists(self.model_dir):
+            os.makedirs(self.model_dir)
         if model_name in os.listdir(self.model_dir) and not mode == "train":
             model.load_state_dict(torch.load(self.model_path))
             logging.info(f"Model found with path {self.model_path}")
@@ -214,6 +239,9 @@ class TabularDDPM(EditCapableGenerator):
             return epoch_loss / len(dataloader.dataset)
 
         if mode == "train":
+            from torch.utils.tensorboard import SummaryWriter
+            import matplotlib.pyplot as plt
+            writer = SummaryWriter(os.path.join(self.model_dir, "logs"))
             model.train()
             # num_epochs = self.config['num_epochs']
             num_epochs = self.config.num_epochs
@@ -235,9 +263,25 @@ class TabularDDPM(EditCapableGenerator):
 
                 train_loss = epoch_loss / len(dataloader.dataset)
                 print(f"Epoch: {i}, train_loss: {train_loss}")
-                losses.append(train_loss.detach().numpy())
+                writer.add_scalar("Loss/train", train_loss, i)
+                losses.append(train_loss.detach().cpu().numpy())
+
+                if i % 10 == 0 or i == num_epochs - 1:
+                    model.eval()
+                    with torch.no_grad():
+                        sample_x = self.sample_ddpm(model, n_samples=min(1000, len(self.dataset)))[-1].cpu().numpy()
+                        real_x = next(iter(dataloader))[0][:, self.input_idx].cpu().numpy()
+                        fig, ax = plt.subplots()
+                        ax.scatter(real_x[:, 0], real_x[:, 1], alpha=0.5, label="Real Data", color="blue")
+                        ax.scatter(sample_x[:, 0], sample_x[:, 1], alpha=0.5, label="Generated Data", color="orange")
+                        ax.legend()
+                        writer.add_figure("Generated Data vs Real", fig, i)
+                        plt.close(fig)
+                    model.train()
 
             torch.save(model.state_dict(), self.model_path)
+            from peal.global_utils import save_yaml_config
+            save_yaml_config(self.config, os.path.join(self.model_dir, "config.yaml"))
 
         self.model = model
 
@@ -248,7 +292,7 @@ class TabularDDPM(EditCapableGenerator):
         """
         model.eval()
         x_pred = []
-        x = torch.randn(n_samples, self.input_dim)
+        x = torch.randn(n_samples, self.input_dim).to(next(model.parameters()).device)
         x_pred.append(x)
 
         with torch.no_grad():

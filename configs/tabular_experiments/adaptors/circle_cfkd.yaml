@@ -4,12 +4,12 @@ min_train_samples                    :  8 #hyperparameter as proportion of the f
 mixing_ratio                         :  0.5 # 1 `only new dataset, 0 `only old dataset
 finetune_iterations                  :  5 #hyperparameter
 max_validation_samples               :  8
-continuous_learning                  :  False
+continuous_learning                  :  "False"
 replace_model                        :  True
-explainer                            :  <PEAL_BASE>/configs/explainers/counterfactual_default.yaml
-training                             :  <PEAL_BASE>/configs/training/symbolic_classifier.yaml
-data                                 :  <PEAL_BASE>/configs/data/circle_dataset_diffusion_poisoned.yaml
-test_data                            :  <PEAL_BASE>/configs/data/circle_dataset_diffusion_unpoisoned.yaml
+explainer                            :  <PEAL_BASE>/configs/tabular_experiments/explainers/counterfactual_default.yaml
+training                             :  <PEAL_BASE>/configs/tabular_experiments/training/symbolic_classifier.yaml
+data                                 :  <PEAL_BASE>/configs/tabular_experiments/data/circle_dataset_diffusion_poisoned.yaml
+test_data                            :  <PEAL_BASE>/configs/tabular_experiments/data/circle_dataset_diffusion_unpoisoned.yaml
 student                              :  $PEAL_RUNS/circle/classifier_poisoned/model.cpl
 teacher                              :  $PEAL_RUNS/circle/classifier_unpoisoned/model.cpl
 generator                            :  $PEAL_RUNS/circle/ddpm/config.yaml
