@@ -1,5 +1,5 @@
 # python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/clarc/skincon_1k_poisoned098_rrclarc.yaml"
-adaptor_type                         :  "ClarC"
+adaptor_type                         :  "ClArC"
 category                             :  "adaptor"
 batch_size                           :  100
 tracking_level                       :  1

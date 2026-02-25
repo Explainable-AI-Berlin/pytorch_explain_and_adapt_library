@@ -702,10 +702,17 @@ class CFKD(Adaptor):
                     self.adaptor_config.tracking_level,
                     2,
                 )
-                self.student = torch.load(
-                    os.path.join(self.adaptor_config.base_dir, "model.cpl"),
-                    map_location=self.device,
-                )
+                try:
+                    self.student = torch.load(
+                        os.path.join(self.adaptor_config.base_dir, "model.cpl"),
+                        map_location=self.device,
+                    )
+                except Exception:
+                    self.student = torch.load(
+                        os.path.join(self.adaptor_config.base_dir, "model.cpl"),
+                        map_location=self.device,
+                        weights_only=False
+                    )
                 self.explainer.predictor = self.student
 
         visualization_path = os.path.join(self.base_dir, "visualization.png")
@@ -967,7 +974,10 @@ class CFKD(Adaptor):
             )
 
         else:
-            self.distilled_predictor = torch.load(distilled_predictor_final, map_location=self.device)
+            try:
+                self.distilled_predictor = torch.load(distilled_predictor_final, map_location=self.device)
+            except Exception:
+                self.distilled_predictor = torch.load(distilled_predictor_final, map_location=self.device, weights_only=False)
 
         if self.overwrite or not os.path.exists(
             os.path.join(self.base_dir, str(finetune_iteration), mode + "_feedback.txt")
@@ -1395,15 +1405,27 @@ class CFKD(Adaptor):
                 for val_dataloader in self.joint_validation_dataloader.dataloaders:
                     val_dataloader.dataset.enable_idx()
 
-        self.student = torch.load(
-            os.path.join(
-                self.base_dir,
-                str(finetune_iteration),
-                "finetuned_model",
-                "model.cpl",
-            ),
-            map_location=self.device,
-        )
+        try:
+            self.student = torch.load(
+                os.path.join(
+                    self.base_dir,
+                    str(finetune_iteration),
+                    "finetuned_model",
+                    "model.cpl",
+                ),
+                map_location=self.device,
+            )
+        except Exception:
+            self.student = torch.load(
+                os.path.join(
+                    self.base_dir,
+                    str(finetune_iteration),
+                    "finetuned_model",
+                    "model.cpl",
+                ),
+                map_location=self.device,
+                weights_only=False
+            )
         self.explainer.predictor = self.student
         self.explainer.predictor_datasources = [
             self.dataloader_mixer,

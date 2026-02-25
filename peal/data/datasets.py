@@ -122,11 +122,23 @@ class SymbolicDataset(PealDataset):
 
         return x_list, collage_paths
 
-    def serialize_dataset(self, output_dir, x_list, y_list, sample_names=None):
+    def serialize_dataset(
+        self,
+        output_dir,
+        x_list,
+        y_list,
+        sample_names=None,
+        hint_list=[],
+        classifier=None,
+    ):
         Path(output_dir).mkdir(parents=True, exist_ok=True)
 
-        x = torch.stack(x_list, dim=0)
-        y = torch.stack([torch.tensor([y]) for y in y_list], dim=0)
+        if len(x_list) == 0:
+            print("Warning: serialize_dataset called with empty x_list. Skipping.")
+            return
+
+        x = torch.stack(x_list, dim=0).cpu()
+        y = torch.stack([torch.tensor([y]) for y in y_list], dim=0).cpu()
         data = torch.cat([x, y], dim=1)
         if (
             not self.task_config is None
@@ -744,7 +756,7 @@ class Image2MixedDataset(ImageDataset):
             ), "output shape inacceptable for singleclass classification"
             target = target[0].to(torch.int64)
 
-        return_dict = {"img": img_tensor, "labels": target}
+        return_dict = {"x": img_tensor, "y": target}
 
         if self.hints_enabled:
             if self.config.in_memory:

@@ -37,17 +37,17 @@ class PositionalEncoding(nn.Module):
     def __init__(self, embed_dim, max_len=500):
         super(PositionalEncoding, self).__init__()
         max_len += 1
-        self.P = torch.zeros(max_len, embed_dim)
+        P = torch.zeros(max_len, embed_dim)
         freqs = torch.arange(max_len)[:, None] / (
             torch.pow(
                 10000, torch.arange(0, embed_dim, 2, dtype=torch.float32) / embed_dim
             )
         )
 
-        self.P[:, 0::2] = torch.sin(freqs)
-        self.P[:, 1::2] = torch.cos(freqs)
+        P[:, 0::2] = torch.sin(freqs)
+        P[:, 1::2] = torch.cos(freqs)
 
-        self.P = self.P[1:]
+        self.register_buffer("P", P[1:])
 
     def forward(self, t):
         return self.P[t]
@@ -344,9 +344,9 @@ class TabularDDPM(EditCapableGenerator):
         )  # contains evolution from noisy to cleaned instance for each data point
         for i in tqdm(range(0, num_noise_steps)[::-1]):
             # Denoise z_t to create z_t-1 (next z)
-            alpha_i = self.alpha[i].repeat(bs)[:, None]
-            alpha_bar_i = self.alpha_bar[i].repeat(bs)[:, None]
-            sigma_i = torch.sqrt(1 - self.alpha[i])
+            alpha_i = self.alpha[i].repeat(bs)[:, None].to(next_z.device)
+            alpha_bar_i = self.alpha_bar[i].repeat(bs)[:, None].to(next_z.device)
+            sigma_i = torch.sqrt(1 - self.alpha[i]).to(next_z.device)
             eps_hat = model(next_z, i)
 
             # Unconditional mean
@@ -462,9 +462,16 @@ class TabularDDPM(EditCapableGenerator):
         source_classes: torch.Tensor,
         target_classes: nn.Module,
         classifier=None,
+        **kwargs
     ) -> Tuple[
-        list[torch.Tensor], list[torch.Tensor], list[torch.Tensor], list[torch.Tensor]
+        list[torch.Tensor], list[torch.Tensor], list[torch.Tensor], list[torch.Tensor], list[torch.Tensor], list[torch.Tensor]
     ]:
+        if classifier is None:
+            classifier = kwargs.get("predictor", None)
+
+        device = next(classifier.parameters()).device
+        x_in = x_in.to(device)
+        target_classes = target_classes.to(device)
 
         self.original_sample = x_in
 
@@ -515,7 +522,10 @@ class TabularDDPM(EditCapableGenerator):
         self.counterfactuals = minimal_counterfactuals
         self.original_sample = x_in
 
-        return list_counterfactuals, diff_latent, y_target_end_confidence, x_list
+        history_list = [[] for _ in range(len(minimal_counterfactuals))]
+        cluster_list = [None for _ in range(len(minimal_counterfactuals))]
+
+        return list_counterfactuals, diff_latent, y_target_end_confidence, x_list, history_list, cluster_list
 
     def plot_counterfactuals(self):
         plt.figure(figsize=(5, 5))

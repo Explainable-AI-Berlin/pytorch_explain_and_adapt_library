@@ -86,8 +86,8 @@ def calculate_test_accuracy(
             break
 
         if calculate_group_accuracies:
-            x = sample["img"]
-            y = sample["labels"]
+            x = sample["x"]
+            y = sample["y"]
             has_confounder = sample["has_confounder"]
             group = y + test_dataloader.dataset.output_size * has_confounder
 
@@ -664,14 +664,25 @@ class ModelTrainer:
                 else:
                     self.regularization_level *= 1.3
 
-                checkpoint = torch.load(
-                    os.path.join(
-                        self.model_path,
-                        "checkpoints",
-                        str(self.config.training.epoch - 1) + ".cpl",
-                    ),
-                    map_location=torch.device(self.device),
-                )
+                try:
+                    checkpoint = torch.load(
+                        os.path.join(
+                            self.model_path,
+                            "checkpoints",
+                            str(self.config.training.epoch - 1) + ".cpl",
+                        ),
+                        map_location=torch.device(self.device),
+                    )
+                except Exception:
+                    checkpoint = torch.load(
+                        os.path.join(
+                            self.model_path,
+                            "checkpoints",
+                            str(self.config.training.epoch - 1) + ".cpl",
+                        ),
+                        map_location=torch.device(self.device),
+                        weights_only=False
+                    )
                 self.model.load_state_dict(checkpoint)
 
             else:
@@ -683,6 +694,10 @@ class ModelTrainer:
             save_yaml_config(self.config, os.path.join(self.model_path, "config.yaml"))
 
             self.config.training.epoch += 1
+
+        if not os.path.exists(os.path.join(self.model_path, "model.cpl")):
+            torch.save(self.model.to("cpu"), os.path.join(self.model_path, "model.cpl"))
+            self.model.to(self.device)
 
 
 def distill_binary_dataset(predictor_distillation, base_path, predictor, predictor_datasets):

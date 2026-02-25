@@ -110,8 +110,14 @@ def get_teacher(
         )
 
     elif teacher[-4:] == ".cpl":
+        try:
+            loaded_teacher = torch.load(teacher, map_location=device)
+            
+        except Exception:
+            loaded_teacher = torch.load(teacher, map_location=device, weights_only=False)
+
         teacher = Model2ModelTeacher(
-            torch.load(teacher, map_location=device),
+            loaded_teacher,
             dataset=dataset,
             tracking_level=tracking_level,
             counterfactual_type=counterfactual_type,

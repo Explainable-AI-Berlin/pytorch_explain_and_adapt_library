@@ -1,5 +1,5 @@
 # python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/clarc/nico_plus_plus_1k_poisoned098_pclarc.yaml"
-adaptor_type                         :  "ClarC"
+adaptor_type                         :  "ClArC"
 category                             :  "adaptor"
 batch_size                           :  100
 tracking_level                       :  1
