@@ -18,6 +18,8 @@ def get_explainer(
     explainer: Union[ExplainerInterface, str, dict],
     device: Union[str, torch.device] = "cuda",
     predictor_datasets=None,
+    **kwargs
+
 ) -> ExplainerInterface:
     """
     This function returns a explainer.
@@ -31,10 +33,11 @@ def get_explainer(
     """
     if not isinstance(explainer, ExplainerInterface):
         explainer_config = load_yaml_config(explainer)
-        if explainer_config.explainer_type in ["PDC", "ACE", "TIME"]:
+        if explainer_config.explainer_type in ["SCE", "ACE", "TIME", "DAEdistill"]:
             explainer_out = CounterfactualExplainer(
                 explainer_config=explainer_config,
                 datasets=predictor_datasets,
+                **kwargs
             )
 
         else:
@@ -54,6 +57,7 @@ def get_explainer(
                     config=explainer_config,
                     device=device,
                     predictor_dataset=predictor_datasets,
+                    **kwargs
                 )
 
     else:

@@ -54,6 +54,9 @@ class SymbolicDataset(PealDataset):
             mode=mode,
             set_negative_to_zero=config.set_negative_to_zero,
         )
+        import pandas as pd
+        df_data = [self.data[k].numpy() for k in self.keys]
+        self.df = pd.DataFrame(df_data, columns=self.attributes)
 
     def __len__(self):
         return len(self.keys)

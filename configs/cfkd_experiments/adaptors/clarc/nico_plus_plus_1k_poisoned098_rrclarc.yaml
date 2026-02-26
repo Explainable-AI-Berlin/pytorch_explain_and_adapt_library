@@ -1,14 +1,10 @@
 # python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/clarc/nico_plus_plus_1k_poisoned098_rrclarc.yaml"
-adaptor_type                         :  "RRClArC"
 category                             :  "adaptor"
-batch_size                           :  100
-tracking_level                       :  1
-calculate_group_accuracies           :  True
+adaptor_type                         :  "RRClArC"
+base_dir                             :  $PEAL_RUNS/nico_plus_plus_1k/classifier_poisoned098/rrclarc
+model_path                           :  $PEAL_RUNS/nico_plus_plus_1k/classifier_poisoned098/model.cpl
 data                                 :  <PEAL_BASE>/configs/cfkd_experiments/data/nico_plus_plus_1k_poisoned098.yaml
 unpoisoned_data                      :  <PEAL_BASE>/configs/cfkd_experiments/data/nico_plus_plus_unpoisoned.yaml
-student                              :  $PEAL_RUNS/nico_plus_plus_1k/classifier_poisoned098/model.cpl
-base_dir                             :  $PEAL_RUNS/nico_plus_plus_1k/classifier_poisoned098/rrclarc
-model_path: $PEAL_RUNS/nico_plus_plus_1k/classifier_poisoned098/model.cpl
 #
 projection_type: 'pcav' # 'pcav', 'svm', 'simple'
 # cav_mode: "cavs_max" # 'cavs_max', 'cavs_mean'; only relevant when using projection_type 'pcav'

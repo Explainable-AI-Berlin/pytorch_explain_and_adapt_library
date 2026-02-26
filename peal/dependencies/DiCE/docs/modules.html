@@ -1,0 +1,266 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>dice_ml &mdash; DiCE 0.12 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=3f949d3d"></script>
+      <script src="_static/doctools.js?v=9a2dae69"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            DiCE
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="readme.html">Diverse Counterfactual Explanations (DiCE) for ML</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Notebooks:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="notebooks/DiCE_getting_started.html">Quick introduction to generating counterfactual explanations using DiCE</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notebooks/DiCE_feature_importances.html">Estimating local and global feature importance scores using DiCE</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notebooks/DiCE_multiclass_classification_and_regression.html">Generating counterfactuals for multi-class classification and regression models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notebooks/DiCE_multiclass_classification_and_regression.html#Regression">Regression</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notebooks/DiCE_model_agnostic_CFs.html">Generating counterfactual explanations with any ML model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notebooks/DiCE_with_private_data.html">Generating counterfactual explanations without access to training data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notebooks/DiCE_with_advanced_options.html">Advanced options to customize Counterfactual Explanations</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Package:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="dice_ml.html">dice_ml package</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">DiCE</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">dice_ml</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/modules.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="dice-ml">
+<h1>dice_ml<a class="headerlink" href="#dice-ml" title="Link to this heading"></a></h1>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="dice_ml.html">dice_ml package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.html#subpackages">Subpackages</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.data_interfaces.html">dice_ml.data_interfaces package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#module-dice_ml.data_interfaces.base_data_interface">dice_ml.data_interfaces.base_data_interface module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#module-dice_ml.data_interfaces.private_data_interface">dice_ml.data_interfaces.private_data_interface module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#module-dice_ml.data_interfaces.public_data_interface">dice_ml.data_interfaces.public_data_interface module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#module-dice_ml.data_interfaces">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.explainer_interfaces.html">dice_ml.explainer_interfaces package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#module-dice_ml.explainer_interfaces.dice_KD">dice_ml.explainer_interfaces.dice_KD module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#module-dice_ml.explainer_interfaces.dice_genetic">dice_ml.explainer_interfaces.dice_genetic module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#module-dice_ml.explainer_interfaces.dice_pytorch">dice_ml.explainer_interfaces.dice_pytorch module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#module-dice_ml.explainer_interfaces.dice_random">dice_ml.explainer_interfaces.dice_random module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#module-dice_ml.explainer_interfaces.dice_tensorflow1">dice_ml.explainer_interfaces.dice_tensorflow1 module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#module-dice_ml.explainer_interfaces.dice_tensorflow2">dice_ml.explainer_interfaces.dice_tensorflow2 module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#module-dice_ml.explainer_interfaces.dice_xgboost">dice_ml.explainer_interfaces.dice_xgboost module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#module-dice_ml.explainer_interfaces.explainer_base">dice_ml.explainer_interfaces.explainer_base module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#module-dice_ml.explainer_interfaces.feasible_base_vae">dice_ml.explainer_interfaces.feasible_base_vae module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#module-dice_ml.explainer_interfaces.feasible_model_approx">dice_ml.explainer_interfaces.feasible_model_approx module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#module-dice_ml.explainer_interfaces">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.model_interfaces.html">dice_ml.model_interfaces package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.model_interfaces.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.model_interfaces.html#module-dice_ml.model_interfaces.base_model">dice_ml.model_interfaces.base_model module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.model_interfaces.html#module-dice_ml.model_interfaces.keras_tensorflow_model">dice_ml.model_interfaces.keras_tensorflow_model module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.model_interfaces.html#module-dice_ml.model_interfaces.pytorch_model">dice_ml.model_interfaces.pytorch_model module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.model_interfaces.html#dice-ml-model-interfaces-xgboost-model-module">dice_ml.model_interfaces.xgboost_model module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.model_interfaces.html#module-dice_ml.model_interfaces">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.schema.html">dice_ml.schema package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.schema.html#module-dice_ml.schema">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.utils.html">dice_ml.utils package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.utils.html#subpackages">Subpackages</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.utils.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.utils.html#module-dice_ml.utils.exception">dice_ml.utils.exception module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.utils.html#module-dice_ml.utils.helpers">dice_ml.utils.helpers module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.utils.html#module-dice_ml.utils.neuralnetworks">dice_ml.utils.neuralnetworks module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.utils.html#module-dice_ml.utils.serialize">dice_ml.utils.serialize module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.utils.html#module-dice_ml.utils">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.html#module-dice_ml.constants">dice_ml.constants module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.html#dice_ml.constants.BackEndTypes"><code class="docutils literal notranslate"><span class="pre">BackEndTypes</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.html#dice_ml.constants.BackEndTypes.ALL"><code class="docutils literal notranslate"><span class="pre">BackEndTypes.ALL</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.html#dice_ml.constants.BackEndTypes.Pytorch"><code class="docutils literal notranslate"><span class="pre">BackEndTypes.Pytorch</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.html#dice_ml.constants.BackEndTypes.Sklearn"><code class="docutils literal notranslate"><span class="pre">BackEndTypes.Sklearn</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.html#dice_ml.constants.BackEndTypes.Tensorflow1"><code class="docutils literal notranslate"><span class="pre">BackEndTypes.Tensorflow1</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.html#dice_ml.constants.BackEndTypes.Tensorflow2"><code class="docutils literal notranslate"><span class="pre">BackEndTypes.Tensorflow2</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.html#dice_ml.constants.ModelTypes"><code class="docutils literal notranslate"><span class="pre">ModelTypes</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.html#dice_ml.constants.ModelTypes.ALL"><code class="docutils literal notranslate"><span class="pre">ModelTypes.ALL</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.html#dice_ml.constants.ModelTypes.Classifier"><code class="docutils literal notranslate"><span class="pre">ModelTypes.Classifier</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.html#dice_ml.constants.ModelTypes.Regressor"><code class="docutils literal notranslate"><span class="pre">ModelTypes.Regressor</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.html#dice_ml.constants.SamplingStrategy"><code class="docutils literal notranslate"><span class="pre">SamplingStrategy</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.html#dice_ml.constants.SamplingStrategy.Genetic"><code class="docutils literal notranslate"><span class="pre">SamplingStrategy.Genetic</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.html#dice_ml.constants.SamplingStrategy.Gradient"><code class="docutils literal notranslate"><span class="pre">SamplingStrategy.Gradient</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.html#dice_ml.constants.SamplingStrategy.KdTree"><code class="docutils literal notranslate"><span class="pre">SamplingStrategy.KdTree</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.html#dice_ml.constants.SamplingStrategy.Random"><code class="docutils literal notranslate"><span class="pre">SamplingStrategy.Random</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.html#module-dice_ml.counterfactual_explanations">dice_ml.counterfactual_explanations module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.html#dice_ml.counterfactual_explanations.CounterfactualExplanations"><code class="docutils literal notranslate"><span class="pre">CounterfactualExplanations</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.html#dice_ml.counterfactual_explanations.CounterfactualExplanations.cf_examples_list"><code class="docutils literal notranslate"><span class="pre">CounterfactualExplanations.cf_examples_list</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.html#dice_ml.counterfactual_explanations.CounterfactualExplanations.from_json"><code class="docutils literal notranslate"><span class="pre">CounterfactualExplanations.from_json()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.html#dice_ml.counterfactual_explanations.CounterfactualExplanations.local_importance"><code class="docutils literal notranslate"><span class="pre">CounterfactualExplanations.local_importance</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.html#dice_ml.counterfactual_explanations.CounterfactualExplanations.metadata"><code class="docutils literal notranslate"><span class="pre">CounterfactualExplanations.metadata</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.html#dice_ml.counterfactual_explanations.CounterfactualExplanations.summary_importance"><code class="docutils literal notranslate"><span class="pre">CounterfactualExplanations.summary_importance</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.html#dice_ml.counterfactual_explanations.CounterfactualExplanations.to_json"><code class="docutils literal notranslate"><span class="pre">CounterfactualExplanations.to_json()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.html#dice_ml.counterfactual_explanations.CounterfactualExplanations.visualize_as_dataframe"><code class="docutils literal notranslate"><span class="pre">CounterfactualExplanations.visualize_as_dataframe()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.html#dice_ml.counterfactual_explanations.CounterfactualExplanations.visualize_as_list"><code class="docutils literal notranslate"><span class="pre">CounterfactualExplanations.visualize_as_list()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.html#module-dice_ml.data">dice_ml.data module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.html#dice_ml.data.Data"><code class="docutils literal notranslate"><span class="pre">Data</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.html#dice_ml.data.Data.decide_implementation_type"><code class="docutils literal notranslate"><span class="pre">Data.decide_implementation_type()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.html#dice_ml.data.decide"><code class="docutils literal notranslate"><span class="pre">decide()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.html#module-dice_ml.dice">dice_ml.dice module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.html#dice_ml.dice.Dice"><code class="docutils literal notranslate"><span class="pre">Dice</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.html#dice_ml.dice.Dice.decide_implementation_type"><code class="docutils literal notranslate"><span class="pre">Dice.decide_implementation_type()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.html#dice_ml.dice.decide"><code class="docutils literal notranslate"><span class="pre">decide()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.html#module-dice_ml.diverse_counterfactuals">dice_ml.diverse_counterfactuals module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.html#dice_ml.diverse_counterfactuals.CounterfactualExamples"><code class="docutils literal notranslate"><span class="pre">CounterfactualExamples</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.html#dice_ml.diverse_counterfactuals.CounterfactualExamples.display_df"><code class="docutils literal notranslate"><span class="pre">CounterfactualExamples.display_df()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.html#dice_ml.diverse_counterfactuals.CounterfactualExamples.from_json"><code class="docutils literal notranslate"><span class="pre">CounterfactualExamples.from_json()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.html#dice_ml.diverse_counterfactuals.CounterfactualExamples.print_list"><code class="docutils literal notranslate"><span class="pre">CounterfactualExamples.print_list()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.html#dice_ml.diverse_counterfactuals.CounterfactualExamples.to_json"><code class="docutils literal notranslate"><span class="pre">CounterfactualExamples.to_json()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.html#dice_ml.diverse_counterfactuals.CounterfactualExamples.visualize_as_dataframe"><code class="docutils literal notranslate"><span class="pre">CounterfactualExamples.visualize_as_dataframe()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.html#dice_ml.diverse_counterfactuals.CounterfactualExamples.visualize_as_list"><code class="docutils literal notranslate"><span class="pre">CounterfactualExamples.visualize_as_list()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.html#dice_ml.diverse_counterfactuals.json_converter"><code class="docutils literal notranslate"><span class="pre">json_converter()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.html#module-dice_ml.model">dice_ml.model module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.html#dice_ml.model.Model"><code class="docutils literal notranslate"><span class="pre">Model</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.html#dice_ml.model.Model.decide_implementation_type"><code class="docutils literal notranslate"><span class="pre">Model.decide_implementation_type()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.html#dice_ml.model.decide"><code class="docutils literal notranslate"><span class="pre">decide()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.html#module-dice_ml">Module contents</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.html#dice_ml.Data"><code class="docutils literal notranslate"><span class="pre">Data</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.html#dice_ml.Data.decide_implementation_type"><code class="docutils literal notranslate"><span class="pre">Data.decide_implementation_type()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.html#dice_ml.Dice"><code class="docutils literal notranslate"><span class="pre">Dice</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.html#dice_ml.Dice.decide_implementation_type"><code class="docutils literal notranslate"><span class="pre">Dice.decide_implementation_type()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.html#dice_ml.Model"><code class="docutils literal notranslate"><span class="pre">Model</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.html#dice_ml.Model.decide_implementation_type"><code class="docutils literal notranslate"><span class="pre">Model.decide_implementation_type()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2020, Ramaravind, Amit, Chenhao.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

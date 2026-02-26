@@ -1,0 +1,30 @@
+# python run_cfkd.py --config configs/tabular_experiments/adaptors/german_cfkd_dice.yaml
+batch_size                           :  8
+min_train_samples                    :  8
+mixing_ratio                         :  0.5
+finetune_iterations                  :  5
+max_validation_samples               :  100
+continuous_learning                  :  "False"
+replace_model                        :  True
+explainer                            :  <PEAL_BASE>/configs/tabular_experiments/explainers/dice_german.yaml
+training                             :  <PEAL_BASE>/configs/tabular_experiments/training/symbolic_classifier.yaml
+data                                 :  <PEAL_BASE>/configs/tabular_experiments/data/german.yaml
+
+test_data                            :  <PEAL_BASE>/configs/tabular_experiments/data/german.yaml
+student                              :  peal_runs/german/classifier_poisoned/model.cpl
+
+teacher                              :
+  type: "symbolic"
+  model: peal_runs/german/classifier_poisoned/model.cpl
+  confounder_name: "sex"
+
+
+base_dir                             :  $PEAL_RUNS/german/classifier_poisoned/cfkd
+
+task:
+  criterions:
+    ce     : 1.0
+  output_type             : multiclass
+  output_channels         : 2
+  y_selection             : [Target]
+  x_selection             : [age, sex, job, housing, savings_status, checking_status, credit_amount, duration, purpose, credit_history, employment, installment_commitment, other_parties, residence_since, property_magnitude, other_payment_plans, existing_credits, num_dependents, own_telephone, foreign_worker]

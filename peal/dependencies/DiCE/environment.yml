@@ -1,0 +1,10 @@
+name: example-environment
+
+dependencies:
+  - numpy
+  - scikit-learn
+  - pandas
+  - jsonschema
+  - tqdm
+  - pip:
+    - raiutils

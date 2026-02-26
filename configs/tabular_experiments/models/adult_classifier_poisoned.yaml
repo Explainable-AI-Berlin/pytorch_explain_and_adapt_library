@@ -1,0 +1,11 @@
+# python train_predictor.py --config configs/tabular_experiments/models/adult_classifier_poisoned.yaml
+model_path        : $PEAL_RUNS/adult/classifier_poisoned
+data              : <PEAL_BASE>/configs/tabular_experiments/data/adult.yaml
+training          : <PEAL_BASE>/configs/tabular_experiments/training/symbolic_classifier.yaml
+architecture      : <PEAL_BASE>/configs/tabular_experiments/architectures/symbolic2vector.yaml
+task:
+  criterions:
+    ce     : 1.0
+  output_type             : singleclass
+  output_size             : 2
+  y_selection             : [Target]

@@ -53,6 +53,7 @@ from peal.generators.interfaces import GeneratorConfig
 from peal.training.interfaces import TrainingConfig, PredictorConfig
 from peal.architectures.interfaces import TaskConfig
 from peal.explainers.interfaces import ExplainerConfig
+from peal.explainers.explainer_factory import get_explainer
 from peal.explainers.counterfactual_explainer import SCEConfig
 from peal.adaptors.interfaces import AdaptorConfig, Adaptor
 
@@ -95,7 +96,7 @@ class CFKDConfig(AdaptorConfig):
     All parameters regarding paths, where the generator is from etc in there are overwritten by CFKD and only
     used if the information is not available for CFKD
     """
-    explainer: ExplainerConfig = SCEConfig()
+    explainer: Union[dict, ExplainerConfig] = SCEConfig()
     """
     The config of the training used for finetuning the student model.
     If not set student config can be used.
@@ -121,7 +122,7 @@ class CFKDConfig(AdaptorConfig):
     """
     The type of teacher used.
     """
-    teacher: str = "cluster@8000"
+    teacher: Union[str, dict] = "cluster@8000"
     """
     The config of the generator used.
     This value will be overwritten if Generator is given via constructor directly.
@@ -373,14 +374,14 @@ class CFKD(Adaptor):
             transform=self.val_dataloader.dataset.transform,
         )
 
-        if teacher[:5] == "human":
+        if isinstance(teacher, str) and teacher[:5] == "human":
             assert self.adaptor_config.tracking_level >= 4, "Tracking level too low!"
 
-        self.explainer = CounterfactualExplainer(
+        self.explainer = get_explainer(
+            explainer=self.adaptor_config.explainer,
             predictor=self.student,
             generator=self.generator,
             input_type=self.adaptor_config.data.input_type,
-            explainer_config=self.adaptor_config.explainer,
             datasource=[self.dataloader_mixer, self.joint_validation_dataloader],
             tracking_level=self.adaptor_config.tracking_level,
         )

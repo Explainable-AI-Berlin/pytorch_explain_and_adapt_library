@@ -7,8 +7,9 @@ from typing import Union
 from peal.teachers.baseline_teacher import BaselineTeacher
 from peal.teachers.cluster_teacher import ClusterTeacher
 from peal.teachers.interfaces import TeacherInterface
-from peal.teachers.model2model_teacher import Model2ModelTeacher
 from peal.teachers.human2model_teacher import Human2ModelTeacher
+from peal.teachers.model2model_teacher import Model2ModelTeacher
+from peal.teachers.symbolic_teacher import SymbolicTeacher
 
 from peal.teachers.preclustered_teacher import PreclusteredTeacher
 from peal.teachers.segmentation_mask_teacher import SegmentationMaskTeacher
@@ -50,7 +51,22 @@ def get_teacher(
             counterfactual_type=counterfactual_type,
         )
 
-    elif teacher == "preclustered":
+    elif isinstance(teacher, dict) and teacher.get("type") == "symbolic":
+        model_path = teacher.get("model")
+        try:
+            loaded_teacher = torch.load(model_path, map_location=device)
+        except Exception:
+            loaded_teacher = torch.load(model_path, map_location=device, weights_only=False)
+            
+        teacher = SymbolicTeacher(
+            loaded_teacher,
+            dataset=dataset,
+            confounder_name=teacher.get("confounder_name"),
+            tracking_level=tracking_level,
+            counterfactual_type=counterfactual_type,
+        )
+
+    elif isinstance(teacher, str) and teacher == "preclustered":
         teacher = PreclusteredTeacher(
             dataset=dataset,
             correct_clusters=adaptor_config.correct_clusters,
@@ -58,7 +74,7 @@ def get_teacher(
             counterfactual_type=counterfactual_type,
         )
 
-    elif teacher[:7] == "cluster":
+    elif isinstance(teacher, str) and teacher[:7] == "cluster":
         if len(teacher) == 12:
             port = int(teacher[-4:])
 
@@ -71,7 +87,7 @@ def get_teacher(
             tracking_level=tracking_level,
         )
 
-    elif teacher[:7] == "virelay":
+    elif isinstance(teacher, str) and teacher[:7] == "virelay":
         if len(teacher) == 12:
             port = int(teacher[-4:])
 
@@ -84,7 +100,7 @@ def get_teacher(
             tracking_level=tracking_level,
         )
 
-    elif teacher[:5] == "human":
+    elif isinstance(teacher, str) and teacher[:5] == "human":
         if len(teacher) == 10:
             port = int(teacher[-4:])
 
@@ -93,7 +109,7 @@ def get_teacher(
 
         teacher = Human2ModelTeacher(port)
 
-    elif teacher == "SegmentationMask":
+    elif isinstance(teacher, str) and teacher == "SegmentationMask":
         teacher = SegmentationMaskTeacher(
             adaptor_config.attribution_threshold,
             dataset=dataset,
@@ -101,7 +117,7 @@ def get_teacher(
             counterfactual_type=counterfactual_type,
         )
 
-    elif teacher[: len("Baseline")] == "Baseline":
+    elif isinstance(teacher, str) and teacher[: len("Baseline")] == "Baseline":
         teacher = BaselineTeacher(
             strategy=teacher.split(":")[1],
             dataset=dataset,
@@ -109,7 +125,7 @@ def get_teacher(
             counterfactual_type=counterfactual_type,
         )
 
-    elif teacher[-4:] == ".cpl":
+    elif isinstance(teacher, str) and teacher[-4:] == ".cpl":
         try:
             loaded_teacher = torch.load(teacher, map_location=device)
             

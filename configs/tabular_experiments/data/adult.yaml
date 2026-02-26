@@ -1,0 +1,12 @@
+dataset_class: AdultDataset
+category: data
+dataset_path: datasets/adult
+output_size: [ 1 ]
+input_size: [ 14 ]
+input_type: "symbolic"
+split: [ 0.8, 1.0 ]
+confounding_factors     : [Target, gender]
+output_type:  "singleclass"
+shuffle: "True"
+delimiter: ","
+set_negative_to_zero : False

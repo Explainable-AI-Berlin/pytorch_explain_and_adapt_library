@@ -1,0 +1,12 @@
+dataset_class: GermanDataset
+category: data
+dataset_path: datasets/german
+output_size: [ 1 ]
+input_size: [ 20 ]
+input_type: "symbolic"
+split: [ 0.8, 1.0 ]
+confounding_factors: [Target, sex]
+output_type:  "singleclass"
+shuffle: "True"
+delimiter: ","
+set_negative_to_zero : False
