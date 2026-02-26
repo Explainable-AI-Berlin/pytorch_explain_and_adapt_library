@@ -180,9 +180,17 @@ python train_generator.py --config configs/tabular_experiments/generators/circle
 python train_predictor.py --config configs/tabular_experiments/models/symbolic_circle_classifier_poisoned.yaml
 python run_cfkd.py --config configs/tabular_experiments/adaptors/circle_cfkd.yaml
 
+# Adult Income Dataset
+python train_predictor.py --config configs/tabular_experiments/models/adult_classifier_poisoned.yaml
+python run_cfkd.py --config configs/tabular_experiments/adaptors/adult_cfkd_dice.yaml
 
+# German Credit Risk Dataset
+python train_predictor.py --config configs/tabular_experiments/models/german_classifier_poisoned.yaml
+python run_cfkd.py --config configs/tabular_experiments/adaptors/german_cfkd_dice.yaml
 
-
+# COMPAS Recidivism Dataset
+python train_predictor.py --config configs/tabular_experiments/models/compass_classifier_poisoned.yaml
+python run_cfkd.py --config configs/tabular_experiments/adaptors/compass_cfkd_dice.yaml
 
 
 # Experiments over different poisoning levels
