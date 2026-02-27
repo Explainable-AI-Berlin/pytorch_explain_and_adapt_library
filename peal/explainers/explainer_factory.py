@@ -36,7 +36,6 @@ def get_explainer(
         if explainer_config.explainer_type in ["SCE", "ACE", "TIME", "DAEdistill"]:
             explainer_out = CounterfactualExplainer(
                 explainer_config=explainer_config,
-                datasets=predictor_datasets,
                 **kwargs
             )
 

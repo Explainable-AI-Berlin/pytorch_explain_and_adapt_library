@@ -269,7 +269,7 @@ class CFKD(Adaptor):
                 The visualization function that is used for the run. Defaults to lambda x: x.
         """
         self.adaptor_config = load_yaml_config(adaptor_config, AdaptorConfig)
-        self.adaptor_config.min_train_samples = (
+        self.min_train_samples = (
             self.adaptor_config.explainer.num_attempts * self.adaptor_config.min_train_samples
         )
         if self.adaptor_config.test_data is None:
@@ -430,7 +430,7 @@ class CFKD(Adaptor):
         self.data_config.data.output_size = self.train_dataloader.dataset.output_size
         self.data_config.data.delimiter = ","
         self.data_config.data.x_selection = "imgs"
-        self.data_config.data.num_samples = self.adaptor_config.min_train_samples
+        self.data_config.data.num_samples = self.min_train_samples
         self.data_config.data.dataset_class = None
         self.validation_data_config = copy.deepcopy(self.data_config)
         self.validation_data_config.data.x_selection = "imgs"
@@ -843,7 +843,7 @@ class CFKD(Adaptor):
             2,
         )
         pbar = tqdm(
-            total=int(self.adaptor_config.min_train_samples / self.adaptor_config.batch_size + 0.99)
+            total=int(self.min_train_samples / self.adaptor_config.batch_size + 0.99)
             * (
                 self.adaptor_config.explainer.gradient_steps
                 if hasattr(self.adaptor_config.explainer, "gradient_steps")
@@ -852,10 +852,10 @@ class CFKD(Adaptor):
         )
         pbar.stored_values = {}
         pbar.stored_values["n_total"] = 0
-        remaining_sample_number = self.adaptor_config.min_train_samples
+        remaining_sample_number = self.min_train_samples
         while continue_collecting:
             num_batches_per_iteration = int(1 + remaining_sample_number / self.adaptor_config.batch_size)
-            if len(list(tracked_values.values())[0]) >= self.adaptor_config.min_train_samples:
+            if len(list(tracked_values.values())[0]) >= self.min_train_samples:
                 break
 
             for i in range(num_batches_per_iteration):
@@ -873,12 +873,12 @@ class CFKD(Adaptor):
                         tracked_values[key].extend(values[key])
 
                 pbar.stored_values["n_valid"] = (
-                    str(len(list(tracked_values.values())[0])) + "/" + str(self.adaptor_config.min_train_samples)
+                    str(len(list(tracked_values.values())[0])) + "/" + str(self.min_train_samples)
                 )
                 pbar.stored_values["th"] = acceptance_threshold
                 pbar.stored_values["n_total"] += self.adaptor_config.batch_size
                 pbar.stored_values["fr"] = len(list(tracked_values.values())[0]) / pbar.stored_values["n_total"]
-                remaining_sample_number = self.adaptor_config.min_train_samples - len(list(tracked_values.values())[0])
+                remaining_sample_number = self.min_train_samples - len(list(tracked_values.values())[0])
 
                 if remaining_sample_number <= 0:
                     break
