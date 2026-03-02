@@ -912,11 +912,12 @@ class CFKD(Adaptor):
                 ) as f:
                     tracked_values_file = {}
                     for key in tracked_values.keys():
-                        if isinstance(tracked_values[key][0], torch.Tensor):
-                            tracked_values_file[key] = torch.stack(tracked_values[key], dim=0).numpy()
+                        if len(tracked_values[key]) > 0:
+                            if isinstance(tracked_values[key][0], torch.Tensor):
+                                tracked_values_file[key] = torch.stack(tracked_values[key], dim=0).numpy()
 
-                        elif isinstance(tracked_values[key][0], int) or isinstance(tracked_values[key][0], float):
-                            tracked_values_file[key] = np.array(tracked_values[key])
+                            elif isinstance(tracked_values[key][0], int) or isinstance(tracked_values[key][0], float):
+                                tracked_values_file[key] = np.array(tracked_values[key])
 
                     np.savez(f, **tracked_values_file)
 
@@ -1031,7 +1032,11 @@ class CFKD(Adaptor):
         )
 
         flip_rate = len(flipped_samples) / flip_rate_reference
-        ood_rate = len(list(filter(lambda sample: sample == "ood", feedback))) / num_samples
+        try:
+            ood_rate = len(list(filter(lambda sample: sample == "ood", feedback))) / num_samples
+        
+        except Exception:
+            import pdb; pdb.set_trace()
 
         num_true_1sided = len(
             list(

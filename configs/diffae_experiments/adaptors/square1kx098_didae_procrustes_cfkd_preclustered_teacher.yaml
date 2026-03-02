@@ -1,4 +1,4 @@
-# python run_cfkd.py --config "<PEAL_BASE>/configs/diffae_experiments/adaptors/square1kx098_didae_procrustes_cfkd.yaml"
+# python run_cfkd.py --config "<PEAL_BASE>/configs/diffae_experiments/adaptors/square1kx098_didae_procrustes_cfkd_preclustered_teacher.yaml"
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  50
@@ -17,7 +17,7 @@ student                              :  $PEAL_RUNS/square1k/colora_confounding_c
 teacher                              :  preclustered
 generator                            :  $PEAL_RUNS/square/diffusion_autoencoder/config.yaml
 sparse_dictionary                    :  $PEAL_RUNS/square/diffusion_autoencoder/OrthogonalProcrustesDictionary/config.yaml
-base_dir                             :  $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/foundation_poisoned098/didae_cfkd
+base_dir                             :  $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/foundation_poisoned098/didae_cfkd_preclustered_teacher
 task:
   criterions:
     ce     : 1.0

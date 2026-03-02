@@ -440,4 +440,8 @@ class TorchvisionModel(torch.nn.Module):
             x = self.model.encoder(x)
             x = x[:, 0]
             x = self.model.heads(x)
+            if return_latents:
+                return x, x
+            else:
+                return x
         # --- ViT ---
