@@ -5,4 +5,5 @@ vocabulary: laion
 vocabulary_size: -1
 l1_penalty: 0.15
 solver: skl
-component_strings: [blond, male, makeup, attractive]
+component_strings: [blond, female, makeup, attractive]
+opposite_component_strings: [dark-haired, male, no makeup, unattractive]

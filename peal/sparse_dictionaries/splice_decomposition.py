@@ -27,6 +27,9 @@ class SpLICEDecompositionConfig(SparseDictionaryConfig):
     solver: str = "skl"                       # Solver type: 'skl' or 'admm'
     ending: str = ".pt"
     n_components: Union[int, None] = None     # Set dynamically from vocabulary size
+    component_strings: Union[list, None] = None # Targeted concepts for DiDAE edits
+    opposite_component_strings: Union[list, None] = None # Opposites for DDPM benchmarking
+    benchmark_ddpm_inversion: bool = False    # If True, use text prompts instead of z_sem for edits
 
 
 class SpLICEDecomposition(SparseDictionary):

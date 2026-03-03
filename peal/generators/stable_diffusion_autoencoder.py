@@ -231,10 +231,19 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         # VAE encode
         w0 = (self.pipe.vae.encode(x0).latent_dist.mode() * 0.18215).float()
 
-        # Balanced Conditioning: Inject z_sem into a 77-token null sequence.
+        # Balanced Conditioning: Inject z_sem into a 77-token sequence.
+        # Format: [<BOS>, MODIFIED_CLS] + 75 * [<EOS>]
         uncond_embedding = encode_text(self.pipe, [""] * batch_size)
         z_sem_cond = uncond_embedding.clone()
-        z_sem_cond[:, 1, :] = z_sem
+
+        # Scale match the z_sem visual embedding to the text token norm it is replacing
+        target_norm = torch.norm(uncond_embedding[:, 1, :], p=2, dim=-1, keepdim=True)
+        current_norm = torch.norm(z_sem, p=2, dim=-1, keepdim=True)
+        z_sem_scaled = z_sem * (target_norm / (current_norm + 1e-8))
+
+        z_sem_cond[:, 1, :] = z_sem_scaled
+        # Explicitly replicate the <EOS> token (at index 1 of an empty prompt) 75 times
+        z_sem_cond[:, 2:, :] = uncond_embedding[:, 1:2, :].expand(-1, 75, -1)
 
         # DDPM forward process with empty prompt (faithful encoding)
         # Pass z_sem as encoder_hidden_states for consistency
@@ -265,11 +274,20 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         z_sem, (wT, zs, wts) = z
         batch_size = z_sem.shape[0]
 
-        # Balanced Conditioning: Inject z_sem into a 77-token null sequence.
+        # Balanced Conditioning: Inject z_sem into a 77-token sequence.
         # This prevents attention saturation and stabilizes CFG at high scales.
+        # Format: [<BOS>, MODIFIED_CLS] + 75 * [<EOS>]
         uncond_embedding = encode_text(self.pipe, [""] * batch_size)
         z_sem_cond = uncond_embedding.clone()
-        z_sem_cond[:, 1, :] = z_sem
+
+        # Scale match the z_sem visual embedding to the text token norm it is replacing
+        target_norm = torch.norm(uncond_embedding[:, 1, :], p=2, dim=-1, keepdim=True)
+        current_norm = torch.norm(z_sem, p=2, dim=-1, keepdim=True)
+        z_sem_scaled = z_sem * (target_norm / (current_norm + 1e-8))
+
+        z_sem_cond[:, 1, :] = z_sem_scaled
+        # Explicitly replicate the <EOS> token (at index 1 of an empty prompt) 75 times
+        z_sem_cond[:, 2:, :] = uncond_embedding[:, 1:2, :].expand(-1, 75, -1)
 
         # Setup attention controller
         controller = AttentionStore()
@@ -299,7 +317,7 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
 
         return x_decoded.detach()
 
-    def decode_with_modified_embedding(self, z_sem_modified, stochastic_code, original_shape):
+    def decode_with_modified_embedding(self, z_sem_modified, stochastic_code, original_shape, prompts=None):
         """Decode using a modified semantic embedding for counterfactual generation.
 
         Uses the modified CLIP embedding as text conditioning for the DDPM
@@ -310,6 +328,7 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             z_sem_modified: (B, 768) modified CLIP embedding.
             stochastic_code: tuple (wT, zs, wts) from encode.
             original_shape: target spatial dimensions for output.
+            prompts: Optional list of text prompts for benchmarking.
 
         Returns:
             x_counterfactual: (B, 3, H, W) counterfactual images.
@@ -317,10 +336,23 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         wT, zs, wts = stochastic_code
         batch_size = z_sem_modified.shape[0]
 
-        # Balanced Conditioning for modified embedding
-        uncond_embedding = encode_text(self.pipe, [""] * batch_size)
-        encoder_hidden_states = uncond_embedding.clone()
-        encoder_hidden_states[:, 1, :] = z_sem_modified
+        if prompts is not None:
+            # Benchmark Mode: Use text prompts directly
+            encoder_hidden_states = encode_text(self.pipe, prompts)
+        else:
+            # Balanced Conditioning for modified embedding
+            # Format: [<BOS>, MODIFIED_CLS] + 75 * [<EOS>]
+            uncond_embedding = encode_text(self.pipe, [""] * batch_size)
+            encoder_hidden_states = uncond_embedding.clone()
+
+            # Scale match the z_sem_modified visual embedding to the text token norm it is replacing
+            target_norm = torch.norm(uncond_embedding[:, 1, :], p=2, dim=-1, keepdim=True)
+            current_norm = torch.norm(z_sem_modified, p=2, dim=-1, keepdim=True)
+            z_sem_scaled = z_sem_modified * (target_norm / (current_norm + 1e-8))
+
+            encoder_hidden_states[:, 1, :] = z_sem_scaled
+            # Explicitly replicate the <EOS> token (at index 1 of an empty prompt) 75 times
+            encoder_hidden_states[:, 2:, :] = uncond_embedding[:, 1:2, :].expand(-1, 75, -1)
 
         # Setup attention controller
         controller = AttentionStore()
@@ -508,8 +540,43 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         wT_decoding = wT_decoding.reshape([-1] + list(wT.shape[1:]))
 
         # Decode all candidates
+        prompts = None
+        if (
+            hasattr(self.sparse_dictionary.config, "benchmark_ddpm_inversion")
+            and self.sparse_dictionary.config.benchmark_ddpm_inversion
+            and hasattr(self.sparse_dictionary.config, "component_strings")
+            and self.sparse_dictionary.config.component_strings is not None
+        ):
+            original_labels = torch.argmax(pred_original, dim=-1)
+            component_strings = self.sparse_dictionary.config.component_strings
+            opposite_strings = getattr(self.sparse_dictionary.config, "opposite_component_strings", None)
+            
+            num_attempts = z_sem_before.shape[1]
+            num_linesearch_factors = z_sem_before.shape[2]
+            prompts = []
+            for b in range(z_sem_before.shape[0]):
+                is_present = (original_labels[b].item() == 1)
+                for a in range(num_attempts):
+                    idx = a % len(component_strings)
+                    if is_present:
+                        # Use provided opposite if available, else fallback to "not <concept>"
+                        if opposite_strings is not None and idx < len(opposite_strings):
+                            concept_to_use = opposite_strings[idx]
+                        else:
+                            concept_to_use = f"not {component_strings[idx]}"
+                    else:
+                        concept_to_use = component_strings[idx]
+                        
+                    for l in range(num_linesearch_factors):
+                        prompts.append(concept_to_use)
+                        print(concept_to_use)
+                        print(concept_to_use)
+                        print(concept_to_use)
+                    
+                    import pdb; pdb.set_trace()
+
         x_counterfactuals_generator = self.decode_with_modified_embedding(
-            z_sem2, (wT_decoding, zs, wts), x_in.shape
+            z_sem2, (wT_decoding, zs, wts), x_in.shape, prompts=prompts
         )
         x_counterfactuals = x_counterfactuals_generator.detach()
 
@@ -650,6 +717,7 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
                 W = W_all[:, component_indices].to(z_sem.device).to(z_sem.dtype)
                 if explainer_config is not None and hasattr(explainer_config, "num_attempts"):
                     explainer_config.num_attempts = min(len(component_indices), W.shape[1])
+
             else:
                 W = W_all.to(z_sem.device).to(z_sem.dtype)
 
@@ -678,11 +746,20 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             # Distances and sorting
             distances = torch.norm(z_base - z_reflected, p=2, dim=-1)
             sorted_indices = torch.argsort(distances, dim=1)
-            component_indices = torch.arange(sorted_indices.shape[1]).unsqueeze(0).tile(
+            
+            # Use the actual component_indices (e.g., [34540, 36845, ...]) instead of 0, 1, 2, 3
+            if isinstance(component_indices, list):
+                component_indices_tensor = torch.tensor(component_indices).to(z_sem.device)
+            elif isinstance(component_indices, range):
+                component_indices_tensor = torch.tensor(list(component_indices)).to(z_sem.device)
+            else:
+                component_indices_tensor = component_indices.to(z_sem.device)
+                
+            out_component_indices = component_indices_tensor.unsqueeze(0).tile(
                 [sorted_indices.shape[0], 1]
             )
 
-            return z_reflected, component_indices, distances
+            return z_reflected, out_component_indices, distances
 
     # -------------------------------------------------------------------
     # Component Explanation (mirroring DiffusionAutoencoder)

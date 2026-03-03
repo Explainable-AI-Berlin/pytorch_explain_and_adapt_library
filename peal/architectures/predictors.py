@@ -30,9 +30,13 @@ def get_predictor(predictor, device="cuda"):
     elif isinstance(predictor, str):
         if predictor[-4:] == ".cpl":
             try:
-                return torch.load(predictor, map_location=device), None
+                model = torch.load(predictor, map_location="cpu")
             except Exception:
-                return torch.load(predictor, map_location=device, weights_only=False), None
+                model = torch.load(predictor, map_location="cpu", weights_only=False)
+            
+            if hasattr(model, 'to'):
+                model = model.to(device)
+            return model, None
 
         elif predictor[-5:] == ".onnx":
             import onnxruntime as ort
@@ -67,11 +71,14 @@ def get_predictor(predictor, device="cuda"):
         else:
             model_path = os.path.join(predictor_config.model_path, "model.cpl")
             try:
-                predictor_out = torch.load(model_path, map_location=device)
+                predictor_out = torch.load(model_path, map_location="cpu")
             except Exception:
                 # Fallback for PyTorch 2.6+ defaults that block loading custom objects
-                predictor_out = torch.load(model_path, map_location=device, weights_only=False)
-
+                predictor_out = torch.load(model_path, map_location="cpu", weights_only=False)
+        
+        if hasattr(predictor_out, 'to'):
+            predictor_out = predictor_out.to(device)
+            
         return predictor_out, predictor_config
 
 
