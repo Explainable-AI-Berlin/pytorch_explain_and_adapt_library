@@ -2,7 +2,7 @@
 model_path        : $PEAL_RUNS/nico_plus_plus/classifier_unpoisoned
 data              : <PEAL_BASE>/configs/cfkd_experiments/data/nico_plus_plus_unpoisoned.yaml
 training          : <PEAL_BASE>/configs/cfkd_experiments/training/img_classifier.yaml
-architecture      : torchvision_resnet18
+architecture      : torchvision_dino_v2
 task:
   criterions:
     ce     : 1.0

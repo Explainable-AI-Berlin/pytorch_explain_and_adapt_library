@@ -1,6 +1,7 @@
 import copy
 import csv
 import os
+import io
 import shutil
 import tarfile
 from pathlib import Path
@@ -1078,7 +1079,7 @@ class SkinConDataset(Image2MixedDataset):
 
 class NicoPlusPlusDataset(Image2MixedDataset):
     def __init__(self, config, **kwargs):
-        if not os.path.exists(config.dataset_path):
+        if not os.path.exists(os.path.join(config.dataset_path, "data.csv")):
             import requests
             import zipfile
             import shutil
@@ -1099,60 +1100,77 @@ class NicoPlusPlusDataset(Image2MixedDataset):
                 
                 raise RuntimeError(f"NICO++ Dataset missing. Please follow the instructions to download it. Ensure it is at {zip_path}")
             
-            print(f"Found {zip_path}. Extracting and formatting Dog vs Cat | Outdoor vs Dim subsets...")
-            extract_dir = os.path.join(peal_data_dir, "nico_temp_extract")
-            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                zip_ref.extractall(extract_dir)
-                
-            # Extract nested zips 
-            for root, dirs, files in os.walk(extract_dir):
-                for file in files:
-                    if file.lower().endswith('.zip'):
-                        nested_zip_path = os.path.join(root, file)
-                        try:
-                            with zipfile.ZipFile(nested_zip_path, 'r') as nested_ref:
-                                nested_ref.extractall(root)
-                        except Exception as e:
-                            print(f"Failed to extract {nested_zip_path}: {e}")
-
-            os.makedirs(config.dataset_path, exist_ok=True)
-            img_dir = os.path.join(config.dataset_path, "imgs")
-            os.makedirs(img_dir, exist_ok=True)
-
+                raise FileNotFoundError(f"Please download NICO++.zip to {zip_path}")
+            
+            target_categories = ["dog", "bear"]
+            target_contexts = ["grass", "water"]
+            
+            # Since NICO++ is nested, we might need a temporary extraction or read inline
+            # We'll extract only the target images
+            print(f"Extracting selected subset from NICO++.zip...")
+            
+            # Ensure the output directories exist before writing
+            img_out_dir = os.path.join(config.dataset_path, "imgs")
+            os.makedirs(img_out_dir, exist_ok=True)
+            
             lines = ["img,label,confounder"]
             count = 0
+            
+            # Use actual group counts for extraction without hard clipping
+            counts = {
+                "dog_grass": 0,
+                "dog_water": 0,
+                "bear_grass": 0,
+                "bear_water": 0
+            }
 
-            target_categories = {"dog": 1, "cat": 0}
-            target_contexts = {"outdoor": 1, "dim": 0}
-
-            for root, dirs, files in os.walk(extract_dir):
-                for file in files:
-                    if file.lower().endswith(('.jpg', '.jpeg', '.png')):
-                        parts = root.split(os.sep)
-                        if len(parts) >= 2:
-                            # NICO_DG structure is NICO_DG/{context}/{category}/img.jpg
-                            category = parts[-1].lower()
-                            context = parts[-2].lower()
-
+            with zipfile.ZipFile(zip_path, 'r') as z1:
+                # Find the nested zip
+                nested_zip_name = None
+                for name in z1.namelist():
+                    if name.endswith("NICO_DG_Benchmark.zip"):
+                        nested_zip_name = name
+                        break
+                
+                if not nested_zip_name:
+                    raise FileNotFoundError("Could not find NICO_DG_Benchmark.zip inside NICO++.zip")
+                
+                with z1.open(nested_zip_name) as nested_zip_file:
+                    nested_data = nested_zip_file.read()
+                    
+            with zipfile.ZipFile(io.BytesIO(nested_data)) as z2:
+                for name in z2.namelist():
+                    if name.lower().endswith('.jpg') or name.lower().endswith('.png'):
+                        parts = name.split('/')
+                        if len(parts) >= 3:
+                            context = parts[-3].lower()
+                            category = parts[-2].lower()
+                            
+                            key = f"{category}_{context}"
                             if category in target_categories and context in target_contexts:
-                                label = target_categories[category]
-                                confounder = target_contexts[context]
+                                img_name = f"{category}_{context}_{count:05d}.jpg"
+                                img_data = z2.read(name)
+                                with open(os.path.join(img_out_dir, img_name), "wb") as f_out:
+                                    f_out.write(img_data)
                                 
-                                img_name = f"{category}_{context}_{file}"
-                                dest_path = os.path.join(img_dir, img_name)
-                                if not os.path.exists(dest_path):
-                                    shutil.copy2(os.path.join(root, file), dest_path)
-                                    lines.append(f"{img_name},{label},{confounder}")
-                                    count += 1
-                                    
+                                # Label matching
+                                # We use 0 for dog, 1 for bear
+                                # We use 0 for grass, 1 for water
+                                label_idx = target_categories.index(category)
+                                context_idx = target_contexts.index(context)
+                                
+                                lines.append(f"{img_name},{label_idx},{context_idx}")
+                                counts[key] += 1
+                                count += 1
+
+            # NICO++ subset uses "label" for class and "confounder" for context
             with open(os.path.join(config.dataset_path, "data.csv"), "w") as f:
                 f.write("\n".join(lines))
             
-            shutil.rmtree(extract_dir)
-            
             if count == 0:
-                raise RuntimeError(f"Could not find Dog/Cat and Outdoor/Dim images within the extracted {zip_path}. Please check the zip contents.")
+                raise RuntimeError(f"Could not find matching images within the extracted {zip_path}. Please check the zip contents.")
             else:
                 print(f"NICO++ dataset subset successfully created with {count} images in {config.dataset_path}")
+                print(f"Counts: {counts}")
 
         super(NicoPlusPlusDataset, self).__init__(config=config, **kwargs)

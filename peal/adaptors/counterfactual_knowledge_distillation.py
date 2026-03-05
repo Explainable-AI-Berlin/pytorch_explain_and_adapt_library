@@ -1309,7 +1309,7 @@ class CFKD(Adaptor):
         )
         if (
             not isinstance(dataloader_val, torch.utils.data.DataLoader)
-            or len(dataloader_val.dataset) < 2 * self.adaptor_config.training.val_batch_size
+            or len(dataloader_val.dataset) < 2 * self.validation_data_config.training.val_batch_size
         ):
             open(
                 os.path.join(

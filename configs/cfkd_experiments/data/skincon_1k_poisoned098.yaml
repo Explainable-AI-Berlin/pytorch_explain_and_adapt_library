@@ -1,6 +1,6 @@
 dataset_class           : SkinConDataset
 dataset_path            : $PEAL_DATA/skincon
-num_samples             : 200
+num_samples             : 800
 split                   : [0.8, 1.0]
 input_type              : image
 input_size              : [3, 128, 128]
@@ -8,5 +8,5 @@ output_type             : multiclass
 output_size             : [2]
 downsize                : Resize
 delimiter               : ","
-confounder_probability  : 0.98
+confounder_probability  : 0.02
 confounding_factors     : [label, confounder]

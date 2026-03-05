@@ -148,7 +148,7 @@ python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/cl
 cat ${PEAL_RUNS}/skincon_1k/classifier_poisoned098/rrclarc/best_model_result.txt
 
 
-# Reproduce SOTA results on NICO++ dataset
+# Reproduce SOTA results on NICO++ dataset (Dog/Bear confounding Grass/Water)
 # Ensure you have manually downloaded NICO++ to $PEAL_DATA/nico_plus_plus according to custom_datasets.py instructions
 python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/nico_plus_plus_classifier_unpoisoned.yaml"
 python train_generator.py --config "<PEAL_BASE>/configs/cfkd_experiments/generators/nico_plus_plus_1k_ddpm_poisoned098.yaml"
