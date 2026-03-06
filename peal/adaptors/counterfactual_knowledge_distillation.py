@@ -228,6 +228,7 @@ class CFKDConfig(AdaptorConfig):
     sparse_dictionary: Union[SparseDictionaryConfig, dict, type(None)] = None
     correct_clusters: list = [0]
     use_true_counterfactuals: bool = False
+    seed: int = 0
 
 
 class CFKD(Adaptor):
