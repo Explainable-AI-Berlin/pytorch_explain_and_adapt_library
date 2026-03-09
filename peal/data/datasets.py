@@ -57,6 +57,57 @@ class SymbolicDataset(PealDataset):
         import pandas as pd
         df_data = [self.data[k].numpy() for k in self.keys]
         self.df = pd.DataFrame(df_data, columns=self.attributes)
+        self.groups_enabled = False
+        self.idx_enabled = False
+        self.return_dict = False
+        self.hints_enabled = False
+
+        if hasattr(self.config, "tabular_preprocessing") and self.config.tabular_preprocessing is not None:
+            for preprocessing_step in self.config.tabular_preprocessing:
+                if preprocessing_step == "minmax_-1_1":
+                    # Determine which columns to NOT scale (targets and confounders)
+                    exclude_cols = []
+                    if self.task_config is not None and self.task_config.y_selection is not None:
+                        exclude_cols.extend(self.task_config.y_selection)
+                    else:
+                        exclude_cols.append(self.attributes[-1]) # Default target is last column
+                        
+                    if hasattr(self.config, "confounding_factors") and self.config.confounding_factors is not None:
+                        exclude_cols.extend(self.config.confounding_factors)
+                    
+                    exclude_indices = [self.attributes.index(col) for col in exclude_cols if col in self.attributes]
+                    
+                    # Convert data dict to tensor for faster metric calculation
+                    all_data_tensor = torch.stack(list(self.data.values()))
+                    
+                    # We only want to scale continuous features, not categorical ones (e.g., 0, 1)
+                    # Use a heuristic: features with > 10 unique values are continuous
+                    continuous_indices = []
+                    for i in range(all_data_tensor.shape[1]):
+                        if i not in exclude_indices and len(torch.unique(all_data_tensor[:, i])) > 10:
+                            continuous_indices.append(i)
+                            
+                    col_mins = all_data_tensor.min(dim=0)[0]
+                    col_maxs = all_data_tensor.max(dim=0)[0]
+                    col_ranges = col_maxs - col_mins
+                    
+                    # Prevent division by zero
+                    col_ranges[col_ranges == 0] = 1.0
+
+                    for k in self.keys:
+                        # Start with unscaled original data
+                        scaled = self.data[k].clone()
+                        
+                        # Only scale the continuous indices identified
+                        for idx in continuous_indices:
+                            val = (self.data[k][idx] - col_mins[idx]) / col_ranges[idx] # Scale to [0, 1]
+                            scaled[idx] = val * 2.0 - 1.0 # Scale to [-1, 1]
+                            
+                        self.data[k] = scaled
+                        
+                    # Update DataFrame representation as well
+                    df_data = [self.data[k].numpy() for k in self.keys]
+                    self.df = pd.DataFrame(df_data, columns=self.attributes)
 
     def __len__(self):
         return len(self.keys)
@@ -68,6 +119,24 @@ class SymbolicDataset(PealDataset):
 
         else:
             return self.config.output_size
+
+    def enable_hints(self):
+        self.hints_enabled = True
+
+    def disable_hints(self):
+        self.hints_enabled = False
+
+    def enable_groups(self):
+        self.groups_enabled = True
+
+    def disable_groups(self):
+        self.groups_enabled = False
+
+    def enable_idx(self):
+        self.idx_enabled = True
+
+    def disable_idx(self):
+        self.idx_enabled = False
 
     def __getitem__(self, idx):
         name = self.keys[idx]
@@ -101,29 +170,94 @@ class SymbolicDataset(PealDataset):
         else:
             y = data[-1]
 
-        return x, y
+        if not self.return_dict:
+            if self.idx_enabled:
+                return x, [y, idx]
+            return x, y
+
+        return_dict = {"x": x, "y": y}
+        if self.idx_enabled:
+            return_dict["index"] = idx
+
+        if self.groups_enabled:
+            if (
+                not self.config.confounding_factors is None
+                and len(self.config.confounding_factors) >= 2
+            ):
+                confounder_name = self.config.confounding_factors[1]
+                has_confounder = data[self.attributes.index(confounder_name)]
+                return_dict["has_confounder"] = has_confounder
+            else:
+                return_dict["has_confounder"] = 0.0
+
+        return return_dict
 
     def generate_contrastive_collage(
         self,
-        x_list,
-        x_counterfactual_list,
-        y_target_list,
-        y_source_list,
-        target_confidence_goal,
-        base_path,
-        start_idx,
-        classifier=None,
-        **args,
-    ):
-        # TODO
-        collage_paths = [
-            os.path.join(base_path, embed_numberstring(str(start_idx + i)))
-            for i in range(len(x_list))
-        ]
-        for path in collage_paths:
-            Path(path).mkdir(parents=True, exist_ok=True)
+        x_list: list,
+        x_counterfactual_list: list,
+        y_target_list: list,
+        y_source_list: list,
+        y_list: list,
+        y_target_start_confidence_list: list,
+        y_target_end_confidence_list: list,
+        base_path: str,
+        start_idx: int = 0,
+        y_original_teacher_list=None,
+        y_counterfactual_teacher_list=None,
+        feedback_list=None,
+        **kwargs: dict,
+    ) -> tuple:
+        import matplotlib.pyplot as plt
+        import numpy as np
+        from pathlib import Path
 
-        return x_list, collage_paths
+        Path(base_path).mkdir(parents=True, exist_ok=True)
+        collage_paths = []
+        attribution_list = []
+
+        if self.task_config is not None and self.task_config.x_selection is not None:
+            feature_names = self.task_config.x_selection
+        else:
+            feature_names = self.attributes[:-1]
+
+        for i in range(len(x_list)):
+            original = x_list[i].detach().cpu().numpy().flatten()
+            cf = x_counterfactual_list[i].detach().cpu().numpy().flatten()
+            diff = cf - original
+            attribution_list.append(torch.tensor(np.abs(diff)))
+
+            fig, axes = plt.subplots(3, 1, figsize=(10, 12))
+            
+            # Plot Original
+            axes[0].bar(feature_names, original, color='#3498db')
+            axes[0].set_title(f'Original (Source Class: {int(y_source_list[i])}, Confidence: {float(y_target_start_confidence_list[i]):.2f})', fontweight='bold')
+            axes[0].tick_params(axis='x', rotation=45)
+            axes[0].grid(axis='y', linestyle='--', alpha=0.7)
+            
+            # Plot Counterfactual
+            axes[1].bar(feature_names, cf, color='#2ecc71')
+            axes[1].set_title(f'Counterfactual (Target Class: {int(y_target_list[i])}, Confidence: {float(y_target_end_confidence_list[i]):.2f})', fontweight='bold')
+            axes[1].tick_params(axis='x', rotation=45)
+            axes[1].grid(axis='y', linestyle='--', alpha=0.7)
+            
+            # Plot Difference
+            axes[2].bar(feature_names, diff, color='#e74c3c')
+            axes[2].set_title('Difference (Counterfactual - Original)', fontweight='bold')
+            axes[2].tick_params(axis='x', rotation=45)
+            axes[2].grid(axis='y', linestyle='--', alpha=0.7)
+            
+            plt.tight_layout()
+            
+            collage_path = os.path.join(
+                base_path,
+                embed_numberstring(str(start_idx + i)) + "_collage.png",
+            )
+            plt.savefig(collage_path, dpi=150)
+            plt.close(fig)
+            collage_paths.append(collage_path)
+
+        return attribution_list, collage_paths
 
     def serialize_dataset(
         self,

@@ -4,8 +4,8 @@ min_train_samples                    :  8 #hyperparameter as proportion of the f
 mixing_ratio                         :  0.5 # 1 `only new dataset, 0 `only old dataset
 finetune_iterations                  :  5 #hyperparameter
 max_validation_samples               :  8
-continuous_learning                  :  "False"
-replace_model                        :  True
+continuous_learning                  :  "finetuning"
+calculate_group_accuracies           :  True
 explainer                            :  <PEAL_BASE>/configs/tabular_experiments/explainers/counterfactual_default.yaml
 training                             :  <PEAL_BASE>/configs/tabular_experiments/training/symbolic_classifier.yaml
 data                                 :  <PEAL_BASE>/configs/tabular_experiments/data/circle_dataset_diffusion_poisoned.yaml

@@ -84,7 +84,9 @@ class DiceGenetic(ExplainerBase):
         # kx is the number of valid inits found so far
         kx = 0
         precisions = self.data_interface.get_decimal_precisions()
-        while kx < num_inits:
+        max_iters = num_inits * 10
+        curr_iter = 0
+        while kx < num_inits and curr_iter < max_iters:
             one_init = np.zeros(self.data_interface.number_of_features)
             for jx, feature in enumerate(self.data_interface.feature_names):
                 if feature in features_to_vary:
@@ -98,6 +100,22 @@ class DiceGenetic(ExplainerBase):
             if self.is_cf_valid(self.predict_fn_scores(one_init)):
                 remaining_cfs[kx] = one_init
                 kx += 1
+            curr_iter += 1
+            
+        # fallback if not enough valid inits found after max_iters
+        while kx < num_inits:
+            one_init = np.zeros(self.data_interface.number_of_features)
+            for jx, feature in enumerate(self.data_interface.feature_names):
+                if feature in features_to_vary:
+                    if feature in self.data_interface.continuous_feature_names:
+                        one_init[jx] = np.round(np.random.uniform(
+                            self.feature_range[feature][0], self.feature_range[feature][1]), precisions[jx])
+                    else:
+                        one_init[jx] = np.random.choice(self.feature_range[feature])
+                else:
+                    one_init[jx] = query_instance[jx]
+            remaining_cfs[kx] = one_init
+            kx += 1
         return remaining_cfs
 
     def do_KD_init(self, features_to_vary, query_instance, cfs, desired_class, desired_range):

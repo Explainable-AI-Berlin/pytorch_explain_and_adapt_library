@@ -195,6 +195,10 @@ class CFKDConfig(AdaptorConfig):
     """
     group_accuracies: list = []
     """
+    The average group accuracies of the model after every finetuning iteration.
+    """
+    avg_group_accuracies: list = []
+    """
     What type of counterfactuals are valid. 1sided means that we can only start from samples with correct prediction,
     2sided also allows that we start from samples with wrong orignal prediction.
     """
@@ -550,12 +554,13 @@ class CFKD(Adaptor):
                     self.adaptor_config.tracking_level,
                     2,
                 )
-                avg_group_accuracy = np.mean(group_accuracies)
+                avg_group_accuracy = float(np.mean(group_accuracies))
                 cprint(
                     "avg_group_accuracy: " + str(avg_group_accuracy),
                     self.adaptor_config.tracking_level,
                     2,
                 )
+                self.adaptor_config.avg_group_accuracies.append(avg_group_accuracy)
                 writer.add_scalar(
                     "test_avg_group_accuracy",
                     avg_group_accuracy,
@@ -2037,12 +2042,13 @@ class CFKD(Adaptor):
                     self.adaptor_config.tracking_level,
                     2,
                 )
-                avg_group_accuracy = np.mean(group_accuracies)
+                avg_group_accuracy = float(np.mean(group_accuracies))
                 cprint(
                     "avg_group_accuracy: " + str(avg_group_accuracy),
                     self.adaptor_config.tracking_level,
                     2,
                 )
+                self.adaptor_config.avg_group_accuracies.append(avg_group_accuracy)
                 writer.add_scalar("test_avg_group_accuracy", avg_group_accuracy, finetune_iteration)
                 old_avg_group_accuracy = np.mean(self.adaptor_config.group_accuracies[-2])
                 gain = (avg_group_accuracy - old_avg_group_accuracy) / (1 - old_avg_group_accuracy)

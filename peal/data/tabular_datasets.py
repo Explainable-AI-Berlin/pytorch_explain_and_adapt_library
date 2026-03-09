@@ -35,8 +35,6 @@ class CircleDataset(SymbolicDataset):
             circle_dataset_generator = CircleDatasetGenerator(config)
             circle_dataset_generator.generate_dataset()
         super(CircleDataset, self).__init__(mode=mode, config=config, **kwargs)
-        self.hints_enabled = False
-        self.idx_enabled = False
 
     def calculate_outlier_score(self, x):
         import torch
@@ -79,8 +77,6 @@ class AdultDataset(SymbolicDataset):
         with open(f"{config.dataset_path}/data.csv", "r") as f:
             config.input_size = [len(f.readline().strip().split(",")) - 1]
         super(AdultDataset, self).__init__(mode, config, **kwargs)
-        self.hints_enabled = False
-        self.idx_enabled = False
 
     def calculate_outlier_score(self, x):
         import torch
@@ -121,8 +117,6 @@ class CompassDataset(SymbolicDataset):
         with open(f"{config.dataset_path}/data.csv", "r") as f:
             config.input_size = [len(f.readline().strip().split(",")) - 1]
         super(CompassDataset, self).__init__(mode, config, **kwargs)
-        self.hints_enabled = False
-        self.idx_enabled = False
 
     def calculate_outlier_score(self, x):
         import torch
@@ -165,8 +159,6 @@ class GermanDataset(SymbolicDataset):
         with open(f"{config.dataset_path}/data.csv", "r") as f:
             config.input_size = [len(f.readline().strip().split(",")) - 1]
         super(GermanDataset, self).__init__(mode, config, **kwargs)
-        self.hints_enabled = False
-        self.idx_enabled = False
 
     def calculate_outlier_score(self, x):
         import torch

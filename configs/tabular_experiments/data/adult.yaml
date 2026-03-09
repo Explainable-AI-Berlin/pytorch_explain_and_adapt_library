@@ -10,3 +10,4 @@ output_type:  "singleclass"
 shuffle: "True"
 delimiter: ","
 set_negative_to_zero : False
+tabular_preprocessing: ["minmax_-1_1"]

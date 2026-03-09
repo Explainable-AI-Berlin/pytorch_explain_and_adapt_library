@@ -269,3 +269,8 @@ class DataConfig(BaseModel):
     sampling_time_fraction: float = 0.3
     num_discretization_steps: int = 20
     batch_wise_augmentation: bool = True
+    """
+    List of preprocessing methods to apply to tabular datasets.
+    Options: ['minmax_-1_1']
+    """
+    tabular_preprocessing: Union[type(None), list[str]] = None
