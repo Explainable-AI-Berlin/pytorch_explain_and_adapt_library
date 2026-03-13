@@ -309,7 +309,10 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
                 encoder = UNI(model, transform)
 
         elif not self.config.encoder_path is None:
-            encoder = torch.load(self.config.encoder_path, map_location="cpu")
+            try:
+                encoder = torch.load(self.config.encoder_path, map_location="cpu")
+            except Exception:
+                encoder = torch.load(self.config.encoder_path, map_location="cpu", weights_only=False)
             if self.config.is_torchvision_resnet:
                 # remove the head
                 encoder.model.fc = nn.Identity()
@@ -322,13 +325,15 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
 
         if not encoder is None:
             # nn module that normalizes with self.generator_dataset.config.normalization
-
-            normalization = NormalizationModule(
-                self.generator_dataset.config.normalization[0],
-                self.generator_dataset.config.normalization[1],
-            )
-            # include the normalization directly into the encoder
-            self.encoder = torch.nn.Sequential(normalization, encoder)
+            if not self.generator_dataset.config.normalization is None:
+                normalization = NormalizationModule(
+                    self.generator_dataset.config.normalization[0],
+                    self.generator_dataset.config.normalization[1],
+                )
+                # include the normalization directly into the encoder
+                self.encoder = torch.nn.Sequential(normalization, encoder)
+            else:
+                self.encoder = encoder
 
         else:
             self.encoder = None
@@ -656,7 +661,10 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
                 )
 
             else:
-                self.gradient_predictor = torch.load(distilled_path, map_location=self.device)
+                try:
+                    self.gradient_predictor = torch.load(distilled_path, map_location=self.device)
+                except Exception:
+                    self.gradient_predictor = torch.load(distilled_path, map_location=self.device, weights_only=False)
 
             decision_boundary_path = os.path.join(
                 base_path, "explainer", "distilled_predictor", "decision_boundary.png"

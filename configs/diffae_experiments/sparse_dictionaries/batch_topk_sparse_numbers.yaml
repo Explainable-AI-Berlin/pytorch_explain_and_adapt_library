@@ -10,3 +10,4 @@ model_batch_size: 32
 n_batches_to_dead: 100
 top_k_aux: 4
 aux_penalty: 0.03125
+seed: 42

@@ -27,7 +27,7 @@ class BatchTopKSAE(SparseDictionary):
         self.config = config
         
         # Prepare internal config for the dependency's SAE class
-        if isinstance(self.config.cfg, dict):
+        if isinstance(self.config.cfg, dict) and len(self.config.cfg) > 0:
             cfg = self.config.cfg
         else:
             cfg = {
@@ -89,7 +89,10 @@ class BatchTopKSAE(SparseDictionary):
         }, path)
 
     def load_from_disk(self, path):
-        checkpoint = torch.load(path, map_location="cpu")
+        try:
+            checkpoint = torch.load(path, map_location="cpu")
+        except Exception:
+            checkpoint = torch.load(path, map_location="cpu", weights_only=False)
         self.sae.W_enc.data = checkpoint['W_enc'].to(self.config.device)
         self.sae.W_dec.data = checkpoint['W_dec'].to(self.config.device)
         self.sae.b_enc.data = checkpoint['b_enc'].to(self.config.device)

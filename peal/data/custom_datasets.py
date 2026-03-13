@@ -759,7 +759,10 @@ class Camelyon17AugmentedDataset(Image2MixedDataset):
         peal_runs = os.environ.get("PEAL_RUNS", "peal_runs")
         oracle_path = os.path.join(peal_runs, "camelyon17", "latent_oracle", "model.cpl")
         if os.path.exists(oracle_path):
-            self.oracle = torch.load(oracle_path)
+            try:
+                self.oracle = torch.load(oracle_path)
+            except Exception:
+                self.oracle = torch.load(oracle_path, weights_only=False)
             self.oracle.eval()
 
         super(Camelyon17AugmentedDataset, self).__init__(config=config, **kwargs)
@@ -916,7 +919,10 @@ class CelebADataset(Image2MixedDataset):
             peal_runs = os.environ.get("PEAL_RUNS", "peal_runs")
             oracle_path = os.path.join(peal_runs, "celeba", "latent_oracle", "model.cpl")
             if os.path.exists(oracle_path):
-                self.oracle = torch.load(oracle_path)
+                try:
+                    self.oracle = torch.load(oracle_path)
+                except Exception:
+                    self.oracle = torch.load(oracle_path, weights_only=False)
                 self.oracle.eval()
 
     def sample_to_latent(self, sample, mask=None):

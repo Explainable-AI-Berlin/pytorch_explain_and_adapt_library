@@ -299,7 +299,7 @@ class LitModel(L.LightningModule):
                 with torch.no_grad():
                     # (n, c)
                     # print('idx:', batch['index'])
-                    cond = model.encoder(batch["img"].to(self.device))
+                    cond = model.encoder(batch["x"].to(self.device))
 
                     # used for reordering to match the original dataset
                     idx = batch["index"]
@@ -361,7 +361,7 @@ class LitModel(L.LightningModule):
                     self.device
                 )
         else:
-            imgs, idxs = batch["img"], batch["index"]
+            imgs, idxs = batch["x"], batch["index"]
             # print(f'(rank {self.global_rank}) batch size:', len(imgs))
             x_start = imgs
 
@@ -426,7 +426,7 @@ class LitModel(L.LightningModule):
             if self.conf.train_mode.require_dataset_infer():
                 imgs = None
             else:
-                imgs = batch["img"]
+                imgs = batch["x"]
             self.log_sample(x_start=imgs)
             #self.evaluate_scores()
 
