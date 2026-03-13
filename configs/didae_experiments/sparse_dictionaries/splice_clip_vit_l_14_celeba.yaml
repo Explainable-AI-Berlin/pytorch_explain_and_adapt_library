@@ -1,0 +1,9 @@
+category: sparse_dictionaries
+sparse_dictionaries_type: SpLICEDecomposition
+clip_model: "clip:ViT-L/14"
+vocabulary: laion
+vocabulary_size: -1
+l1_penalty: 0.15
+solver: skl
+component_strings: [blond, female, makeup, attractive]
+opposite_component_strings: [dark-haired, male, no makeup, unattractive]

@@ -1,6 +1,6 @@
 # python train_predictor.py --config "<PEAL_BASE>/configs/didae_experiments/predictors/waterbirds_openclip_linear.yaml"
 model_path        : $PEAL_RUNS/waterbirds/openclip_natural
-training          : <PEAL_BASE>/configs/cfkd_experiments/training/img_classifier_balanced.yaml
+training          : <PEAL_BASE>/configs/didae_experiments/training/img_classifier_balanced.yaml
 data              : <PEAL_BASE>/configs/didae_experiments/data/waterbirds.yaml
 architecture      : torchvision_open_clip
 continue_training : True
@@ -11,5 +11,4 @@ task:
     l2     : 100.0
   output_type             : singleclass
   y_selection             : [y]
-  x_selection             : [""]
   output_channels         : 2

@@ -161,6 +161,7 @@ def get_datasets(
     dataset_class_dict = {
         dataset_class.__name__: dataset_class for dataset_class in dataset_class_list
     }
+    print(f"DEBUG: Found dataset classes: {list(dataset_class_dict.keys())}")
     if config.dataset_class in dataset_class_dict.keys():
         dataset = dataset_class_dict[config.dataset_class]
 

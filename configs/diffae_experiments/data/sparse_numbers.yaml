@@ -1,0 +1,13 @@
+dataset_class           : SparseNumbersDataset
+dataset_path            : $PEAL_DATA/sparse_numbers
+num_samples             : 125000
+split                   : [0.8,0.9]
+input_type              : image
+input_size              : [3, 128, 128]
+x_selection             : imgs
+output_split            : 10000
+output_type             : mixed
+output_size             : [16]
+downsize                : Resize
+delimiter               : ","
+has_hints               : false

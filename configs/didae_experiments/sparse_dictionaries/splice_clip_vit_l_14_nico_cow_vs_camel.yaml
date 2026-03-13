@@ -1,0 +1,10 @@
+category: sparse_dictionaries
+sparse_dictionaries_type: SpLICEDecomposition
+clip_model: "clip:ViT-L/14"
+vocabulary: laion
+vocabulary_size: -1
+l1_penalty: 0.15
+solver: skl
+component_strings: [cow, grass]
+opposite_component_strings: [camel, sand]
+data: "<PEAL_BASE>/configs/didae_experiments/data/nico_cow_vs_camel.yaml"

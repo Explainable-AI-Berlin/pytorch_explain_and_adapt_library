@@ -8,4 +8,5 @@ l1_penalty: 0.15
 solver: skl
 component_strings: [bear, water]
 opposite_component_strings: [dog, grass]
-data: "<PEAL_BASE>/configs/didae_experiments/data/nico_bear_vs_dog.yaml"
+batch_size: 1
+data: "<PEAL_BASE>/configs/didae_experiments/data/nico_bear_vs_dog_generator.yaml"

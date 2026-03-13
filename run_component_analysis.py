@@ -18,6 +18,12 @@ def main():
 
     if not args.sd_config is None:
         sparse_dictionary_config = load_yaml_config(args.sd_config)
+        
+        # Force the generator to use this specific sparse dictionary during init
+        generator_config.sparse_dictionary = sparse_dictionary_config
+        # Also ensure the generator data matches the dictionary data
+        if hasattr(sparse_dictionary_config, "data") and sparse_dictionary_config.data:
+            generator_config.data = sparse_dictionary_config.data
 
     else:
         sparse_dictionary_config = None

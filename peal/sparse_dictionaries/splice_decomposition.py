@@ -51,7 +51,9 @@ class SpLICEDecomposition(SparseDictionary):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.splice_model = None
         self.image_mean = None
-        self._load_splice_model()
+        # Lazy loading: we don't call _load_splice_model() here
+        # to avoid double loading CLIP onto GPU if the generator
+        # is about to inject its own model via set_clip_model().
 
     def _load_splice_model(self):
         """Load the SpLICE model with the configured CLIP backbone."""
@@ -88,10 +90,8 @@ class SpLICEDecomposition(SparseDictionary):
         self.splice_model.clip.eval()
 
     def fit(self, X: torch.Tensor, y: torch.Tensor = None):
-        """No-op — SpLICE uses a pretrained dictionary, not learned from data.
-        
-        If X is provided, computes the image mean from it for centering.
-        """
+        if self.splice_model is None:
+            self._load_splice_model()
         if X is not None and X.shape[0] > 0:
             self.image_mean = X.mean(dim=0)
             self.splice_model.image_mean = self.image_mean.to(self.device)
@@ -134,17 +134,13 @@ class SpLICEDecomposition(SparseDictionary):
         self.image_mean = all_embeddings.mean(dim=0)
         
         # Update the SpLICE model's image mean to use dataset-specific mean
+        if self.splice_model is None:
+            self._load_splice_model()
         self.splice_model.image_mean = self.image_mean.to(self.device)
 
     def decompose(self, embeddings: torch.Tensor) -> torch.Tensor:
-        """Decompose CLIP embeddings into sparse concept weights.
-        
-        Args:
-            embeddings: (batch, clip_dim) normalized CLIP image embeddings
-            
-        Returns:
-            weights: (batch, n_concepts) sparse weight vector
-        """
+        if self.splice_model is None:
+            self._load_splice_model()
         embeddings = embeddings.to(self.device).float()
         embeddings = F.normalize(embeddings, dim=1)
         centered = F.normalize(
@@ -154,25 +150,13 @@ class SpLICEDecomposition(SparseDictionary):
         return weights
 
     def recompose(self, weights: torch.Tensor) -> torch.Tensor:
-        """Reconstruct dense CLIP embeddings from sparse weights.
-        
-        Args:
-            weights: (batch, n_concepts) sparse weight vector
-            
-        Returns:
-            recon: (batch, clip_dim) reconstructed CLIP embedding
-        """
+        if self.splice_model is None:
+            self._load_splice_model()
         return self.splice_model.recompose_image(weights.to(self.device))
 
     def get_components(self):
-        """Return the concept dictionary matrix.
-        
-        Returns:
-            components: (clip_dim, n_concepts) — transposed to match
-            the convention used in OrthogonalProcrustesDictionary and
-            DiffusionAutoencoder._calculate_z_counterfactuals()
-        """
-        # SpLICE dictionary is (n_concepts, clip_dim), transpose to (clip_dim, n_concepts)
+        if self.splice_model is None:
+            self._load_splice_model()
         return self.splice_model.dictionary.T.cpu()
 
     def save_on_disk(self, path):

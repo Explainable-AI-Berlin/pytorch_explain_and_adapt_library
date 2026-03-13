@@ -87,7 +87,10 @@ class CLIPImageEncoder(nn.Module):
 
     def __init__(self, device="cpu"):
         super().__init__()
+        # Load in float16 if on CUDA
         self.clip_model, self.preprocess = clip.load("ViT-L/14", device=device)
+        if device != "cpu":
+            self.clip_model = self.clip_model.half()
         self.clip_model.eval()
         for p in self.clip_model.parameters():
             p.requires_grad_(False)
@@ -140,6 +143,27 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         self.predictor_dataset = copy.deepcopy(predictor_dataset)
         self.device = device if torch.cuda.is_available() or device == "cpu" else "cpu"
 
+        # --- Resolve data config override from sparse dictionary ---
+        if self.config.sparse_dictionary is not None:
+            sd_config = self.config.sparse_dictionary
+            
+            # If it's a string path, load it temporarily to check for data override
+            if isinstance(sd_config, str):
+                sd_config = load_yaml_config(sd_config)
+            
+            sd_data = None
+            if isinstance(sd_config, dict):
+                sd_data = sd_config.get("data")
+            elif hasattr(sd_config, "data"):
+                sd_data = sd_config.data
+            
+            if sd_data:
+                print(f"StableDiffusionAutoencoder: Overriding generator data with {sd_data} from sparse dictionary config.")
+                self.config.data = sd_data
+
+        # Ensure self.config.data is fully loaded as a DataConfig
+        self.config.data = load_yaml_config(self.config.data, DataConfig)
+
         # --- Load datasets ---
         self.generator_datasets = get_datasets(self.config.data)
         if self.config.task_config is not None:
@@ -149,32 +173,42 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
 
         self.generator_dataset = self.generator_datasets[0] if self.generator_datasets else None
 
+        # --- Setup CLIP ViT-L/14 semantic encoder ---
+        self.encoder = CLIPImageEncoder(device=self.device)
+
         # --- Load Stable Diffusion pipeline ---
+        # Using float16 and attention slicing to fit in limited VRAM (e.g. 4GB GPUs)
+        dtype = torch.float16 if self.device != "cpu" else torch.float32
+        
         self.pipe = StableDiffusionPipeline.from_pretrained(
-            self.config.model_id
+            self.config.model_id,
+            torch_dtype=dtype,
         ).to(self.device)
+        
+        if self.device != "cpu":
+            self.pipe.enable_attention_slicing()
+            torch.cuda.empty_cache()
+
         self.pipe.scheduler = DDIMScheduler.from_config(
             self.config.model_id, subfolder="scheduler"
         )
         self.pipe.scheduler.set_timesteps(self.config.num_diffusion_steps)
         self.pipe.safety_checker = None
 
-        # --- Setup CLIP ViT-L/14 semantic encoder ---
-        self.encoder = CLIPImageEncoder(device=self.device)
-
         # --- Load sparse dictionary (SpLICE) if configured ---
         self.sparse_dictionary = None
         if self.config.sparse_dictionary is not None:
             self.load_sparse_dictionary()
             
+            # Ensure CLIP weight identity by sharing the model instance FIRST
+            # This avoids double-loading weights during fit_sparse_dictionary
+            if self.sparse_dictionary is not None and hasattr(self.sparse_dictionary, 'set_clip_model'):
+                self.sparse_dictionary.set_clip_model(self.encoder.clip_model)
+
             # Check if it was actually loaded from disk (has image_mean)
             # If not, it means the (default) weights file didn't exist yet, so we fit.
             if getattr(self.sparse_dictionary, "image_mean", None) is None:
                 self.fit_sparse_dictionary()
-                
-            # Ensure CLIP weight identity by sharing the model instance
-            if self.sparse_dictionary is not None and hasattr(self.sparse_dictionary, 'set_clip_model'):
-                self.sparse_dictionary.set_clip_model(self.encoder.clip_model)
 
     def __setattr__(self, name, value):
         """Override __setattr__ to ensure dictionary consistency.
@@ -774,6 +808,15 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             else:
                 if isinstance(sparse_dictionary, SparseDictionaryConfig):
                     self.config.sparse_dictionary = sparse_dictionary
+                
+                # Check for data override in the new sparse dictionary config
+                sd_data = getattr(self.config.sparse_dictionary, "data", None)
+                if sd_data:
+                    print(f"StableDiffusionAutoencoder: Reloading datasets from {sd_data} for component explanation.")
+                    self.config.data = sd_data
+                    self.generator_datasets = get_datasets(self.config.data)
+                    self.generator_dataset = self.generator_datasets[0] if self.generator_datasets else None
+
                 self.config.sparse_dictionary.act_size = self.config.encoder_dimensions
                 self.load_sparse_dictionary()
                 if self.sparse_dictionary is None:
@@ -806,10 +849,11 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             )
             self.generator_datasets[1].task_config = None
 
+            batch_size = getattr(self.config.sparse_dictionary, "batch_size", 10)
             for idx, batch in enumerate(
-                torch.utils.data.DataLoader(self.generator_datasets[1], batch_size=10)
+                torch.utils.data.DataLoader(self.generator_datasets[1], batch_size=batch_size)
             ):
-                print(f"{10 * idx}/{len(self.generator_datasets[1])}")
+                print(f"{batch_size * idx}/{len(self.generator_datasets[1])}")
                 x, y = batch
                 z, _ = self.encode(x.to(self.device))
                 c = z @ self.sparse_dictionary.get_components().to(self.device).to(z.dtype)

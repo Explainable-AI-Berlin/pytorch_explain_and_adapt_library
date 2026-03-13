@@ -12,7 +12,9 @@ class SparseDictionaryConfig(BaseModel):
     act_size: int = 512
     visualizations_per_component: int = 100
     weights_name: str = "weights.npz"
+    batch_size: int = 16
     component_strings: Union[list, None] = None
+    data: Union[str, object, None] = None
 
 class SparseDictionary:
     config : SparseDictionaryConfig

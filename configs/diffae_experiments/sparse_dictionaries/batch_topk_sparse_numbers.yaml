@@ -1,0 +1,12 @@
+sparse_dictionaries_type: BatchTopKSAE
+n_components: 10016
+top_k: 12
+act_size: 512
+category: sparse_dictionaries
+weights_name: sae_weights.npz
+lr: 0.0003
+l1_coeff: 0.0
+model_batch_size: 32
+n_batches_to_dead: 100
+top_k_aux: 4
+aux_penalty: 0.03125

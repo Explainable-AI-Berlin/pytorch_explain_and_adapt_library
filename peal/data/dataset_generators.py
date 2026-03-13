@@ -11,7 +11,8 @@ from pathlib import Path
 
 import torch
 import torchvision
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
+from tqdm import tqdm
 from torchvision.transforms import ToTensor
 
 from peal.global_utils import get_project_resource_dir, embed_numberstring
@@ -1070,3 +1071,188 @@ class SquareDatasetGenerator:
             os.path.join(self.data_config.dataset_path + "_inverse", "data.csv"),
             "w",
         ).write("\n".join(lines_out_inverse))
+
+class SparseNumbersDatasetGenerator:
+    """
+    Generates a dataset of images with a 2x4 grid of 4-digit numbers.
+    Resolution: 128x128.
+    Grid: 2 columns, 4 rows.
+    Numbers: 0000-9999, each appears 50 times in the dataset.
+    Occupancy: Each slot has a 50% chance of being present (500,000 total numbers in 125,000 samples).
+    Background: Variable red intensity (white to red).
+    Foreground: Black numbers.
+    """
+
+    def __init__(self, data_config, **kwargs):
+        self.data_config = data_config
+        self.font_path = kwargs.get("font_path", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+
+    def _draw_number_in_cell(self, draw, text, box):
+        # box is (x0, y0, x1, y1)
+        cell_w = box[2] - box[0]
+        cell_h = box[3] - box[1]
+        
+        # Binary search for optimal font size
+        low = 1
+        high = cell_h * 2
+        best_size = 1
+        
+        while low <= high:
+            mid = (low + high) // 2
+            try:
+                font = ImageFont.truetype(self.font_path, mid)
+            except OSError:
+                font = ImageFont.load_default()
+                best_size = mid
+                break
+                
+            if hasattr(font, "getbbox"):
+                bbox = font.getbbox(text)
+                w = bbox[2] - bbox[0]
+                h = bbox[3] - bbox[1]
+            else:
+                w, h = draw.textsize(text, font=font)
+                
+            if w <= cell_w * 0.9 and h <= cell_h * 0.9:
+                best_size = mid
+                low = mid + 1
+            else:
+                high = mid - 1
+                
+        try:
+            font = ImageFont.truetype(self.font_path, best_size)
+        except OSError:
+            font = ImageFont.load_default()
+            
+        if hasattr(font, "getbbox"):
+            bbox = font.getbbox(text)
+            w = bbox[2] - bbox[0]
+            h = bbox[3] - bbox[1]
+        else:
+            w, h = draw.textsize(text, font=font)
+            
+        x = box[0] + (cell_w - w) / 2
+        y = box[1] + (cell_h - h) / 2
+        draw.text((x, y), text, fill=(0, 0, 0), font=font)
+
+    def generate_dataset(self):
+        """Generates the sparse_numbers dataset."""
+
+
+        dataset_path = self.data_config.dataset_path
+        print(f"DEBUG: dataset_path={dataset_path}")
+        if os.path.exists(dataset_path):
+            datestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            shutil.move(dataset_path, dataset_path + "_old_" + datestamp)
+
+        os.makedirs(os.path.join(dataset_path, "imgs"), exist_ok=True)
+
+        num_samples = self.data_config.num_samples if self.data_config.num_samples else 125000
+        print(f"DEBUG: num_samples={num_samples}")
+        n_unique_numbers = 10000
+        # Calculate repeats to aim for 50% occupancy if num_samples changed
+        # Total slots = num_samples * 8. Occupancy 50% = 4 * num_samples.
+        # repeats = (4 * num_samples) // n_unique_numbers
+        repeats = max(1, (4 * num_samples) // n_unique_numbers)
+        total_slots = num_samples * 8
+        total_number_entries = min(n_unique_numbers * repeats, total_slots)
+        
+        # Prepare all numbers
+        all_numbers = []
+        for n in range(n_unique_numbers):
+            all_numbers.extend([n] * repeats)
+        random.shuffle(all_numbers)
+        all_numbers = all_numbers[:total_number_entries]
+        
+        # Assign numbers to slots
+        # Total slots = 125,000 * 8 = 1,000,000
+        # We need to pick 500,000 slots to be occupied.
+        occupied_indices = random.sample(range(total_slots), total_number_entries)
+        
+        # Map indices to samples
+        sample_slots = [{} for _ in range(num_samples)]
+        for i, slot_idx in enumerate(occupied_indices):
+            sample_idx = slot_idx // 8
+            local_slot_idx = slot_idx % 8
+            sample_slots[sample_idx][local_slot_idx] = all_numbers[i]
+            
+        # Check for duplicates within samples and fix them
+        # We'll use a simple swap strategy with another random sample's slot
+        for s_idx in range(num_samples):
+            seen = {}
+            for local_idx, val in list(sample_slots[s_idx].items()):
+                if val in seen:
+                    # Collision! Find another sample to swap with
+                    done = False
+                    while not done:
+                        other_s_idx = random.randint(0, num_samples - 1)
+                        if other_s_idx == s_idx: continue
+                        other_slots = sample_slots[other_s_idx]
+                        if not other_slots: continue
+                        # Pick a random slot in other_sample
+                        other_local_idx = random.choice(list(other_slots.keys()))
+                        other_val = other_slots[other_local_idx]
+                        
+                        # Check if swapping causes collision in either sample
+                        if other_val not in seen and val not in set(other_slots.values()):
+                            # Swap
+                            sample_slots[s_idx][local_idx] = other_val
+                            sample_slots[other_s_idx][other_local_idx] = val
+                            done = True
+                else:
+                    seen[val] = local_idx
+            
+        # Grid layout
+        # Resolution 128x128. 2 columns, 4 rows.
+        # Cell size: 60x30. Gaps: 8px horiz (between cols), 2px vert.
+        # Padding: 2px around.
+        cell_w, cell_h = 60, 30
+        col_x = [2, 66] # x-starts for col 0 and col 1
+        row_y = [2, 34, 66, 98] # y-starts for row 0, 1, 2, 3
+        
+        slots_coord = []
+        for r in range(4):
+            for c in range(2):
+                slots_coord.append((col_x[c], row_y[r], col_x[c] + cell_w, row_y[r] + cell_h))
+
+        lines_out = ["imgs,Red1,Red2,Red3,Red4,Red5,Red6,Red7,Red8,Num1,Num2,Num3,Num4,Num5,Num6,Num7,Num8"]
+        
+        for s_idx in tqdm(range(num_samples), desc="Generating samples"):
+            img = Image.new("RGB", (128, 128), (255, 255, 255))
+            draw = ImageDraw.Draw(img)
+            
+            row_data = [f"{s_idx:06d}.png"]
+            intensities = [random.random() for _ in range(8)]
+            nums_in_sample = []
+            
+            for i in range(8):
+                intensity = intensities[i]
+                box = slots_coord[i]
+                
+                # Draw background: White (255,255,255) to Red (255,0,0)
+                # color = (255, int(255*(1-intensity)), int(255*(1-intensity)))
+                # Fill the cell
+                draw.rectangle(box, fill=(255, int(255*(1-intensity)), int(255*(1-intensity))))
+                
+                if i in sample_slots[s_idx]:
+                    num = sample_slots[s_idx][i]
+                    text = f"{num:04d}"
+                    self._draw_number_in_cell(draw, text, box)
+                    nums_in_sample.append(num)
+                else:
+                    nums_in_sample.append(-1)
+            
+            row_data.extend([f"{intt:.4f}" for intt in intensities])
+            row_data.extend([str(n) for n in nums_in_sample])
+            lines_out.append(",".join(row_data))
+            
+            img.save(os.path.join(dataset_path, "imgs", f"{s_idx:06d}.png"))
+            
+            if (s_idx + 1) % 1000 == 0:
+                with open(os.path.join(dataset_path, "data.csv"), "w") as f:
+                    f.write("\n".join(lines_out))
+                    
+        with open(os.path.join(dataset_path, "data.csv"), "w") as f:
+            f.write("\n".join(lines_out))
+
+        print(f"Dataset generated at {dataset_path}")

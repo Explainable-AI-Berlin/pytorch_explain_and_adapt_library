@@ -199,6 +199,14 @@ class DataConfig(BaseModel):
     """
     confounding_factors: Union[type(None), list[str]] = []
     """
+    The foreground categories to use for the experiment.
+    """
+    foreground: Union[type(None), list[str]] = None
+    """
+    The background contexts to use for the experiment.
+    """
+    background: Union[type(None), list[str]] = None
+    """
     The correlation strength of the target and the confounding variable.
     """
     confounder_probability: Union[type(None), float] = None

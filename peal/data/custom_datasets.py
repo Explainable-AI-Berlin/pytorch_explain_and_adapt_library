@@ -23,6 +23,7 @@ from peal.data.dataloaders import DataloaderMixer, WeightedDataloaderList
 from peal.data.dataset_generators import (
     SquareDatasetGenerator,
     ConfounderDatasetGenerator,
+    SparseNumbersDatasetGenerator,
 )
 from peal.data.datasets import (
     Image2ClassDataset,
@@ -358,6 +359,50 @@ class SquareDataset(Image2MixedDataset):
                 raise NotImplementedError("Only confounder_probability=0.5 can be used to generate the dataset")
 
         super(SquareDataset, self).__init__(config=config, **kwargs)
+
+
+class SparseNumbersDataset(Image2MixedDataset):
+    def __init__(self, config: DataConfig, **kwargs):
+        if not os.path.exists(os.path.join(config.dataset_path, "data.csv")):
+            sdg = SparseNumbersDatasetGenerator(data_config=config, **kwargs)
+            sdg.generate_dataset()
+
+        super(SparseNumbersDataset, self).__init__(config=config, **kwargs)
+
+    def __getitem__(self, idx):
+        sample = super().__getitem__(idx)
+
+        # In Image2MixedDataset, the return format depends on return_dict.
+        if self.return_dict:
+            x = sample["x"]
+            y_raw = sample["y"]
+        else:
+            x, y_raw = sample
+
+        # y_raw has 16 values (8 Red, 8 Num) if output_size is configured as [16] in DataConfig
+        # or if we just take them from self.data[name].
+        # In SparseNumbersDataset, self.data[name] will have 16 values.
+        
+        reds = y_raw[:8]
+        nums = y_raw[8:16]
+
+        # First 10,000 are binary flags for number presence
+        # Next 8 are regression for red intensities
+        binary_nums = torch.zeros(10000)
+        for n in nums:
+            if n >= 0:
+                # Ensure the number is within the expected range
+                num_idx = int(n)
+                if 0 <= num_idx < 10000:
+                    binary_nums[num_idx] = 1.0
+
+        y_final = torch.cat([binary_nums, reds])
+
+        if self.return_dict:
+            sample["y"] = y_final
+            return sample
+        else:
+            return x, y_final
 
     def global_counterfactual_visualization(
         self,
@@ -1102,8 +1147,8 @@ class NicoPlusPlusDataset(Image2MixedDataset):
             
                 raise FileNotFoundError(f"Please download NICO++.zip to {zip_path}")
             
-            target_categories = ["dog", "bear"]
-            target_contexts = ["grass", "water"]
+            target_categories = config.foreground if config.foreground else ["bear", "dog"]
+            target_contexts = config.background if config.background else ["grass", "water"]
             
             # Since NICO++ is nested, we might need a temporary extraction or read inline
             # We'll extract only the target images
@@ -1117,12 +1162,11 @@ class NicoPlusPlusDataset(Image2MixedDataset):
             count = 0
             
             # Use actual group counts for extraction without hard clipping
-            counts = {
-                "dog_grass": 0,
-                "dog_water": 0,
-                "bear_grass": 0,
-                "bear_water": 0
-            }
+            counts = {}
+            for target_category in target_categories:
+                for target_context in target_contexts:
+                    counts[f"{target_category}_{target_context}"] = 0
+
 
             with zipfile.ZipFile(zip_path, 'r') as z1:
                 # Find the nested zip
@@ -1153,9 +1197,8 @@ class NicoPlusPlusDataset(Image2MixedDataset):
                                 with open(os.path.join(img_out_dir, img_name), "wb") as f_out:
                                     f_out.write(img_data)
                                 
-                                # Label matching
-                                # We use 0 for dog, 1 for bear
-                                # We use 0 for grass, 1 for water
+                                # Label matching and Context matching
+                                # Indices are based on the order in the configuration's foreground/background lists
                                 label_idx = target_categories.index(category)
                                 context_idx = target_contexts.index(context)
                                 

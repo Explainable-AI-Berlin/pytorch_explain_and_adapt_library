@@ -73,7 +73,7 @@ class Logger:
 
         self.losses.append(loss_logs["loss"])
 
-        if "mixed" in self.config.task.criterions.keys():
+        if any(k in self.config.task.criterions.keys() for k in ["mixed", "focal_mixed"]):
             self.targets.append(y.detach())
             self.predictions.append(pred.detach())
 
@@ -146,7 +146,7 @@ class Logger:
             )
             self.correct = torch.cat(self.correct)
 
-        if "mixed" in self.config.task.criterions.keys():
+        if any(k in self.config.task.criterions.keys() for k in ["mixed", "focal_mixed"]):
             targets_one_hot = torch.cat(self.targets).cpu()
             self.predictions = torch.cat(self.predictions)
             class_preds = torch.tensor(
@@ -169,9 +169,36 @@ class Logger:
                 dtype=torch.float32,
             )
             correct_per_class = self.correct.mean(0)
+            
+            # Calculate Balanced Accuracy for the discrete part
+            split = self.model.config.data.output_split
+            disc_targets = targets_one_hot[:, :split]
+            disc_preds = predictions_one_hot[:, :split]
+            
+            # Sensitivity (TPR) and Specificity (TNR)
+            pos_mask = (disc_targets == 1)
+            neg_mask = (disc_targets == 0)
+            
+            tp = (disc_preds == 1) & pos_mask
+            tn = (disc_preds == 0) & neg_mask
+            
+            # Use nan_to_num to handle classes that might be missing in a specific validation batch
+            sensitivity = tp.sum(0).float() / pos_mask.sum(0).float().clamp(min=1e-6)
+            specificity = tn.sum(0).float() / neg_mask.sum(0).float().clamp(min=1e-6)
+            
+            balanced_acc_per_class = (sensitivity + specificity) / 2
+            avg_balanced_acc = balanced_acc_per_class.mean().item()
+
             if not pbar is None:
                 pbar.stored_values["correct_per_class"] = correct_per_class
+                pbar.stored_values[mode + "_balanced_accuracy"] = avg_balanced_acc
 
+            self.writer.add_scalar(
+                "epoch_" + mode + "_balanced_accuracy",
+                avg_balanced_acc,
+                self.config.training.epoch,
+            )
+            
             self.writer.add_histogram(
                 "epoch_" + mode + "_correct_per_class",
                 correct_per_class,
@@ -179,7 +206,7 @@ class Logger:
             )
 
         if len(
-            set(["ce", "bce", "mixed"]).intersection(self.config.task.criterions.keys())
+            set(["ce", "bce", "mixed", "focal_mixed"]).intersection(self.config.task.criterions.keys())
         ) >= 1 and not isinstance(self.model, InvertibleGenerator):
             accuracy = self.correct.mean().item()
             self.writer.add_scalar(
@@ -187,7 +214,16 @@ class Logger:
                 accuracy,
                 self.config.training.epoch,
             )
-            for channel in range(self.output_channels):
+            # Limit per-channel logging for high-dimensional outputs to avoid hanging
+            # Log first 50, three in the middle, and last 8 (regression)
+            channels_to_log = sorted(list(set(
+                list(range(min(50, self.output_channels))) + 
+                [self.output_channels // 2 - 1, self.output_channels // 2, self.output_channels // 2 + 1] +
+                list(range(max(0, self.output_channels - 8), self.output_channels))
+            )))
+            channels_to_log = [c for c in channels_to_log if 0 <= c < self.output_channels]
+
+            for channel in channels_to_log:
                 try:
                     self.writer.add_scalar(
                         "z_epoch_" + mode + "_predicted_classes" + str(channel),
@@ -196,7 +232,7 @@ class Logger:
                     )
 
                 except Exception as exp:
-                    import pdb; pdb.set_trace()
+                    pass
 
                 if mode[: len("validation")] == "validation":
                     prefix = "0_"
@@ -214,7 +250,7 @@ class Logger:
                     )
 
                 except:
-                    import pdb; pdb.set_trace()
+                    pass
             if not pbar is None:
                 pbar.stored_values[mode + "_accuracy"] = accuracy
                 pbar.stored_values[

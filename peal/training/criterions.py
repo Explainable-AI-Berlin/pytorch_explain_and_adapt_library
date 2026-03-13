@@ -72,12 +72,12 @@ def l2_criterion(model, pred, y, latent_code=None):
 
 def mixed_bce_mse_criterion(model, y_pred, y_target, latent_code=None):
     loss_discrete = torch.nn.BCEWithLogitsLoss()(
-        y_pred[: model.config.data.output_split],
-        y_target[: model.config.data.output_split],
+        y_pred[:, : model.config.data.output_split],
+        y_target[:, : model.config.data.output_split],
     )
     loss_continuous = torch.nn.MSELoss()(
-        y_pred[model.config.data.output_split :],
-        y_target[model.config.data.output_split :],
+        y_pred[:, model.config.data.output_split :],
+        y_target[:, model.config.data.output_split :],
     )
     return loss_discrete + loss_continuous
 
@@ -110,6 +110,38 @@ def latent_convexity_criterion(model, y_pred, y_target, latent_code=None):
     return cross_entropy_criterion(model, logits, targets_new)
 
 
+class FocalLoss(nn.Module):
+    def __init__(self, alpha=1, gamma=2, reduction="mean"):
+        super(FocalLoss, self).__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+        self.reduction = reduction
+
+    def forward(self, inputs, targets):
+        BCE_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction="none")
+        pt = torch.exp(-BCE_loss)
+        F_loss = self.alpha * (1 - pt) ** self.gamma * BCE_loss
+
+        if self.reduction == "mean":
+            return torch.mean(F_loss)
+        elif self.reduction == "sum":
+            return torch.sum(F_loss)
+        else:
+            return F_loss
+
+
+def mixed_focal_mse_criterion(model, y_pred, y_target, latent_code=None):
+    loss_discrete = FocalLoss()(
+        y_pred[:, : model.config.data.output_split],
+        y_target[:, : model.config.data.output_split],
+    )
+    loss_continuous = torch.nn.MSELoss()(
+        y_pred[:, model.config.data.output_split :],
+        y_target[:, model.config.data.output_split :],
+    )
+    return loss_discrete + loss_continuous
+
+
 available_criterions = {
     "ce": cross_entropy_criterion,
     "bce": lambda model, y_pred, y_target, latent_code: nn.BCEWithLogitsLoss()(
@@ -118,6 +150,7 @@ available_criterions = {
     "mse": lambda model, y_pred, y_target, latent_code: nn.MSELoss()(y_pred, y_target),
     "mae": lambda model, y_pred, y_target, latent_code: nn.L1Loss()(y_pred, y_target),
     "mixed": mixed_bce_mse_criterion,
+    "focal_mixed": mixed_focal_mse_criterion,
     "orthogonality": orthogonality_criterion,
     "l1": l1_criterion,
     "l2": l2_criterion,
