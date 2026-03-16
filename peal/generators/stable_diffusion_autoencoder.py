@@ -89,8 +89,8 @@ class CLIPImageEncoder(nn.Module):
         super().__init__()
         # Load in float16 if on CUDA
         self.clip_model, self.preprocess = clip.load("ViT-L/14", device=device)
-        if device != "cpu":
-            self.clip_model = self.clip_model.half()
+        # We don't call .half() explicitly here as results in LayerNorm dtype mismatches
+        # clip.load already handles the appropriate dtype for the device.
         self.clip_model.eval()
         for p in self.clip_model.parameters():
             p.requires_grad_(False)
@@ -117,7 +117,7 @@ class CLIPImageEncoder(nn.Module):
         x_norm = (x_resized - mean) / std
 
         with torch.no_grad():
-            features = self.clip_model.encode_image(x_norm)
+            features = self.clip_model.encode_image(x_norm.to(self.clip_model.visual.conv1.weight.dtype))
 
         return F.normalize(features.float(), dim=1)
 
@@ -162,7 +162,10 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
                 self.config.data = sd_data
 
         # Ensure self.config.data is fully loaded as a DataConfig
+        import types
         self.config.data = load_yaml_config(self.config.data, DataConfig)
+        if isinstance(self.config.data, types.SimpleNamespace):
+            self.config.data = DataConfig(**vars(self.config.data))
 
         # --- Load datasets ---
         self.generator_datasets = get_datasets(self.config.data)
@@ -263,7 +266,7 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         )(x.clone().to(self.device))
 
         # VAE encode
-        w0 = (self.pipe.vae.encode(x0).latent_dist.mode() * 0.18215).float()
+        w0 = (self.pipe.vae.encode(x0.to(self.pipe.vae.dtype)).latent_dist.mode() * 0.18215)
 
         # Balanced Conditioning: Inject z_sem into a 77-token sequence.
         # Format: [<BOS>, MODIFIED_CLS] + 75 * [<EOS>]
@@ -283,13 +286,13 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         # Pass z_sem as encoder_hidden_states for consistency
         wT, zs, wts = inversion_forward_process(
             self.pipe,
-            w0,
+            w0.to(self.pipe.unet.dtype),
             etas=self.config.eta,
             prompt=batch_size * [""],
             cfg_scale=self.config.cfg_scale_src,
             prog_bar=False,
             num_inference_steps=self.config.num_diffusion_steps,
-            encoder_hidden_states=z_sem_cond,
+            encoder_hidden_states=z_sem_cond.to(self.pipe.unet.dtype),
         )
 
         return z_sem, (wT, zs, wts)
@@ -333,18 +336,18 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         # DDPM reverse process conditioned on z_sem
         w0_dec, _ = inversion_reverse_process(
             self.pipe,
-            xT=xT,
+            xT=xT.to(self.pipe.unet.dtype),
             etas=self.config.eta,
             prompts=batch_size * [""],
             cfg_scales=[self.config.cfg_scale_src],
             prog_bar=False,
             zs=zs[: (self.config.num_diffusion_steps - self.config.skip)],
             controller=controller,
-            encoder_hidden_states=z_sem_cond,
+            encoder_hidden_states=z_sem_cond.to(self.pipe.unet.dtype),
         )
 
         # VAE decode
-        x_decoded = self.pipe.vae.decode(1 / 0.18215 * w0_dec).sample
+        x_decoded = self.pipe.vae.decode((1 / 0.18215 * w0_dec).to(self.pipe.vae.dtype)).sample
 
         if x_decoded.dim() < 4:
             x_decoded = x_decoded.unsqueeze(0)
@@ -398,18 +401,18 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         # Run reverse process with the modified conditioning
         w0_dec, _ = inversion_reverse_process(
             self.pipe,
-            xT=xT,
+            xT=xT.to(self.pipe.unet.dtype),
             etas=self.config.eta,
             prompts=batch_size * [""],
             cfg_scales=[self.config.cfg_scale_tar],
             prog_bar=False,
             zs=zs[: (self.config.num_diffusion_steps - self.config.skip)],
             controller=controller,
-            encoder_hidden_states=encoder_hidden_states,
+            encoder_hidden_states=encoder_hidden_states.to(self.pipe.unet.dtype),
         )
 
         # VAE decode
-        x_decoded = self.pipe.vae.decode(1 / 0.18215 * w0_dec).sample
+        x_decoded = self.pipe.vae.decode((1 / 0.18215 * w0_dec).to(self.pipe.vae.dtype)).sample
 
         if x_decoded.dim() < 4:
             x_decoded = x_decoded.unsqueeze(0)
@@ -813,7 +816,10 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
                 sd_data = getattr(self.config.sparse_dictionary, "data", None)
                 if sd_data:
                     print(f"StableDiffusionAutoencoder: Reloading datasets from {sd_data} for component explanation.")
-                    self.config.data = sd_data
+                    import types
+                    self.config.data = load_yaml_config(sd_data, DataConfig)
+                    if isinstance(self.config.data, types.SimpleNamespace):
+                        self.config.data = DataConfig(**vars(self.config.data))
                     self.generator_datasets = get_datasets(self.config.data)
                     self.generator_dataset = self.generator_datasets[0] if self.generator_datasets else None
 
@@ -827,6 +833,32 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             self.config.sparse_dictionary.sparse_dictionaries_type,
         )
         Path(explanation_path).mkdir(parents=True, exist_ok=True)
+
+        # Resolve which components to explain
+        component_indices = self._resolve_component_indices(self.config.sparse_dictionary)
+        
+        if component_indices is None:
+            n_comps = self.config.sparse_dictionary.n_components
+            if n_comps is None or n_comps <= 0:
+                n_comps = self.sparse_dictionary.get_components().shape[1]
+            component_indices = list(range(n_comps))
+
+        # Filter out duplicates and invalid indices
+        component_indices = sorted(list(set(component_indices)))
+        component_indices = [i for i in component_indices if i < self.sparse_dictionary.get_components().shape[1]]
+
+        # Prepare one batch of images for visualization and cache their encodings
+        viz_batch_size = self.config.visualizations_per_component or 10
+        viz_dataloader = torch.utils.data.DataLoader(
+            self.generator_datasets[1],
+            batch_size=viz_batch_size,
+            shuffle=False
+        )
+        viz_batch = next(iter(viz_dataloader))
+        x_factual_viz = viz_batch[0].to(self.device)
+        y_factual_viz = viz_batch[1].cpu() if len(viz_batch) > 1 else []
+        print(f"Pre-encoding {len(x_factual_viz)} images for {len(component_indices)} component visualizations...")
+        cached_encodings = self.encode(x_factual_viz)
 
         # Cache paths
         y_list_path = os.path.join(explanation_path, "y_list.pt")
@@ -868,31 +900,22 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             torch.save(c_list, c_list_path)
             torch.save(z_list, z_list_path)
 
-        # Visualize individual components
-        # Default to all components if n_components is not specified or <= 0
-        n_comps = self.config.sparse_dictionary.n_components
-        if n_comps is None or n_comps <= 0:
-            n_comps = self.sparse_dictionary.get_components().shape[1]
-            
-        for component_idx in range(
-            min(
-                n_comps,
-                self.sparse_dictionary.get_components().shape[1],
-            )
-        ):
+        for component_idx in component_indices:
+            print(f"Explaining component {component_idx}...")
             self.explain_sparse_component(
-                torch.utils.data.DataLoader(
-                    self.generator_datasets[1],
-                    batch_size=self.config.visualizations_per_component or 10,
-                ),
+                None, # Dataloader not needed if cached
                 component_idx,
+                cached_encodings=cached_encodings,
+                x_factual_viz=x_factual_viz,
+                y_factual_viz=y_factual_viz
             )
 
-    def explain_sparse_component(self, dataloader, component_idx):
+    def explain_sparse_component(self, dataloader, component_idx, cached_encodings=None, x_factual_viz=None, y_factual_viz=None):
         """Visualize a single sparse dictionary component."""
         x_factual_list = []
         x_counterfactual_list = []
-        start_idx = 0
+        y_factual_list = []
+        
         current_base_path = os.path.join(
             self.config.base_path,
             self.config.sparse_dictionary.sparse_dictionaries_type,
@@ -900,32 +923,56 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         )
         Path(current_base_path).mkdir(parents=True, exist_ok=True)
 
-        for i, batch in enumerate(dataloader):
-            if (
-                self.config.visualizations_per_component is not None
-                and start_idx >= self.config.visualizations_per_component
-            ):
-                break
-
-            x_factual_list.extend(list(batch[0]))
-            x_factual = batch[0].to(self.device)
+        if cached_encodings is not None:
+            x_factual_list.extend(list(x_factual_viz.cpu()))
+            if y_factual_viz is not None:
+                y_factual_list.extend(list(y_factual_viz))
             x_counterfactual, (dot_before, dot_after) = (
-                self.explain_sparse_component_batch(x_factual, component_idx)
+                self.explain_sparse_component_batch(x_factual_viz, component_idx, cached_encodings=cached_encodings)
             )
             x_counterfactual_list.extend(list(x_counterfactual.cpu()))
-            start_idx += len(x_factual)
+        else:
+            start_idx = 0
+            for i, batch in enumerate(dataloader):
+                if (
+                    self.config.visualizations_per_component is not None
+                    and start_idx >= self.config.visualizations_per_component
+                ):
+                    break
+
+                x_factual_list.extend(list(batch[0]))
+                if len(batch) > 1:
+                    y_factual_list.extend(list(batch[1]))
+                x_factual = batch[0].to(self.device)
+                x_counterfactual, (dot_before, dot_after) = (
+                    self.explain_sparse_component_batch(x_factual, component_idx)
+                )
+                x_counterfactual_list.extend(list(x_counterfactual.cpu()))
+                start_idx += len(x_factual)
+
+        # Generate collage
+        self.generator_dataset.generate_contrastive_collage(
+            x_factual_list,
+            x_counterfactual_list,
+            [], [], y_factual_list, [], [],
+            current_base_path,
+            0,
+        )
 
         return x_factual_list, x_counterfactual_list
 
-    def explain_sparse_component_batch(self, x_generator, component_idx):
+    def explain_sparse_component_batch(self, x_generator, component_idx, cached_encodings=None):
         """Generate counterfactuals for a single sparse component."""
-        z_sem, stochastic_code = self.encode(x_generator.to(self.device))
+        if cached_encodings is not None:
+            z_sem, stochastic_code = cached_encodings
+        else:
+            z_sem, stochastic_code = self.encode(x_generator.to(self.device))
 
-        w_raw = self.sparse_dictionary.get_components()[:, component_idx].to(self.device)
+        w_raw = self.sparse_dictionary.get_components()[:, component_idx].to(self.device).to(z_sem.dtype)
         w = w_raw / torch.norm(w_raw, p=2)
 
         mu = (
-            self.sparse_dictionary.mu.to(self.device)
+            self.sparse_dictionary.mu.to(self.device).to(z_sem.dtype)
             if hasattr(self.sparse_dictionary, 'mu') and self.sparse_dictionary.mu is not None
             else torch.zeros_like(z_sem[0])
         )
@@ -942,3 +989,39 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             proj_factors.cpu(),
             proj_factors_after.cpu(),
         )
+
+    def _resolve_component_indices(self, sd_config):
+        """Resolve component strings or config indices to vocabulary indices."""
+        component_indices = None
+        
+        # 1. Try component_indices from config
+        if hasattr(sd_config, "component_indices") and sd_config.component_indices is not None:
+            component_indices = sd_config.component_indices
+            
+        # 2. Try component_strings from config
+        elif hasattr(sd_config, "component_strings") and sd_config.component_strings is not None:
+            if hasattr(self.sparse_dictionary, 'get_vocabulary'):
+                vocab_list = self.sparse_dictionary.get_vocabulary()
+                vocab_list = [v.lower() for v in vocab_list]
+                
+                component_indices = []
+                for search_term in sd_config.component_strings:
+                    search_term = search_term.lower()
+                    # Find exact match first
+                    try:
+                        found_idx = vocab_list.index(search_term)
+                        component_indices.append(found_idx)
+                    except ValueError:
+                        # Fallback to substring matching
+                        found = False
+                        for i, v in enumerate(vocab_list):
+                            if search_term in v:
+                                component_indices.append(i)
+                                found = True
+                                break
+                        if not found:
+                            print(f"Warning: Could not find match for {search_term} in SpLICE vocab")
+            else:
+                print("Warning: Sparse dictionary does not support get_vocabulary()")
+
+        return component_indices

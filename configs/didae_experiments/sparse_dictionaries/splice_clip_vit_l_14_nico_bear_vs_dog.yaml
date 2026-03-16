@@ -10,3 +10,4 @@ component_strings: [bear, water]
 opposite_component_strings: [dog, grass]
 batch_size: 1
 data: "<PEAL_BASE>/configs/didae_experiments/data/nico_bear_vs_dog_generator.yaml"
+benchmark_ddpm_inversion: True

@@ -142,15 +142,15 @@ def inversion_forward_process(
     encoder_hidden_states=None,
 ):
     if not encoder_hidden_states is None:
-        text_embeddings = encoder_hidden_states
+        text_embeddings = encoder_hidden_states.to(model.unet.dtype)
     
     elif not prompt == "":
-        text_embeddings = encode_text(model, prompt)
+        text_embeddings = encode_text(model, prompt).to(model.unet.dtype)
     
     else:
         text_embeddings = None
 
-    uncond_embedding = encode_text(model, [""] * x0.shape[0])
+    uncond_embedding = encode_text(model, [""] * x0.shape[0]).to(model.unet.dtype)
     timesteps = model.scheduler.timesteps.to(model.device)
     """variance_noise_shape = (
         num_inference_steps,
@@ -173,7 +173,7 @@ def inversion_forward_process(
         zs = torch.zeros(size=variance_noise_shape, device=model.device)
 
     t_to_idx = {int(v): k for k, v in enumerate(timesteps)}
-    xt = x0
+    xt = x0.to(model.unet.dtype)
     # op = tqdm(reversed(timesteps)) if prog_bar else reversed(timesteps)
     op = tqdm(timesteps) if prog_bar else timesteps
 
@@ -187,11 +187,11 @@ def inversion_forward_process(
 
         with torch.no_grad():
             out = model.unet.forward(
-                xt, timestep=t, encoder_hidden_states=uncond_embedding
+                xt.to(model.unet.dtype), timestep=t, encoder_hidden_states=uncond_embedding
             )
             if not text_embeddings is None:
                 cond_out = model.unet.forward(
-                    xt, timestep=t, encoder_hidden_states=text_embeddings
+                    xt.to(model.unet.dtype), timestep=t, encoder_hidden_states=text_embeddings
                 )
 
         if not text_embeddings is None:
@@ -311,15 +311,15 @@ def inversion_reverse_process(
 
     cfg_scales_tensor = torch.Tensor(cfg_scales).view(-1, 1, 1, 1).to(model.device)
 
-    uncond_embedding = encode_text(model, [""] * batch_size)
+    uncond_embedding = encode_text(model, [""] * batch_size).to(model.unet.dtype)
     if not encoder_hidden_states is None:
-        text_embeddings = encoder_hidden_states
+        text_embeddings = encoder_hidden_states.to(model.unet.dtype)
     
     elif prompts == "":
         text_embeddings = uncond_embedding
 
     else:
-        text_embeddings = encode_text(model, prompts)
+        text_embeddings = encode_text(model, prompts).to(model.unet.dtype)
 
     if etas is None:
         etas = 0
@@ -331,7 +331,7 @@ def inversion_reverse_process(
         etas = [etas] * len(timesteps)
     assert len(etas) == len(timesteps)
 
-    xt = xT.expand(batch_size, -1, -1, -1)
+    xt = xT.expand(batch_size, -1, -1, -1).to(model.unet.dtype)
     op = tqdm(timesteps[-zs.shape[0] :]) if prog_bar else timesteps[-zs.shape[0] :]
 
     t_to_idx = {int(v): k for k, v in enumerate(timesteps[-zs.shape[0] :])}
@@ -345,7 +345,7 @@ def inversion_reverse_process(
         ## Unconditional embedding
         with torch.no_grad():
             uncond_out = model.unet.forward(
-                xt, timestep=t, encoder_hidden_states=uncond_embedding
+                xt.to(model.unet.dtype), timestep=t, encoder_hidden_states=uncond_embedding
             )
 
         ## Conditional embedding
@@ -354,7 +354,7 @@ def inversion_reverse_process(
             if not classifier is None:
                 if not f is None:
                     cond_out = model.unet.forward(
-                        xt, timestep=t, encoder_hidden_states=text_embeddings, f=f
+                        xt.to(model.unet.dtype), timestep=t, encoder_hidden_states=text_embeddings, f=f
                     )
 
                 else:
@@ -375,14 +375,14 @@ def inversion_reverse_process(
                         xt.detach() - grad_classifier
                     )  # * (1 - a_t).sqrt()
                     cond_out = model.unet.forward(
-                        x_noise_adapted,
+                        x_noise_adapted.to(model.unet.dtype),
                         timestep=t,
                         encoder_hidden_states=text_embeddings,
                     )
 
             else:
                 cond_out = model.unet.forward(
-                    xt, timestep=t, encoder_hidden_states=text_embeddings
+                    xt.to(model.unet.dtype), timestep=t, encoder_hidden_states=text_embeddings
                 )
 
         z = zs[idx] if not zs is None else None

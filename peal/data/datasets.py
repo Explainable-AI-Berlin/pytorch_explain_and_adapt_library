@@ -14,7 +14,7 @@ from matplotlib import pyplot as plt
 
 from peal.data.interfaces import PealDataset
 from peal.data.dataset_utils import parse_csv
-from peal.global_utils import embed_numberstring, high_contrast_heatmap, DINOEvaluator
+from peal.global_utils import embed_numberstring, high_contrast_heatmap, DINOEvaluator, generate_overlay
 from peal.generators.interfaces import Generator
 
 matplotlib.use("Agg")
@@ -341,33 +341,54 @@ class ImageDataset(PealDataset):
             heatmap_list.append(heatmap_high_contrast)
 
             if tracking_level >= 1:
+                overlay = generate_overlay(x, counterfactual)
                 current_collage = torch.cat(
-                    [x_in, counterfactual_rgb, heatmap_high_contrast], -1
+                    [x_in, counterfactual_rgb, heatmap_high_contrast, overlay], -1
                 )
-                current_collage = torchvision.utils.make_grid(current_collage, nrow=3)
+                current_collage = torchvision.utils.make_grid(current_collage, nrow=4)
                 plt.gcf()
                 plt.imshow(current_collage.permute(1, 2, 0))
-                title_string = (
-                    "Original: "
-                    + str(int(y_list[i]))
-                    + " -> Prediction: "
-                    + str(int(y_source_list[i]))
-                    + " -> Target: "
-                    + str(int(y_target_list[i]))
-                    + "\n"
-                )
+                # Robustly build title string with length checks
+                def safe_int_str(val):
+                    if torch.is_tensor(val):
+                        if val.numel() == 1:
+                            return str(int(val.item()))
+                        else:
+                            return str(int(val.argmax()))
+                    try:
+                        return str(int(val))
+                    except (ValueError, TypeError):
+                        return str(val)
+
+                title_string = "Original: "
+                if len(y_list) > i:
+                    title_string += safe_int_str(y_list[i])
+                else:
+                    title_string += "?"
+                
+                title_string += " -> Prediction: "
+                if len(y_source_list) > i:
+                    title_string += safe_int_str(y_source_list[i])
+                else:
+                    title_string += "?"
+                
+                title_string += " -> Target: "
+                if len(y_target_list) > i:
+                    title_string += safe_int_str(y_target_list[i])
+                else:
+                    title_string += "?"
+                
+                title_string += "\n"
+
+                start_conf = float(y_target_start_confidence_list[i]) if len(y_target_start_confidence_list) > i else 0.0
+                end_conf = float(y_target_end_confidence_list[i]) if len(y_target_end_confidence_list) > i else 0.0
+                
                 title_string += (
                     "Target Confidence: "
-                    + str(
-                        round(
-                            float(y_target_start_confidence_list[i]),
-                            2,
-                        )
-                    )
+                    + str(round(start_conf, 2))
                     + " -> "
-                )
-                title_string += (
-                    str(round(float(y_target_end_confidence_list[i]), 2)) + "\n"
+                    + str(round(end_conf, 2))
+                    + "\n"
                 )
                 if not hint_list is None and not idx_to_info is None:
                     title_string += (

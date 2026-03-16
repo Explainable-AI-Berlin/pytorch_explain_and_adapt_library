@@ -541,33 +541,66 @@ def get_predictions(args):
 
 
 def high_contrast_heatmap(x, counterfactual):
-    heatmap_red = torch.maximum(
-        torch.tensor(0.0),
-        torch.sum(x, dim=0) - torch.sum(counterfactual, dim=0),
-    )
-    heatmap_blue = torch.maximum(
-        torch.tensor(0.0),
-        torch.sum(counterfactual, dim=0) - torch.sum(x, dim=0),
-    )
-    if counterfactual.shape[0] == 3:
-        heatmap_green = torch.abs(x[0] - counterfactual[0])
-        heatmap_green = heatmap_green + torch.abs(x[1] - counterfactual[1])
-        heatmap_green = heatmap_green + torch.abs(x[2] - counterfactual[2])
-        heatmap_green = heatmap_green - heatmap_red - heatmap_blue
+    if x.shape[0] == 3:
+        # Per-channel differences
+        diff_channels = counterfactual - x
+        
+        # Intensity change (mean of channel changes)
+        # Red = Intensity Up, Blue = Intensity Down
+        delta_intensity = diff_channels.mean(dim=0)
+        heatmap_red = torch.clamp(delta_intensity, min=0)
+        heatmap_blue = torch.clamp(-delta_intensity, min=0)
+        
+        # Color change (deviance from the mean change)
+        # We boost the green channel by a factor of 1.5 relative to intensity changes
+        # to reflect the stronger subjective impression of color shifts.
+        heatmap_green = (diff_channels - delta_intensity).abs().sum(dim=0) * 1.3
+        
         x_in = torch.clone(x)
         counterfactual_rgb = torch.clone(counterfactual)
-
     else:
+        # For single channel, all changes are intensity changes
+        diff = (counterfactual - x)
+        heatmap_red = torch.clamp(diff, min=0)[0]
+        heatmap_blue = torch.clamp(-diff, min=0)[0]
         heatmap_green = torch.zeros_like(heatmap_red)
         x_in = torch.tile(x, [3, 1, 1])
         counterfactual_rgb = torch.tile(torch.clone(counterfactual), [3, 1, 1])
 
+    # Stack channels: Red (Up), Green (Color Neutral), Blue (Down)
     heatmap = torch.stack([heatmap_red, heatmap_green, heatmap_blue], dim=0)
-    if torch.abs(heatmap.sum() - torch.abs(x - counterfactual).sum()) > 0.1:
-        print("Error: Heatmap does not add up to absolute counterfactual difference.")
-    heatmap_high_contrast = torch.clamp(heatmap / heatmap.max(), 0.0, 1.0)
+
+    # Dilate the heatmap to make connected regions more visible
+    heatmap = torch.nn.functional.max_pool2d(
+        heatmap.unsqueeze(0), kernel_size=3, stride=1, padding=1
+    ).squeeze(0)
+    
+    if heatmap.max() > 0:
+        heatmap_high_contrast = torch.clamp(heatmap / heatmap.max(), 0.0, 1.0)
+    else:
+        heatmap_high_contrast = heatmap
 
     return heatmap_high_contrast, x_in, counterfactual_rgb
+
+
+def generate_overlay(x, counterfactual, alpha_factor=2.0):
+    heatmap, x_in, _ = high_contrast_heatmap(x, counterfactual)
+    if x_in.shape[0] == 3:
+        grey = x_in.mean(dim=0, keepdim=True).repeat(3, 1, 1)
+    else:
+        grey = x_in  # already tiled in high_contrast_heatmap if 1 channel
+
+    # Bring everything closer to the mean (0.5) so that black and white look grey
+    grey = (grey - 0.5) * 0.5 + 0.5
+
+    # alpha mask based on max difference across colors
+    # Since heatmap reached at least one 1.0 value due to normalization in high_contrast_heatmap,
+    # the relative strongest change will be clearly highlighted.
+    alpha = torch.clamp(heatmap.max(dim=0, keepdim=True)[0] * alpha_factor, 0, 1)
+
+    # Blend heatmap onto the low-contrast greyscale background
+    overlay = grey * (1 - alpha) + heatmap * alpha
+    return overlay
 
 
 @torch.no_grad()

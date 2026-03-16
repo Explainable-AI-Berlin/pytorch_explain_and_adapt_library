@@ -8,7 +8,7 @@ inpaint: 0.15
 allow_overlap: false
 # parameters constant in ablation study
 dilation: 13
-clustering_strategy: activation_clusters
+clustering_strategy: highest_activation
 gradient_clipping: 1000000000000.0
 gradient_steps: 50
 greedy: false
