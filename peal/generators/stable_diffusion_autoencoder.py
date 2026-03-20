@@ -352,7 +352,7 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         if x_decoded.dim() < 4:
             x_decoded = x_decoded.unsqueeze(0)
 
-        return x_decoded.detach()
+        return x_decoded.detach().float()
 
     def decode_with_modified_embedding(self, z_sem_modified, stochastic_code, original_shape, prompts=None):
         """Decode using a modified semantic embedding for counterfactual generation.
@@ -422,7 +422,7 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             original_shape[2:], antialias=True
         )(x_decoded.detach().cpu())
 
-        return x_counterfactual
+        return x_counterfactual.float()
 
     # -------------------------------------------------------------------
     # Sampling
@@ -514,7 +514,7 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
 
         # Compute initial predictions
         pred_original = F.softmax(
-            predictor(x_in.to(self.device)), dim=-1
+            predictor(x_in.to(device).float()), dim=-1
         ).detach().cpu()
         target_confidences = [
             pred_original[i][target_classes[i]] for i in range(len(target_classes))
@@ -563,6 +563,7 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         z_sem_before, indices, distances = self._calculate_z_counterfactuals(
             z_sem, w, explainer_config, explainer_config.num_attempts
         )
+        explainer_config.num_attempts = z_sem_before.shape[1]
 
         # Flatten for batch decoding
         z_sem2 = z_sem_before.reshape([-1, z_sem_before.shape[-1]])
@@ -595,22 +596,56 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
                 is_present = (original_labels[b].item() == 1)
                 for a in range(num_attempts):
                     idx = a % len(component_strings)
-                    if is_present:
-                        # Use provided opposite if available, else fallback to "not <concept>"
-                        if opposite_strings is not None and idx < len(opposite_strings):
-                            concept_to_use = opposite_strings[idx]
+                    if predictor_datasets[0].dataset.config.dataset_class == "CelebADataset":
+                        if is_present:
+                            # Use provided opposite if available, else fallback to "not <concept>"
+                            if idx == 0:
+                                concept_to_use = "A photo of a " + opposite_strings[0] + ", " + component_strings[3] + " " + component_strings[1] + " with " + component_strings[2]
+
+                            elif idx == 1:
+                                concept_to_use = "A photo of a " + component_strings[0] + ", " + component_strings[3] + " " + opposite_strings[1] + " with " + component_strings[2]
+                            
+                            elif idx == 2:
+                                concept_to_use = "A photo of a " + component_strings[0] + ", " + component_strings[3] + " " + component_strings[1] + " with " + opposite_strings[2]
+                                
+                            elif idx == 3:
+                                concept_to_use = "A photo of a " + component_strings[0] + ", " + opposite_strings[3] + " " + component_strings[1] + " with " + component_strings[2]
+                                
                         else:
-                            concept_to_use = f"not {component_strings[idx]}"
-                    else:
-                        concept_to_use = component_strings[idx]
-                        
+                            if idx == 0:
+                                concept_to_use = "A photo of a " + component_strings[0] + ", " + opposite_strings[3] + " " + opposite_strings[1] + " with " + opposite_strings[2]
+                            
+                            elif idx == 1:
+                                concept_to_use = "A photo of a " + opposite_strings[0] + ", " + opposite_strings[3] + " " + component_strings[1] + " with " + opposite_strings[2]
+                            
+                            elif idx == 2:
+                                concept_to_use = "A photo of a " + opposite_strings[0] + ", " + opposite_strings[3] + " " + opposite_strings[1] + " with " + component_strings[2]
+                                
+                            elif idx == 3:
+                                concept_to_use = "A photo of a " + opposite_strings[0] + ", " + component_strings[3] + " " + component_strings[1] + " with " + component_strings[2]
+                    
+                    elif predictor_datasets[0].dataset.config.dataset_class == "NicoPlusPlusDataset":
+                        if is_present:
+                            # Use provided opposite if available, else fallback to "not <concept>"
+                            if idx == 0:
+                                concept_to_use = "A photo of a " + opposite_strings[idx] + " with " + component_strings[1]
+
+                            else:
+                                concept_to_use = "A photo of a " + component_strings[0] + " with " + opposite_strings[idx]
+                                
+                        else:
+                            if idx == 0:
+                                concept_to_use = "A photo of a " + component_strings[idx] + " with " + opposite_strings[1]
+                                
+                            else:
+                                concept_to_use = "A photo of a " + opposite_strings[0] + " with " + component_strings[idx]
+                    
+                    
                     for l in range(num_linesearch_factors):
                         prompts.append(concept_to_use)
                         print(concept_to_use)
                         print(concept_to_use)
                         print(concept_to_use)
-                    
-                    import pdb; pdb.set_trace()
 
         x_counterfactuals_generator = self.decode_with_modified_embedding(
             z_sem2, (wT_decoding, zs, wts), x_in.shape, prompts=prompts
@@ -619,7 +654,7 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
 
         # Evaluate all candidates with the predictor
         preds = F.softmax(
-            predictor(x_counterfactuals.to(device)), dim=-1
+            predictor(x_counterfactuals.to(device).float()), dim=-1
         ).detach().cpu()
         y_target_end_confidence = torch.zeros([preds.shape[0]])
         for i in range(preds.shape[0]):
@@ -661,7 +696,7 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
                 y_target_end_confidence_list.append(
                     float(y_target_end_confidence[k, i, j[k]])
                 )
-                indices_list.append(indices[k])
+                indices_list.append(indices[k, i].unsqueeze(0))
 
             x_out_list.append(x_in)
 
@@ -707,96 +742,126 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             )
 
         else:
-            # Multi-component reflection with linesearch
-            
-            # Allow targeted edits via predefined component strings/indices
-            component_indices = None
-            if hasattr(self.sparse_dictionary.config, "component_strings") and self.sparse_dictionary.config.component_strings is not None:
-                # Resolve base path and read vocabulary
-                base_path = os.environ.get("PEAL_BASE", "")
-                if not base_path:
-                    base_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
-                vocab_path = os.path.join(base_path, "peal", "dependencies", "SpLiCE", "data", "vocab", "laion.txt")
+            # Targeted Swap Logic: Precisely swap concepts with their opposites
+            vocab = self.sparse_dictionary.get_vocabulary() if hasattr(self.sparse_dictionary, 'get_vocabulary') else None
 
-                if os.path.exists(vocab_path):
-                    with open(vocab_path, "r") as f:
-                        vocab_list = [line.strip().lower() for line in f.readlines()]
-                    
-                    component_indices = []
-                    for search_term in self.sparse_dictionary.config.component_strings:
-                        
-                        # Find exact match first
-                        try:
-                            found_idx = vocab_list.index(search_term)
-                            component_indices.append(found_idx)
-                        except ValueError:
-                            # Fallback to substring matching
-                            found = False
-                            for i, v in enumerate(vocab_list):
-                                if search_term in v:
-                                    component_indices.append(i)
-                                    found = True
-                                    break
-                            if not found:
-                                print(f"Warning: Could not find match for {search_term} in SpLICE vocab")
-                else:
-                    print(f"Warning: SpLICE vocab not found at {vocab_path}")
+            # Resolve conceptual strings from config
+            orig_comp_strs = self.sparse_dictionary.config.component_strings
+            orig_opp_strs = getattr(self.sparse_dictionary.config, "opposite_component_strings", [])
+            
+            # Identify all concepts to track for comprehensive logging (union of targets and opposites)
+            track_strs = list(orig_comp_strs)
+            if orig_opp_strs:
+                for o in orig_opp_strs:
+                    if o and o not in track_strs:
+                        track_strs.append(o)
+            
+            # Resolve all for tracking (this also triggers the loud warnings for not-found concepts)
+            track_indices = self._resolve_component_indices(self.sparse_dictionary.config, track_strs)
+            
+            # Resolve primary and opposite indices for swapping logic
+            component_indices = self._resolve_component_indices(self.sparse_dictionary.config)
+            opp_indices = None
+            if orig_opp_strs:
+                opp_indices = self._resolve_component_indices(self.sparse_dictionary.config, orig_opp_strs)
 
             if component_indices is None or len(component_indices) == 0:
-                if hasattr(explainer_config, "component_indices") and explainer_config.component_indices is not None:
-                    component_indices = explainer_config.component_indices
-                else:
-                    component_indices = range(num_attempts)
+                component_indices = list(range(num_attempts))
+                opp_indices = None
                 
-            W_all = self.sparse_dictionary.get_components()
-
-            if component_indices is not None:
-                W = W_all[:, component_indices].to(z_sem.device).to(z_sem.dtype)
-                if explainer_config is not None and hasattr(explainer_config, "num_attempts"):
-                    explainer_config.num_attempts = min(len(component_indices), W.shape[1])
-
-            else:
-                W = W_all.to(z_sem.device).to(z_sem.dtype)
-
-            # Cross-projection targeting classifier flip
-            w_cast = w.to(z_sem.dtype)
-            dot_zw = torch.sum(z_sem * w_cast, dim=-1, keepdim=True)
-            dot_uw = torch.matmul(w_cast, W)
-
-            eps = 1e-6
-            dot_uw_safe = dot_uw.clone()
-            dot_uw_safe[torch.abs(dot_uw_safe) < eps] = eps
-
-            proj_factors = dot_zw / dot_uw_safe.unsqueeze(0)
-            projections = proj_factors.unsqueeze(-1) * W.permute(1, 0).unsqueeze(0)
-
-            # Linesearch
+            W_all = self.sparse_dictionary.get_components().to(z_sem.device).to(z_sem.dtype)
+            
+            # Initial decomposition for activation detection
+            with torch.no_grad():
+                activations = self.sparse_dictionary.decompose(z_sem) # (B, K)
+            
+            # Step size modulation step
             line_search_factors = torch.tensor(
                 explainer_config.linesearch_factors
-            ).to(z_sem.device)
-            z_base = z_sem.unsqueeze(1).unsqueeze(1)
-            proj_expanded = projections.unsqueeze(2)
-            factors_expanded = line_search_factors.view(1, 1, -1, 1)
-
-            z_reflected = z_base - factors_expanded * proj_expanded
+            ).to(z_sem.device).to(z_sem.dtype)
             
-            # Distances and sorting
-            distances = torch.norm(z_base - z_reflected, p=2, dim=-1)
-            sorted_indices = torch.argsort(distances, dim=1)
+            z_reflected_list = []
             
-            # Use the actual component_indices (e.g., [34540, 36845, ...]) instead of 0, 1, 2, 3
-            if isinstance(component_indices, list):
-                component_indices_tensor = torch.tensor(component_indices).to(z_sem.device)
-            elif isinstance(component_indices, range):
-                component_indices_tensor = torch.tensor(list(component_indices)).to(z_sem.device)
-            else:
-                component_indices_tensor = component_indices.to(z_sem.device)
+            # Generate candidates per targeted attempt
+            for i, comp_idx in enumerate(component_indices):
+                opp_idx = opp_indices[i] if (opp_indices is not None and i < len(opp_indices)) else None
                 
-            out_component_indices = component_indices_tensor.unsqueeze(0).tile(
-                [sorted_indices.shape[0], 1]
-            )
+                # Concept Names for reporting
+                comp_name = orig_comp_strs[i]
+                opp_name = orig_opp_strs[i] if (orig_opp_strs and i < len(orig_opp_strs)) else "None"
+                
+                print(f"\n--- Attempt {i}: Target '{comp_name}' (ID {comp_idx}) / Opposite '{opp_name}' (ID {opp_idx}) ---", flush=True)
 
+                if comp_idx is None:
+                    print(f"  !!! Skipping attempt {i} as primary concept '{comp_name}' was not found in vocabulary !!!", flush=True)
+                    continue
+                
+                W_primary = W_all[:, comp_idx]
+                W_opp = W_all[:, opp_idx] if opp_idx is not None else None
+                
+                is_activated = (activations[:, comp_idx] > 0.01) # (B,)
+                
+                print("  Status BEFORE edit:", flush=True)
+                for b in range(z_sem.shape[0]):
+                    scores_list = []
+                    for name, idx in zip(track_strs, track_indices):
+                        val = f"{activations[b, idx]:.2f}" if idx is not None else "N/A"
+                        scores_list.append(f"'{name}': {val}")
+                    
+                    status = f"ACTIVE ({activations[b, comp_idx]:.2f})" if is_activated[b] else "ABSENT"
+                    print(f"    Sample {b}: '{comp_name}' is {status}. Scores -> {', '.join(scores_list)}", flush=True)
+
+                attempt_results = []
+                for factor in line_search_factors:
+                    z_edit = z_sem.clone()
+                    # Logic: Swap present concepts for opposites, or introduce absent concepts.
+                    if factor == 0.0:
+                        z_step = z_sem # Baseline
+                    else:
+                        # Logic 1: Present -> Remove primary, Add opposite
+                        proj_primary = (torch.sum(z_sem * W_primary, dim=-1, keepdim=True)) * W_primary
+                        res1 = z_sem - proj_primary
+                        if W_opp is not None:
+                            res1 += factor * W_opp
+                        
+                        # Logic 2: Absent -> Remove opposite (if accidentally active), Add primary
+                        if W_opp is not None:
+                            proj_opp = (torch.sum(z_sem * W_opp, dim=-1, keepdim=True)) * W_opp
+                            res2 = z_sem - proj_opp
+                        else:
+                            res2 = z_sem
+                        res2 += factor * W_primary
+                        
+                        z_step = torch.where(is_activated.unsqueeze(1), res1, res2)
+                    
+                    attempt_results.append(z_step.unsqueeze(1))
+                
+                # Sanity Check (Verification decomposition of candidates)
+                z_check = attempt_results[-1].squeeze(1)
+                with torch.no_grad():
+                    new_activations = self.sparse_dictionary.decompose(z_check)
+                
+                print(f"  Status AFTER edit (Sanity Check, Factor {line_search_factors[-1]:.2f}):", flush=True)
+                for b in range(z_sem.shape[0]):
+                    after_list = []
+                    for name, idx in zip(track_strs, track_indices):
+                        val = f"{new_activations[b, idx]:.2f}" if idx is not None else "N/A"
+                        after_list.append(f"'{name}': {val}")
+                    print(f"    Sample {b}: Scores -> {', '.join(after_list)}", flush=True)
+
+                z_reflected_list.append(torch.cat(attempt_results, dim=1).unsqueeze(1))
+
+            z_reflected = torch.cat(z_reflected_list, dim=1)
+            z_base = z_sem.unsqueeze(1).unsqueeze(1)
+            distances = torch.norm(z_base - z_reflected, p=2, dim=-1)
+            
+            valid_indices = [idx for idx in component_indices if idx is not None]
+            out_component_indices = torch.tensor(valid_indices).to(z_sem.device).unsqueeze(0).tile(
+                [z_sem.shape[0], 1]
+            )
+            
             return z_reflected, out_component_indices, distances
+
 
     # -------------------------------------------------------------------
     # Component Explanation (mirroring DiffusionAutoencoder)
@@ -990,38 +1055,43 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             proj_factors_after.cpu(),
         )
 
-    def _resolve_component_indices(self, sd_config):
+    def _resolve_component_indices(self, sd_config, strings_to_resolve=None):
         """Resolve component strings or config indices to vocabulary indices."""
         component_indices = None
         
         # 1. Try component_indices from config
-        if hasattr(sd_config, "component_indices") and sd_config.component_indices is not None:
+        if hasattr(sd_config, "component_indices") and sd_config.component_indices is not None and strings_to_resolve is None:
             component_indices = sd_config.component_indices
             
-        # 2. Try component_strings from config
-        elif hasattr(sd_config, "component_strings") and sd_config.component_strings is not None:
-            if hasattr(self.sparse_dictionary, 'get_vocabulary'):
-                vocab_list = self.sparse_dictionary.get_vocabulary()
-                vocab_list = [v.lower() for v in vocab_list]
-                
-                component_indices = []
-                for search_term in sd_config.component_strings:
-                    search_term = search_term.lower()
-                    # Find exact match first
-                    try:
-                        found_idx = vocab_list.index(search_term)
-                        component_indices.append(found_idx)
-                    except ValueError:
-                        # Fallback to substring matching
-                        found = False
-                        for i, v in enumerate(vocab_list):
-                            if search_term in v:
-                                component_indices.append(i)
-                                found = True
-                                break
-                        if not found:
-                            print(f"Warning: Could not find match for {search_term} in SpLICE vocab")
-            else:
-                print("Warning: Sparse dictionary does not support get_vocabulary()")
+        # 2. Try strings
+        else:
+            if strings_to_resolve is None:
+                 strings_to_resolve = getattr(sd_config, "component_strings", None)
+            
+            if strings_to_resolve is not None:
+                if hasattr(self.sparse_dictionary, 'get_vocabulary'):
+                    vocab_list = self.sparse_dictionary.get_vocabulary()
+                    vocab_list = [v.lower() for v in vocab_list]
+                    
+                    component_indices = []
+                    for search_term in strings_to_resolve:
+                        search_term = search_term.lower()
+                        # Find exact match first
+                        try:
+                            found_idx = vocab_list.index(search_term)
+                            component_indices.append(found_idx)
+                        except ValueError:
+                            # Fallback to substring matching
+                            found = False
+                            for i, v in enumerate(vocab_list):
+                                if search_term in v:
+                                    component_indices.append(i)
+                                    found = True
+                                    break
+                            if not found:
+                                print(f"!!! [SpLICE] RESOLUTION FAILED: Concept '{search_term}' not found in vocabulary !!!", flush=True)
+                                component_indices.append(None) # Keep list length consistent
+                else:
+                    print("Warning: Sparse dictionary does not support get_vocabulary()", flush=True)
 
         return component_indices

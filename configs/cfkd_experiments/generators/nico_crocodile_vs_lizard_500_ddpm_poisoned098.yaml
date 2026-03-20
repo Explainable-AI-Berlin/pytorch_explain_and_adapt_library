@@ -1,0 +1,7 @@
+generator_type : DDPM
+category : generator
+base_path : $PEAL_RUNS/nico_crocodile_vs_lizard_500/ddpm
+data: "<PEAL_BASE>/configs/cfkd_experiments/data/nico_crocodile_vs_lizard_500_poisoned098_generator.yaml"
+image_size: 128
+batch_size: 100
+max_steps: 50000

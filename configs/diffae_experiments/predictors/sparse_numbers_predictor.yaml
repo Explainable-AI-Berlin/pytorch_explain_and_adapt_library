@@ -8,6 +8,6 @@ continue_training : False
 only_last_layer   : False
 task:
   criterions:
-    mixed  : 1.0
+    focal_mixed  : 1.0
   output_type             : mixed
-  output_channels         : 10008
+  output_channels         : 1008

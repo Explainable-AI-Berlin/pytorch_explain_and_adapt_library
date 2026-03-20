@@ -11,10 +11,12 @@ calculate_group_accuracies           :  True
 generator                            :  "<PEAL_BASE>/configs/didae_experiments/generators/stable_diffusion_autoencoder_splice.yaml"
 sparse_dictionary                    :  "<PEAL_BASE>/configs/didae_experiments/sparse_dictionaries/splice_clip_vit_l_14_nico_bear_vs_dog.yaml"
 explainer                            :  "<PEAL_BASE>/configs/diffae_experiments/explainers/dae_distill.yaml"
-data                                 :  "<PEAL_BASE>/configs/didae_experiments/data/nico_bear_vs_dog.yaml"
-student                              :  "<PEAL_BASE>/configs/didae_experiments/predictors/nico_bear_vs_dog_openclip_linear.yaml"
+data                                 :  "<PEAL_BASE>/configs/didae_experiments/data/nico_bear_vs_dog_poisoned098.yaml"
+test_data                            :  "<PEAL_BASE>/configs/didae_experiments/data/nico_bear_vs_dog.yaml"
+teacher                              :  "$PEAL_RUNS/nico_bear_vs_dog/openclip_natural/model.cpl"
+student                              :  "$PEAL_RUNS/nico_bear_vs_dog/classifier_poisoned098/model.cpl"
 training                             :  "<PEAL_BASE>/configs/cfkd_experiments/training/img_finetuning.yaml"
-base_path                            :  "$PEAL_RUNS/nico_bear_vs_dog/didae_sd_splice_cfkd"
+base_dir                             :  "$PEAL_RUNS/nico_bear_vs_dog/classifier_poisoned098/didae_sd_splice_cfkd"
 task:
   criterions:
     ce     : 1.0

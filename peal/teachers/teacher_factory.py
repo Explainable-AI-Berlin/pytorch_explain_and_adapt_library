@@ -8,7 +8,7 @@ from peal.teachers.baseline_teacher import BaselineTeacher
 from peal.teachers.cluster_teacher import ClusterTeacher
 from peal.teachers.interfaces import TeacherInterface
 from peal.teachers.human2model_teacher import Human2ModelTeacher
-from peal.teachers.model2model_teacher import Model2ModelTeacher
+from peal.teachers.model2model_teacher import Model2ModelTeacher, NoisyModel2ModelTeacher
 from peal.teachers.symbolic_teacher import SymbolicTeacher
 
 from peal.teachers.preclustered_teacher import PreclusteredTeacher
@@ -62,6 +62,21 @@ def get_teacher(
             loaded_teacher,
             dataset=dataset,
             confounder_name=teacher.get("confounder_name"),
+            tracking_level=tracking_level,
+            counterfactual_type=counterfactual_type,
+        )
+
+    elif isinstance(teacher, dict) and teacher.get("type") == "NoisyModel2Model":
+        model_path = teacher.get("model")
+        try:
+            loaded_teacher = torch.load(model_path, map_location=device)
+        except Exception:
+            loaded_teacher = torch.load(model_path, map_location=device, weights_only=False)
+
+        teacher = NoisyModel2ModelTeacher(
+            loaded_teacher,
+            dataset=dataset,
+            noise_prob=teacher.get("noise_prob", 0.1),
             tracking_level=tracking_level,
             counterfactual_type=counterfactual_type,
         )

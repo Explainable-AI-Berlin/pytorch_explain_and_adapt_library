@@ -1,0 +1,10 @@
+dataset_class           : ISICAnnotatedDataset
+dataset_path            : $PEAL_DATA/isic_annotated
+split                   : [0.0, 1.0]
+input_type              : image
+input_size              : [3, 128, 128]
+output_type             : multiclass
+output_size             : [2]
+downsize                : Resize
+delimiter               : ","
+confounding_factors     : [label, confounder]

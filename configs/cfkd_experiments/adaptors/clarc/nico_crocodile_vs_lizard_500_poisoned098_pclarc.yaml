@@ -1,0 +1,18 @@
+adaptor_type                         :  "ClArC"
+category                             :  "adaptor"
+batch_size                           :  100
+tracking_level                       :  1
+calculate_group_accuracies           :  True
+data                                 :  <PEAL_BASE>/configs/cfkd_experiments/data/nico_crocodile_vs_lizard_500_poisoned098.yaml
+test_data                            :  <PEAL_BASE>/configs/cfkd_experiments/data/nico_crocodile_vs_lizard_unpoisoned.yaml
+student                              :  $PEAL_RUNS/nico_crocodile_vs_lizard_500/classifier_poisoned098/model.cpl
+generator                            :  $PEAL_RUNS/nico_crocodile_vs_lizard_500/ddpm/config.yaml
+base_dir                             :  $PEAL_RUNS/nico_crocodile_vs_lizard_500/classifier_poisoned098/pclarc
+method                               :  "pclarc"
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [label]

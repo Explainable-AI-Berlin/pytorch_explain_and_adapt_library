@@ -873,7 +873,7 @@ class Image2MixedDataset(ImageDataset):
 
         name = self.keys[idx]
 
-        if not name[-4:] in [".png", ".jpg"]:
+        if not name[-4:] in [".png", ".jpg", ".JPG", ".PNG"]:
             name_img = name + ".jpg"
 
         else:
@@ -883,7 +883,11 @@ class Image2MixedDataset(ImageDataset):
             img = Image.fromarray(self.in_memory_images[name_img])
 
         else:
-            img = Image.open(os.path.join(self.root_dir, self.config.x_selection, name_img))
+            try:
+                img = Image.open(os.path.join(self.root_dir, self.config.x_selection, name_img))
+
+            except:
+                img = Image.open(os.path.join(self.root_dir, self.config.x_selection, name_img.replace(".JPG", ".jpg")))
 
         state = torch.get_rng_state()
         img_tensor = self.transform(img)

@@ -116,7 +116,12 @@ class ActivationStore:
         self.current_index = 0
 
     def next_batch(self):
-        batch_size = self.config.cfg["model_batch_size"]
+        if isinstance(self.config, dict):
+            batch_size = self.config.get("batch_size", self.config.get("model_batch_size", 32))
+        elif hasattr(self.config, "cfg") and isinstance(self.config.cfg, dict):
+            batch_size = self.config.cfg.get("batch_size", self.config.cfg.get("model_batch_size", 32))
+        else:
+            batch_size = getattr(self.config, "batch_size", 32)
         if self.current_index + batch_size > self.X.shape[0]:
             self.current_index = 0  # Reset if we exceed the dataset size
         batch = self.X[self.current_index:self.current_index + batch_size]

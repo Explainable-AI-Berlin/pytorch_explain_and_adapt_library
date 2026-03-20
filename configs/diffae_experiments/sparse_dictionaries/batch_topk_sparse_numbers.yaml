@@ -1,5 +1,5 @@
 sparse_dictionaries_type: BatchTopKSAE
-n_components: 10016
+n_components: 1024
 top_k: 12
 act_size: 512
 category: sparse_dictionaries

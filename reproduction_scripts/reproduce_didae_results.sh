@@ -151,3 +151,29 @@ python run_cfkd.py --config "<PEAL_BASE>/configs/diffae_experiments/adaptors/cam
 # run SDAE CFKD
 python run_cfkd.py --config "<PEAL_BASE>/configs/diffae_experiments/adaptors/camelyon1k_resnet18_poisoned098_sdae_cfkd.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/diffae_experiments/adaptors/camelyon1kx098_sdae_cfkd.yaml"
+
+
+# Reproduce DIDAE results on FunnyNodules dataset (InternalStructure confounding Roundness)
+python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/funnynodules_classifier_unpoisoned.yaml"
+python train_generator.py --config "<PEAL_BASE>/configs/cfkd_experiments/generators/funnynodules1k_ddpm_poisoned098.yaml"
+python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/funnynodules1k_classifier_poisoned098.yaml"
+# run SCE-CFKD (base model)
+python run_cfkd.py --config "<PEAL_BASE>/configs/diffae_experiments/adaptors/funnynodules1k_resnet18_poisoned098_sce_cfkd.yaml"
+# train funnynodules foundation model (all attributes)
+python train_predictor.py --config "<PEAL_BASE>/configs/diffae_experiments/predictors/funnynodules_all_attributes_resnet18.yaml"
+# train funnynodules diffusion autoencoder
+python train_generator.py --config "<PEAL_BASE>/configs/diffae_experiments/generators/funnynodules_diffusion_autoencoder.yaml"
+# train linear probe from foundation model
+python train_predictor.py --config "<PEAL_BASE>/configs/diffae_experiments/predictors/funnynodules1k_foundation_linear_poisoned098.yaml"
+# train funnynodules component analysis (Procrustes)
+python run_component_analysis.py --config $PEAL_RUNS/funnynodules/diffusion_autoencoder/config.yaml --sd_config configs/diffae_experiments/sparse_dictionaries/procrustes_sae_funnynodules.yaml
+# run DFR
+python train_predictor.py --config "<PEAL_BASE>/configs/diffae_experiments/predictors/funnynodules1k_foundation_linear_poisoned098_dfr.yaml"
+python evaluate_predictor.py --model_path $PEAL_RUNS/funnynodules1k/internalstructure_confounding_roundness/torchvision/foundation_poisoned098/dfr/model.cpl --data_config configs/cfkd_experiments/data/funnynodules_unpoisoned.yaml --model_config configs/cfkd_experiments/predictors/funnynodules1k_classifier_poisoned098.yaml
+# run GroupDRO
+python run_adaptor.py --config "<PEAL_BASE>/configs/diffae_experiments/adaptors/funnynodules_1k_foundation_linear_poisoned098_group_dro.yaml"
+python evaluate_predictor.py --model_path $PEAL_RUNS/funnynodules1k/internalstructure_confounding_roundness/torchvision/foundation_linear_poisoned098/group_dro/model.cpl --data_config configs/cfkd_experiments/data/funnynodules_unpoisoned.yaml --model_config configs/cfkd_experiments/predictors/funnynodules1k_classifier_poisoned098.yaml
+# run SDAE projection
+python run_adaptor.py --config "<PEAL_BASE>/configs/diffae_experiments/adaptors/funnynodules1kx098_sdae_projection.yaml"
+# run DIDAE CFKD (Procrustes)
+python run_cfkd.py --config "<PEAL_BASE>/configs/diffae_experiments/adaptors/funnynodules1kx098_didae_procrustes_cfkd.yaml"

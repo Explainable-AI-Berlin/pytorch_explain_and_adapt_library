@@ -765,7 +765,7 @@ class DINOEvaluator:
                 else:
                     imgs = batch
 
-                imgs = imgs.to(self.device)
+                imgs = imgs.to(self.device).float()
                 outputs = self.model(pixel_values=imgs)
                 # DINOv2: The [CLS] token is usually the first token or pooled output
                 # transformers implementation usually puts pooled_output in .pooler_output
@@ -780,7 +780,7 @@ class DINOEvaluator:
 
         # If inputs is a direct tensor batch
         else:
-            inputs = inputs.to(self.device)
+            inputs = inputs.to(self.device).float()
             outputs = self.model(pixel_values=inputs)
             if hasattr(outputs, 'pooler_output') and outputs.pooler_output is not None:
                 return outputs.pooler_output

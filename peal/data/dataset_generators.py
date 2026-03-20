@@ -1149,7 +1149,8 @@ class SparseNumbersDatasetGenerator:
 
         num_samples = self.data_config.num_samples if self.data_config.num_samples else 125000
         print(f"DEBUG: num_samples={num_samples}")
-        n_unique_numbers = 10000
+        n_unique_numbers = self.data_config.output_split if self.data_config.output_split else 10000
+        num_digits = len(str(n_unique_numbers - 1))
         # Calculate repeats to aim for 50% occupancy if num_samples changed
         # Total slots = num_samples * 8. Occupancy 50% = 4 * num_samples.
         # repeats = (4 * num_samples) // n_unique_numbers
@@ -1236,7 +1237,7 @@ class SparseNumbersDatasetGenerator:
                 
                 if i in sample_slots[s_idx]:
                     num = sample_slots[s_idx][i]
-                    text = f"{num:04d}"
+                    text = f"{num:0{num_digits}d}"
                     self._draw_number_in_cell(draw, text, box)
                     nums_in_sample.append(num)
                 else:
@@ -1256,3 +1257,117 @@ class SparseNumbersDatasetGenerator:
             f.write("\n".join(lines_out))
 
         print(f"Dataset generated at {dataset_path}")
+
+
+class FunnyNodulesDatasetGenerator:
+    """
+    Generates a PEAL-compatible FunnyNodules dataset.
+
+    The FunnyNodules dataset consists of synthetic medical nodule images with six attributes:
+    - roundness (1-5): round to oval
+    - spiculation (1-5): none to marked
+    - edge_sharpness (1-5): sharp to soft
+    - size (1-5): small to big
+    - intensity (1-5): dark to bright
+    - internal_structure (0-1): absent or present
+
+    For the PEAL confounding experiment:
+    - True feature (target): internal_structure (binary: 0 or 1)
+    - Confounder: roundness (correlated with internal_structure)
+
+    The confounding is controlled by confounder_probability from the data config.
+    """
+
+    def __init__(self, data_config, **kwargs):
+        self.data_config = data_config
+
+    def generate_dataset(self):
+        from peal.dependencies.FunnyNodules.dataset.dataset_generator import generate_nodule
+
+        dataset_path = self.data_config.dataset_path
+        if os.path.exists(dataset_path):
+            datestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            shutil.move(dataset_path, dataset_path + "_old_" + datestamp)
+
+        os.makedirs(os.path.join(dataset_path, "imgs"), exist_ok=True)
+        os.makedirs(os.path.join(dataset_path, "masks"), exist_ok=True)
+
+        num_samples = self.data_config.num_samples
+        confounder_probability = getattr(self.data_config, 'confounder_probability', 0.5)
+
+        # Probability that the confounder does NOT match the true feature
+        # confounder_probability = 0.5 means no confounding (balanced)
+        # confounder_probability = 0.02 means 98% confounding
+        non_confounding_probability = confounder_probability
+
+        rng = np.random.RandomState(self.data_config.seed if self.data_config.seed else 0)
+
+        lines_out = [
+            "Name,InternalStructure,Roundness,Spiculation,EdgeSharpness,Size,Intensity"
+        ]
+
+        img_size = 64  # Default image size
+
+        for sample_idx in range(num_samples):
+            # Deterministic balancing for InternalStructure and Roundness to ensure 
+            # perfect balance in the raw pool (if num_samples % 4 == 0).
+            internal_structure = sample_idx % 2
+            roundness_label = (int(sample_idx / 2) % 2)
+            
+            if roundness_label == 1:
+                roundness = rng.randint(4, 6) # high roundness (round)
+            else:
+                roundness = rng.randint(1, 3) # low roundness (oval)
+
+            # Other attributes are random
+            spiculation = rng.randint(1, 6)
+            edge_sharpness = rng.randint(1, 6)
+            size_attr = rng.randint(1, 6)
+            intensity = rng.randint(1, 6)
+
+            # Generate the nodule image
+            img_np, mask_np, _ = generate_nodule(
+                size_px=img_size,
+                roundness=roundness,
+                spiculation=spiculation,
+                edge_sharpness=edge_sharpness,
+                size_attr=size_attr,
+                intensity=intensity,
+                internal_structure=internal_structure,
+                seed=rng.randint(0, 2**31),
+            )
+
+            # Convert grayscale to 3-channel RGB so it works with standard architectures
+            img_rgb = np.stack([img_np, img_np, img_np], axis=-1)
+            img_pil = Image.fromarray(img_rgb)
+
+            sample_name = embed_numberstring(sample_idx, 8) + ".png"
+            img_pil.save(os.path.join(dataset_path, "imgs", sample_name))
+
+            # Save mask
+            mask_pil = Image.fromarray((mask_np * 255).astype(np.uint8))
+            mask_rgb = np.stack([mask_np * 255, mask_np * 255, mask_np * 255], axis=-1).astype(np.uint8)
+            mask_pil = Image.fromarray(mask_rgb)
+            mask_pil.save(os.path.join(dataset_path, "masks", sample_name))
+
+            # Normalize attributes for CSV. Note: Roundness is saved as binary label (0/1)
+            # to compatible with process_confounder_data_controlled.
+            attributes = [
+                sample_name,
+                str(internal_structure),                    # InternalStructure: 0 or 1
+                str(roundness_label),                       # Roundness: 0 (oval) or 1 (round)
+                str(round((spiculation - 1) / 4.0, 4)),    # Spiculation: normalized [0, 1]
+                str(round((edge_sharpness - 1) / 4.0, 4)), # EdgeSharpness: normalized [0, 1]
+                str(round((size_attr - 1) / 4.0, 4)),      # Size: normalized [0, 1]
+                str(round((intensity - 1) / 4.0, 4)),      # Intensity: normalized [0, 1]
+            ]
+            lines_out.append(",".join(attributes))
+
+            if (sample_idx + 1) % 100 == 0:
+                print(f"Generated {sample_idx + 1}/{num_samples} FunnyNodules samples")
+                with open(os.path.join(dataset_path, "data.csv"), "w") as f:
+                    f.write("\n".join(lines_out))
+
+        with open(os.path.join(dataset_path, "data.csv"), "w") as f:
+            f.write("\n".join(lines_out))
+        print(f"FunnyNodules dataset generated at {dataset_path}")

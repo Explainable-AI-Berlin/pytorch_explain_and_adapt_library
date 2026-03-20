@@ -24,6 +24,7 @@ from peal.data.dataset_generators import (
     SquareDatasetGenerator,
     ConfounderDatasetGenerator,
     SparseNumbersDatasetGenerator,
+    FunnyNodulesDatasetGenerator,
 )
 from peal.data.datasets import (
     Image2ClassDataset,
@@ -386,14 +387,15 @@ class SparseNumbersDataset(Image2MixedDataset):
         reds = y_raw[:8]
         nums = y_raw[8:16]
 
-        # First 10,000 are binary flags for number presence
+        # Binary flags for number presence
         # Next 8 are regression for red intensities
-        binary_nums = torch.zeros(10000)
+        n_unique_numbers = self.config.output_split if self.config.output_split else 10000
+        binary_nums = torch.zeros(n_unique_numbers)
         for n in nums:
             if n >= 0:
                 # Ensure the number is within the expected range
                 num_idx = int(n)
-                if 0 <= num_idx < 10000:
+                if 0 <= num_idx < n_unique_numbers:
                     binary_nums[num_idx] = 1.0
 
         y_final = torch.cat([binary_nums, reds])
@@ -1043,6 +1045,19 @@ class FollicleDataset(Image2MixedDataset):
                     )
 
 
+class FunnyNodulesDataset(Image2MixedDataset):
+    def __init__(self, config: DataConfig, **kwargs):
+        if not os.path.exists(os.path.join(config.dataset_path, "data.csv")):
+            if config.confounder_probability == 0.5:
+                fng = FunnyNodulesDatasetGenerator(data_config=config)
+                fng.generate_dataset()
+            else:
+                raise NotImplementedError("Only confounder_probability=0.5 can be used to generate the dataset. "
+                                          "Please run the unpoisoned experiment first to generate the raw pool.")
+
+        super(FunnyNodulesDataset, self).__init__(config=config, **kwargs)
+
+
 class SkinConDataset(Image2MixedDataset):
     def __init__(self, config, **kwargs):
         if not os.path.exists(config.dataset_path):
@@ -1223,3 +1238,207 @@ class NicoPlusPlusDataset(Image2MixedDataset):
                 print(f"Counts: {counts}")
 
         super(NicoPlusPlusDataset, self).__init__(config=config, **kwargs)
+        
+class ISICAnnotatedDataset(Image2MixedDataset):
+    def __init__(self, config, **kwargs):
+        print("instantiate ISICAnnotated dataset!")
+        dataset_labels = os.path.join(config.dataset_path, "data.csv")
+        if not os.path.exists(dataset_labels):
+            self._prepare_dataset(config)
+        
+        super(ISICAnnotatedDataset, self).__init__(config=config, **kwargs)
+
+    def _prepare_dataset(self, config):
+        import csv
+        import requests
+        from PIL import Image
+        import numpy as np
+        from tqdm import tqdm
+        from pathlib import Path
+        
+        print(f"Preparing ISICAnnotated dataset at {config.dataset_path}...")
+        Path(config.dataset_path).mkdir(parents=True, exist_ok=True)
+        
+        img_metadata_path = os.path.join(config.dataset_path, "img_metadata.csv")
+        seg_metadata_path = os.path.join(config.dataset_path, "seg_metadata.csv")
+        segs_zip_path = os.path.join(config.dataset_path, "segs.zip")
+        
+        # Zenodo record URL parts
+        base_zenodo_url = "https://zenodo.org/records/14201693/files/"
+        
+        files_to_download = {
+            "img_metadata.csv": img_metadata_path,
+            "seg_metadata.csv": seg_metadata_path,
+            "segs.zip": segs_zip_path
+        }
+        
+        for filename, local_path in files_to_download.items():
+            if not os.path.exists(local_path):
+                print(f"Downloading {filename} from Zenodo...")
+                url = base_zenodo_url + filename + "?download=1"
+                try:
+                    r = requests.get(url, stream=True)
+                    r.raise_for_status()
+                    with open(local_path, 'wb') as f:
+                        for chunk in r.iter_content(chunk_size=8192):
+                            f.write(chunk)
+                except Exception as e:
+                    print(f"Error downloading {filename}: {e}")
+                    if filename != "segs.zip": # Metadata is critical
+                        raise e
+
+        if not os.path.exists(img_metadata_path) or not os.path.exists(seg_metadata_path):
+            print("Metadata files still missing after download attempt.")
+            raise FileNotFoundError(f"Missing metadata in {config.dataset_path}")
+
+
+        # Read img_metadata: isic_id -> benign_malignant
+        img_labels = {}
+        with open(img_metadata_path, mode='r') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                img_labels[row['isic_id']] = row['benign_malignant']
+
+        data = []
+        areas = []
+        
+        mask_dir = os.path.join(config.dataset_path, "masks")
+        if not os.path.exists(mask_dir) or not os.listdir(mask_dir):
+            segs_zip = os.path.join(config.dataset_path, "segs.zip")
+            if os.path.exists(segs_zip):
+                print(f"Extracting {segs_zip}...")
+                import zipfile
+                with zipfile.ZipFile(segs_zip, 'r') as zip_ref:
+                    zip_ref.extractall(config.dataset_path)
+                
+                # Debugging: List top-level items after extraction
+                extracted_items = os.listdir(config.dataset_path)
+                print(f"Contents of {config.dataset_path} after extraction: {extracted_items}")
+
+                # Check where it extracted. Could be 'segs' or 'masks' or 'segmentations'
+                # IMA++ typically has 'segs'
+                possible_sources = ["segs", "segmentations", "masks"]
+                found_source = False
+                for src_name in possible_sources:
+                    src_path = os.path.join(config.dataset_path, src_name)
+                    if os.path.exists(src_path) and os.path.isdir(src_path):
+                        if src_path != mask_dir:
+                            print(f"Renaming {src_path} to {mask_dir}...")
+                            import shutil
+                            if os.path.exists(mask_dir):
+                                shutil.rmtree(mask_dir)
+                            shutil.move(src_path, mask_dir)
+                        found_source = True
+                        break
+                
+                if not found_source:
+                    print("Warning: Did not find a standard mask source directory. Zip might have extracted files directly or into a different folder.")
+                    # Let's check if there are many .png files in the root now
+                    png_files = [f for f in extracted_items if f.endswith('.png')]
+                    if len(png_files) > 100:
+                        print(f"Found {len(png_files)} PNG files in root. Moving them to 'masks' folder...")
+                        os.makedirs(mask_dir, exist_ok=True)
+                        import shutil
+                        for f in png_files:
+                            shutil.move(os.path.join(config.dataset_path, f), os.path.join(mask_dir, f))
+            
+            # If still doesn't exist, create it to avoid repeating unzip/errors
+            if not os.path.exists(mask_dir):
+                os.makedirs(mask_dir, exist_ok=True)
+
+
+        # Read seg_metadata and process
+        with open(seg_metadata_path, mode='r') as f:
+            reader = csv.DictReader(f)
+            seg_rows = list(reader)
+
+        print(f"Processing {len(seg_rows)} rows from seg_metadata.csv...")
+        print(f"Checking for masks in: {mask_dir}")
+        print(f"Number of img_labels available: {len(img_labels)}")
+
+        print("Calculating mask areas for confounder retrieval...")
+        for row in tqdm(seg_rows):
+            isic_id = row['ISIC_id']
+            seg_filename = row['seg_filename']
+            mask_path = os.path.join(mask_dir, seg_filename)
+            
+            if not os.path.exists(mask_path):
+                # Retry with some variations just in case (e.g. extension)
+                if not os.path.exists(mask_path):
+                    continue
+            
+            if isic_id not in img_labels:
+                continue
+
+            mask = Image.open(mask_path).convert('L')
+            mask_arr = np.array(mask)
+            area_ratio = np.mean(mask_arr > 127) 
+            
+            label = 1 if img_labels[isic_id] == 'malignant' else 0
+            img_filename = row['img_filename']
+            
+            data.append({
+                'img': img_filename,
+                'label': label,
+                'area_ratio': area_ratio
+            })
+            areas.append(area_ratio)
+
+        if not areas:
+            print(f"Error: areas list is empty.")
+            # Sample check
+            if seg_rows:
+                sample_row = seg_rows[0]
+                sample_mask = os.path.join(mask_dir, sample_row['seg_filename'])
+                print(f"Sample mask path: {sample_mask} (Exists: {os.path.exists(sample_mask)})")
+                print(f"Sample ISIC_id: {sample_row['ISIC_id']} (In img_labels: {sample_row['ISIC_id'] in img_labels})")
+            raise Exception("No images/masks found to process! Check console for debug info.")
+
+
+        threshold = np.median(areas)
+        print(f"Confounder threshold (median area ratio): {threshold}")
+        
+        # Ensure imgs directory exists and contains images
+        imgs_dir = os.path.join(config.dataset_path, "imgs")
+        if not os.path.exists(imgs_dir):
+            # Try to find where images are. They might be in a folder called 'images' or just in the root
+            possible_img_dirs = [os.path.join(config.dataset_path, "images"), config.dataset_path]
+            found = False
+            for p in possible_img_dirs:
+                # Check for a few expected images
+                if any(os.path.exists(os.path.join(p, row['img_filename'])) for row in seg_rows[:10]):
+                    if p == config.dataset_path:
+                        # We need 'imgs' to be a subfolder. We can't easily symlink the parent to a child.
+                        # We'll create 'imgs' and symlink all images into it.
+                        os.makedirs(imgs_dir, exist_ok=True)
+                        print("Symlinking images into 'imgs' folder...")
+                        for row in tqdm(seg_rows):
+                            src = os.path.join(config.dataset_path, row['img_filename'])
+                            dst = os.path.join(imgs_dir, row['img_filename'])
+                            if os.path.exists(src) and not os.path.exists(dst):
+                                try:
+                                    os.symlink(os.path.relpath(src, imgs_dir), dst)
+                                except Exception:
+                                    pass # Fallback to copy if symlink fails?
+                    else:
+                        os.symlink(os.path.relpath(p, config.dataset_path), imgs_dir)
+                    found = True
+                    break
+            if not found:
+                print("Warning: Could not find image files. Please ensures images are in 'imgs' folder.")
+
+        # Save to data.csv
+        data_csv_path = os.path.join(config.dataset_path, "data.csv")
+        with open(data_csv_path, mode='w', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=['imgs', 'label', 'confounder'])
+            writer.writeheader()
+            for item in data:
+                confounder = 1 if item['area_ratio'] > threshold else 0
+                writer.writerow({
+                    'imgs': item['img'], # This is the filename
+                    'label': item['label'],
+                    'confounder': confounder
+                })
+        print("data.csv generated successfully.")
+
+
