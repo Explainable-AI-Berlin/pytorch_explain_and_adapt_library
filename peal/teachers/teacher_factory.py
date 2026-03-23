@@ -70,6 +70,7 @@ def get_teacher(
         model_path = teacher.get("model")
         try:
             loaded_teacher = torch.load(model_path, map_location=device)
+            
         except Exception:
             loaded_teacher = torch.load(model_path, map_location=device, weights_only=False)
 

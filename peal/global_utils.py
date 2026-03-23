@@ -254,19 +254,30 @@ def _load_yaml_config(config_path):
             else:
                 raise e
 
-        for key in config.keys():
-            if isinstance(config[key], str):
-                if config[key][: len("$PEAL_RUNS")] == "$PEAL_RUNS":
+        def expand_recursive(cfg):
+            if isinstance(cfg, dict):
+                for key in list(cfg.keys()):
+                    cfg[key] = expand_recursive(cfg[key])
+            elif isinstance(cfg, list):
+                for i in range(len(cfg)):
+                    cfg[i] = expand_recursive(cfg[i])
+            elif isinstance(cfg, str):
+                if cfg.startswith("$PEAL_RUNS"):
                     peal_runs = os.environ.get("PEAL_RUNS", "peal_runs")
-                    config[key] = config[key].replace("$PEAL_RUNS", peal_runs)
+                    cfg = cfg.replace("$PEAL_RUNS", peal_runs)
 
-                if config[key][: len("$PEAL_DATA")] == "$PEAL_DATA":
+                if cfg.startswith("$PEAL_DATA"):
                     peal_data = os.environ.get("PEAL_DATA", "datasets")
-                    config[key] = config[key].replace("$PEAL_DATA", peal_data)
+                    cfg = cfg.replace("$PEAL_DATA", peal_data)
 
-                if config[key][-5:] == ".yaml":
-                    config[key] = _load_yaml_config(config[key])
+                if "<PEAL_BASE>" in cfg:
+                    cfg = cfg.replace("<PEAL_BASE>", get_project_resource_dir())
 
+                if cfg.endswith(".yaml"):
+                    cfg = _load_yaml_config(cfg)
+            return cfg
+
+        config = expand_recursive(config)
         return config
 
     else:

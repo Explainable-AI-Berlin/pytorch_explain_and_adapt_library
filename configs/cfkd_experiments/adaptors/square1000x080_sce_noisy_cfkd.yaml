@@ -18,7 +18,7 @@ teacher                              :
   type: NoisyModel2Model
   model: $PEAL_RUNS/square/colora_confounding_colorb/torchvision/classifier_unpoisoned/model.cpl
   noise_prob: 0.1
-generator                            :  $PEAL_RUNS/square1k/ddpm_poisoned080/config.yaml
+generator                            :  $PEAL_RUNS/square1k/ddpm/config.yaml
 base_dir                             :  $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/classifier_poisoned080/sce_noisy_cfkd
 task:
   criterions:

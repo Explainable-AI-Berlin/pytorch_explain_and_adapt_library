@@ -1044,6 +1044,8 @@ class FollicleDataset(Image2MixedDataset):
                         "PNG",
                     )
 
+        super(FollicleDataset, self).__init__(config=config, **kwargs)
+
 
 class FunnyNodulesDataset(Image2MixedDataset):
     def __init__(self, config: DataConfig, **kwargs):
