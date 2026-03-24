@@ -1,6 +1,6 @@
 dataset_class: AdultDataset
 category: data
-dataset_path: datasets/adult
+dataset_path: datasets/adult_test
 output_size: [ 1 ]
 input_size: [ 20 ]
 input_type: "symbolic"

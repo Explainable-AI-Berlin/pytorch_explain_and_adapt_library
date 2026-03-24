@@ -9,3 +9,4 @@ task:
   output_type             : singleclass
   output_size             : 2
   y_selection             : [Target]
+#tracking_level    : 1

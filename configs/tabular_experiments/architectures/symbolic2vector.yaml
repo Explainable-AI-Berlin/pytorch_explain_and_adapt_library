@@ -1,7 +1,7 @@
 config_name : ArchitectureConfig
 layers : [
-  {config_name: FCConfig, num_neurons: 512, dropout: 0.25},
-  {config_name: FCConfig, num_neurons: 512, dropout: 0.5},
+  {config_name: FCConfig, num_neurons: 64, dropout: 0.0},
+  {config_name: FCConfig, num_neurons: 64, dropout: 0.0},
 ]
 #layers : [
 #  [fc, 512, 0.25],
