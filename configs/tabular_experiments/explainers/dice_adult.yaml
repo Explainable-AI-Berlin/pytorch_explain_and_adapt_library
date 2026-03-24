@@ -1,7 +1,7 @@
 explainer_type                       :   DiCEExplainer
 category                             :   explainer
 y_target_goal_confidence             :   0.51
-num_attempts                         :   4
+num_attempts                         :   2
 parallel_attempts                    :   1
 method                               :   "genetic"
 features_to_vary                     :   "all"
