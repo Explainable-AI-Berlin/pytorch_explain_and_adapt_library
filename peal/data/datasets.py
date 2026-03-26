@@ -14,7 +14,7 @@ from matplotlib import pyplot as plt
 
 from peal.data.interfaces import PealDataset
 from peal.data.dataset_utils import parse_csv
-from peal.global_utils import embed_numberstring, high_contrast_heatmap, DINOEvaluator, generate_overlay
+from peal.global_utils import embed_numberstring, high_contrast_heatmap, DINOEvaluator, generate_overlay, generate_ssim_overlay
 from peal.generators.interfaces import Generator
 
 matplotlib.use("Agg")
@@ -342,10 +342,11 @@ class ImageDataset(PealDataset):
 
             if tracking_level >= 1:
                 overlay = generate_overlay(x, counterfactual)
+                ssim_overlay = generate_ssim_overlay(x, counterfactual)
                 current_collage = torch.cat(
-                    [x_in, counterfactual_rgb, heatmap_high_contrast, overlay], -1
+                    [x_in, counterfactual_rgb, heatmap_high_contrast, overlay, ssim_overlay], -1
                 )
-                current_collage = torchvision.utils.make_grid(current_collage, nrow=4)
+                current_collage = torchvision.utils.make_grid(current_collage, nrow=5)
                 plt.gcf()
                 plt.imshow(current_collage.permute(1, 2, 0))
                 # Robustly build title string with length checks

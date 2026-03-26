@@ -614,6 +614,75 @@ def generate_overlay(x, counterfactual, alpha_factor=2.0):
     return overlay
 
 
+def ssim_map(img1, img2, window_size=11, C1=0.01**2, C2=0.03**2):
+    """
+    Computes a simplified Structural Similarity Index Measure (SSIM) map between two images locally.
+    img1, img2: (C, H, W) tensors.
+    """
+    import torch.nn.functional as F
+
+    # Add batch dimension and convert to greyscale for structural check
+    if img1.shape[0] == 3:
+        img1_grey = img1.mean(dim=0, keepdim=True).unsqueeze(0)
+        img2_grey = img2.mean(dim=0, keepdim=True).unsqueeze(0)
+    else:
+        img1_grey = img1.unsqueeze(0)
+        img2_grey = img2.unsqueeze(0)
+
+    window = (
+        torch.ones((1, 1, window_size, window_size)).to(img1.device) / (window_size**2)
+    )
+
+    mu1 = F.conv2d(img1_grey, window, padding=window_size // 2)
+    mu2 = F.conv2d(img2_grey, window, padding=window_size // 2)
+
+    mu1_sq = mu1.pow(2)
+    mu2_sq = mu2.pow(2)
+    mu1_mu2 = mu1 * mu2
+
+    sigma1_sq = (
+        F.conv2d(img1_grey * img1_grey, window, padding=window_size // 2) - mu1_sq
+    )
+    sigma2_sq = (
+        F.conv2d(img2_grey * img2_grey, window, padding=window_size // 2) - mu2_sq
+    )
+    sigma12 = (
+        F.conv2d(img1_grey * img2_grey, window, padding=window_size // 2) - mu1_mu2
+    )
+
+    ssim = ((2 * mu1_mu2 + C1) * (2 * sigma12 + C2)) / (
+        (mu1_sq + mu2_sq + C1) * (sigma1_sq + sigma2_sq + C2)
+    )
+
+    # SSIM map: 1.0 is identical, <1.0 is different.
+    # Return 1 - SSIM to highlight differences.
+    return torch.clamp(1.0 - ssim, 0.0, 1.0).squeeze(0).squeeze(0)
+
+
+def generate_ssim_overlay(x, counterfactual, alpha_factor=1.5):
+    diff = ssim_map(x, counterfactual)
+    if diff.max() > 0:
+        diff = diff / diff.max()
+
+    if x.shape[0] == 3:
+        grey = x.mean(dim=0, keepdim=True).repeat(3, 1, 1)
+    else:
+        grey = torch.tile(x, [3, 1, 1])
+
+    # Low-contrast greyscale background (slightly lighter for nuance)
+    grey = (grey - 0.5) * 0.4 + 0.6
+
+    # nuancing: scale red intensity directly by SSIM change map
+    heatmap_red = torch.zeros_like(grey)
+    heatmap_red[0] = diff  # Red channel scaled by SSIM diff map
+
+    # alpha mask for blending (less aggressive factor)
+    alpha = torch.clamp(diff * alpha_factor, 0, 1)
+
+    overlay = grey * (1 - alpha) + heatmap_red * alpha
+    return overlay
+
+
 @torch.no_grad()
 def generate_smooth_mask(x1, x2, dilation, max_avg_combination=0.5):
     assert (dilation % 2) == 1, "dilation must be an odd number"
@@ -637,38 +706,34 @@ def generate_smooth_mask(x1, x2, dilation, max_avg_combination=0.5):
 
 
 def get_intermediate_output(
-    model: torch.nn.Module, x: torch.Tensor, distance_from_last_layer: int
+    model: torch.nn.Module, x: torch.Tensor, distance_from_last_layer: int = None, layer_name: str = None
 ):
     """
-    Runs the model on input x and returns the activation tensor
-    that is `distance_from_last_layer` layers away from the final layer.
-
-    Args:
-        model (nn.Module): The predictor model.
-        x (torch.Tensor): Input tensor (image).
-        distance_from_last_layer (int): Number of layers away from the final output layer.
-                                        (1 = last layer before logits, 2 = two layers back, etc.)
+    Runs the model on input x and returns the activation tensor.
+    Can specify distance from end or a specific layer name.
     """
     activations = {}
     handles = []
 
-    # Get a flat list of all modules in order
-    layers = [
-        m
-        for m in model.modules()
-        if not isinstance(m, torch.nn.Sequential)
-        and not isinstance(m, torch.nn.ModuleList)
-    ]
-    layers = [
-        m for m in layers if len(list(m.children())) == 0
-    ]  # keep only leaf modules
+    if layer_name is not None:
+        target_layer = dict(model.named_modules())[layer_name]
+    else:
+        # Get a flat list of all modules in order
+        layers = [
+            m
+            for m in model.modules()
+            if not isinstance(m, torch.nn.Sequential)
+            and not isinstance(m, torch.nn.ModuleList)
+        ]
+        layers = [
+            m for m in layers if len(list(m.children())) == 0
+        ]  # keep only leaf modules
 
-    # Select the layer we want
-    target_layer_index = len(layers) - distance_from_last_layer
-    if target_layer_index < 0 or target_layer_index >= len(layers):
-        raise ValueError("distance_from_last_layer is out of range.")
-
-    target_layer = layers[target_layer_index]
+        # Select the layer we want
+        target_layer_index = len(layers) - distance_from_last_layer
+        if target_layer_index < 0 or target_layer_index >= len(layers):
+            raise ValueError("distance_from_last_layer is out of range.")
+        target_layer = layers[target_layer_index]
 
     # Hook to capture the output
     def hook_fn(module, input, output):
@@ -678,13 +743,64 @@ def get_intermediate_output(
     handles.append(handle)
 
     # Run forward pass
-    _ = model(x)
+    try:
+        _ = model(x)
+    except:
+        pass # Some models might fail on full forward pass if we only need intermediate
 
     # Cleanup
     for h in handles:
         h.remove()
 
     return activations["out"]
+
+
+def generate_feature_similarity_overlay(x, counterfactual, model, layer_name='model.layer2', alpha_factor=2.0):
+    """
+    Visualizes similarity of intermediate features.
+    """
+    device = next(model.parameters()).device
+    x_batch = x.unsqueeze(0).to(device)
+    cf_batch = counterfactual.unsqueeze(0).to(device)
+    
+    # Get features
+    try:
+        feat_x = get_intermediate_output(model, x_batch, layer_name=layer_name)
+        feat_cf = get_intermediate_output(model, cf_batch, layer_name=layer_name)
+    except:
+        # Fallback for different model structures
+        if 'model.' in layer_name:
+            layer_name = layer_name.replace('model.', '')
+        feat_x = get_intermediate_output(model, x_batch, layer_name=layer_name)
+        feat_cf = get_intermediate_output(model, cf_batch, layer_name=layer_name)
+
+    # Cosine similarity across channels
+    # feat shape: [1, C, H, W]
+    sim = torch.nn.functional.cosine_similarity(feat_x, feat_cf, dim=1)
+    
+    # Change map: 1 - similarity
+    diff = torch.clamp(1.0 - sim, 0, 2).squeeze(0)
+    if diff.max() > 0:
+        diff = diff / diff.max()
+        
+    # Interpolate to image size
+    diff = torch.nn.functional.interpolate(
+        diff.unsqueeze(0).unsqueeze(0), size=x.shape[1:], mode='bilinear'
+    ).squeeze(0).squeeze(0).cpu()
+    
+    # Standard overlay style
+    if x.shape[0] == 3:
+        grey = x.mean(dim=0, keepdim=True).repeat(3, 1, 1).cpu()
+    else:
+        grey = torch.tile(x, [3, 1, 1]).cpu()
+    
+    grey = (grey - 0.5) * 0.4 + 0.6
+    heatmap_red = torch.zeros_like(grey)
+    heatmap_red[0] = diff
+    
+    alpha = torch.clamp(diff * alpha_factor, 0, 1)
+    overlay = grey * (1 - alpha) + heatmap_red * alpha
+    return overlay
 
 
 def extract_penultima_activation(x, predictor, distance_from_last_layer=1):

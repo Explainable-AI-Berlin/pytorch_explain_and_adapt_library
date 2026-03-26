@@ -11,7 +11,7 @@ from pathlib import Path
 # Allow running from project root
 sys.path.append(str(Path(__file__).resolve().parents[2]))
 
-from peal.global_utils import generate_overlay
+from peal.global_utils import generate_overlay, generate_ssim_overlay
 
 NUM_CLUSTERS = 2
 
@@ -22,8 +22,8 @@ def plot_images_with_custom_padding(
     num_methods, num_tasks, c, h, w = imgs.shape
 
     # Define padding configuration
-    col_spacing = [0.5 if i in [2, 4, 6] else 0.0 for i in range(num_tasks)] if num_tasks > 1 else [0.0]
-    row_spacing = [0.5 if i in [0, 2] else 0.0 for i in range(num_methods)] if num_methods > 1 else [0.0]
+    col_spacing = [0.2 if i in [2, 4, 6] else 0.0 for i in range(num_tasks)] if num_tasks > 1 else [0.0]
+    row_spacing = [0.2 if i in [0, 2] else 0.0 for i in range(num_methods)] if num_methods > 1 else [0.0]
 
     # Create GridSpec for precise control over spacings
     fig = plt.figure(figsize=(2 * num_tasks, 2 * num_methods))
@@ -42,8 +42,8 @@ def plot_images_with_custom_padding(
             ax.imshow(img)
             ax.axis("off")
 
-            # Add confidence values below the image (unless it's an overlay)
-            if "Overlay" not in method_names[i]:
+            # Add confidence values below the image (unless it's an overlay or ssim)
+            if "Overlay" not in method_names[i] and "SSIM" not in method_names[i]:
                 ax.text(
                     0.5,
                     -0.1,
@@ -74,7 +74,7 @@ def plot_images_with_custom_padding(
             left=max(0.05, sum(col_spacing) / num_tasks if num_tasks > 0 else 0),
             right=min(0.95, 1 - sum(col_spacing) / num_tasks if num_tasks > 0 else 1),
         )
-    plt.savefig(output_path, dpi=300)
+    plt.savefig(output_path, dpi=300, bbox_inches="tight", pad_inches=0.05)
     plt.close(fig)
 
 
@@ -85,7 +85,7 @@ if __name__ == "__main__":
         + "/square1k/colora_confounding_colorb/torchvision/classifier_poisoned098",
         base_path
         + "/celeba1k_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned098",
-        base_path + "/celeba1k/Blond_Hair/resnet18_poisoned098",
+        base_path + "/celeba1k/Blond_Hair/classifier_poisoned098",
         base_path + "/follicles_cut/classifier_natural",
         # base_path + "/camelyon17_1k/classifier_poisoned098",
     ]
@@ -108,9 +108,9 @@ if __name__ == "__main__":
     method_names = [
         "Original",
         "Counterfactual Before",
-        "Overlay Before",
+        "SSIM Before",
         "Counterfactual After",
-        "Overlay After",
+        "SSIM After",
     ]
     # sample_idxs = [[11, 12], [5, 12, 40, 36, 103, 125], [36, 93, 140, 157], [3, 52, 150, 314, 80], [0, 1]]
     sample_idxs = [[11, 12], [103, 125], [140, 157], [80, 150]]
@@ -152,7 +152,7 @@ if __name__ == "__main__":
                     
                     method_base_idx = rows_per_method * method_idx + 1
                     imgs[method_base_idx][2 * dataset_idx + i] = cf_img
-                    imgs[method_base_idx + 1][2 * dataset_idx + i] = generate_overlay(orig_img, cf_img)
+                    imgs[method_base_idx + 1][2 * dataset_idx + i] = generate_ssim_overlay(orig_img, cf_img)
                     
                     for r in range(rows_per_method):
                         target_confidences[method_base_idx + r][2 * dataset_idx + i] = float(
