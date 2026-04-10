@@ -1,6 +1,0 @@
-category: explainer
-explainer_type: DAEdistill
-distilled_predictor: <PEAL_BASE>/configs/diffae_experiments/predictors/dae_distill_predictor.yaml
-use_clustering: false
-num_attempts: 4
-linesearch_factors: [2.0]

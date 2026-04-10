@@ -1,0 +1,14 @@
+# python train_generator.py --config "<PEAL_BASE>/configs/didae_experiments/generators/celeba_diffusion_autoencoder_dinov2.yaml"
+# python run_component_analysis.py --config $PEAL_RUNS/celeba/diffusion_autoencoder_dinov2/config.yaml --sd_config configs/didae_experiments/sparse_dictionaries/matryoshka_sae_default.yaml
+# python run_component_analysis.py --config $PEAL_RUNS/celeba/diffusion_autoencoder_dinov2/config.yaml --sd_config configs/didae_experiments/sparse_dictionaries/procrustes_sae_celeba.yaml
+generator_type : DiffusionAutoencoder
+category : generator
+base_path : $PEAL_RUNS/celeba/diffusion_autoencoder_dinov2
+data: <PEAL_BASE>/configs/sce_experiments/data/celeba_generator.yaml
+image_size: 64
+batch_size: 100
+save_every_samples: 20000
+total_samples: 40000001
+encoder_dimensions : 1024
+encoder_path: $PEAL_RUNS/celeba1k/Blond_Hair/dinov2_linear_poisoned098/model.cpl
+#encoder: "open_clip" #"facebook/dinov2-base"

@@ -1,8 +1,0 @@
-dataset_path            : $PEAL_DATA/rxrx1
-dataset_class           : RxRx1Dataset
-split                   : [1.0, 1.0]
-input_type              : image
-input_size              : [3, 128, 128]
-output_type             : multiclass
-output_size             : [2]
-normalization           : [0.5,0.5]

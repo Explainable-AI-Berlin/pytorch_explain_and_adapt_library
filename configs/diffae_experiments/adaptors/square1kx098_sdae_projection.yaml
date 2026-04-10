@@ -1,9 +1,0 @@
-# python run_adaptor.py --config "<PEAL_BASE>/configs/diffae_experiments/adaptors/square1kx098_sdae_projection.yaml"
-adaptor_type                         :  "ProjectionAdaptor"
-category                             :  "adaptor"
-data                                 :  <PEAL_BASE>/configs/cfkd_experiments/data/square1k_poisoned098.yaml
-test_data                            :  <PEAL_BASE>/configs/cfkd_experiments/data/square_unpoisoned.yaml
-base_model_config                    :  $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/foundation_poisoned098/config.yaml
-base_dir                             :  $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/foundation_poisoned098/sdae_projection
-projected_component_index_list       :  [1]
-sparse_dictionary                    :  $PEAL_RUNS/square/diffusion_autoencoder/OrthogonalProcrustesDictionary/config.yaml

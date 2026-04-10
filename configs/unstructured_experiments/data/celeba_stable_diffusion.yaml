@@ -1,8 +1,0 @@
-dataset_path     : $PEAL_DATA/celeba
-num_samples             : 202599
-input_type              : image
-input_size              : [3, 512, 512]
-output_type             : multiclass
-output_size             : [40]
-delimiter               : ","
-normalization           : [0.5, 0.5]
