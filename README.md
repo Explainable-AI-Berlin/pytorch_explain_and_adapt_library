@@ -1,10 +1,12 @@
 Welcome to the Pytorch Explain and Adapt Library (PEAL)!
 
-The contribution of this library is two-fold:
+The contribution of this library is three-fold:
 
 1) Official implementation of the **Smoothed Counterfactual Explorer (SCE)**.
 
 2) Official implementation of **Counterfactual Knowledge Distillation (CFKD)**.
+
+3) Official implementation of **Disentangled Diffusion Autoencoders (DiDAE)**.
 
 Additionally, the library includes reimplementations of other commonly used counterfactual explainers and model robustification techniques.
 
@@ -27,6 +29,17 @@ If you use CFKD (https://arxiv.org/pdf/2510.17524) useful consider citing:
   author={Bender, Sidney and Delzer, Ole and Herrmann, Jan and Marxfeld, Heike Antje and M{\"u}ller, Klaus-Robert and Montavon, Gr{\'e}goire},
   journal={arXiv preprint arXiv:2510.17524},
   year={2025}
+}
+```
+
+If you use DiDAE (https://arxiv.org/pdf/2601.21851) useful consider citing:
+
+```
+@article{bender2026visual,
+  title={Visual Disentangled Diffusion Autoencoders: Scalable Counterfactual Generation for Foundation Models},
+  author={Bender, Sidney and Morik, Marco},
+  journal={arXiv preprint arXiv:2601.21851},
+  year={2026}
 }
 ```
 
