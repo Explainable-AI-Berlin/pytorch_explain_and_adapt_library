@@ -131,6 +131,7 @@ class EditCapableGenerator(Generator):
         list[torch.Tensor],
         list[torch.Tensor],
         list[torch.Tensor],
+        list[torch.Tensor],
     ]:
         """
         This function edits the input to match the target confidence goal and target classes

@@ -1,0 +1,5 @@
+ending: .npz
+n_components: 2
+sparse_dictionaries_type: ProbeSAE
+category: sparse_dictionaries
+pretrained_model_path: $PEAL_RUNS/square1k/colora_confounding_colorb/torchvision/multiclass_poisoned098/model.cpl

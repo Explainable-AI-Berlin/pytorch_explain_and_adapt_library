@@ -1,0 +1,13 @@
+# python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/isic_annotated_classifier_poisoned098.yaml"
+category: predictor
+training: <PEAL_BASE>/configs/cfkd_experiments/training/img_classifier.yaml
+data: <PEAL_BASE>/configs/cfkd_experiments/data/isic_annotated.yaml
+architecture: torchvision_resnet18
+model_path: $PEAL_RUNS/isic_annotated/classifier_poisoned098
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type: singleclass
+  output_channels: 2
+  y_selection: [label]

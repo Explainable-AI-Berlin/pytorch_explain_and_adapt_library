@@ -49,11 +49,11 @@ class ExplainerConfig(BaseModel):
     """
     Whether to cluster the explanations and return most salient ones.
     """
-    use_clustering: bool = True
+    use_clustering: bool = False
     """
     How to merge clusters of explanations?
     """
-    merge_clusters: str = "best"
+    merge_clusters: str = "concatenate"
     """
     The number of counterfactuals created for the same sample.
     """

@@ -11,11 +11,12 @@ from pathlib import Path
 
 import torch
 import torchvision
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
+from tqdm import tqdm
 from torchvision.transforms import ToTensor
 
 from peal.global_utils import get_project_resource_dir, embed_numberstring
-from peal.dependencies.ddpm_inversion.ddpm_inversion import DDPMInversion
+#from peal.dependencies.ddpm_inversion.ddpm_inversion import DDPMInversion
 
 
 class ArtificialConfounderTabularDatasetGenerator:
@@ -716,13 +717,15 @@ class CircleDatasetGenerator:
 
     def __init__(
         self,
-        dataset_name,
+        config=None,
+        dataset_name=None,
         dataset_origin_path="datasets",
         num_samples=1024,
         radius=1,
         noise_scale=0.0,
         # false_confounder_percentage=0.0,
         seed=0,
+        **kwargs,
     ):
         """
         Initiates the dataset parameters
@@ -737,24 +740,34 @@ class CircleDatasetGenerator:
         """
 
         self.data = None
-        self.dataset_name = dataset_name
-        self.dataset_origin_path = dataset_origin_path
-        self.dataset_dir = os.path.join(self.dataset_origin_path, self.dataset_name)
-        self.num_samples = num_samples
-        self.radius = radius
-        self.noise_scale = noise_scale
-        self.seed = seed
-        name = (
-            "size_"
-            + str(self.num_samples)
-            + "_"
-            + "radius_"
-            + str(round(radius, 1))
-            + "_"
-            + "seed_"
-            + str(seed)
-        )
-        self.label_dir = os.path.join(self.dataset_dir, name + ".csv")
+        if config is not None:
+            self.dataset_dir = config.dataset_path
+            self.num_samples = config.num_samples
+            self.radius = getattr(config, "radius", radius)
+            self.noise_scale = getattr(config, "noise_scale", noise_scale)
+            self.seed = getattr(config, "seed", seed)
+        else:
+            self.num_samples = num_samples
+            self.radius = radius
+            self.noise_scale = noise_scale
+            self.seed = seed
+            
+            if dataset_name is None:
+                dataset_name = (
+                    "size_"
+                    + str(self.num_samples)
+                    + "_"
+                    + "radius_"
+                    + str(round(self.radius, 1))
+                    + "_"
+                    + "seed_"
+                    + str(self.seed)
+                )
+            self.dataset_name = dataset_name
+            self.dataset_origin_path = dataset_origin_path
+            self.dataset_dir = os.path.join(self.dataset_origin_path, self.dataset_name)
+
+        self.label_dir = os.path.join(self.dataset_dir, "data.csv")
 
     def generate_dataset(self):
         """
@@ -1058,3 +1071,303 @@ class SquareDatasetGenerator:
             os.path.join(self.data_config.dataset_path + "_inverse", "data.csv"),
             "w",
         ).write("\n".join(lines_out_inverse))
+
+class SparseNumbersDatasetGenerator:
+    """
+    Generates a dataset of images with a 2x4 grid of 4-digit numbers.
+    Resolution: 128x128.
+    Grid: 2 columns, 4 rows.
+    Numbers: 0000-9999, each appears 50 times in the dataset.
+    Occupancy: Each slot has a 50% chance of being present (500,000 total numbers in 125,000 samples).
+    Background: Variable red intensity (white to red).
+    Foreground: Black numbers.
+    """
+
+    def __init__(self, data_config, **kwargs):
+        self.data_config = data_config
+        self.font_path = kwargs.get("font_path", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+
+    def _draw_number_in_cell(self, draw, text, box):
+        # box is (x0, y0, x1, y1)
+        cell_w = box[2] - box[0]
+        cell_h = box[3] - box[1]
+        
+        # Binary search for optimal font size
+        low = 1
+        high = cell_h * 2
+        best_size = 1
+        
+        while low <= high:
+            mid = (low + high) // 2
+            try:
+                font = ImageFont.truetype(self.font_path, mid)
+            except OSError:
+                font = ImageFont.load_default()
+                best_size = mid
+                break
+                
+            if hasattr(font, "getbbox"):
+                bbox = font.getbbox(text)
+                w = bbox[2] - bbox[0]
+                h = bbox[3] - bbox[1]
+            else:
+                w, h = draw.textsize(text, font=font)
+                
+            if w <= cell_w * 0.9 and h <= cell_h * 0.9:
+                best_size = mid
+                low = mid + 1
+            else:
+                high = mid - 1
+                
+        try:
+            font = ImageFont.truetype(self.font_path, best_size)
+        except OSError:
+            font = ImageFont.load_default()
+            
+        if hasattr(font, "getbbox"):
+            bbox = font.getbbox(text)
+            w = bbox[2] - bbox[0]
+            h = bbox[3] - bbox[1]
+        else:
+            w, h = draw.textsize(text, font=font)
+            
+        x = box[0] + (cell_w - w) / 2
+        y = box[1] + (cell_h - h) / 2
+        draw.text((x, y), text, fill=(0, 0, 0), font=font)
+
+    def generate_dataset(self):
+        """Generates the sparse_numbers dataset."""
+
+
+        dataset_path = self.data_config.dataset_path
+        print(f"DEBUG: dataset_path={dataset_path}")
+        if os.path.exists(dataset_path):
+            datestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            shutil.move(dataset_path, dataset_path + "_old_" + datestamp)
+
+        os.makedirs(os.path.join(dataset_path, "imgs"), exist_ok=True)
+
+        num_samples = self.data_config.num_samples if self.data_config.num_samples else 125000
+        print(f"DEBUG: num_samples={num_samples}")
+        n_unique_numbers = self.data_config.output_split if self.data_config.output_split else 10000
+        num_digits = len(str(n_unique_numbers - 1))
+        # Calculate repeats to aim for 50% occupancy if num_samples changed
+        # Total slots = num_samples * 8. Occupancy 50% = 4 * num_samples.
+        # repeats = (4 * num_samples) // n_unique_numbers
+        repeats = max(1, (4 * num_samples) // n_unique_numbers)
+        total_slots = num_samples * 8
+        total_number_entries = min(n_unique_numbers * repeats, total_slots)
+        
+        # Prepare all numbers
+        all_numbers = []
+        for n in range(n_unique_numbers):
+            all_numbers.extend([n] * repeats)
+        random.shuffle(all_numbers)
+        all_numbers = all_numbers[:total_number_entries]
+        
+        # Assign numbers to slots
+        # Total slots = 125,000 * 8 = 1,000,000
+        # We need to pick 500,000 slots to be occupied.
+        occupied_indices = random.sample(range(total_slots), total_number_entries)
+        
+        # Map indices to samples
+        sample_slots = [{} for _ in range(num_samples)]
+        for i, slot_idx in enumerate(occupied_indices):
+            sample_idx = slot_idx // 8
+            local_slot_idx = slot_idx % 8
+            sample_slots[sample_idx][local_slot_idx] = all_numbers[i]
+            
+        # Check for duplicates within samples and fix them
+        # We'll use a simple swap strategy with another random sample's slot
+        for s_idx in range(num_samples):
+            seen = {}
+            for local_idx, val in list(sample_slots[s_idx].items()):
+                if val in seen:
+                    # Collision! Find another sample to swap with
+                    done = False
+                    while not done:
+                        other_s_idx = random.randint(0, num_samples - 1)
+                        if other_s_idx == s_idx: continue
+                        other_slots = sample_slots[other_s_idx]
+                        if not other_slots: continue
+                        # Pick a random slot in other_sample
+                        other_local_idx = random.choice(list(other_slots.keys()))
+                        other_val = other_slots[other_local_idx]
+                        
+                        # Check if swapping causes collision in either sample
+                        if other_val not in seen and val not in set(other_slots.values()):
+                            # Swap
+                            sample_slots[s_idx][local_idx] = other_val
+                            sample_slots[other_s_idx][other_local_idx] = val
+                            done = True
+                else:
+                    seen[val] = local_idx
+            
+        # Grid layout
+        # Resolution 128x128. 2 columns, 4 rows.
+        # Cell size: 60x30. Gaps: 8px horiz (between cols), 2px vert.
+        # Padding: 2px around.
+        cell_w, cell_h = 60, 30
+        col_x = [2, 66] # x-starts for col 0 and col 1
+        row_y = [2, 34, 66, 98] # y-starts for row 0, 1, 2, 3
+        
+        slots_coord = []
+        for r in range(4):
+            for c in range(2):
+                slots_coord.append((col_x[c], row_y[r], col_x[c] + cell_w, row_y[r] + cell_h))
+
+        lines_out = ["imgs,Red1,Red2,Red3,Red4,Red5,Red6,Red7,Red8,Num1,Num2,Num3,Num4,Num5,Num6,Num7,Num8"]
+        
+        for s_idx in tqdm(range(num_samples), desc="Generating samples"):
+            img = Image.new("RGB", (128, 128), (255, 255, 255))
+            draw = ImageDraw.Draw(img)
+            
+            row_data = [f"{s_idx:06d}.png"]
+            intensities = [random.random() for _ in range(8)]
+            nums_in_sample = []
+            
+            for i in range(8):
+                intensity = intensities[i]
+                box = slots_coord[i]
+                
+                # Draw background: White (255,255,255) to Red (255,0,0)
+                # color = (255, int(255*(1-intensity)), int(255*(1-intensity)))
+                # Fill the cell
+                draw.rectangle(box, fill=(255, int(255*(1-intensity)), int(255*(1-intensity))))
+                
+                if i in sample_slots[s_idx]:
+                    num = sample_slots[s_idx][i]
+                    text = f"{num:0{num_digits}d}"
+                    self._draw_number_in_cell(draw, text, box)
+                    nums_in_sample.append(num)
+                else:
+                    nums_in_sample.append(-1)
+            
+            row_data.extend([f"{intt:.4f}" for intt in intensities])
+            row_data.extend([str(n) for n in nums_in_sample])
+            lines_out.append(",".join(row_data))
+            
+            img.save(os.path.join(dataset_path, "imgs", f"{s_idx:06d}.png"))
+            
+            if (s_idx + 1) % 1000 == 0:
+                with open(os.path.join(dataset_path, "data.csv"), "w") as f:
+                    f.write("\n".join(lines_out))
+                    
+        with open(os.path.join(dataset_path, "data.csv"), "w") as f:
+            f.write("\n".join(lines_out))
+
+        print(f"Dataset generated at {dataset_path}")
+
+
+class FunnyNodulesDatasetGenerator:
+    """
+    Generates a PEAL-compatible FunnyNodules dataset.
+
+    The FunnyNodules dataset consists of synthetic medical nodule images with six attributes:
+    - roundness (1-5): round to oval
+    - spiculation (1-5): none to marked
+    - edge_sharpness (1-5): sharp to soft
+    - size (1-5): small to big
+    - intensity (1-5): dark to bright
+    - internal_structure (0-1): absent or present
+
+    For the PEAL confounding experiment:
+    - True feature (target): internal_structure (binary: 0 or 1)
+    - Confounder: roundness (correlated with internal_structure)
+
+    The confounding is controlled by confounder_probability from the data config.
+    """
+
+    def __init__(self, data_config, **kwargs):
+        self.data_config = data_config
+
+    def generate_dataset(self):
+        from peal.dependencies.FunnyNodules.dataset.dataset_generator import generate_nodule
+
+        dataset_path = self.data_config.dataset_path
+        if os.path.exists(dataset_path):
+            datestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            shutil.move(dataset_path, dataset_path + "_old_" + datestamp)
+
+        os.makedirs(os.path.join(dataset_path, "imgs"), exist_ok=True)
+        os.makedirs(os.path.join(dataset_path, "masks"), exist_ok=True)
+
+        num_samples = self.data_config.num_samples
+        confounder_probability = getattr(self.data_config, 'confounder_probability', 0.5)
+
+        # Probability that the confounder does NOT match the true feature
+        # confounder_probability = 0.5 means no confounding (balanced)
+        # confounder_probability = 0.02 means 98% confounding
+        non_confounding_probability = confounder_probability
+
+        rng = np.random.RandomState(self.data_config.seed if self.data_config.seed else 0)
+
+        lines_out = [
+            "Name,InternalStructure,Roundness,Spiculation,EdgeSharpness,Size,Intensity"
+        ]
+
+        img_size = 64  # Default image size
+
+        for sample_idx in range(num_samples):
+            # Deterministic balancing for InternalStructure and Roundness to ensure 
+            # perfect balance in the raw pool (if num_samples % 4 == 0).
+            internal_structure = sample_idx % 2
+            roundness_label = (int(sample_idx / 2) % 2)
+            
+            if roundness_label == 1:
+                roundness = rng.randint(4, 6) # high roundness (round)
+            else:
+                roundness = rng.randint(1, 3) # low roundness (oval)
+
+            # Other attributes are random
+            spiculation = rng.randint(1, 6)
+            edge_sharpness = rng.randint(1, 6)
+            size_attr = rng.randint(1, 6)
+            intensity = rng.randint(1, 6)
+
+            # Generate the nodule image
+            img_np, mask_np, _ = generate_nodule(
+                size_px=img_size,
+                roundness=roundness,
+                spiculation=spiculation,
+                edge_sharpness=edge_sharpness,
+                size_attr=size_attr,
+                intensity=intensity,
+                internal_structure=internal_structure,
+                seed=rng.randint(0, 2**31),
+            )
+
+            # Convert grayscale to 3-channel RGB so it works with standard architectures
+            img_rgb = np.stack([img_np, img_np, img_np], axis=-1)
+            img_pil = Image.fromarray(img_rgb)
+
+            sample_name = embed_numberstring(sample_idx, 8) + ".png"
+            img_pil.save(os.path.join(dataset_path, "imgs", sample_name))
+
+            # Save mask
+            mask_pil = Image.fromarray((mask_np * 255).astype(np.uint8))
+            mask_rgb = np.stack([mask_np * 255, mask_np * 255, mask_np * 255], axis=-1).astype(np.uint8)
+            mask_pil = Image.fromarray(mask_rgb)
+            mask_pil.save(os.path.join(dataset_path, "masks", sample_name))
+
+            # Normalize attributes for CSV. Note: Roundness is saved as binary label (0/1)
+            # to compatible with process_confounder_data_controlled.
+            attributes = [
+                sample_name,
+                str(internal_structure),                    # InternalStructure: 0 or 1
+                str(roundness_label),                       # Roundness: 0 (oval) or 1 (round)
+                str(round((spiculation - 1) / 4.0, 4)),    # Spiculation: normalized [0, 1]
+                str(round((edge_sharpness - 1) / 4.0, 4)), # EdgeSharpness: normalized [0, 1]
+                str(round((size_attr - 1) / 4.0, 4)),      # Size: normalized [0, 1]
+                str(round((intensity - 1) / 4.0, 4)),      # Intensity: normalized [0, 1]
+            ]
+            lines_out.append(",".join(attributes))
+
+            if (sample_idx + 1) % 100 == 0:
+                print(f"Generated {sample_idx + 1}/{num_samples} FunnyNodules samples")
+                with open(os.path.join(dataset_path, "data.csv"), "w") as f:
+                    f.write("\n".join(lines_out))
+
+        with open(os.path.join(dataset_path, "data.csv"), "w") as f:
+            f.write("\n".join(lines_out))
+        print(f"FunnyNodules dataset generated at {dataset_path}")

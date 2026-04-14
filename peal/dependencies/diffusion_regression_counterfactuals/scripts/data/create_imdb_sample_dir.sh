@@ -1,0 +1,2 @@
+#!/bin/bash
+awk -F, '{ print $1} ' /home/tha/master-thesis-xai/diff_cf_ir/scripts/data/imdb_age_sampled.csv | xargs -I {} ln -s /home/space/datasets/imdb-wiki-clean/imdb-clean/data/clean/imdb-clean-1024-cropped/{} .

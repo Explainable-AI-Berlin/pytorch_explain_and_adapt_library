@@ -49,13 +49,15 @@ def get_datasets(
     Returns:
         _type_: _description_
     """
-    config = load_yaml_config(config)
+    config = load_yaml_config(config, DataConfig)
 
     if base_dir is None:
         base_dir = config.dataset_path
 
     if test_config is None:
         test_config = config
+    else:
+        test_config = load_yaml_config(test_config, DataConfig)
 
     #
     transform_list_train = []

@@ -27,7 +27,7 @@ def mu_tilde(model, xt, x0, timestep):
     prev_timestep = (
         timestep
         - model.scheduler.config.num_train_timesteps
-        // model.scheduler.num_inference_steps
+        // len(model.scheduler.timesteps)
     )
     alpha_prod_t_prev = (
         model.scheduler.alphas_cumprod[prev_timestep]
@@ -60,10 +60,10 @@ def sample_xts_from_x0(model, x0, num_inference_steps=50):
 
     timesteps = model.scheduler.timesteps.to(model.device)
     t_to_idx = {int(v): k for k, v in enumerate(timesteps)}
-    xts = torch.zeros([num_inference_steps + 1] + list(x0.shape)).to(x0.device)
+    xts = torch.zeros([len(timesteps) + 1] + list(x0.shape)).to(x0.device)
     xts[0] = x0
     for t in reversed(timesteps):
-        idx = num_inference_steps - t_to_idx[int(t)]
+        idx = len(timesteps) - t_to_idx[int(t)]
         xts[idx] = (
             x0 * (alpha_bar[t] ** 0.5)
             + torch.randn_like(x0) * sqrt_one_minus_alpha_bar[t]
@@ -116,7 +116,7 @@ def get_variance(model, timestep):  # , prev_timestep):
     prev_timestep = (
         timestep
         - model.scheduler.config.num_train_timesteps
-        // model.scheduler.num_inference_steps
+        // len(model.scheduler.timesteps)
     )
     alpha_prod_t = model.scheduler.alphas_cumprod[timestep]
     alpha_prod_t_prev = (
@@ -139,11 +139,18 @@ def inversion_forward_process(
     cfg_scale=3.5,
     num_inference_steps=50,
     eps=None,
+    encoder_hidden_states=None,
 ):
-    if not prompt == "":
-        text_embeddings = encode_text(model, prompt)
+    if not encoder_hidden_states is None:
+        text_embeddings = encoder_hidden_states.to(model.unet.dtype)
+    
+    elif not prompt == "":
+        text_embeddings = encode_text(model, prompt).to(model.unet.dtype)
+    
+    else:
+        text_embeddings = None
 
-    uncond_embedding = encode_text(model, [""] * x0.shape[0])
+    uncond_embedding = encode_text(model, [""] * x0.shape[0]).to(model.unet.dtype)
     timesteps = model.scheduler.timesteps.to(model.device)
     """variance_noise_shape = (
         num_inference_steps,
@@ -159,13 +166,14 @@ def inversion_forward_process(
     else:
         eta_is_zero = False
         if type(etas) in [int, float]:
-            etas = [etas] * model.scheduler.num_inference_steps
+            # Use len(timesteps) to ensure consistency with the loop
+            etas = [etas] * len(timesteps)
         xts = sample_xts_from_x0(model, x0, num_inference_steps=num_inference_steps)
         alpha_bar = model.scheduler.alphas_cumprod
         zs = torch.zeros(size=variance_noise_shape, device=model.device)
 
     t_to_idx = {int(v): k for k, v in enumerate(timesteps)}
-    xt = x0
+    xt = x0.to(model.unet.dtype)
     # op = tqdm(reversed(timesteps)) if prog_bar else reversed(timesteps)
     op = tqdm(timesteps) if prog_bar else timesteps
 
@@ -179,14 +187,14 @@ def inversion_forward_process(
 
         with torch.no_grad():
             out = model.unet.forward(
-                xt, timestep=t, encoder_hidden_states=uncond_embedding
+                xt.to(model.unet.dtype), timestep=t, encoder_hidden_states=uncond_embedding
             )
-            if not prompt == "":
+            if not text_embeddings is None:
                 cond_out = model.unet.forward(
-                    xt, timestep=t, encoder_hidden_states=text_embeddings
+                    xt.to(model.unet.dtype), timestep=t, encoder_hidden_states=text_embeddings
                 )
 
-        if not prompt == "":
+        if not text_embeddings is None:
             ## classifier free guidance
             noise_pred = out.sample + cfg_scale * (cond_out.sample - out.sample)
         else:
@@ -207,7 +215,7 @@ def inversion_forward_process(
             prev_timestep = (
                 t
                 - model.scheduler.config.num_train_timesteps
-                // model.scheduler.num_inference_steps
+                // len(model.scheduler.timesteps)
             )
             alpha_prod_t_prev = (
                 model.scheduler.alphas_cumprod[prev_timestep]
@@ -243,7 +251,7 @@ def reverse_step(model, model_output, timestep, sample, eta=0, variance_noise=No
     prev_timestep = (
         timestep
         - model.scheduler.config.num_train_timesteps
-        // model.scheduler.num_inference_steps
+        // len(model.scheduler.timesteps)
     )
     # 2. compute alphas, betas
     alpha_prod_t = model.scheduler.alphas_cumprod[timestep]
@@ -297,40 +305,47 @@ def inversion_reverse_process(
     classifier=None,
     classifier_scale=0.0,
     asyrp=False,
+    encoder_hidden_states=None,
 ):
     batch_size = len(prompts)
 
     cfg_scales_tensor = torch.Tensor(cfg_scales).view(-1, 1, 1, 1).to(model.device)
 
-    uncond_embedding = encode_text(model, [""] * batch_size)
-    if prompts == "":
+    uncond_embedding = encode_text(model, [""] * batch_size).to(model.unet.dtype)
+    if not encoder_hidden_states is None:
+        text_embeddings = encoder_hidden_states.to(model.unet.dtype)
+    
+    elif prompts == "":
         text_embeddings = uncond_embedding
 
     else:
-        text_embeddings = encode_text(model, prompts)
+        text_embeddings = encode_text(model, prompts).to(model.unet.dtype)
 
     if etas is None:
         etas = 0
-    if type(etas) in [int, float]:
-        etas = [etas] * model.scheduler.num_inference_steps
-    assert len(etas) == model.scheduler.num_inference_steps
+    
     timesteps = model.scheduler.timesteps.to(model.device)
+    
+    if type(etas) in [int, float]:
+        # Use len(timesteps) to ensure consistency with the loop
+        etas = [etas] * len(timesteps)
+    assert len(etas) == len(timesteps)
 
-    xt = xT.expand(batch_size, -1, -1, -1)
+    xt = xT.expand(batch_size, -1, -1, -1).to(model.unet.dtype)
     op = tqdm(timesteps[-zs.shape[0] :]) if prog_bar else timesteps[-zs.shape[0] :]
 
     t_to_idx = {int(v): k for k, v in enumerate(timesteps[-zs.shape[0] :])}
 
     for t in op:
         idx = (
-            model.scheduler.num_inference_steps
+            len(timesteps)
             - t_to_idx[int(t)]
-            - (model.scheduler.num_inference_steps - zs.shape[0] + 1)
+            - (len(timesteps) - zs.shape[0] + 1)
         )
         ## Unconditional embedding
         with torch.no_grad():
             uncond_out = model.unet.forward(
-                xt, timestep=t, encoder_hidden_states=uncond_embedding
+                xt.to(model.unet.dtype), timestep=t, encoder_hidden_states=uncond_embedding
             )
 
         ## Conditional embedding
@@ -339,7 +354,7 @@ def inversion_reverse_process(
             if not classifier is None:
                 if not f is None:
                     cond_out = model.unet.forward(
-                        xt, timestep=t, encoder_hidden_states=text_embeddings, f=f
+                        xt.to(model.unet.dtype), timestep=t, encoder_hidden_states=text_embeddings, f=f
                     )
 
                 else:
@@ -360,14 +375,14 @@ def inversion_reverse_process(
                         xt.detach() - grad_classifier
                     )  # * (1 - a_t).sqrt()
                     cond_out = model.unet.forward(
-                        x_noise_adapted,
+                        x_noise_adapted.to(model.unet.dtype),
                         timestep=t,
                         encoder_hidden_states=text_embeddings,
                     )
 
             else:
                 cond_out = model.unet.forward(
-                    xt, timestep=t, encoder_hidden_states=text_embeddings
+                    xt.to(model.unet.dtype), timestep=t, encoder_hidden_states=text_embeddings
                 )
 
         z = zs[idx] if not zs is None else None

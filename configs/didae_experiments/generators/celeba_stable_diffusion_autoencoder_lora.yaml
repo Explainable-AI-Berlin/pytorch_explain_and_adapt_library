@@ -1,0 +1,22 @@
+# python train_generator.py --config "<PEAL_BASE>/configs/didae_experiments/generators/celeba_stable_diffusion_autoencoder_lora.yaml"
+category: generator
+generator_type: StableDiffusionAutoencoder
+data: "<PEAL_BASE>/configs/didae_experiments/data/celeba_stable_diffusion.yaml"
+base_path : $PEAL_RUNS/celeba/stable_diffusion_autoencoder_lora
+encoder: "facebook/dinov2-base"
+task_config:
+  criterions:
+    bce     : 1.0
+    l2      : 1.0
+  output_type             : multiclass
+  y_selection             : []
+  output_channels         : 40
+
+use_lora: True
+rank: 32
+learning_rate: 2e-4
+num_train_epochs: 200
+train_batch_size: 32
+snr_gamma: 5.0
+center_crop: True
+random_flip: True

@@ -97,7 +97,7 @@ class PGD_L2(Attacker):
 
         """
         if inputs.min() < 0 or inputs.max() > 1:
-            raise ValueError("Input values should be in the [0, 1] range.")
+            raise ValueError("Input values should be in the [0, 1] range, but range is " + str(inputs.min()) + " " + str(inputs.max()))
 
         batch_size = inputs.shape[0]
         multiplier = 1 if targeted else -1

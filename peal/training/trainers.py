@@ -74,9 +74,7 @@ def calculate_test_accuracy(
     # determine the test accuracy of the student
     correct = 0
     num_samples = 0
-    pbar = tqdm(
-        total=int(test_dataloader.dataset.__len__() / test_dataloader.batch_size)
-    )
+    pbar = tqdm(total=int(test_dataloader.dataset.__len__() / test_dataloader.batch_size))
     if calculate_group_accuracies:
         test_dataloader.dataset.enable_groups()
         return_dict_buffer = bool(test_dataloader.dataset.return_dict)
@@ -102,12 +100,7 @@ def calculate_test_accuracy(
         correct += float(torch.sum(y == y_pred))
         num_samples += x.shape[0]
         if tracking_level >= 1:
-            pbar.set_description(
-                "test_correct: "
-                + str(correct / num_samples)
-                + ", it: "
-                + str(it * x.shape[0])
-            )
+            pbar.set_description("test_correct: " + str(correct / num_samples) + ", it: " + str(it * x.shape[0]))
             pbar.update(1)
 
         if calculate_group_accuracies:
@@ -139,10 +132,7 @@ def calculate_test_accuracy(
 
 def get_predictor(config, model=None):
     if model is None:
-        if (
-            not config.task.x_selection is None
-            and not config.data.input_type == "image"
-        ):
+        if not config.task.x_selection is None and not config.data.input_type == "image":
             input_channels = len(config.task.x_selection)
 
         else:
@@ -162,10 +152,7 @@ def get_predictor(config, model=None):
                 config.training.dropout,
             )
 
-        elif (
-            isinstance(config.architecture, str)
-            and config.architecture[:12] == "torchvision_"
-        ):
+        elif isinstance(config.architecture, str) and config.architecture[:12] == "torchvision_":
             model = TorchvisionModel(
                 config.architecture[12:],
                 output_channels,
@@ -173,9 +160,7 @@ def get_predictor(config, model=None):
                 config=config,
             )
 
-        elif (
-            isinstance(config.architecture, str) and config.architecture[-4:] == ".cpl"
-        ):
+        elif isinstance(config.architecture, str) and config.architecture[-4:] == ".cpl":
             model = torch.load(config.architecture)
 
         else:
@@ -227,9 +212,7 @@ class ModelTrainer:
             self.train_dataloader,
             self.val_dataloaders,
             test_dataloader,
-        ) = create_dataloaders_from_datasource(
-            config=self.config, datasource=datasource
-        )
+        ) = create_dataloaders_from_datasource(config=self.config, datasource=datasource)
         if self.config.training.train_on_test:
             self.train_dataloader = test_dataloader
 
@@ -248,9 +231,7 @@ class ModelTrainer:
                 new_config = copy.deepcopy(self.config.training)
                 new_config.steps_per_epoch = 200
                 new_config.concatenate_batches = True
-                self.train_dataloader = DataloaderMixer(
-                    new_config, self.train_dataloader
-                )
+                self.train_dataloader = DataloaderMixer(new_config, self.train_dataloader)
 
             self.train_dataloader.enable_class_balancing()
 
@@ -261,12 +242,8 @@ class ModelTrainer:
                     val_dataloader_copy = copy.deepcopy(self.val_dataloaders[j])
                     val_dataloader_copy.dataset.enable_class_restriction(i)
                     new_val_dataloaders.append(val_dataloader_copy)
-                    new_val_dataloader_weights.append(
-                        0.5 * self.val_dataloader_weights[j]
-                    )
-                    new_val_dataloader_weights.append(
-                        0.5 * self.val_dataloader_weights[j]
-                    )
+                    new_val_dataloader_weights.append(0.5 * self.val_dataloader_weights[j])
+                    new_val_dataloader_weights.append(0.5 * self.val_dataloader_weights[j])
 
             self.val_dataloaders = new_val_dataloaders
             self.val_dataloader_weights = new_val_dataloader_weights
@@ -286,9 +263,7 @@ class ModelTrainer:
                     else:
                         num_unfrozen = 1
 
-                    assert (
-                        len(param_list[-num_unfrozen].shape) == 2
-                    ), "Wrong layer was chosen!"
+                    assert len(param_list[-num_unfrozen].shape) == 2, "Wrong layer was chosen!"
                     for param in param_list[-num_unfrozen:]:
                         param_list_trained.append(param)
 
@@ -307,14 +282,10 @@ class ModelTrainer:
                     weight_decay=0.0001,
                 )
                 lambda1 = lambda epoch: 0.95**epoch
-                self.scheduler = torch.optim.lr_scheduler.LambdaLR(
-                    self.optimizer, lr_lambda=lambda1
-                )
+                self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=lambda1)
 
             elif self.config.training.optimizer == "adam":
-                self.optimizer = torch.optim.Adam(
-                    param_list, lr=self.config.training.learning_rate
-                )
+                self.optimizer = torch.optim.Adam(param_list, lr=self.config.training.learning_rate)
 
             elif self.config.training.optimizer[:5] == "adamw":
                 if len(self.config.training.optimizer) > 5:
@@ -344,9 +315,7 @@ class ModelTrainer:
             for criterion_key in self.config.task.criterions:
                 if inspect.isclass(criterions[criterion_key]):
                     # and issubclass(criterions[criterion_key], nn.Module):
-                    self.criterions[criterion_key] = criterions[criterion_key](
-                        self.config, None, self.device
-                    )
+                    self.criterions[criterion_key] = criterions[criterion_key](self.config, None, self.device)
 
                 else:
                     self.criterions[criterion_key] = criterions[criterion_key]
@@ -383,7 +352,6 @@ class ModelTrainer:
     def run_epoch(self, dataloader, mode="train", pbar=None):
         """ """
         sources = {}
-        # import pdb; pdb.set_trace()
         for batch_idx, sample in enumerate(dataloader):
             if not self.config.training.steps_per_epoch is None and batch_idx >= self.config.training.steps_per_epoch:
                 break
@@ -403,9 +371,7 @@ class ModelTrainer:
 
                 source_distibution = ""
                 for key in sources.keys():
-                    source_distibution += (
-                        key + ": " + str(sources[key] / (batch_idx + 1)) + ", "
-                    )
+                    source_distibution += key + ": " + str(sources[key] / (batch_idx + 1)) + ", "
 
             else:
                 source_distibution = None
@@ -426,17 +392,22 @@ class ModelTrainer:
 
             X = move_to_device(X, self.device)
 
-            if mode == "train" and hasattr(
-                self.train_dataloader.dataset, "diffusion_augmentation"
-            ):
+            if mode == "train" and hasattr(self.train_dataloader.dataset, "diffusion_augmentation"):
                 X = self.train_dataloader.dataset.diffusion_augmentation(X)
 
+            if (
+                "bce" in self.config.task.criterions.keys()
+                and len(self.config.task.y_selection) == 1
+                and isinstance(dataloader, DataloaderMixer)
+                and len(y.shape) == 1
+            ):
+                y = y.unsqueeze(-1)
+
             y_original = y
+
             if self.config.training.label_smoothing > 0.0 and mode == "train":
                 y_dist = torch.ones(y.size(0), self.config.task.output_channels)
-                y_dist *= self.config.training.label_smoothing / (
-                    self.config.task.output_channels - 1
-                )
+                y_dist *= self.config.training.label_smoothing / (self.config.task.output_channels - 1)
                 for i in range(y.size(0)):
                     y_dist[i, y[i]] = 1 - self.config.training.label_smoothing
 
@@ -451,21 +422,19 @@ class ModelTrainer:
                 )
 
             if self.config.training.adv_training and mode == "train":
-                noise = (
-                    torch.randn_like(X, device=self.device)
-                    * self.config.training.input_noise_std
-                )
+                noise = torch.randn_like(X, device=self.device) * self.config.training.input_noise_std
 
                 requires_grad_(self.model, False)
                 self.model.eval()
                 X = self.attacker.attack(
                     self.model,
-                    X,
+                    torch.clamp(X, 0, 1),
                     y.to(self.device),
                     noise=noise,
                     num_noise_vectors=self.config.training.num_noise_vec,
                     no_grad=self.config.training.no_grad_attack,
                 )
+
                 self.model.train()
                 requires_grad_(self.model, True)
 
@@ -481,9 +450,7 @@ class ModelTrainer:
             loss = torch.tensor(0.0).to(self.device)
             loss_logs = {}
             for criterion in self.config.task.criterions.keys():
-                criterion_loss = self.config.task.criterions[
-                    criterion
-                ] * self.criterions[criterion](
+                criterion_loss = self.config.task.criterions[criterion] * self.criterions[criterion](
                     self.model, pred, y.to(self.device), latent_code
                 )
 
@@ -501,27 +468,14 @@ class ModelTrainer:
             loss.backward()
             current_state = "MT: " + mode + "_it: " + str(batch_idx)
             if "val_acc" in pbar.stored_values.keys():
-                current_state += ", val_acc: " + str(
-                    round(float(pbar.stored_values["val_acc"]), 3)
-                )
+                current_state += ", val_acc: " + str(round(float(pbar.stored_values["val_acc"]), 3))
 
             current_state += ", loss: " + str(loss.detach().item())
-            current_state += ", ".join(
-                [
-                    key + ": " + str(pbar.stored_values[key])
-                    for key in pbar.stored_values
-                ]
-            )
+            current_state += ", ".join([key + ": " + str(pbar.stored_values[key]) for key in pbar.stored_values])
             current_state += ", lr: " + str(
-                self.scheduler.get_last_lr()
-                if hasattr(self, "scheduler")
-                else self.optimizer.param_groups[0]["lr"]
+                self.scheduler.get_last_lr() if hasattr(self, "scheduler") else self.optimizer.param_groups[0]["lr"]
             )
-            current_state += (
-                ", source_distibution: " + source_distibution
-                if not source_distibution is None
-                else ""
-            )
+            current_state += ", source_distibution: " + source_distibution if not source_distibution is None else ""
 
             if self.config.tracking_level < 4:
                 current_state = current_state[:199]
@@ -555,23 +509,17 @@ class ModelTrainer:
             if os.path.exists(self.model_path):
                 shutil.move(
                     self.model_path,
-                    self.model_path
-                    + "_old_"
-                    + datetime.now().strftime("%Y%m%d_%H%M%S"),
+                    self.model_path + "_old_" + datetime.now().strftime("%Y%m%d_%H%M%S"),
                 )
 
-            Path(os.path.join(self.model_path, "logs")).mkdir(
-                parents=True, exist_ok=True
-            )
+            Path(os.path.join(self.model_path, "logs")).mkdir(parents=True, exist_ok=True)
             cprint(os.path.join(self.model_path, "logs"), self.config.tracking_level, 4)
             writer = SummaryWriter(os.path.join(self.model_path, "logs"))
             self.logger.writer = writer
             os.makedirs(os.path.join(self.model_path, "outputs"))
             os.makedirs(os.path.join(self.model_path, "checkpoints"))
             if self.config.tracking_level >= 3:
-                open(os.path.join(self.model_path, "platform.txt"), "w").write(
-                    platform.node()
-                )
+                open(os.path.join(self.model_path, "platform.txt"), "w").write(platform.node())
 
                 print("log train images!")
                 log_images_to_writer(self.train_dataloader, self.logger.writer, "train")
@@ -592,10 +540,7 @@ class ModelTrainer:
 
         pbar = tqdm(
             total=self.config.training.max_epochs
-            * (
-                len(self.train_dataloader)
-                + int(np.sum(list(map(lambda dl: len(dl), self.val_dataloaders))))
-            ),
+            * (len(self.train_dataloader) + int(np.sum(list(map(lambda dl: len(dl), self.val_dataloaders))))),
             ncols=200,
         )
         pbar.stored_values = {}
@@ -613,9 +558,7 @@ class ModelTrainer:
                     if val_accuracy is None:
                         val_accuracy = 0.0
 
-                    val_accuracy += (
-                        self.val_dataloader_weights[idx] * val_accuracy_current
-                    )
+                    val_accuracy += self.val_dataloader_weights[idx] * val_accuracy_current
 
                 elif self.config.training.early_stopping_goal == "worst_group_accuracy":
                     if val_accuracy is None:
@@ -634,7 +577,6 @@ class ModelTrainer:
 
         self.config.training.epoch = 0
         while self.config.training.epoch < self.config.training.max_epochs:
-            #import pdb; pdb.set_trace()
             pbar.stored_values["Epoch"] = self.config.training.epoch
             self.logger.writer.add_scalar(
                 "regularization_level",
@@ -643,14 +585,10 @@ class ModelTrainer:
             )
             #
             self.model.train()
-            train_loss, train_accuracy = self.run_epoch(
-                self.train_dataloader, pbar=pbar
-            )
+            train_loss, train_accuracy = self.run_epoch(self.train_dataloader, pbar=pbar)
             if isinstance(self.model, Generator):
-                train_generator_performance = (
-                    self.train_dataloader.dataset.track_generator_performance(
-                        self.model, self.train_dataloader.batch_size
-                    )
+                train_generator_performance = self.train_dataloader.dataset.track_generator_performance(
+                    self.model, self.train_dataloader.batch_size
                 )
                 cprint(train_generator_performance, self.config.tracking_level, 4)
                 for key in train_generator_performance.keys():
@@ -671,27 +609,18 @@ class ModelTrainer:
                         if val_accuracy is None:
                             val_accuracy = 0.0
 
-                        val_accuracy += (
-                            self.val_dataloader_weights[idx] * val_accuracy_current
-                        )
+                        val_accuracy += self.val_dataloader_weights[idx] * val_accuracy_current
 
-                    elif (
-                        self.config.training.early_stopping_goal
-                        == "worst_group_accuracy"
-                    ):
+                    elif self.config.training.early_stopping_goal == "worst_group_accuracy":
                         if val_accuracy is None:
                             val_accuracy = val_accuracy_current
 
                         val_accuracy = min(val_accuracy, val_accuracy_current)
 
-            self.logger.writer.add_scalar(
-                "epoch_validation_accuracy", val_accuracy, self.config.training.epoch
-            )
+            self.logger.writer.add_scalar("epoch_validation_accuracy", val_accuracy, self.config.training.epoch)
             pbar.stored_values["val_acc"] = val_accuracy
             if isinstance(self.model, Generator):
-                val_generator_performance = self.val_dataloaders[
-                    0
-                ].dataset.track_generator_performance(
+                val_generator_performance = self.val_dataloaders[0].dataset.track_generator_performance(
                     self.model, self.val_dataloaders[0].batch_size
                 )
                 cprint(val_generator_performance, self.config.tracking_level, 4)
@@ -716,31 +645,45 @@ class ModelTrainer:
                     self.model.to("cpu").state_dict(),
                     os.path.join(self.model_path, "checkpoints", "final.cpl"),
                 )
-                torch.save(
-                    self.model.to("cpu"), os.path.join(self.model_path, "model.cpl")
-                )
+                try:
+                    torch.save(self.model.to("cpu"), os.path.join(self.model_path, "model.cpl"))
+
+                except Exception:
+                    print("model could not be serialized!!!")
+                    print("model could not be serialized!!!")
+                    print("model could not be serialized!!!")
+                    pass
+
                 val_accuracy_max = val_accuracy
                 self.model.to(self.device)
 
             # increase regularization and reset checkpoint if overfitting occurs
-            if (
-                train_accuracy >= train_accuracy_previous
-                and val_accuracy < val_accuracy_previous
-            ):
+            if train_accuracy >= train_accuracy_previous and val_accuracy < val_accuracy_previous:
                 if self.regularization_level == 0:
                     self.regularization_level = 1
 
                 else:
                     self.regularization_level *= 1.3
 
-                checkpoint = torch.load(
-                    os.path.join(
-                        self.model_path,
-                        "checkpoints",
-                        str(self.config.training.epoch - 1) + ".cpl",
-                    ),
-                    map_location=torch.device(self.device),
-                )
+                try:
+                    checkpoint = torch.load(
+                        os.path.join(
+                            self.model_path,
+                            "checkpoints",
+                            str(self.config.training.epoch - 1) + ".cpl",
+                        ),
+                        map_location=torch.device(self.device),
+                    )
+                except Exception:
+                    checkpoint = torch.load(
+                        os.path.join(
+                            self.model_path,
+                            "checkpoints",
+                            str(self.config.training.epoch - 1) + ".cpl",
+                        ),
+                        map_location=torch.device(self.device),
+                        weights_only=False
+                    )
                 self.model.load_state_dict(checkpoint)
 
             else:
@@ -753,10 +696,12 @@ class ModelTrainer:
 
             self.config.training.epoch += 1
 
+        if not os.path.exists(os.path.join(self.model_path, "model.cpl")):
+            torch.save(self.model.to("cpu"), os.path.join(self.model_path, "model.cpl"))
+            self.model.to(self.device)
 
-def distill_binary_dataset(
-    predictor_distillation, base_path, predictor, predictor_datasets
-):
+
+def distill_binary_dataset(predictor_distillation, base_path, predictor, predictor_datasets):
     distillation_datasource = []
     for i in range(len(predictor_datasets)):
         if isinstance(predictor_datasets[i], torch.utils.data.DataLoader):
@@ -782,26 +727,22 @@ def distill_binary_dataset(
             predictor_dataset.disable_url()
 
         distilled_dataset_config = copy.deepcopy(predictor_dataset.config)
-        distilled_dataset_config.delimiter = ","  # update delimeter to ',' in case of different delimiter in orginal dataset.
+        distilled_dataset_config.delimiter = (
+            ","  # update delimeter to ',' in case of different delimiter in orginal dataset.
+        )
         distilled_dataset_config.split = [1.0, 1.0] if i == 0 else [0.0, 1.0]
         distilled_dataset_config.confounding_factors = None
         distilled_dataset_config.confounder_probability = None
         distilled_dataset_config.dataset_class = None
         distilled_dataset_config.output_type = "multiclass"
         distillation_datasource.append(
-            get_datasets(
-                config=distilled_dataset_config, data_dir=class_predictions_path
-            )[i]
+            get_datasets(config=distilled_dataset_config, data_dir=class_predictions_path)[i]
         )
-        distilled_predictor_config = load_yaml_config(
-            predictor_distillation, PredictorConfig
-        )
+        distilled_predictor_config = load_yaml_config(predictor_distillation, PredictorConfig)
         distilled_predictor_config.data = distilled_dataset_config
         predictor_distillation = distilled_predictor_config
         distillation_datasource[i].task_config = predictor_distillation.task
-        distillation_datasource[
-            i
-        ].task_config.x_selection = predictor_dataset.task_config.x_selection
+        distillation_datasource[i].task_config.x_selection = predictor_dataset.task_config.x_selection
         try:
             sample = distillation_datasource[-1][0]
 
@@ -813,9 +754,7 @@ def distill_binary_dataset(
     return distillation_datasource
 
 
-def distill_1ofn_dataset(
-    predictor_distillation, base_path, predictor, predictor_datasets
-):
+def distill_1ofn_dataset(predictor_distillation, base_path, predictor, predictor_datasets):
     distillation_datasource = []
     for i in range(2):
         class_predictions_path = os.path.join(base_path, "dataset_" + str(i))
@@ -825,12 +764,8 @@ def distill_1ofn_dataset(
                 # get device of predictor torch.nn.Module
                 device = next(predictor.parameters()).device
                 y_pred = str(int(predictor(X.unsqueeze(0).to(device))[0].argmax(-1)))
-                Path(os.path.join(class_predictions_path, y_pred)).mkdir(
-                    exist_ok=True, parents=True
-                )
-                sample_url = os.path.join(
-                    class_predictions_path, y_pred, str(sample_idx) + ".png"
-                )
+                Path(os.path.join(class_predictions_path, y_pred)).mkdir(exist_ok=True, parents=True)
+                sample_url = os.path.join(class_predictions_path, y_pred, str(sample_idx) + ".png")
                 X_default = predictor_datasets[i].project_to_pytorch_default(X)
                 torchvision.utils.save_image(X_default, sample_url)
 
@@ -841,13 +776,9 @@ def distill_1ofn_dataset(
         distilled_dataset_config.confounder_probability = None
         distilled_dataset_config.dataset_class = None
         distillation_datasource.append(
-            get_datasets(
-                config=distilled_dataset_config, data_dir=class_predictions_path
-            )[i]
+            get_datasets(config=distilled_dataset_config, data_dir=class_predictions_path)[i]
         )
-        distilled_predictor_config = load_yaml_config(
-            predictor_distillation, PredictorConfig
-        )
+        distilled_predictor_config = load_yaml_config(predictor_distillation, PredictorConfig)
         distilled_predictor_config.data = distilled_dataset_config
         predictor_distillation = distilled_predictor_config
         distillation_datasource[i].task_config = predictor_datasets[i].task_config
@@ -855,9 +786,7 @@ def distill_1ofn_dataset(
     return distillation_datasource
 
 
-def distill_dataloader_mixer(
-    predictor_distillation, base_path, predictor, predictor_datasource
-):
+def distill_dataloader_mixer(predictor_distillation, base_path, predictor, predictor_datasource):
     print("distill_dataloader_mixer")
     distillation_datasource = copy.deepcopy(predictor_datasource)
     for i in range(len(distillation_datasource.dataloaders)):
@@ -873,9 +802,7 @@ def distill_dataloader_mixer(
                 predictor_distillation=predictor_distillation,
                 base_path=os.path.join(base_path, str(i)),
                 predictor=predictor,
-                predictor_datasource=copy.deepcopy(
-                    distillation_datasource.dataloaders[i]
-                ),
+                predictor_datasource=copy.deepcopy(distillation_datasource.dataloaders[i]),
             )
 
         else:
@@ -883,9 +810,7 @@ def distill_dataloader_mixer(
                 predictor_distillation=predictor_distillation,
                 base_path=os.path.join(base_path, str(i)),
                 predictor=predictor,
-                predictor_datasets=copy.deepcopy(
-                    [distillation_datasource.dataloaders[i]]
-                ),
+                predictor_datasets=copy.deepcopy([distillation_datasource.dataloaders[i]]),
             )
             distillation_datasource.dataloaders[i] = torch.utils.data.DataLoader(
                 dataset[0],
@@ -901,6 +826,10 @@ def distill_predictor(
     predictor_datasource,
     replace_with_activation=None,
     tracking_level=4,
+    predictor_distilled=None,
+    only_last_layer=False,
+    continue_training=False,
+    task_config=None,
 ):
     predictor_distillation = load_yaml_config(
         predictor_distillation,
@@ -935,6 +864,8 @@ def distill_predictor(
                 validation_datasets[i],
                 batch_size=distillation_datasource[1].dataloaders[i].batch_size,
             )
+            if not task_config is None:
+                distillation_datasource[1].dataloaders[i].dataset.task_config = task_config
 
     elif isinstance(predictor_datasource[0], Image2MixedDataset) or isinstance(
         predictor_datasource[0].dataset, Image2MixedDataset
@@ -942,36 +873,45 @@ def distill_predictor(
         distillation_datasource = distill_binary_dataset(
             predictor_distillation, base_path, predictor, predictor_datasource
         )
+        if not task_config is None:
+            for i in range(len(distillation_datasource)):
+                distillation_datasource[i].task_config = task_config
 
     elif isinstance(predictor_datasource[0].dataset, Image2ClassDataset):
         distillation_datasource = distill_1ofn_dataset(
             predictor_distillation, base_path, predictor, predictor_datasource
         )
         predictor_distillation.task = predictor_datasource[0].task_config
+        if not task_config is None:
+            for i in range(len(distillation_datasource)):
+                distillation_datasource[i].task_config = task_config
 
     else:
-        raise Exception(
-            "Either distill from dataset or use available dataset type for relabeling"
-        )
+        raise Exception("Either distill from dataset or use available dataset type for relabeling")
 
-    if isinstance(predictor, torch.nn.Module):
-        predictor_distilled = copy.deepcopy(predictor)
+    if predictor_distilled is None:
+        if not predictor_distillation.architecture is None:
+            predictor_distilled = get_predictor(predictor_distillation)
 
-    else:
-        # TODO how can I determine that there are no gradients anymore?
-        predictor_distilled = get_predictor(predictor_distillation)
+        elif isinstance(predictor, torch.nn.Module):
+            predictor_distilled = copy.deepcopy(predictor)
 
-    if replace_with_activation == "leakysoftplus":
-        predictor_distilled = replace_relu_with_leakysoftplus(predictor_distilled)
+        else:
+            # TODO how can I determine that there are no gradients anymore?
+            predictor_distilled = get_predictor(predictor_distillation)
 
-    elif replace_with_activation == "leakyrelu":
-        predictor_distilled = replace_relu_with_leakyrelu(predictor_distilled)
+        if replace_with_activation == "leakysoftplus":
+            predictor_distilled = replace_relu_with_leakysoftplus(predictor_distilled)
+
+        elif replace_with_activation == "leakyrelu":
+            predictor_distilled = replace_relu_with_leakyrelu(predictor_distilled)
 
     distillation_trainer = ModelTrainer(
         config=predictor_distillation,
         model=predictor_distilled,
         datasource=distillation_datasource,
         model_path=os.path.join(base_path, "distilled_predictor"),
+        only_last_layer=only_last_layer,
     )
-    distillation_trainer.fit()
+    distillation_trainer.fit(continue_training=continue_training)
     return predictor_distilled

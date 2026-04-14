@@ -1,0 +1,31 @@
+# python run_cfkd.py --config configs/tabular_experiments/adaptors/compass_cfkd_dice.yaml
+batch_size                           :  8
+min_train_samples                    :  800
+mixing_ratio                         :  0.5
+finetune_iterations                  :  1
+max_validation_samples               :  200
+continuous_learning                  :  "finetuning"
+calculate_group_accuracies           :  True
+tracking_level                       :  4
+explainer                            :  <PEAL_BASE>/configs/tabular_experiments/explainers/dice_compass.yaml
+training                             :  <PEAL_BASE>/configs/tabular_experiments/training/symbolic_classifier.yaml
+data                                 :  <PEAL_BASE>/configs/tabular_experiments/data/compass.yaml
+
+test_data                            :  <PEAL_BASE>/configs/tabular_experiments/data/compass.yaml
+student                              :  $PEAL_RUNS/compass/classifier_poisoned/model.cpl
+
+teacher                              :
+  type: "symbolic"
+  model: peal_runs/compass/classifier_poisoned/model.cpl
+  confounder_name: "African_American" # the user specifies to use 'being black' as the confounder
+
+
+base_dir                             :  $PEAL_RUNS/compass/classifier_poisoned/cfkd
+
+task:
+  criterions:
+    ce     : 1.0
+  output_type             : multiclass
+  output_channels         : 2
+  y_selection             : [Target]
+  x_selection             : [Number_of_Priors, score_factor, Age_Above_FourtyFive, Age_Below_TwentyFive, African_American, Asian, Hispanic, Native_American, Other, Female, Misdemeanor]

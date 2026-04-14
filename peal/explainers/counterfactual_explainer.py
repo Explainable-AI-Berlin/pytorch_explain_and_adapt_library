@@ -40,6 +40,33 @@ from peal.training.trainers import distill_predictor
 from peal.visualization.visualize_counterfactual_gradients import visualize_step
 
 
+class DAEdistillConfig(ExplainerConfig):
+    """
+    This class defines the config of the SCE explainer.
+    """
+
+    """
+    The type of explanation that shall be used.
+    """
+    explainer_type: str = "DAEdistillConfig"
+    """
+    The path to the predictor that shall be explained.
+    """
+    predictor_path: Union[str, type(None)] = None
+    """
+    The generator that shall be used for the counterfactual search
+    """
+    generator: Union[type(None), GeneratorConfig] = None
+    """
+    The data config used for the counterfactual search
+    """
+    data_config: Union[type(None), DataConfig] = None
+    """
+    The config for the predictor distillation.
+    """
+    distilled_predictor: Union[type(None), str, dict] = None
+    linesearch_factors: list = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+
 class SCEConfig(ExplainerConfig):
     """
     This class defines the config of the SCE explainer.
@@ -477,6 +504,8 @@ class CounterfactualExplainer(ExplainerInterface):
                 inverse_test_config = copy.deepcopy(self.val_dataset.config)
                 inverse_test_config.dataset_path += "_inverse"
                 self.inverse_datasets["test"] = get_datasets(inverse_test_config)[-1]
+
+        self.counterfactuals_per_second = None
 
     def perfect_false_counterfactuals(self, x_in, target_classes, idx_list, mode):
         """
@@ -1102,6 +1131,9 @@ class CounterfactualExplainer(ExplainerInterface):
         else:
             target_confidence_goal = y_target_goal_confidence_in
 
+        if self.counterfactuals_per_second is None and start_idx != 0:
+            start_time = time.perf_counter()
+
         if isinstance(self.explainer_config, PerfectFalseCounterfactualConfig):
             (
                 batch["x_counterfactual_list"],
@@ -1143,6 +1175,7 @@ class CounterfactualExplainer(ExplainerInterface):
                 batch["y_target_end_confidence_list"],
                 batch["x_list"],
                 batch["history_list"],
+                batch['cluster_list'],
             ) = self.generator.edit(
                 x_in=torch.tensor(batch["x_list"]),
                 target_confidence_goal=target_confidence_goal,
@@ -1155,6 +1188,14 @@ class CounterfactualExplainer(ExplainerInterface):
                 predictor_datasets=self.predictor_datasources,
                 base_path=explainer_path,
             )
+
+        if self.counterfactuals_per_second is None and start_idx != 0:
+            end_time = time.perf_counter()
+            total_time = end_time - start_time
+            self.counterfactuals_per_second = len(batch["x_counterfactual_list"]) / total_time
+            print(f"Explainer speed: {self.counterfactuals_per_second:.2f} counterfactuals per second.")
+            print(f"Explainer speed: {self.counterfactuals_per_second:.2f} counterfactuals per second.")
+            print(f"Explainer speed: {self.counterfactuals_per_second:.2f} counterfactuals per second.")
 
         if len(batch["x_list"]) < len(batch["x_counterfactual_list"]):
             n_reps = len(batch["x_counterfactual_list"]) // len(batch["x_list"])
@@ -1304,7 +1345,24 @@ class CounterfactualExplainer(ExplainerInterface):
 
         cluster_lists = [[] for i in range(n_clusters)]
         collage_path_base = None
-        if self.explainer_config.clustering_strategy == "kmeans":
+        if self.explainer_config.clustering_strategy == "preclustered":
+            for idx, explanation in enumerate(explanations_list):
+                idx_cluster = explanation['cluster_list']
+                cluster_lists[idx_cluster].append(explanation)
+                collage_path = explanation["collage_path_list"]
+                cluster_collage_dir = collage_path_base + "_" + str(int(idx_cluster))
+                if not os.path.exists(cluster_collage_dir):
+                    os.makedirs(cluster_collage_dir)
+
+                collage_path_new = os.path.join(
+                    *[
+                        cluster_collage_dir,
+                        embed_numberstring(idx, 7) + ".png",
+                    ]
+                )
+                shutil.copy(collage_path, collage_path_new)
+
+        elif self.explainer_config.clustering_strategy == "kmeans":
             for sample_idx in range(len(explanations_list_by_source[0])):
                 feature_difference, cosine_similarities_list, norm_list, ratio_list = extract_feature_difference(
                     [e[sample_idx] for e in explanations_list_by_source]
@@ -1502,14 +1560,8 @@ class CounterfactualExplainer(ExplainerInterface):
         cluster_scores = []
         for cluster_idx in range(len(cluster_dicts)):
             sample_scores = []
-            try:
-                for sample_idx in range(len(cluster_dicts[cluster_idx]["x_list"])):
-                    sample_scores.append(cluster_dicts[cluster_idx]["y_target_end_confidence_list"][sample_idx])
-
-            except Exception:
-                import pdb
-
-                pdb.set_trace()
+            for sample_idx in range(len(cluster_dicts[cluster_idx]["x_list"])):
+                sample_scores.append(cluster_dicts[cluster_idx]["y_target_end_confidence_list"][sample_idx])
 
             cluster_scores.append(torch.mean(torch.tensor(sample_scores)))
 
@@ -1529,19 +1581,24 @@ class CounterfactualExplainer(ExplainerInterface):
         if self.explainer_config.merge_clusters == "concatenate":
             for cluster_idx in range(1, len(cluster_dicts)):
                 for key in cluster_dicts[sorted_cluster_idxs[cluster_idx]].keys():
-                    try:
-                        explanations_dict_out[key] += cluster_dicts[sorted_cluster_idxs[cluster_idx]][key]
-
-                    except Exception:
-                        import pdb
-
-                        pdb.set_trace()
+                    explanations_dict_out[key] += cluster_dicts[sorted_cluster_idxs[cluster_idx]][key]
 
         return explanations_dict_out
 
     def calculate_latent_difference_stats(self, explanations_dict):
         tracked_stats = {}
         latent_differences = None
+        # TODO is this correct??
+        if not "clusters0" in explanations_dict.keys():
+            for cluster_idx in range(self.explainer_config.num_attempts):
+                explanations_dict["clusters" + str(cluster_idx)] = []
+                for i in range(int(len(explanations_dict["x_list"]) / self.explainer_config.num_attempts)):
+                    explanations_dict["clusters" + str(cluster_idx)].append(
+                        explanations_dict["x_counterfactual_list"][
+                            i * self.explainer_config.num_attempts + cluster_idx
+                        ]
+                    )
+
         if hasattr(self.val_dataset, "sample_to_latent"):
             latents_original = []
             for i, e in enumerate(explanations_dict["x_list"][: len(explanations_dict["clusters0"])]):
@@ -1624,7 +1681,6 @@ class CounterfactualExplainer(ExplainerInterface):
                     latent_sparsities.append(latent_sparsity)
 
                 latent_sparsity = 1.0 - float(torch.mean(torch.tensor(latent_sparsities)))
-                latent_sparsity_var = torch.std(torch.tensor(latent_sparsities)) / math.sqrt(len(latent_sparsities))
                 if self.explainer_config.num_attempts >= 2:
                     cosine_similiarities_list = [
                         torch.abs(
@@ -1637,13 +1693,9 @@ class CounterfactualExplainer(ExplainerInterface):
                     ]
                     cosine_similiarities = torch.tensor(cosine_similiarities_list)
                     latent_diversity = 1.0 - float(torch.mean(cosine_similiarities))
-                    latent_diversity_var = torch.std(torch.tensor(cosine_similiarities)) / math.sqrt(
-                        len(cosine_similiarities)
-                    )
 
                 else:
                     latent_diversity = 0.0
-                    latent_diversity_var = 0.0
 
             tracked_stats["latent_sparsity"] = latent_sparsity
             cprint(
@@ -1651,21 +1703,9 @@ class CounterfactualExplainer(ExplainerInterface):
                 self.explainer_config.tracking_level,
                 2,
             )
-            tracked_stats["latent_sparsity_var"] = latent_sparsity_var
-            cprint(
-                "latent_sparsity_var: " + str(latent_sparsity_var),
-                self.explainer_config.tracking_level,
-                2,
-            )
             tracked_stats["latent_diversity"] = latent_diversity
             cprint(
                 "latent_diversity: " + str(latent_diversity),
-                self.explainer_config.tracking_level,
-                2,
-            )
-            tracked_stats["latent_diversity_var"] = latent_diversity_var
-            cprint(
-                "latent_diversity_var: " + str(latent_diversity_var),
                 self.explainer_config.tracking_level,
                 2,
             )

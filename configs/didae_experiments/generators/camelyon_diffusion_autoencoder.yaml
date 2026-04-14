@@ -1,0 +1,13 @@
+# python train_generator.py --config "<PEAL_BASE>/configs/didae_experiments/generators/camelyon_diffusion_autoencoder.yaml"
+# python run_component_analysis.py --config $PEAL_RUNS/camelyon/diffusion_autoencoder/config.yaml --sd_config configs/didae_experiments/sparse_dictionaries/matryoshka_sae_default.yaml
+# python run_component_analysis.py --config $PEAL_RUNS/camelyon/diffusion_autoencoder/config.yaml --sd_config configs/didae_experiments/sparse_dictionaries/procrustes_sae_camelyon.yaml
+generator_type : DiffusionAutoencoder
+category : generator
+base_path : $PEAL_RUNS/camelyon/diffusion_autoencoder
+data: <PEAL_BASE>/configs/sce_experiments/data/camelyon17_generator.yaml
+batch_size: 40
+save_every_samples: 20000
+total_samples: 400001
+encoder_dimensions : 1024
+encoder_path: $PEAL_RUNS/camelyon17_1k/dinov2_linear_poisoned098/model.cpl
+#model_type: UNI

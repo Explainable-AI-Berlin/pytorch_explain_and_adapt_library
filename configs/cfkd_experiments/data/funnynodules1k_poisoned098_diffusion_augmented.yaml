@@ -1,0 +1,18 @@
+dataset_class           : FunnyNodulesDataset
+dataset_path            : $PEAL_DATA/funnynodules
+num_samples             : 1000
+split                   : [0.8,1.0]
+input_type              : image
+input_size              : [3, 64, 64]
+output_type             : multiclass
+output_size             : [6]
+downsize                : Resize
+delimiter               : ","
+confounder_probability  : 0.02
+confounding_factors     : [InternalStructure, Roundness]
+has_hints               : true
+generator               : $PEAL_RUNS/funnynodules1k/ddpm/config.yaml
+diffusion_augmented     : true
+sampling_time_fraction  : 0.3
+num_discretization_steps: 10
+batch_wise_augmentation : true

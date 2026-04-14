@@ -1,0 +1,5 @@
+category: generator
+generator_type: DDPM
+data: <PEAL_BASE>/configs/cfkd_experiments/data/isic_annotated_generator.yaml
+base_path: $PEAL_RUNS/isic_annotated/ddpm
+batch_size: 100

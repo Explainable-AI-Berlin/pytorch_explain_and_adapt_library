@@ -1,0 +1,902 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>dice_ml package &mdash; DiCE 0.12 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=3f949d3d"></script>
+      <script src="_static/doctools.js?v=9a2dae69"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="dice_ml.data_interfaces package" href="dice_ml.data_interfaces.html" />
+    <link rel="prev" title="&lt;no title&gt;" href="notebooks/DiCE_getting_started_feasible.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            DiCE
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="readme.html">Diverse Counterfactual Explanations (DiCE) for ML</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Notebooks:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="notebooks/DiCE_getting_started.html">Quick introduction to generating counterfactual explanations using DiCE</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notebooks/DiCE_feature_importances.html">Estimating local and global feature importance scores using DiCE</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notebooks/DiCE_multiclass_classification_and_regression.html">Generating counterfactuals for multi-class classification and regression models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notebooks/DiCE_multiclass_classification_and_regression.html#Regression">Regression</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notebooks/DiCE_model_agnostic_CFs.html">Generating counterfactual explanations with any ML model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notebooks/DiCE_with_private_data.html">Generating counterfactual explanations without access to training data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notebooks/DiCE_with_advanced_options.html">Advanced options to customize Counterfactual Explanations</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Package:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">dice_ml package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#subpackages">Subpackages</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.data_interfaces.html">dice_ml.data_interfaces package</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.explainer_interfaces.html">dice_ml.explainer_interfaces package</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.model_interfaces.html">dice_ml.model_interfaces package</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.schema.html">dice_ml.schema package</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.utils.html">dice_ml.utils package</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-dice_ml.constants">dice_ml.constants module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#dice_ml.constants.BackEndTypes"><code class="docutils literal notranslate"><span class="pre">BackEndTypes</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#dice_ml.constants.BackEndTypes.ALL"><code class="docutils literal notranslate"><span class="pre">BackEndTypes.ALL</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dice_ml.constants.BackEndTypes.Pytorch"><code class="docutils literal notranslate"><span class="pre">BackEndTypes.Pytorch</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dice_ml.constants.BackEndTypes.Sklearn"><code class="docutils literal notranslate"><span class="pre">BackEndTypes.Sklearn</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dice_ml.constants.BackEndTypes.Tensorflow1"><code class="docutils literal notranslate"><span class="pre">BackEndTypes.Tensorflow1</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dice_ml.constants.BackEndTypes.Tensorflow2"><code class="docutils literal notranslate"><span class="pre">BackEndTypes.Tensorflow2</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#dice_ml.constants.ModelTypes"><code class="docutils literal notranslate"><span class="pre">ModelTypes</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#dice_ml.constants.ModelTypes.ALL"><code class="docutils literal notranslate"><span class="pre">ModelTypes.ALL</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dice_ml.constants.ModelTypes.Classifier"><code class="docutils literal notranslate"><span class="pre">ModelTypes.Classifier</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dice_ml.constants.ModelTypes.Regressor"><code class="docutils literal notranslate"><span class="pre">ModelTypes.Regressor</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#dice_ml.constants.SamplingStrategy"><code class="docutils literal notranslate"><span class="pre">SamplingStrategy</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#dice_ml.constants.SamplingStrategy.Genetic"><code class="docutils literal notranslate"><span class="pre">SamplingStrategy.Genetic</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dice_ml.constants.SamplingStrategy.Gradient"><code class="docutils literal notranslate"><span class="pre">SamplingStrategy.Gradient</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dice_ml.constants.SamplingStrategy.KdTree"><code class="docutils literal notranslate"><span class="pre">SamplingStrategy.KdTree</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dice_ml.constants.SamplingStrategy.Random"><code class="docutils literal notranslate"><span class="pre">SamplingStrategy.Random</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#module-dice_ml.counterfactual_explanations">dice_ml.counterfactual_explanations module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#dice_ml.counterfactual_explanations.CounterfactualExplanations"><code class="docutils literal notranslate"><span class="pre">CounterfactualExplanations</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#dice_ml.counterfactual_explanations.CounterfactualExplanations.cf_examples_list"><code class="docutils literal notranslate"><span class="pre">CounterfactualExplanations.cf_examples_list</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dice_ml.counterfactual_explanations.CounterfactualExplanations.from_json"><code class="docutils literal notranslate"><span class="pre">CounterfactualExplanations.from_json()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dice_ml.counterfactual_explanations.CounterfactualExplanations.local_importance"><code class="docutils literal notranslate"><span class="pre">CounterfactualExplanations.local_importance</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dice_ml.counterfactual_explanations.CounterfactualExplanations.metadata"><code class="docutils literal notranslate"><span class="pre">CounterfactualExplanations.metadata</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dice_ml.counterfactual_explanations.CounterfactualExplanations.summary_importance"><code class="docutils literal notranslate"><span class="pre">CounterfactualExplanations.summary_importance</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dice_ml.counterfactual_explanations.CounterfactualExplanations.to_json"><code class="docutils literal notranslate"><span class="pre">CounterfactualExplanations.to_json()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dice_ml.counterfactual_explanations.CounterfactualExplanations.visualize_as_dataframe"><code class="docutils literal notranslate"><span class="pre">CounterfactualExplanations.visualize_as_dataframe()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dice_ml.counterfactual_explanations.CounterfactualExplanations.visualize_as_list"><code class="docutils literal notranslate"><span class="pre">CounterfactualExplanations.visualize_as_list()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#module-dice_ml.data">dice_ml.data module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#dice_ml.data.Data"><code class="docutils literal notranslate"><span class="pre">Data</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#dice_ml.data.Data.decide_implementation_type"><code class="docutils literal notranslate"><span class="pre">Data.decide_implementation_type()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#dice_ml.data.decide"><code class="docutils literal notranslate"><span class="pre">decide()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#module-dice_ml.dice">dice_ml.dice module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#dice_ml.dice.Dice"><code class="docutils literal notranslate"><span class="pre">Dice</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#dice_ml.dice.Dice.decide_implementation_type"><code class="docutils literal notranslate"><span class="pre">Dice.decide_implementation_type()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#dice_ml.dice.decide"><code class="docutils literal notranslate"><span class="pre">decide()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#module-dice_ml.diverse_counterfactuals">dice_ml.diverse_counterfactuals module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#dice_ml.diverse_counterfactuals.CounterfactualExamples"><code class="docutils literal notranslate"><span class="pre">CounterfactualExamples</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#dice_ml.diverse_counterfactuals.CounterfactualExamples.display_df"><code class="docutils literal notranslate"><span class="pre">CounterfactualExamples.display_df()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dice_ml.diverse_counterfactuals.CounterfactualExamples.from_json"><code class="docutils literal notranslate"><span class="pre">CounterfactualExamples.from_json()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dice_ml.diverse_counterfactuals.CounterfactualExamples.print_list"><code class="docutils literal notranslate"><span class="pre">CounterfactualExamples.print_list()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dice_ml.diverse_counterfactuals.CounterfactualExamples.to_json"><code class="docutils literal notranslate"><span class="pre">CounterfactualExamples.to_json()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dice_ml.diverse_counterfactuals.CounterfactualExamples.visualize_as_dataframe"><code class="docutils literal notranslate"><span class="pre">CounterfactualExamples.visualize_as_dataframe()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dice_ml.diverse_counterfactuals.CounterfactualExamples.visualize_as_list"><code class="docutils literal notranslate"><span class="pre">CounterfactualExamples.visualize_as_list()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#dice_ml.diverse_counterfactuals.json_converter"><code class="docutils literal notranslate"><span class="pre">json_converter()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#module-dice_ml.model">dice_ml.model module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#dice_ml.model.Model"><code class="docutils literal notranslate"><span class="pre">Model</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#dice_ml.model.Model.decide_implementation_type"><code class="docutils literal notranslate"><span class="pre">Model.decide_implementation_type()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#dice_ml.model.decide"><code class="docutils literal notranslate"><span class="pre">decide()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#module-dice_ml">Module contents</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#dice_ml.Data"><code class="docutils literal notranslate"><span class="pre">Data</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#dice_ml.Data.decide_implementation_type"><code class="docutils literal notranslate"><span class="pre">Data.decide_implementation_type()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#dice_ml.Dice"><code class="docutils literal notranslate"><span class="pre">Dice</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#dice_ml.Dice.decide_implementation_type"><code class="docutils literal notranslate"><span class="pre">Dice.decide_implementation_type()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#dice_ml.Model"><code class="docutils literal notranslate"><span class="pre">Model</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#dice_ml.Model.decide_implementation_type"><code class="docutils literal notranslate"><span class="pre">Model.decide_implementation_type()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">DiCE</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">dice_ml package</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/dice_ml.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="dice-ml-package">
+<h1>dice_ml package<a class="headerlink" href="#dice-ml-package" title="Link to this heading"></a></h1>
+<section id="subpackages">
+<h2>Subpackages<a class="headerlink" href="#subpackages" title="Link to this heading"></a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="dice_ml.data_interfaces.html">dice_ml.data_interfaces package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.data_interfaces.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.data_interfaces.html#module-dice_ml.data_interfaces.base_data_interface">dice_ml.data_interfaces.base_data_interface module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.data_interfaces.html#module-dice_ml.data_interfaces.private_data_interface">dice_ml.data_interfaces.private_data_interface module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.private_data_interface.PrivateData"><code class="docutils literal notranslate"><span class="pre">PrivateData</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.private_data_interface.PrivateData.create_ohe_params"><code class="docutils literal notranslate"><span class="pre">PrivateData.create_ohe_params()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.private_data_interface.PrivateData.de_normalize_data"><code class="docutils literal notranslate"><span class="pre">PrivateData.de_normalize_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.private_data_interface.PrivateData.fit_label_encoders"><code class="docutils literal notranslate"><span class="pre">PrivateData.fit_label_encoders()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.private_data_interface.PrivateData.from_dummies"><code class="docutils literal notranslate"><span class="pre">PrivateData.from_dummies()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.private_data_interface.PrivateData.from_label"><code class="docutils literal notranslate"><span class="pre">PrivateData.from_label()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.private_data_interface.PrivateData.get_all_dummy_colnames"><code class="docutils literal notranslate"><span class="pre">PrivateData.get_all_dummy_colnames()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.private_data_interface.PrivateData.get_data_params_for_gradient_dice"><code class="docutils literal notranslate"><span class="pre">PrivateData.get_data_params_for_gradient_dice()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.private_data_interface.PrivateData.get_decimal_precisions"><code class="docutils literal notranslate"><span class="pre">PrivateData.get_decimal_precisions()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.private_data_interface.PrivateData.get_decoded_data"><code class="docutils literal notranslate"><span class="pre">PrivateData.get_decoded_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.private_data_interface.PrivateData.get_encoded_categorical_feature_indexes"><code class="docutils literal notranslate"><span class="pre">PrivateData.get_encoded_categorical_feature_indexes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.private_data_interface.PrivateData.get_features_range"><code class="docutils literal notranslate"><span class="pre">PrivateData.get_features_range()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.private_data_interface.PrivateData.get_indexes_of_features_to_vary"><code class="docutils literal notranslate"><span class="pre">PrivateData.get_indexes_of_features_to_vary()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.private_data_interface.PrivateData.get_inverse_ohe_min_max_normalized_data"><code class="docutils literal notranslate"><span class="pre">PrivateData.get_inverse_ohe_min_max_normalized_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.private_data_interface.PrivateData.get_mads"><code class="docutils literal notranslate"><span class="pre">PrivateData.get_mads()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.private_data_interface.PrivateData.get_minx_maxx"><code class="docutils literal notranslate"><span class="pre">PrivateData.get_minx_maxx()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.private_data_interface.PrivateData.get_ohe_min_max_normalized_data"><code class="docutils literal notranslate"><span class="pre">PrivateData.get_ohe_min_max_normalized_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.private_data_interface.PrivateData.get_valid_feature_range"><code class="docutils literal notranslate"><span class="pre">PrivateData.get_valid_feature_range()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.private_data_interface.PrivateData.get_valid_mads"><code class="docutils literal notranslate"><span class="pre">PrivateData.get_valid_mads()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.private_data_interface.PrivateData.normalize_data"><code class="docutils literal notranslate"><span class="pre">PrivateData.normalize_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.private_data_interface.PrivateData.one_hot_encode_data"><code class="docutils literal notranslate"><span class="pre">PrivateData.one_hot_encode_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.private_data_interface.PrivateData.prepare_df_for_ohe_encoding"><code class="docutils literal notranslate"><span class="pre">PrivateData.prepare_df_for_ohe_encoding()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.private_data_interface.PrivateData.prepare_query_instance"><code class="docutils literal notranslate"><span class="pre">PrivateData.prepare_query_instance()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.private_data_interface.PrivateData.query_instance_to_df"><code class="docutils literal notranslate"><span class="pre">PrivateData.query_instance_to_df()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.data_interfaces.html#module-dice_ml.data_interfaces.public_data_interface">dice_ml.data_interfaces.public_data_interface module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.public_data_interface.PublicData"><code class="docutils literal notranslate"><span class="pre">PublicData</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.public_data_interface.PublicData.create_ohe_params"><code class="docutils literal notranslate"><span class="pre">PublicData.create_ohe_params()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.public_data_interface.PublicData.de_normalize_data"><code class="docutils literal notranslate"><span class="pre">PublicData.de_normalize_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.public_data_interface.PublicData.fit_label_encoders"><code class="docutils literal notranslate"><span class="pre">PublicData.fit_label_encoders()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.public_data_interface.PublicData.from_dummies"><code class="docutils literal notranslate"><span class="pre">PublicData.from_dummies()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.public_data_interface.PublicData.from_label"><code class="docutils literal notranslate"><span class="pre">PublicData.from_label()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.public_data_interface.PublicData.get_all_dummy_colnames"><code class="docutils literal notranslate"><span class="pre">PublicData.get_all_dummy_colnames()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.public_data_interface.PublicData.get_data_params_for_gradient_dice"><code class="docutils literal notranslate"><span class="pre">PublicData.get_data_params_for_gradient_dice()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.public_data_interface.PublicData.get_data_type"><code class="docutils literal notranslate"><span class="pre">PublicData.get_data_type()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.public_data_interface.PublicData.get_decimal_precisions"><code class="docutils literal notranslate"><span class="pre">PublicData.get_decimal_precisions()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.public_data_interface.PublicData.get_decoded_data"><code class="docutils literal notranslate"><span class="pre">PublicData.get_decoded_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.public_data_interface.PublicData.get_encoded_categorical_feature_indexes"><code class="docutils literal notranslate"><span class="pre">PublicData.get_encoded_categorical_feature_indexes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.public_data_interface.PublicData.get_features_range"><code class="docutils literal notranslate"><span class="pre">PublicData.get_features_range()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.public_data_interface.PublicData.get_indexes_of_features_to_vary"><code class="docutils literal notranslate"><span class="pre">PublicData.get_indexes_of_features_to_vary()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.public_data_interface.PublicData.get_inverse_ohe_min_max_normalized_data"><code class="docutils literal notranslate"><span class="pre">PublicData.get_inverse_ohe_min_max_normalized_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.public_data_interface.PublicData.get_mads"><code class="docutils literal notranslate"><span class="pre">PublicData.get_mads()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.public_data_interface.PublicData.get_minx_maxx"><code class="docutils literal notranslate"><span class="pre">PublicData.get_minx_maxx()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.public_data_interface.PublicData.get_ohe_min_max_normalized_data"><code class="docutils literal notranslate"><span class="pre">PublicData.get_ohe_min_max_normalized_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.public_data_interface.PublicData.get_quantiles_from_training_data"><code class="docutils literal notranslate"><span class="pre">PublicData.get_quantiles_from_training_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.public_data_interface.PublicData.get_valid_feature_range"><code class="docutils literal notranslate"><span class="pre">PublicData.get_valid_feature_range()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.public_data_interface.PublicData.get_valid_mads"><code class="docutils literal notranslate"><span class="pre">PublicData.get_valid_mads()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.public_data_interface.PublicData.normalize_data"><code class="docutils literal notranslate"><span class="pre">PublicData.normalize_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.public_data_interface.PublicData.one_hot_encode_data"><code class="docutils literal notranslate"><span class="pre">PublicData.one_hot_encode_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.public_data_interface.PublicData.prepare_df_for_ohe_encoding"><code class="docutils literal notranslate"><span class="pre">PublicData.prepare_df_for_ohe_encoding()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.data_interfaces.html#dice_ml.data_interfaces.public_data_interface.PublicData.prepare_query_instance"><code class="docutils literal notranslate"><span class="pre">PublicData.prepare_query_instance()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.data_interfaces.html#module-dice_ml.data_interfaces">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="dice_ml.explainer_interfaces.html">dice_ml.explainer_interfaces package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.explainer_interfaces.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.explainer_interfaces.html#module-dice_ml.explainer_interfaces.dice_KD">dice_ml.explainer_interfaces.dice_KD module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_KD.DiceKD"><code class="docutils literal notranslate"><span class="pre">DiceKD</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_KD.DiceKD.do_sparsity_check"><code class="docutils literal notranslate"><span class="pre">DiceKD.do_sparsity_check()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_KD.DiceKD.duplicates"><code class="docutils literal notranslate"><span class="pre">DiceKD.duplicates()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_KD.DiceKD.find_counterfactuals"><code class="docutils literal notranslate"><span class="pre">DiceKD.find_counterfactuals()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_KD.DiceKD.predict_fn"><code class="docutils literal notranslate"><span class="pre">DiceKD.predict_fn()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_KD.DiceKD.predict_fn_scores"><code class="docutils literal notranslate"><span class="pre">DiceKD.predict_fn_scores()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_KD.DiceKD.vary_valid"><code class="docutils literal notranslate"><span class="pre">DiceKD.vary_valid()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.explainer_interfaces.html#module-dice_ml.explainer_interfaces.dice_genetic">dice_ml.explainer_interfaces.dice_genetic module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_genetic.DiceGenetic"><code class="docutils literal notranslate"><span class="pre">DiceGenetic</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_genetic.DiceGenetic.compute_loss"><code class="docutils literal notranslate"><span class="pre">DiceGenetic.compute_loss()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_genetic.DiceGenetic.compute_proximity_loss"><code class="docutils literal notranslate"><span class="pre">DiceGenetic.compute_proximity_loss()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_genetic.DiceGenetic.compute_sparsity_loss"><code class="docutils literal notranslate"><span class="pre">DiceGenetic.compute_sparsity_loss()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_genetic.DiceGenetic.compute_yloss"><code class="docutils literal notranslate"><span class="pre">DiceGenetic.compute_yloss()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_genetic.DiceGenetic.do_KD_init"><code class="docutils literal notranslate"><span class="pre">DiceGenetic.do_KD_init()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_genetic.DiceGenetic.do_cf_initializations"><code class="docutils literal notranslate"><span class="pre">DiceGenetic.do_cf_initializations()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_genetic.DiceGenetic.do_loss_initializations"><code class="docutils literal notranslate"><span class="pre">DiceGenetic.do_loss_initializations()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_genetic.DiceGenetic.do_param_initializations"><code class="docutils literal notranslate"><span class="pre">DiceGenetic.do_param_initializations()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_genetic.DiceGenetic.do_random_init"><code class="docutils literal notranslate"><span class="pre">DiceGenetic.do_random_init()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_genetic.DiceGenetic.find_counterfactuals"><code class="docutils literal notranslate"><span class="pre">DiceGenetic.find_counterfactuals()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_genetic.DiceGenetic.get_valid_feature_range"><code class="docutils literal notranslate"><span class="pre">DiceGenetic.get_valid_feature_range()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_genetic.DiceGenetic.label_decode"><code class="docutils literal notranslate"><span class="pre">DiceGenetic.label_decode()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_genetic.DiceGenetic.label_decode_cfs"><code class="docutils literal notranslate"><span class="pre">DiceGenetic.label_decode_cfs()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_genetic.DiceGenetic.label_encode"><code class="docutils literal notranslate"><span class="pre">DiceGenetic.label_encode()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_genetic.DiceGenetic.mate"><code class="docutils literal notranslate"><span class="pre">DiceGenetic.mate()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_genetic.DiceGenetic.predict_fn"><code class="docutils literal notranslate"><span class="pre">DiceGenetic.predict_fn()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_genetic.DiceGenetic.predict_fn_scores"><code class="docutils literal notranslate"><span class="pre">DiceGenetic.predict_fn_scores()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_genetic.DiceGenetic.update_hyperparameters"><code class="docutils literal notranslate"><span class="pre">DiceGenetic.update_hyperparameters()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.explainer_interfaces.html#module-dice_ml.explainer_interfaces.dice_pytorch">dice_ml.explainer_interfaces.dice_pytorch module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_pytorch.DicePyTorch"><code class="docutils literal notranslate"><span class="pre">DicePyTorch</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_pytorch.DicePyTorch.compute_dist"><code class="docutils literal notranslate"><span class="pre">DicePyTorch.compute_dist()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_pytorch.DicePyTorch.compute_diversity_loss"><code class="docutils literal notranslate"><span class="pre">DicePyTorch.compute_diversity_loss()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_pytorch.DicePyTorch.compute_loss"><code class="docutils literal notranslate"><span class="pre">DicePyTorch.compute_loss()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_pytorch.DicePyTorch.compute_proximity_loss"><code class="docutils literal notranslate"><span class="pre">DicePyTorch.compute_proximity_loss()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_pytorch.DicePyTorch.compute_regularization_loss"><code class="docutils literal notranslate"><span class="pre">DicePyTorch.compute_regularization_loss()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_pytorch.DicePyTorch.compute_yloss"><code class="docutils literal notranslate"><span class="pre">DicePyTorch.compute_yloss()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_pytorch.DicePyTorch.do_cf_initializations"><code class="docutils literal notranslate"><span class="pre">DicePyTorch.do_cf_initializations()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_pytorch.DicePyTorch.do_loss_initializations"><code class="docutils literal notranslate"><span class="pre">DicePyTorch.do_loss_initializations()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_pytorch.DicePyTorch.do_optimizer_initializations"><code class="docutils literal notranslate"><span class="pre">DicePyTorch.do_optimizer_initializations()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_pytorch.DicePyTorch.dpp_style"><code class="docutils literal notranslate"><span class="pre">DicePyTorch.dpp_style()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_pytorch.DicePyTorch.find_counterfactuals"><code class="docutils literal notranslate"><span class="pre">DicePyTorch.find_counterfactuals()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_pytorch.DicePyTorch.get_model_output"><code class="docutils literal notranslate"><span class="pre">DicePyTorch.get_model_output()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_pytorch.DicePyTorch.initialize_CFs"><code class="docutils literal notranslate"><span class="pre">DicePyTorch.initialize_CFs()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_pytorch.DicePyTorch.predict_fn"><code class="docutils literal notranslate"><span class="pre">DicePyTorch.predict_fn()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_pytorch.DicePyTorch.predict_fn_for_sparsity"><code class="docutils literal notranslate"><span class="pre">DicePyTorch.predict_fn_for_sparsity()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_pytorch.DicePyTorch.round_off_cfs"><code class="docutils literal notranslate"><span class="pre">DicePyTorch.round_off_cfs()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_pytorch.DicePyTorch.stop_loop"><code class="docutils literal notranslate"><span class="pre">DicePyTorch.stop_loop()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_pytorch.DicePyTorch.update_hyperparameters"><code class="docutils literal notranslate"><span class="pre">DicePyTorch.update_hyperparameters()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.explainer_interfaces.html#module-dice_ml.explainer_interfaces.dice_random">dice_ml.explainer_interfaces.dice_random module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_random.DiceRandom"><code class="docutils literal notranslate"><span class="pre">DiceRandom</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_random.DiceRandom.get_continuous_samples"><code class="docutils literal notranslate"><span class="pre">DiceRandom.get_continuous_samples()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_random.DiceRandom.get_samples"><code class="docutils literal notranslate"><span class="pre">DiceRandom.get_samples()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.explainer_interfaces.html#module-dice_ml.explainer_interfaces.dice_tensorflow1">dice_ml.explainer_interfaces.dice_tensorflow1 module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_tensorflow1.DiceTensorFlow1"><code class="docutils literal notranslate"><span class="pre">DiceTensorFlow1</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_tensorflow1.DiceTensorFlow1.compute_dist"><code class="docutils literal notranslate"><span class="pre">DiceTensorFlow1.compute_dist()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_tensorflow1.DiceTensorFlow1.compute_diversity_loss"><code class="docutils literal notranslate"><span class="pre">DiceTensorFlow1.compute_diversity_loss()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_tensorflow1.DiceTensorFlow1.compute_proximity_loss"><code class="docutils literal notranslate"><span class="pre">DiceTensorFlow1.compute_proximity_loss()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_tensorflow1.DiceTensorFlow1.compute_regularization_loss"><code class="docutils literal notranslate"><span class="pre">DiceTensorFlow1.compute_regularization_loss()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_tensorflow1.DiceTensorFlow1.compute_yloss"><code class="docutils literal notranslate"><span class="pre">DiceTensorFlow1.compute_yloss()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_tensorflow1.DiceTensorFlow1.do_cf_initializations"><code class="docutils literal notranslate"><span class="pre">DiceTensorFlow1.do_cf_initializations()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_tensorflow1.DiceTensorFlow1.do_loss_initializations"><code class="docutils literal notranslate"><span class="pre">DiceTensorFlow1.do_loss_initializations()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_tensorflow1.DiceTensorFlow1.do_optimizer_initializations"><code class="docutils literal notranslate"><span class="pre">DiceTensorFlow1.do_optimizer_initializations()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_tensorflow1.DiceTensorFlow1.dpp_style"><code class="docutils literal notranslate"><span class="pre">DiceTensorFlow1.dpp_style()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_tensorflow1.DiceTensorFlow1.find_counterfactuals"><code class="docutils literal notranslate"><span class="pre">DiceTensorFlow1.find_counterfactuals()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_tensorflow1.DiceTensorFlow1.initialize_CFs"><code class="docutils literal notranslate"><span class="pre">DiceTensorFlow1.initialize_CFs()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_tensorflow1.DiceTensorFlow1.predict_fn"><code class="docutils literal notranslate"><span class="pre">DiceTensorFlow1.predict_fn()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_tensorflow1.DiceTensorFlow1.predict_fn_for_sparsity"><code class="docutils literal notranslate"><span class="pre">DiceTensorFlow1.predict_fn_for_sparsity()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_tensorflow1.DiceTensorFlow1.round_off_cfs"><code class="docutils literal notranslate"><span class="pre">DiceTensorFlow1.round_off_cfs()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_tensorflow1.DiceTensorFlow1.scipy_optimizers"><code class="docutils literal notranslate"><span class="pre">DiceTensorFlow1.scipy_optimizers()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_tensorflow1.DiceTensorFlow1.stop_loop"><code class="docutils literal notranslate"><span class="pre">DiceTensorFlow1.stop_loop()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_tensorflow1.DiceTensorFlow1.tensorflow_optimizers"><code class="docutils literal notranslate"><span class="pre">DiceTensorFlow1.tensorflow_optimizers()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_tensorflow1.DiceTensorFlow1.update_hyperparameters"><code class="docutils literal notranslate"><span class="pre">DiceTensorFlow1.update_hyperparameters()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.explainer_interfaces.html#module-dice_ml.explainer_interfaces.dice_tensorflow2">dice_ml.explainer_interfaces.dice_tensorflow2 module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_tensorflow2.DiceTensorFlow2"><code class="docutils literal notranslate"><span class="pre">DiceTensorFlow2</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_tensorflow2.DiceTensorFlow2.compute_dist"><code class="docutils literal notranslate"><span class="pre">DiceTensorFlow2.compute_dist()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_tensorflow2.DiceTensorFlow2.compute_diversity_loss"><code class="docutils literal notranslate"><span class="pre">DiceTensorFlow2.compute_diversity_loss()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_tensorflow2.DiceTensorFlow2.compute_loss"><code class="docutils literal notranslate"><span class="pre">DiceTensorFlow2.compute_loss()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_tensorflow2.DiceTensorFlow2.compute_proximity_loss"><code class="docutils literal notranslate"><span class="pre">DiceTensorFlow2.compute_proximity_loss()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_tensorflow2.DiceTensorFlow2.compute_regularization_loss"><code class="docutils literal notranslate"><span class="pre">DiceTensorFlow2.compute_regularization_loss()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_tensorflow2.DiceTensorFlow2.compute_yloss"><code class="docutils literal notranslate"><span class="pre">DiceTensorFlow2.compute_yloss()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_tensorflow2.DiceTensorFlow2.do_cf_initializations"><code class="docutils literal notranslate"><span class="pre">DiceTensorFlow2.do_cf_initializations()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_tensorflow2.DiceTensorFlow2.do_loss_initializations"><code class="docutils literal notranslate"><span class="pre">DiceTensorFlow2.do_loss_initializations()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_tensorflow2.DiceTensorFlow2.do_optimizer_initializations"><code class="docutils literal notranslate"><span class="pre">DiceTensorFlow2.do_optimizer_initializations()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_tensorflow2.DiceTensorFlow2.dpp_style"><code class="docutils literal notranslate"><span class="pre">DiceTensorFlow2.dpp_style()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_tensorflow2.DiceTensorFlow2.find_counterfactuals"><code class="docutils literal notranslate"><span class="pre">DiceTensorFlow2.find_counterfactuals()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_tensorflow2.DiceTensorFlow2.initialize_CFs"><code class="docutils literal notranslate"><span class="pre">DiceTensorFlow2.initialize_CFs()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_tensorflow2.DiceTensorFlow2.predict_fn"><code class="docutils literal notranslate"><span class="pre">DiceTensorFlow2.predict_fn()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_tensorflow2.DiceTensorFlow2.predict_fn_for_sparsity"><code class="docutils literal notranslate"><span class="pre">DiceTensorFlow2.predict_fn_for_sparsity()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_tensorflow2.DiceTensorFlow2.round_off_cfs"><code class="docutils literal notranslate"><span class="pre">DiceTensorFlow2.round_off_cfs()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_tensorflow2.DiceTensorFlow2.stop_loop"><code class="docutils literal notranslate"><span class="pre">DiceTensorFlow2.stop_loop()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_tensorflow2.DiceTensorFlow2.update_hyperparameters"><code class="docutils literal notranslate"><span class="pre">DiceTensorFlow2.update_hyperparameters()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.explainer_interfaces.html#module-dice_ml.explainer_interfaces.dice_xgboost">dice_ml.explainer_interfaces.dice_xgboost module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_xgboost.DiceXGBoost"><code class="docutils literal notranslate"><span class="pre">DiceXGBoost</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.dice_xgboost.DiceXGBoost.generate_counterfactuals"><code class="docutils literal notranslate"><span class="pre">DiceXGBoost.generate_counterfactuals()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.explainer_interfaces.html#module-dice_ml.explainer_interfaces.explainer_base">dice_ml.explainer_interfaces.explainer_base module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.explainer_base.ExplainerBase"><code class="docutils literal notranslate"><span class="pre">ExplainerBase</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.explainer_base.ExplainerBase.build_KD_tree"><code class="docutils literal notranslate"><span class="pre">ExplainerBase.build_KD_tree()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.explainer_base.ExplainerBase.check_permitted_range"><code class="docutils literal notranslate"><span class="pre">ExplainerBase.check_permitted_range()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.explainer_base.ExplainerBase.check_query_instance_validity"><code class="docutils literal notranslate"><span class="pre">ExplainerBase.check_query_instance_validity()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.explainer_base.ExplainerBase.decide_cf_validity"><code class="docutils literal notranslate"><span class="pre">ExplainerBase.decide_cf_validity()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.explainer_base.ExplainerBase.decode_model_output"><code class="docutils literal notranslate"><span class="pre">ExplainerBase.decode_model_output()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.explainer_base.ExplainerBase.decode_to_original_labels"><code class="docutils literal notranslate"><span class="pre">ExplainerBase.decode_to_original_labels()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.explainer_base.ExplainerBase.deserialize_explainer"><code class="docutils literal notranslate"><span class="pre">ExplainerBase.deserialize_explainer()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.explainer_base.ExplainerBase.do_binary_search"><code class="docutils literal notranslate"><span class="pre">ExplainerBase.do_binary_search()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.explainer_base.ExplainerBase.do_linear_search"><code class="docutils literal notranslate"><span class="pre">ExplainerBase.do_linear_search()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.explainer_base.ExplainerBase.do_posthoc_sparsity_enhancement"><code class="docutils literal notranslate"><span class="pre">ExplainerBase.do_posthoc_sparsity_enhancement()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.explainer_base.ExplainerBase.feature_importance"><code class="docutils literal notranslate"><span class="pre">ExplainerBase.feature_importance()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.explainer_base.ExplainerBase.generate_counterfactuals"><code class="docutils literal notranslate"><span class="pre">ExplainerBase.generate_counterfactuals()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.explainer_base.ExplainerBase.get_model_output_from_scores"><code class="docutils literal notranslate"><span class="pre">ExplainerBase.get_model_output_from_scores()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.explainer_base.ExplainerBase.global_feature_importance"><code class="docutils literal notranslate"><span class="pre">ExplainerBase.global_feature_importance()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.explainer_base.ExplainerBase.infer_target_cfs_class"><code class="docutils literal notranslate"><span class="pre">ExplainerBase.infer_target_cfs_class()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.explainer_base.ExplainerBase.infer_target_cfs_range"><code class="docutils literal notranslate"><span class="pre">ExplainerBase.infer_target_cfs_range()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.explainer_base.ExplainerBase.is_cf_valid"><code class="docutils literal notranslate"><span class="pre">ExplainerBase.is_cf_valid()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.explainer_base.ExplainerBase.local_feature_importance"><code class="docutils literal notranslate"><span class="pre">ExplainerBase.local_feature_importance()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.explainer_base.ExplainerBase.misc_init"><code class="docutils literal notranslate"><span class="pre">ExplainerBase.misc_init()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.explainer_base.ExplainerBase.predict_fn"><code class="docutils literal notranslate"><span class="pre">ExplainerBase.predict_fn()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.explainer_base.ExplainerBase.predict_fn_for_sparsity"><code class="docutils literal notranslate"><span class="pre">ExplainerBase.predict_fn_for_sparsity()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.explainer_base.ExplainerBase.round_to_precision"><code class="docutils literal notranslate"><span class="pre">ExplainerBase.round_to_precision()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.explainer_base.ExplainerBase.serialize_explainer"><code class="docutils literal notranslate"><span class="pre">ExplainerBase.serialize_explainer()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.explainer_base.ExplainerBase.setup"><code class="docutils literal notranslate"><span class="pre">ExplainerBase.setup()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.explainer_base.ExplainerBase.sigmoid"><code class="docutils literal notranslate"><span class="pre">ExplainerBase.sigmoid()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.explainer_interfaces.html#module-dice_ml.explainer_interfaces.feasible_base_vae">dice_ml.explainer_interfaces.feasible_base_vae module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.feasible_base_vae.FeasibleBaseVAE"><code class="docutils literal notranslate"><span class="pre">FeasibleBaseVAE</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.feasible_base_vae.FeasibleBaseVAE.compute_loss"><code class="docutils literal notranslate"><span class="pre">FeasibleBaseVAE.compute_loss()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.feasible_base_vae.FeasibleBaseVAE.generate_counterfactuals"><code class="docutils literal notranslate"><span class="pre">FeasibleBaseVAE.generate_counterfactuals()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.feasible_base_vae.FeasibleBaseVAE.train"><code class="docutils literal notranslate"><span class="pre">FeasibleBaseVAE.train()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.explainer_interfaces.html#module-dice_ml.explainer_interfaces.feasible_model_approx">dice_ml.explainer_interfaces.feasible_model_approx module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.feasible_model_approx.FeasibleModelApprox"><code class="docutils literal notranslate"><span class="pre">FeasibleModelApprox</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.feasible_model_approx.FeasibleModelApprox.train"><code class="docutils literal notranslate"><span class="pre">FeasibleModelApprox.train()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.explainer_interfaces.html#module-dice_ml.explainer_interfaces">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="dice_ml.model_interfaces.html">dice_ml.model_interfaces package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.model_interfaces.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.model_interfaces.html#module-dice_ml.model_interfaces.base_model">dice_ml.model_interfaces.base_model module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.model_interfaces.html#dice_ml.model_interfaces.base_model.BaseModel"><code class="docutils literal notranslate"><span class="pre">BaseModel</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.model_interfaces.html#dice_ml.model_interfaces.base_model.BaseModel.get_gradient"><code class="docutils literal notranslate"><span class="pre">BaseModel.get_gradient()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.model_interfaces.html#dice_ml.model_interfaces.base_model.BaseModel.get_num_output_nodes"><code class="docutils literal notranslate"><span class="pre">BaseModel.get_num_output_nodes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.model_interfaces.html#dice_ml.model_interfaces.base_model.BaseModel.get_num_output_nodes2"><code class="docutils literal notranslate"><span class="pre">BaseModel.get_num_output_nodes2()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.model_interfaces.html#dice_ml.model_interfaces.base_model.BaseModel.get_output"><code class="docutils literal notranslate"><span class="pre">BaseModel.get_output()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.model_interfaces.html#dice_ml.model_interfaces.base_model.BaseModel.load_model"><code class="docutils literal notranslate"><span class="pre">BaseModel.load_model()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.model_interfaces.html#module-dice_ml.model_interfaces.keras_tensorflow_model">dice_ml.model_interfaces.keras_tensorflow_model module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.model_interfaces.html#dice_ml.model_interfaces.keras_tensorflow_model.KerasTensorFlowModel"><code class="docutils literal notranslate"><span class="pre">KerasTensorFlowModel</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.model_interfaces.html#dice_ml.model_interfaces.keras_tensorflow_model.KerasTensorFlowModel.get_gradient"><code class="docutils literal notranslate"><span class="pre">KerasTensorFlowModel.get_gradient()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.model_interfaces.html#dice_ml.model_interfaces.keras_tensorflow_model.KerasTensorFlowModel.get_num_output_nodes"><code class="docutils literal notranslate"><span class="pre">KerasTensorFlowModel.get_num_output_nodes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.model_interfaces.html#dice_ml.model_interfaces.keras_tensorflow_model.KerasTensorFlowModel.get_output"><code class="docutils literal notranslate"><span class="pre">KerasTensorFlowModel.get_output()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.model_interfaces.html#dice_ml.model_interfaces.keras_tensorflow_model.KerasTensorFlowModel.load_model"><code class="docutils literal notranslate"><span class="pre">KerasTensorFlowModel.load_model()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.model_interfaces.html#module-dice_ml.model_interfaces.pytorch_model">dice_ml.model_interfaces.pytorch_model module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.model_interfaces.html#dice_ml.model_interfaces.pytorch_model.PyTorchModel"><code class="docutils literal notranslate"><span class="pre">PyTorchModel</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.model_interfaces.html#dice_ml.model_interfaces.pytorch_model.PyTorchModel.get_gradient"><code class="docutils literal notranslate"><span class="pre">PyTorchModel.get_gradient()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.model_interfaces.html#dice_ml.model_interfaces.pytorch_model.PyTorchModel.get_num_output_nodes"><code class="docutils literal notranslate"><span class="pre">PyTorchModel.get_num_output_nodes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.model_interfaces.html#dice_ml.model_interfaces.pytorch_model.PyTorchModel.get_output"><code class="docutils literal notranslate"><span class="pre">PyTorchModel.get_output()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.model_interfaces.html#dice_ml.model_interfaces.pytorch_model.PyTorchModel.load_model"><code class="docutils literal notranslate"><span class="pre">PyTorchModel.load_model()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.model_interfaces.html#dice_ml.model_interfaces.pytorch_model.PyTorchModel.set_eval_mode"><code class="docutils literal notranslate"><span class="pre">PyTorchModel.set_eval_mode()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.model_interfaces.html#dice-ml-model-interfaces-xgboost-model-module">dice_ml.model_interfaces.xgboost_model module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.model_interfaces.html#module-dice_ml.model_interfaces">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="dice_ml.schema.html">dice_ml.schema package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.schema.html#module-dice_ml.schema">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="dice_ml.utils.html">dice_ml.utils package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.utils.html#subpackages">Subpackages</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.utils.sample_architecture.html">dice_ml.utils.sample_architecture package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.utils.sample_architecture.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.utils.sample_architecture.html#module-dice_ml.utils.sample_architecture.vae_model">dice_ml.utils.sample_architecture.vae_model module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.utils.sample_architecture.html#module-dice_ml.utils.sample_architecture">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.utils.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.utils.html#module-dice_ml.utils.exception">dice_ml.utils.exception module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.utils.html#dice_ml.utils.exception.SystemException"><code class="docutils literal notranslate"><span class="pre">SystemException</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.utils.html#module-dice_ml.utils.helpers">dice_ml.utils.helpers module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.utils.html#dice_ml.utils.helpers.DataTransfomer"><code class="docutils literal notranslate"><span class="pre">DataTransfomer</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.utils.html#dice_ml.utils.helpers.DataTransfomer.feed_data_params"><code class="docutils literal notranslate"><span class="pre">DataTransfomer.feed_data_params()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.utils.html#dice_ml.utils.helpers.DataTransfomer.initialize_transform_func"><code class="docutils literal notranslate"><span class="pre">DataTransfomer.initialize_transform_func()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.utils.html#dice_ml.utils.helpers.DataTransfomer.inverse_transform"><code class="docutils literal notranslate"><span class="pre">DataTransfomer.inverse_transform()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.utils.html#dice_ml.utils.helpers.DataTransfomer.transform"><code class="docutils literal notranslate"><span class="pre">DataTransfomer.transform()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.utils.html#dice_ml.utils.helpers.get_adult_data_info"><code class="docutils literal notranslate"><span class="pre">get_adult_data_info()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.utils.html#dice_ml.utils.helpers.get_adult_income_modelpath"><code class="docutils literal notranslate"><span class="pre">get_adult_income_modelpath()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.utils.html#dice_ml.utils.helpers.get_base_gen_cf_initialization"><code class="docutils literal notranslate"><span class="pre">get_base_gen_cf_initialization()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.utils.html#dice_ml.utils.helpers.get_custom_dataset_modelpath_pipeline"><code class="docutils literal notranslate"><span class="pre">get_custom_dataset_modelpath_pipeline()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.utils.html#dice_ml.utils.helpers.get_custom_dataset_modelpath_pipeline_binary"><code class="docutils literal notranslate"><span class="pre">get_custom_dataset_modelpath_pipeline_binary()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.utils.html#dice_ml.utils.helpers.get_custom_dataset_modelpath_pipeline_multiclass"><code class="docutils literal notranslate"><span class="pre">get_custom_dataset_modelpath_pipeline_multiclass()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.utils.html#dice_ml.utils.helpers.get_custom_dataset_modelpath_pipeline_regression"><code class="docutils literal notranslate"><span class="pre">get_custom_dataset_modelpath_pipeline_regression()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.utils.html#dice_ml.utils.helpers.get_custom_vars_dataset_modelpath_pipeline"><code class="docutils literal notranslate"><span class="pre">get_custom_vars_dataset_modelpath_pipeline()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.utils.html#dice_ml.utils.helpers.inverse_ohe_min_max_transformation"><code class="docutils literal notranslate"><span class="pre">inverse_ohe_min_max_transformation()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.utils.html#dice_ml.utils.helpers.load_adult_income_dataset"><code class="docutils literal notranslate"><span class="pre">load_adult_income_dataset()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.utils.html#dice_ml.utils.helpers.load_custom_testing_dataset"><code class="docutils literal notranslate"><span class="pre">load_custom_testing_dataset()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.utils.html#dice_ml.utils.helpers.load_custom_testing_dataset_binary"><code class="docutils literal notranslate"><span class="pre">load_custom_testing_dataset_binary()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.utils.html#dice_ml.utils.helpers.load_custom_testing_dataset_binary_str"><code class="docutils literal notranslate"><span class="pre">load_custom_testing_dataset_binary_str()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.utils.html#dice_ml.utils.helpers.load_custom_testing_dataset_multiclass"><code class="docutils literal notranslate"><span class="pre">load_custom_testing_dataset_multiclass()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.utils.html#dice_ml.utils.helpers.load_custom_testing_dataset_multiclass_str"><code class="docutils literal notranslate"><span class="pre">load_custom_testing_dataset_multiclass_str()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.utils.html#dice_ml.utils.helpers.load_custom_testing_dataset_regression"><code class="docutils literal notranslate"><span class="pre">load_custom_testing_dataset_regression()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.utils.html#dice_ml.utils.helpers.load_min_max_equal_dataset"><code class="docutils literal notranslate"><span class="pre">load_min_max_equal_dataset()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.utils.html#dice_ml.utils.helpers.load_outcome_not_last_column_dataset"><code class="docutils literal notranslate"><span class="pre">load_outcome_not_last_column_dataset()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.utils.html#dice_ml.utils.helpers.ohe_min_max_transformation"><code class="docutils literal notranslate"><span class="pre">ohe_min_max_transformation()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.utils.html#dice_ml.utils.helpers.save_adult_income_model"><code class="docutils literal notranslate"><span class="pre">save_adult_income_model()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.utils.html#module-dice_ml.utils.neuralnetworks">dice_ml.utils.neuralnetworks module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.utils.html#dice_ml.utils.neuralnetworks.FFNetwork"><code class="docutils literal notranslate"><span class="pre">FFNetwork</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.utils.html#dice_ml.utils.neuralnetworks.FFNetwork.forward"><code class="docutils literal notranslate"><span class="pre">FFNetwork.forward()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.utils.html#dice_ml.utils.neuralnetworks.MulticlassNetwork"><code class="docutils literal notranslate"><span class="pre">MulticlassNetwork</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.utils.html#dice_ml.utils.neuralnetworks.MulticlassNetwork.forward"><code class="docutils literal notranslate"><span class="pre">MulticlassNetwork.forward()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.utils.html#module-dice_ml.utils.serialize">dice_ml.utils.serialize module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dice_ml.utils.html#dice_ml.utils.serialize.DummyDataInterface"><code class="docutils literal notranslate"><span class="pre">DummyDataInterface</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="dice_ml.utils.html#dice_ml.utils.serialize.DummyDataInterface.to_json"><code class="docutils literal notranslate"><span class="pre">DummyDataInterface.to_json()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="dice_ml.utils.html#module-dice_ml.utils">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading"></a></h2>
+</section>
+<section id="module-dice_ml.constants">
+<span id="dice-ml-constants-module"></span><h2>dice_ml.constants module<a class="headerlink" href="#module-dice_ml.constants" title="Link to this heading"></a></h2>
+<p>Constants for dice-ml package.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="dice_ml.constants.BackEndTypes">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dice_ml.constants.</span></span><span class="sig-name descname"><span class="pre">BackEndTypes</span></span><a class="reference internal" href="_modules/dice_ml/constants.html#BackEndTypes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dice_ml.constants.BackEndTypes" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dice_ml.constants.BackEndTypes.ALL">
+<span class="sig-name descname"><span class="pre">ALL</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">['sklearn',</span> <span class="pre">'TF1',</span> <span class="pre">'TF2',</span> <span class="pre">'PYT']</span></em><a class="headerlink" href="#dice_ml.constants.BackEndTypes.ALL" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dice_ml.constants.BackEndTypes.Pytorch">
+<span class="sig-name descname"><span class="pre">Pytorch</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'PYT'</span></em><a class="headerlink" href="#dice_ml.constants.BackEndTypes.Pytorch" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dice_ml.constants.BackEndTypes.Sklearn">
+<span class="sig-name descname"><span class="pre">Sklearn</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'sklearn'</span></em><a class="headerlink" href="#dice_ml.constants.BackEndTypes.Sklearn" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dice_ml.constants.BackEndTypes.Tensorflow1">
+<span class="sig-name descname"><span class="pre">Tensorflow1</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'TF1'</span></em><a class="headerlink" href="#dice_ml.constants.BackEndTypes.Tensorflow1" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dice_ml.constants.BackEndTypes.Tensorflow2">
+<span class="sig-name descname"><span class="pre">Tensorflow2</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'TF2'</span></em><a class="headerlink" href="#dice_ml.constants.BackEndTypes.Tensorflow2" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dice_ml.constants.ModelTypes">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dice_ml.constants.</span></span><span class="sig-name descname"><span class="pre">ModelTypes</span></span><a class="reference internal" href="_modules/dice_ml/constants.html#ModelTypes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dice_ml.constants.ModelTypes" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dice_ml.constants.ModelTypes.ALL">
+<span class="sig-name descname"><span class="pre">ALL</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">['classifier',</span> <span class="pre">'regressor']</span></em><a class="headerlink" href="#dice_ml.constants.ModelTypes.ALL" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dice_ml.constants.ModelTypes.Classifier">
+<span class="sig-name descname"><span class="pre">Classifier</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'classifier'</span></em><a class="headerlink" href="#dice_ml.constants.ModelTypes.Classifier" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dice_ml.constants.ModelTypes.Regressor">
+<span class="sig-name descname"><span class="pre">Regressor</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'regressor'</span></em><a class="headerlink" href="#dice_ml.constants.ModelTypes.Regressor" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dice_ml.constants.SamplingStrategy">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dice_ml.constants.</span></span><span class="sig-name descname"><span class="pre">SamplingStrategy</span></span><a class="reference internal" href="_modules/dice_ml/constants.html#SamplingStrategy"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dice_ml.constants.SamplingStrategy" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dice_ml.constants.SamplingStrategy.Genetic">
+<span class="sig-name descname"><span class="pre">Genetic</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'genetic'</span></em><a class="headerlink" href="#dice_ml.constants.SamplingStrategy.Genetic" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dice_ml.constants.SamplingStrategy.Gradient">
+<span class="sig-name descname"><span class="pre">Gradient</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'gradient'</span></em><a class="headerlink" href="#dice_ml.constants.SamplingStrategy.Gradient" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dice_ml.constants.SamplingStrategy.KdTree">
+<span class="sig-name descname"><span class="pre">KdTree</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'kdtree'</span></em><a class="headerlink" href="#dice_ml.constants.SamplingStrategy.KdTree" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dice_ml.constants.SamplingStrategy.Random">
+<span class="sig-name descname"><span class="pre">Random</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'random'</span></em><a class="headerlink" href="#dice_ml.constants.SamplingStrategy.Random" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-dice_ml.counterfactual_explanations">
+<span id="dice-ml-counterfactual-explanations-module"></span><h2>dice_ml.counterfactual_explanations module<a class="headerlink" href="#module-dice_ml.counterfactual_explanations" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="dice_ml.counterfactual_explanations.CounterfactualExplanations">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dice_ml.counterfactual_explanations.</span></span><span class="sig-name descname"><span class="pre">CounterfactualExplanations</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cf_examples_list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">local_importance</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">summary_importance</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">version</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dice_ml/counterfactual_explanations.html#CounterfactualExplanations"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dice_ml.counterfactual_explanations.CounterfactualExplanations" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>A class to store counterfactual examples for one or more inputs
+and feature importance scores.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>cf_examples_list</strong> – A list of CounterfactualExamples instances</p></li>
+<li><p><strong>local_importance</strong> – List of estimated local importance scores. The
+size of the list is the number of input instances, each containing
+feature importance scores for that input.</p></li>
+<li><p><strong>summary_importance</strong> – Estimated global feature importance scores
+based on the input set of CounterfactualExamples instances</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py property">
+<dt class="sig sig-object py" id="dice_ml.counterfactual_explanations.CounterfactualExplanations.cf_examples_list">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">cf_examples_list</span></span><a class="headerlink" href="#dice_ml.counterfactual_explanations.CounterfactualExplanations.cf_examples_list" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dice_ml.counterfactual_explanations.CounterfactualExplanations.from_json">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_json</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">json_str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dice_ml/counterfactual_explanations.html#CounterfactualExplanations.from_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dice_ml.counterfactual_explanations.CounterfactualExplanations.from_json" title="Link to this definition"></a></dt>
+<dd><p>Deserialize json string to a CounterfactualExplanations object.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="dice_ml.counterfactual_explanations.CounterfactualExplanations.local_importance">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">local_importance</span></span><a class="headerlink" href="#dice_ml.counterfactual_explanations.CounterfactualExplanations.local_importance" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="dice_ml.counterfactual_explanations.CounterfactualExplanations.metadata">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">metadata</span></span><a class="headerlink" href="#dice_ml.counterfactual_explanations.CounterfactualExplanations.metadata" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="dice_ml.counterfactual_explanations.CounterfactualExplanations.summary_importance">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">summary_importance</span></span><a class="headerlink" href="#dice_ml.counterfactual_explanations.CounterfactualExplanations.summary_importance" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dice_ml.counterfactual_explanations.CounterfactualExplanations.to_json">
+<span class="sig-name descname"><span class="pre">to_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/dice_ml/counterfactual_explanations.html#CounterfactualExplanations.to_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dice_ml.counterfactual_explanations.CounterfactualExplanations.to_json" title="Link to this definition"></a></dt>
+<dd><p>Serialize Explanations object to json.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dice_ml.counterfactual_explanations.CounterfactualExplanations.visualize_as_dataframe">
+<span class="sig-name descname"><span class="pre">visualize_as_dataframe</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">display_sparse_df</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_only_changes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dice_ml/counterfactual_explanations.html#CounterfactualExplanations.visualize_as_dataframe"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dice_ml.counterfactual_explanations.CounterfactualExplanations.visualize_as_dataframe" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dice_ml.counterfactual_explanations.CounterfactualExplanations.visualize_as_list">
+<span class="sig-name descname"><span class="pre">visualize_as_list</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">display_sparse_df</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_only_changes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dice_ml/counterfactual_explanations.html#CounterfactualExplanations.visualize_as_list"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dice_ml.counterfactual_explanations.CounterfactualExplanations.visualize_as_list" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-dice_ml.data">
+<span id="dice-ml-data-module"></span><h2>dice_ml.data module<a class="headerlink" href="#module-dice_ml.data" title="Link to this heading"></a></h2>
+<p>Module pointing to different implementations of Data class</p>
+<p>DiCE requires only few parameters about the data such as the range of continuous
+features and the levels of categorical features. Hence, DiCE can be used for a
+private data whose meta data are only available (such as the feature names and
+range/levels of different features) by specifying appropriate parameters.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="dice_ml.data.Data">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dice_ml.data.</span></span><span class="sig-name descname"><span class="pre">Data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">params</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dice_ml/data.html#Data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dice_ml.data.Data" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">_BaseData</span></code></p>
+<p>Class containing all required information about the data for DiCE.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dice_ml.data.Data.decide_implementation_type">
+<span class="sig-name descname"><span class="pre">decide_implementation_type</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">params</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dice_ml/data.html#Data.decide_implementation_type"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dice_ml.data.Data.decide_implementation_type" title="Link to this definition"></a></dt>
+<dd><p>Decides if the Data class is for public or private data.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dice_ml.data.decide">
+<span class="sig-prename descclassname"><span class="pre">dice_ml.data.</span></span><span class="sig-name descname"><span class="pre">decide</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">params</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dice_ml/data.html#decide"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dice_ml.data.decide" title="Link to this definition"></a></dt>
+<dd><p>Decides if the Data class is for public or private data.</p>
+<p>To add new implementations of Data, add the class in data_interfaces
+subpackage and import-and-return the class in an elif loop as shown
+in the below method.</p>
+</dd></dl>
+
+</section>
+<section id="module-dice_ml.dice">
+<span id="dice-ml-dice-module"></span><h2>dice_ml.dice module<a class="headerlink" href="#module-dice_ml.dice" title="Link to this heading"></a></h2>
+<p>Module pointing to different implementations of DiCE based on different
+frameworks such as Tensorflow or PyTorch or sklearn, and different methods
+such as RandomSampling, DiCEKD or DiCEGenetic</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="dice_ml.dice.Dice">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dice_ml.dice.</span></span><span class="sig-name descname"><span class="pre">Dice</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data_interface</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_interface</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'random'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dice_ml/dice.html#Dice"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dice_ml.dice.Dice" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.explainer_base.ExplainerBase" title="dice_ml.explainer_interfaces.explainer_base.ExplainerBase"><code class="xref py py-class docutils literal notranslate"><span class="pre">ExplainerBase</span></code></a></p>
+<p>An interface class to different DiCE implementations.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dice_ml.dice.Dice.decide_implementation_type">
+<span class="sig-name descname"><span class="pre">decide_implementation_type</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data_interface</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_interface</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dice_ml/dice.html#Dice.decide_implementation_type"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dice_ml.dice.Dice.decide_implementation_type" title="Link to this definition"></a></dt>
+<dd><p>Decides DiCE implementation type.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dice_ml.dice.decide">
+<span class="sig-prename descclassname"><span class="pre">dice_ml.dice.</span></span><span class="sig-name descname"><span class="pre">decide</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model_interface</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dice_ml/dice.html#decide"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dice_ml.dice.decide" title="Link to this definition"></a></dt>
+<dd><p>Decides DiCE implementation type.</p>
+<p>To add new implementations of DiCE, add the class in explainer_interfaces
+subpackage and import-and-return the class in an elif loop as shown in
+the below method.</p>
+</dd></dl>
+
+</section>
+<section id="module-dice_ml.diverse_counterfactuals">
+<span id="dice-ml-diverse-counterfactuals-module"></span><h2>dice_ml.diverse_counterfactuals module<a class="headerlink" href="#module-dice_ml.diverse_counterfactuals" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="dice_ml.diverse_counterfactuals.CounterfactualExamples">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dice_ml.diverse_counterfactuals.</span></span><span class="sig-name descname"><span class="pre">CounterfactualExamples</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data_interface</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">final_cfs_df</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">test_instance_df</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">final_cfs_df_sparse</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">posthoc_sparsity_param</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">desired_range</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">desired_class</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'opposite'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'classifier'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dice_ml/diverse_counterfactuals.html#CounterfactualExamples"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dice_ml.diverse_counterfactuals.CounterfactualExamples" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>A class to store and visualize the resulting counterfactual explanations.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dice_ml.diverse_counterfactuals.CounterfactualExamples.display_df">
+<span class="sig-name descname"><span class="pre">display_df</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_only_changes</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dice_ml/diverse_counterfactuals.html#CounterfactualExamples.display_df"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dice_ml.diverse_counterfactuals.CounterfactualExamples.display_df" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dice_ml.diverse_counterfactuals.CounterfactualExamples.from_json">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_json</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cf_example_json_str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dice_ml/diverse_counterfactuals.html#CounterfactualExamples.from_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dice_ml.diverse_counterfactuals.CounterfactualExamples.from_json" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dice_ml.diverse_counterfactuals.CounterfactualExamples.print_list">
+<span class="sig-name descname"><span class="pre">print_list</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">li</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_only_changes</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dice_ml/diverse_counterfactuals.html#CounterfactualExamples.print_list"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dice_ml.diverse_counterfactuals.CounterfactualExamples.print_list" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dice_ml.diverse_counterfactuals.CounterfactualExamples.to_json">
+<span class="sig-name descname"><span class="pre">to_json</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">serialization_version</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dice_ml/diverse_counterfactuals.html#CounterfactualExamples.to_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dice_ml.diverse_counterfactuals.CounterfactualExamples.to_json" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dice_ml.diverse_counterfactuals.CounterfactualExamples.visualize_as_dataframe">
+<span class="sig-name descname"><span class="pre">visualize_as_dataframe</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">display_sparse_df</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_only_changes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dice_ml/diverse_counterfactuals.html#CounterfactualExamples.visualize_as_dataframe"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dice_ml.diverse_counterfactuals.CounterfactualExamples.visualize_as_dataframe" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dice_ml.diverse_counterfactuals.CounterfactualExamples.visualize_as_list">
+<span class="sig-name descname"><span class="pre">visualize_as_list</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">display_sparse_df</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_only_changes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dice_ml/diverse_counterfactuals.html#CounterfactualExamples.visualize_as_list"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dice_ml.diverse_counterfactuals.CounterfactualExamples.visualize_as_list" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dice_ml.diverse_counterfactuals.json_converter">
+<span class="sig-prename descclassname"><span class="pre">dice_ml.diverse_counterfactuals.</span></span><span class="sig-name descname"><span class="pre">json_converter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">obj</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dice_ml/diverse_counterfactuals.html#json_converter"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dice_ml.diverse_counterfactuals.json_converter" title="Link to this definition"></a></dt>
+<dd><p>Helper function to convert object to json.</p>
+</dd></dl>
+
+</section>
+<section id="module-dice_ml.model">
+<span id="dice-ml-model-module"></span><h2>dice_ml.model module<a class="headerlink" href="#module-dice_ml.model" title="Link to this heading"></a></h2>
+<p>Module pointing to different implementations of Model class</p>
+<p>The implementations contain methods to access the output or gradients of ML models trained based on different
+frameworks such as Tensorflow or PyTorch.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="dice_ml.model.Model">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dice_ml.model.</span></span><span class="sig-name descname"><span class="pre">Model</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">backend</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'TF1'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'classifier'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">func</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kw_args</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dice_ml/model.html#Model"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dice_ml.model.Model" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>An interface class to different ML Model implementations.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dice_ml.model.Model.decide_implementation_type">
+<span class="sig-name descname"><span class="pre">decide_implementation_type</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">backend</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">func</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kw_args</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dice_ml/model.html#Model.decide_implementation_type"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dice_ml.model.Model.decide_implementation_type" title="Link to this definition"></a></dt>
+<dd><p>Decides the Model implementation type.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dice_ml.model.decide">
+<span class="sig-prename descclassname"><span class="pre">dice_ml.model.</span></span><span class="sig-name descname"><span class="pre">decide</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">backend</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dice_ml/model.html#decide"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dice_ml.model.decide" title="Link to this definition"></a></dt>
+<dd><p>Decides the Model implementation type.</p>
+<p>To add new implementations of Model, add the class in model_interfaces subpackage and
+import-and-return the class in an elif loop as shown in the below method.</p>
+</dd></dl>
+
+</section>
+<section id="module-dice_ml">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-dice_ml" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="dice_ml.Data">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dice_ml.</span></span><span class="sig-name descname"><span class="pre">Data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">params</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dice_ml/data.html#Data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dice_ml.Data" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">_BaseData</span></code></p>
+<p>Class containing all required information about the data for DiCE.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dice_ml.Data.decide_implementation_type">
+<span class="sig-name descname"><span class="pre">decide_implementation_type</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">params</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dice_ml/data.html#Data.decide_implementation_type"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dice_ml.Data.decide_implementation_type" title="Link to this definition"></a></dt>
+<dd><p>Decides if the Data class is for public or private data.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dice_ml.Dice">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dice_ml.</span></span><span class="sig-name descname"><span class="pre">Dice</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data_interface</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_interface</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'random'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dice_ml/dice.html#Dice"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dice_ml.Dice" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="dice_ml.explainer_interfaces.html#dice_ml.explainer_interfaces.explainer_base.ExplainerBase" title="dice_ml.explainer_interfaces.explainer_base.ExplainerBase"><code class="xref py py-class docutils literal notranslate"><span class="pre">ExplainerBase</span></code></a></p>
+<p>An interface class to different DiCE implementations.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dice_ml.Dice.decide_implementation_type">
+<span class="sig-name descname"><span class="pre">decide_implementation_type</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data_interface</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_interface</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dice_ml/dice.html#Dice.decide_implementation_type"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dice_ml.Dice.decide_implementation_type" title="Link to this definition"></a></dt>
+<dd><p>Decides DiCE implementation type.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dice_ml.Model">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dice_ml.</span></span><span class="sig-name descname"><span class="pre">Model</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">backend</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'TF1'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'classifier'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">func</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kw_args</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dice_ml/model.html#Model"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dice_ml.Model" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>An interface class to different ML Model implementations.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dice_ml.Model.decide_implementation_type">
+<span class="sig-name descname"><span class="pre">decide_implementation_type</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">backend</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">func</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kw_args</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dice_ml/model.html#Model.decide_implementation_type"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dice_ml.Model.decide_implementation_type" title="Link to this definition"></a></dt>
+<dd><p>Decides the Model implementation type.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="notebooks/DiCE_getting_started_feasible.html" class="btn btn-neutral float-left" title="&lt;no title&gt;" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="dice_ml.data_interfaces.html" class="btn btn-neutral float-right" title="dice_ml.data_interfaces package" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2020, Ramaravind, Amit, Chenhao.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

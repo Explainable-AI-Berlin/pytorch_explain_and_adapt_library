@@ -124,6 +124,75 @@ python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/cl
 cat ${PEAL_RUNS}/follicles_cut/classifier_natural/rrclarc/best_model_result.txt
 
 
+# Reproduce SOTA results on FunnyNodules dataset (InternalStructure confounding Roundness)
+python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/funnynodules_classifier_unpoisoned.yaml"
+python train_generator.py --config "<PEAL_BASE>/configs/cfkd_experiments/generators/funnynodules1k_ddpm_poisoned098.yaml"
+python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/funnynodules1k_classifier_poisoned098.yaml"
+# run CFKD
+python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/funnynodules1000x098_sce_cfkd.yaml"
+python evaluate_predictor.py --model_path $PEAL_RUNS/funnynodules1k/internalstructure_confounding_roundness/classifier_poisoned098/sce_cfkd/model.cpl --data_config configs/cfkd_experiments/data/funnynodules_unpoisoned.yaml --model_config configs/cfkd_experiments/predictors/funnynodules1k_classifier_poisoned098.yaml
+# run DiffAug
+python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/funnynodules1k_classifier_poisoned098_diffusion_augmented.yaml"
+python evaluate_predictor.py --model_path $PEAL_RUNS/funnynodules1k/internalstructure_confounding_roundness/classifier_poisoned098/diffusion_augmented/model.cpl --data_config configs/cfkd_experiments/data/funnynodules_unpoisoned.yaml --model_config configs/cfkd_experiments/predictors/funnynodules1k_classifier_poisoned098.yaml
+# run DFR
+python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/funnynodules1k_classifier_poisoned098_dfr.yaml"
+python evaluate_predictor.py --model_path $PEAL_RUNS/funnynodules1k/internalstructure_confounding_roundness/classifier_poisoned098/dfr/model.cpl --data_config configs/cfkd_experiments/data/funnynodules_unpoisoned.yaml --model_config configs/cfkd_experiments/predictors/funnynodules1k_classifier_poisoned098.yaml
+# run GroupDRO
+python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/group_dro/funnynodules1k_poisoned098_group_dro.yaml"
+python evaluate_predictor.py --model_path $PEAL_RUNS/funnynodules1k/internalstructure_confounding_roundness/classifier_poisoned098/group_dro/model.cpl --data_config configs/cfkd_experiments/data/funnynodules_unpoisoned.yaml --model_config configs/cfkd_experiments/predictors/funnynodules1k_classifier_poisoned098.yaml
+# run P-ClarC
+python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/clarc/funnynodules1000_poisoned098_pclarc.yaml"
+cat ${PEAL_RUNS}/funnynodules1k/internalstructure_confounding_roundness/classifier_poisoned098/pclarc/best_model_result.txt
+# run RR-ClarC
+python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/clarc/funnynodules1000_poisoned098_rrclarc.yaml"
+cat ${PEAL_RUNS}/funnynodules1k/internalstructure_confounding_roundness/classifier_poisoned098/rrclarc/best_model_result.txt
+
+
+# Reproduce SOTA results on NICO++ dataset (Crocodile/Lizard confounding Grass/Rock)
+# Ensure you have manually downloaded NICO++ to $PEAL_DATA/nico_plus_plus according to custom_datasets.py instructions
+python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/nico_crocodile_vs_lizard_classifier_unpoisoned.yaml"
+python train_generator.py --config "<PEAL_BASE>/configs/cfkd_experiments/generators/nico_crocodile_vs_lizard_500_ddpm_poisoned098.yaml"
+python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/nico_crocodile_vs_lizard_500_classifier_poisoned098.yaml"
+# run CFKD
+python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/nico_crocodile_vs_lizard_500_poisoned098_sce_cfkd.yaml"
+python evaluate_predictor.py --model_path $PEAL_RUNS/nico_crocodile_vs_lizard_500/classifier_poisoned098/sce_cfkd/model.cpl --data_config configs/cfkd_experiments/data/nico_crocodile_vs_lizard_unpoisoned.yaml --model_config configs/cfkd_experiments/predictors/nico_crocodile_vs_lizard_500_classifier_poisoned098.yaml
+# run DiffAug
+python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/nico_crocodile_vs_lizard_500_classifier_poisoned098_diffusion_augmented.yaml"
+python evaluate_predictor.py --model_path $PEAL_RUNS/nico_crocodile_vs_lizard_500/classifier_poisoned098/diffusion_augmented/model.cpl --data_config configs/cfkd_experiments/data/nico_crocodile_vs_lizard_unpoisoned.yaml --model_config configs/cfkd_experiments/predictors/nico_crocodile_vs_lizard_500_classifier_poisoned098.yaml
+# run DFR
+python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/nico_crocodile_vs_lizard_500_classifier_poisoned098_dfr.yaml"
+python evaluate_predictor.py --model_path $PEAL_RUNS/nico_crocodile_vs_lizard_500/classifier_poisoned098/dfr/model.cpl --data_config configs/cfkd_experiments/data/nico_crocodile_vs_lizard_unpoisoned.yaml --model_config configs/cfkd_experiments/predictors/nico_crocodile_vs_lizard_500_classifier_poisoned098.yaml
+# run GroupDRO
+python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/group_dro/nico_crocodile_vs_lizard_500_poisoned098_group_dro.yaml"
+python evaluate_predictor.py --model_path $PEAL_RUNS/nico_crocodile_vs_lizard_500/classifier_poisoned098/group_dro/model.cpl --data_config configs/cfkd_experiments/data/nico_crocodile_vs_lizard_unpoisoned.yaml --model_config configs/cfkd_experiments/predictors/nico_crocodile_vs_lizard_500_classifier_poisoned098.yaml
+# run P-ClarC
+python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/clarc/nico_crocodile_vs_lizard_500_poisoned098_pclarc.yaml"
+cat ${PEAL_RUNS}/nico_crocodile_vs_lizard_500/classifier_poisoned098/pclarc/best_model_result.txt
+# run RR-ClarC
+python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/clarc/nico_crocodile_vs_lizard_500_poisoned098_rrclarc.yaml"
+cat ${PEAL_RUNS}/nico_crocodile_vs_lizard_500/classifier_poisoned098/rrclarc/best_model_result.txt
+
+
+# Experiments on tabular datasets
+# Circle dataset
+python train_predictor.py --config configs/tabular_experiments/models/symbolic_circle_classifier_unpoisoned.yaml
+python train_generator.py --config configs/tabular_experiments/generators/circle_diffusion.yaml
+python train_predictor.py --config configs/tabular_experiments/models/symbolic_circle_classifier_poisoned.yaml
+python run_cfkd.py --config configs/tabular_experiments/adaptors/circle_cfkd.yaml
+
+# Adult Income Dataset
+python train_predictor.py --config configs/tabular_experiments/models/adult_classifier_poisoned.yaml
+python run_cfkd.py --config configs/tabular_experiments/adaptors/adult_cfkd_dice.yaml
+
+# German Credit Risk Dataset
+python train_predictor.py --config configs/tabular_experiments/models/german_classifier_poisoned.yaml
+python run_cfkd.py --config configs/tabular_experiments/adaptors/german_cfkd_dice.yaml
+
+# COMPAS Recidivism Dataset
+python train_predictor.py --config configs/tabular_experiments/models/compass_classifier_poisoned.yaml
+python run_cfkd.py --config configs/tabular_experiments/adaptors/compass_cfkd_dice.yaml
+
+
 # Experiments over different poisoning levels
 # on Square dataset
 # for 50% poisoning (corresponds to 0.0 correlation)
@@ -341,6 +410,7 @@ python evaluate_predictor.py --model_path $PEAL_RUNS/camelyon17_1k/dinov2_linear
 python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/square1000x080_sce_false_cfkd.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/square1000x080_sce_mask_cfkd.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/square1000x080_sce_human_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/square1000x080_sce_noisy_cfkd.yaml"
 
 
 # Analysis of the influence of the Counterfactual Explainer
@@ -351,10 +421,10 @@ python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/squar
 python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/square1000x098_fastdime_cfkd.yaml"
 
 # For Smiling confounding Copyrighttag
-python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_pfc_cfkd.yaml"
-python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_ace_cfkd.yaml"
-python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_dime_cfkd.yaml"
-python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/Smiling_confounding_CopyrightTag_celeba1000x100_fastdime_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/Smiling_confounding_CopyrightTag_celeba1000x098_pfc_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/Smiling_confounding_CopyrightTag_celeba1000x098_ace_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/Smiling_confounding_CopyrightTag_celeba1000x098_dime_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/Smiling_confounding_CopyrightTag_celeba1000x098_fastdime_cfkd.yaml"
 
 # For the Camelyon17 dataset
 python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/camelyon17_1k_poisoned098_ace_cfkd.yaml"

@@ -1,0 +1,9 @@
+explainer_type                       :   DiCEExplainer
+category                             :   explainer
+y_target_goal_confidence             :   0.51
+num_attempts                         :   4
+parallel_attempts                    :   1
+method                               :   "genetic"
+proximity_weight                     :   0.5
+sparsity_weight                      :   0.5
+diversity_weight                     :   0.5

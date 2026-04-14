@@ -1,0 +1,3 @@
+type       : "symbolic"
+model      : $PEAL_RUNS/$DATASET/classifier_unpoisoned/model.cpl
+confounder_name : "" # This should be overridden in the adaptor config

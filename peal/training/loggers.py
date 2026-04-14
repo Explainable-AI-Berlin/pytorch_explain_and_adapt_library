@@ -66,19 +66,23 @@ class Logger:
         """ """
         for criterion in loss_logs:
             self.writer.add_scalar(
-                mode + "_" + criterion,
+                "zz_step_" + mode + "_" + criterion,
                 loss_logs[criterion],
                 self.config.training.global_train_step,
             )
 
         self.losses.append(loss_logs["loss"])
 
+        if any(k in self.config.task.criterions.keys() for k in ["mixed", "focal_mixed"]):
+            self.targets.append(y.detach())
+            self.predictions.append(pred.detach())
+
         if len(
             set(["ce", "bce"]).intersection(self.config.task.criterions.keys())
         ) >= 1 and not isinstance(self.model, InvertibleGenerator):
             #
             self.targets.append(y.detach())
-            self.predictions.append(pred.detach())
+            self.predictions.append(pred.detach().cpu())
             #
             if "ce" in self.config.task.criterions.keys():
                 class_prediction = pred.detach().argmax(-1)
@@ -107,7 +111,7 @@ class Logger:
         #
         loss_accumulated = torch.mean(torch.tensor(self.losses))
         self.writer.add_scalar(
-            "epoch_" + mode + "_loss_accumulated",
+            "z_epoch_" + mode + "_loss_accumulated",
             loss_accumulated.item(),
             self.config.training.epoch,
         )
@@ -117,24 +121,20 @@ class Logger:
         if "ce" in self.config.task.criterions.keys() and not isinstance(
             self.model, InvertibleGenerator
         ):
-            try:
-                targets_one_hot = torch.nn.functional.one_hot(
-                    torch.cat(self.targets).to(torch.int64), self.output_channels
-                ).to(torch.float32)
-            except Exception:
-                import pdb
-
-                pdb.set_trace()
+            targets_one_hot = torch.nn.functional.one_hot(
+                torch.cat(self.targets).to(torch.int64), self.output_channels
+            ).to(torch.float32)
 
             predictions_one_hot = torch.nn.functional.one_hot(
                 torch.cat(self.predicted_classes).to(torch.int64), self.output_channels
-            ).to(torch.float32)
+            ).to(torch.float32).cpu()
+            self.correct = torch.cat(self.correct)
 
         if "bce" in self.config.task.criterions.keys() and not isinstance(
             self.model, InvertibleGenerator
         ):
             targets_one_hot = torch.cat(self.targets)
-            predictions_one_hot = torch.cat(self.predicted_classes)
+            predictions_one_hot = torch.cat(self.predicted_classes).cpu()
             correct_per_class = torch.cat(self.correct).mean(0)
             if not pbar is None:
                 pbar.stored_values["correct_per_class"] = correct_per_class
@@ -144,42 +144,118 @@ class Logger:
                 correct_per_class,
                 self.config.training.epoch,
             )
+            self.correct = torch.cat(self.correct)
+
+        if any(k in self.config.task.criterions.keys() for k in ["mixed", "focal_mixed"]):
+            targets_one_hot = torch.cat(self.targets).cpu()
+            self.predictions = torch.cat(self.predictions)
+            class_preds = torch.tensor(
+                nn.Sigmoid()(
+                    self.predictions[:, :self.model.config.data.output_split]
+                )
+                >= 0.5,
+                dtype=torch.float32,
+            )
+            regression_preds = self.predictions[:,self.model.config.data.output_split :]
+            predictions_one_hot = torch.cat(
+                [
+                    class_preds,
+                    regression_preds,
+                ],
+                dim=-1,
+            ).cpu()
+            self.correct = torch.tensor(
+                torch.abs(targets_one_hot - predictions_one_hot) < 0.5,
+                dtype=torch.float32,
+            )
+            correct_per_class = self.correct.mean(0)
+            
+            # Calculate Balanced Accuracy for the discrete part
+            split = self.model.config.data.output_split
+            disc_targets = targets_one_hot[:, :split]
+            disc_preds = predictions_one_hot[:, :split]
+            
+            # Sensitivity (TPR) and Specificity (TNR)
+            pos_mask = (disc_targets == 1)
+            neg_mask = (disc_targets == 0)
+            
+            tp = (disc_preds == 1) & pos_mask
+            tn = (disc_preds == 0) & neg_mask
+            
+            # Use nan_to_num to handle classes that might be missing in a specific validation batch
+            sensitivity = tp.sum(0).float() / pos_mask.sum(0).float().clamp(min=1e-6)
+            specificity = tn.sum(0).float() / neg_mask.sum(0).float().clamp(min=1e-6)
+            
+            balanced_acc_per_class = (sensitivity + specificity) / 2
+            avg_balanced_acc = balanced_acc_per_class.mean().item()
+
+            if not pbar is None:
+                pbar.stored_values["correct_per_class"] = correct_per_class
+                pbar.stored_values[mode + "_balanced_accuracy"] = avg_balanced_acc
+
+            self.writer.add_scalar(
+                "epoch_" + mode + "_balanced_accuracy",
+                avg_balanced_acc,
+                self.config.training.epoch,
+            )
+            
+            self.writer.add_histogram(
+                "epoch_" + mode + "_correct_per_class",
+                correct_per_class,
+                self.config.training.epoch,
+            )
 
         if len(
-            set(["ce", "bce"]).intersection(self.config.task.criterions.keys())
+            set(["ce", "bce", "mixed", "focal_mixed"]).intersection(self.config.task.criterions.keys())
         ) >= 1 and not isinstance(self.model, InvertibleGenerator):
-            try:
-                accuracy = torch.cat(self.correct).mean().item()
-
-            except Exception:
-                import pdb
-
-                pdb.set_trace()
+            accuracy = self.correct.mean().item()
             self.writer.add_scalar(
                 "epoch_" + mode + "_accuracy",
                 accuracy,
                 self.config.training.epoch,
             )
-            self.writer.add_histogram(
-                "epoch_" + mode + "_predicted_classes",
-                predictions_one_hot.mean(0),
-                self.config.training.epoch,
-            )
-            self.writer.add_histogram(
-                "epoch_" + mode + "_targets",
-                targets_one_hot.mean(0),
-                self.config.training.epoch,
-            )
-            self.writer.add_histogram(
-                mode + "_classes_difference",
-                predictions_one_hot.mean(0).cpu() - targets_one_hot.mean(0).cpu(),
-                self.config.training.epoch,
-            )
+            # Limit per-channel logging for high-dimensional outputs to avoid hanging
+            # Log first 50, three in the middle, and last 8 (regression)
+            channels_to_log = sorted(list(set(
+                list(range(min(50, self.output_channels))) + 
+                [self.output_channels // 2 - 1, self.output_channels // 2, self.output_channels // 2 + 1] +
+                list(range(max(0, self.output_channels - 8), self.output_channels))
+            )))
+            channels_to_log = [c for c in channels_to_log if 0 <= c < self.output_channels]
+
+            for channel in channels_to_log:
+                try:
+                    self.writer.add_scalar(
+                        "z_epoch_" + mode + "_predicted_classes" + str(channel),
+                        predictions_one_hot.mean(0)[channel],
+                        self.config.training.epoch,
+                    )
+
+                except Exception as exp:
+                    pass
+
+                if mode[: len("validation")] == "validation":
+                    prefix = "0_"
+
+                else:
+                    prefix = "z_"
+
+                try:
+                    self.writer.add_scalar(
+                        prefix + "epoch_" + mode + "_classes_difference" + str(channel),
+                        torch.abs(predictions_one_hot.cpu() - targets_one_hot)
+                        .mean(0)
+                        .cpu()[channel],
+                        self.config.training.epoch,
+                    )
+
+                except:
+                    pass
             if not pbar is None:
                 pbar.stored_values[mode + "_accuracy"] = accuracy
-                pbar.stored_values[mode + "_predicted_classes"] = (
-                    predictions_one_hot.mean(0).cpu()[:2]
-                )
+                pbar.stored_values[
+                    mode + "_predicted_classes"
+                ] = predictions_one_hot.mean(0).cpu()[:2]
                 pbar.stored_values[mode + "_targets"] = targets_one_hot.mean(0).cpu()[
                     :2
                 ]
@@ -301,7 +377,10 @@ def log_images_to_writer(dataloader, writer, tag="train"):
         if i == 2 and dataloader_mixer_treatment and len(dataloader.dataloaders) > 1:
             iterator = iter(dataloader.dataloaders[1])
 
-        sample_train_imgs, sample_train_y = next(iterator)
+        try:
+            sample_train_imgs, sample_train_y = next(iterator)
+        except StopIteration:
+            break
 
         if isinstance(sample_train_imgs, list):
             sample_train_imgs, sample_train_y = sample_train_imgs

@@ -24,8 +24,16 @@ peal/dependencies/ace/outputs
 environment.yaml
 $PEAL_DATA
 plots
+.agent
 
 !peal/dependencies/dive/src/datasets
 peal/dependencies/rrclarc/data
 utils/.ipynb_checkpoints
 .venv
+evals
+
+calc_aggregates.py
+curate_data_compas.py
+curate_data.py:Zone.Identifier
+train_model.py
+.agents

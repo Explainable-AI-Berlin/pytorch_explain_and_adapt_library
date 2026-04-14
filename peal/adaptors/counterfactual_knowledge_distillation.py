@@ -18,6 +18,8 @@ from typing import Union
 
 from peal.architectures.predictors import TorchvisionModel, get_predictor
 from peal.global_utils import load_yaml_config, save_yaml_config, cprint
+from peal.sparse_dictionaries.interfaces import SparseDictionaryConfig
+from peal.sparse_dictionaries.sparse_dictionary_factory import get_sparse_dictionary
 from peal.training.loggers import log_images_to_writer
 from peal.data.dataloaders import (
     DataStack,
@@ -51,6 +53,7 @@ from peal.generators.interfaces import GeneratorConfig
 from peal.training.interfaces import TrainingConfig, PredictorConfig
 from peal.architectures.interfaces import TaskConfig
 from peal.explainers.interfaces import ExplainerConfig
+from peal.explainers.explainer_factory import get_explainer
 from peal.explainers.counterfactual_explainer import SCEConfig
 from peal.adaptors.interfaces import AdaptorConfig, Adaptor
 
@@ -93,7 +96,7 @@ class CFKDConfig(AdaptorConfig):
     All parameters regarding paths, where the generator is from etc in there are overwritten by CFKD and only
     used if the information is not available for CFKD
     """
-    explainer: ExplainerConfig = SCEConfig()
+    explainer: Union[dict, ExplainerConfig] = SCEConfig()
     """
     The config of the training used for finetuning the student model.
     If not set student config can be used.
@@ -119,7 +122,7 @@ class CFKDConfig(AdaptorConfig):
     """
     The type of teacher used.
     """
-    teacher: str = "cluster@8000"
+    teacher: Union[str, dict] = "cluster@8000"
     """
     The config of the generator used.
     This value will be overwritten if Generator is given via constructor directly.
@@ -192,6 +195,10 @@ class CFKDConfig(AdaptorConfig):
     """
     group_accuracies: list = []
     """
+    The average group accuracies of the model after every finetuning iteration.
+    """
+    avg_group_accuracies: list = []
+    """
     What type of counterfactuals are valid. 1sided means that we can only start from samples with correct prediction,
     2sided also allows that we start from samples with wrong orignal prediction.
     """
@@ -222,6 +229,10 @@ class CFKDConfig(AdaptorConfig):
     The clustering strategy used by the counterfactual explainer
     """
     clustering_strategy: Union[str, type(None)] = None
+    sparse_dictionary: Union[SparseDictionaryConfig, dict, type(None)] = None
+    correct_clusters: list = [0]
+    use_true_counterfactuals: bool = False
+    seed: int = 0
 
 
 class CFKD(Adaptor):
@@ -263,6 +274,9 @@ class CFKD(Adaptor):
                 The visualization function that is used for the run. Defaults to lambda x: x.
         """
         self.adaptor_config = load_yaml_config(adaptor_config, AdaptorConfig)
+        self.min_train_samples = (
+            self.adaptor_config.explainer.num_attempts * self.adaptor_config.min_train_samples
+        )
         if self.adaptor_config.test_data is None:
             self.adaptor_config.test_data = self.adaptor_config.data
 
@@ -292,8 +306,6 @@ class CFKD(Adaptor):
 
         teacher = teacher if not teacher is None else self.adaptor_config.teacher
 
-        # kind of dirty, but also very confusing if not done this way since validation batches are fed directly
-        # into the explainer and thereby potentially causing VRAM overflows otherwise
         self.adaptor_config.training.val_batch_size = self.adaptor_config.batch_size
 
         (
@@ -330,6 +342,11 @@ class CFKD(Adaptor):
             predictor_dataset=self.val_dataloader.dataset,
             timestep_respacing=timestep_respacing,
         )
+        if not self.adaptor_config.sparse_dictionary is None:
+            print("load sparse dictionary!!!")
+            print("load sparse dictionary!!!")
+            print("load sparse dictionary!!!")
+            self.generator.sparse_dictionary = get_sparse_dictionary(self.adaptor_config.sparse_dictionary)
 
         self.output_size = (
             self.adaptor_config.task.output_channels
@@ -338,6 +355,10 @@ class CFKD(Adaptor):
         )
 
         #
+        outlier_scores_absolute = self.val_dataloader.dataset.calculate_outlier_score(
+            next(iter(self.train_dataloader))[0]
+        )
+        self.val_dataloader.dataset.reference_outlier_scores = torch.mean(outlier_scores_absolute["absolute"]).item()
         self.teacher = get_teacher(
             teacher=teacher,
             output_size=self.output_size,
@@ -358,14 +379,14 @@ class CFKD(Adaptor):
             transform=self.val_dataloader.dataset.transform,
         )
 
-        if teacher[:5] == "human":
+        if isinstance(teacher, str) and teacher[:5] == "human":
             assert self.adaptor_config.tracking_level >= 4, "Tracking level too low!"
 
-        self.explainer = CounterfactualExplainer(
+        self.explainer = get_explainer(
+            explainer=self.adaptor_config.explainer,
             predictor=self.student,
             generator=self.generator,
             input_type=self.adaptor_config.data.input_type,
-            explainer_config=self.adaptor_config.explainer,
             datasource=[self.dataloader_mixer, self.joint_validation_dataloader],
             tracking_level=self.adaptor_config.tracking_level,
         )
@@ -379,6 +400,7 @@ class CFKD(Adaptor):
             "y_list",
             "x_attribution_list",
             "y_target_start_confidence_list",
+            "cluster_list",
         ]
 
         if self.adaptor_config.tracking_level >= 4:
@@ -413,12 +435,13 @@ class CFKD(Adaptor):
         self.data_config.data.output_size = self.train_dataloader.dataset.output_size
         self.data_config.data.delimiter = ","
         self.data_config.data.x_selection = "imgs"
-        self.data_config.data.num_samples = self.adaptor_config.min_train_samples
+        self.data_config.data.num_samples = self.min_train_samples
         self.data_config.data.dataset_class = None
         self.validation_data_config = copy.deepcopy(self.data_config)
         self.validation_data_config.data.x_selection = "imgs"
         self.validation_data_config.data.num_samples = self.adaptor_config.max_validation_samples
         self.validation_data_config.data.split = [0.0, 1.0]
+        self.validation_data_config.training.val_batch_size = 2
 
     def initialize_run(self):
         cprint("initialize run!!!", self.adaptor_config.tracking_level, 2)
@@ -531,12 +554,13 @@ class CFKD(Adaptor):
                     self.adaptor_config.tracking_level,
                     2,
                 )
-                avg_group_accuracy = np.mean(group_accuracies)
+                avg_group_accuracy = float(np.mean(group_accuracies))
                 cprint(
                     "avg_group_accuracy: " + str(avg_group_accuracy),
                     self.adaptor_config.tracking_level,
                     2,
                 )
+                self.adaptor_config.avg_group_accuracies.append(avg_group_accuracy)
                 writer.add_scalar(
                     "test_avg_group_accuracy",
                     avg_group_accuracy,
@@ -685,10 +709,17 @@ class CFKD(Adaptor):
                     self.adaptor_config.tracking_level,
                     2,
                 )
-                self.student = torch.load(
-                    os.path.join(self.adaptor_config.base_dir, "model.cpl"),
-                    map_location=self.device,
-                )
+                try:
+                    self.student = torch.load(
+                        os.path.join(self.adaptor_config.base_dir, "model.cpl"),
+                        map_location=self.device,
+                    )
+                except Exception:
+                    self.student = torch.load(
+                        os.path.join(self.adaptor_config.base_dir, "model.cpl"),
+                        map_location=self.device,
+                        weights_only=False
+                    )
                 self.explainer.predictor = self.student
 
         visualization_path = os.path.join(self.base_dir, "visualization.png")
@@ -818,7 +849,7 @@ class CFKD(Adaptor):
             2,
         )
         pbar = tqdm(
-            total=int(self.adaptor_config.min_train_samples / self.adaptor_config.batch_size + 0.99)
+            total=int(self.min_train_samples / self.adaptor_config.batch_size + 0.99)
             * (
                 self.adaptor_config.explainer.gradient_steps
                 if hasattr(self.adaptor_config.explainer, "gradient_steps")
@@ -827,10 +858,10 @@ class CFKD(Adaptor):
         )
         pbar.stored_values = {}
         pbar.stored_values["n_total"] = 0
-        remaining_sample_number = self.adaptor_config.min_train_samples
+        remaining_sample_number = self.min_train_samples
         while continue_collecting:
             num_batches_per_iteration = int(1 + remaining_sample_number / self.adaptor_config.batch_size)
-            if len(list(tracked_values.values())[0]) >= self.adaptor_config.min_train_samples:
+            if len(list(tracked_values.values())[0]) >= self.min_train_samples:
                 break
 
             for i in range(num_batches_per_iteration):
@@ -844,15 +875,16 @@ class CFKD(Adaptor):
                     explainer_path=os.path.join(self.base_dir, str(finetune_iteration - 1)),
                 )
                 for key in tracked_keys:
-                    tracked_values[key].extend(values[key])
+                    if key in values.keys() and len(values[key]) > 0:
+                        tracked_values[key].extend(values[key])
 
                 pbar.stored_values["n_valid"] = (
-                    str(len(list(tracked_values.values())[0])) + "/" + str(self.adaptor_config.min_train_samples)
+                    str(len(list(tracked_values.values())[0])) + "/" + str(self.min_train_samples)
                 )
                 pbar.stored_values["th"] = acceptance_threshold
                 pbar.stored_values["n_total"] += self.adaptor_config.batch_size
                 pbar.stored_values["fr"] = len(list(tracked_values.values())[0]) / pbar.stored_values["n_total"]
-                remaining_sample_number = self.adaptor_config.min_train_samples - len(list(tracked_values.values())[0])
+                remaining_sample_number = self.min_train_samples - len(list(tracked_values.values())[0])
 
                 if remaining_sample_number <= 0:
                     break
@@ -886,11 +918,12 @@ class CFKD(Adaptor):
                 ) as f:
                     tracked_values_file = {}
                     for key in tracked_values.keys():
-                        if isinstance(tracked_values[key][0], torch.Tensor):
-                            tracked_values_file[key] = torch.stack(tracked_values[key], dim=0).numpy()
+                        if len(tracked_values[key]) > 0:
+                            if isinstance(tracked_values[key][0], torch.Tensor):
+                                tracked_values_file[key] = torch.stack(tracked_values[key], dim=0).detach().cpu().numpy()
 
-                        elif isinstance(tracked_values[key][0], int) or isinstance(tracked_values[key][0], float):
-                            tracked_values_file[key] = np.array(tracked_values[key])
+                            elif isinstance(tracked_values[key][0], int) or isinstance(tracked_values[key][0], float):
+                                tracked_values_file[key] = np.array(tracked_values[key])
 
                     np.savez(f, **tracked_values_file)
 
@@ -925,13 +958,42 @@ class CFKD(Adaptor):
         return tracked_values
 
     def retrieve_feedback(self, tracked_values, finetune_iteration, mode):
+        # this is only for scientific experiments and could also be sourced out into another file!
+        # distill into equivalent model
+        predictor_distillation = load_yaml_config(
+            "<PEAL_BASE>/configs/sce_experiments/predictors/simple_distillation.yaml",
+            PredictorConfig,
+        )
+        distillation_path = os.path.join(
+            self.base_dir, str(self.adaptor_config.current_iteration), "distilled_predictor"
+        )
+        distilled_predictor_final = os.path.join(distillation_path, "distilled_predictor", "model.cpl")
+        if not self.adaptor_config.calculate_explainer_stats:
+            self.distilled_predictor = self.student
+
+        elif not os.path.exists(distilled_predictor_final):
+            self.distilled_predictor = distill_predictor(
+                predictor_distillation,
+                distillation_path,
+                self.student,
+                [self.train_dataloader.dataset, self.val_dataloader.dataset],
+                replace_with_activation="leakysoftplus",
+                tracking_level=self.adaptor_config.tracking_level,
+            )
+
+        else:
+            try:
+                self.distilled_predictor = torch.load(distilled_predictor_final, map_location=self.device)
+            except Exception:
+                self.distilled_predictor = torch.load(distilled_predictor_final, map_location=self.device, weights_only=False)
+
         if self.overwrite or not os.path.exists(
             os.path.join(self.base_dir, str(finetune_iteration), mode + "_feedback.txt")
         ):
             cprint("retrieve feedback!", self.adaptor_config.tracking_level, 2)
             feedback = self.teacher.get_feedback(
                 base_dir=os.path.join(self.base_dir, str(finetune_iteration), mode + "_teacher"),
-                student=self.student,
+                student=self.distilled_predictor, # TODO including this introduces some inconsistencies that should be tracked!
                 num_clusters=self.adaptor_config.explainer.num_attempts
                 * self.adaptor_config.explainer.parallel_attempts,
                 mode=mode,
@@ -976,21 +1038,11 @@ class CFKD(Adaptor):
         )
 
         flip_rate = len(flipped_samples) / flip_rate_reference
-        ood_rate = len(list(filter(lambda sample: sample == "ood", feedback))) / num_samples
-        flipped_samples_tensor = torch.cat(
-            [torch.ones(len(flipped_samples)), torch.zeros(num_samples - len(flipped_samples))]
-        )
-        cprint(
-            "flip_rate_tensor: " + str(flipped_samples_tensor.mean()),
-            self.adaptor_config.tracking_level,
-            2,
-        )
-        flip_rate_var = flipped_samples_tensor.std() / math.sqrt(len(flipped_samples_tensor))
-        cprint(
-            "flip_rate_var: " + str(flip_rate_var),
-            self.adaptor_config.tracking_level,
-            2,
-        )
+        try:
+            ood_rate = len(list(filter(lambda sample: sample == "ood", feedback))) / num_samples
+        
+        except Exception:
+            import pdb; pdb.set_trace()
 
         num_true_1sided = len(
             list(
@@ -1020,50 +1072,30 @@ class CFKD(Adaptor):
             "flip_rate": flip_rate,
             "ood_rate": ood_rate,
             "feedback_accuracy": fa_1sided,
+            "counterfactuals_per_second": self.explainer.counterfactuals_per_second,
         }
-        feedback_stats["flip_rate_tensor"] = float(flipped_samples_tensor.mean())
-        feedback_stats["flip_rate_var"] = float(flip_rate_var)
+        cprint("flip_rate: " + str(self.explainer.counterfactuals_per_second), self.adaptor_config.tracking_level, 2)
         cprint("flip_rate: " + str(flip_rate), self.adaptor_config.tracking_level, 2)
 
-        if self.adaptor_config.calculate_explainer_stats:
-            # this is only for scientific experiments and could also be sourced out into another file!
-            # distill into equivalent model
-            predictor_distillation = load_yaml_config(
-                "<PEAL_BASE>/configs/sce_experiments/predictors/simple_distillation.yaml",
-                PredictorConfig,
-            )
-            distillation_path = os.path.join(self.base_dir, str(finetune_iteration), "distilled_predictor")
-            distilled_predictor_final = os.path.join(distillation_path, "distilled_predictor", "model.cpl")
-            if not os.path.exists(distilled_predictor_final):
-                distilled_predictor = distill_predictor(
-                    predictor_distillation,
-                    distillation_path,
-                    self.student,
-                    [self.train_dataloader.dataset, self.val_dataloader.dataset],
-                    replace_with_activation="leakysoftplus",
-                    tracking_level=self.adaptor_config.tracking_level,
-                )
-
-            else:
-                distilled_predictor = torch.load(distilled_predictor_final, map_location=self.device)
-
+        if self.adaptor_config.calculate_explainer_stats and finetune_iteration == 0:
             # add y_target_end_confidence_distilled_list
             tracked_values["y_target_end_confidence_distilled_list"] = []
             for idx in range(len(tracked_values["x_counterfactual_list"])):
                 x = tracked_values["x_counterfactual_list"][idx]
                 y = tracked_values["y_target_list"][idx]
                 y_target_end_confidence = (
-                    distilled_predictor(x.to(self.device).unsqueeze(0)).squeeze(0).detach().cpu()[y]
+                    self.distilled_predictor(x.to(self.device).unsqueeze(0)).squeeze(0).detach().cpu()[y]
                 )
                 tracked_values["y_target_end_confidence_distilled_list"].append(y_target_end_confidence)
 
             # calculate distilled flip rate
-            flipped_samples = list(
-                filter(
-                    lambda x: x > 0.5,
+            zipped_list = list(
+                zip(
                     tracked_values["y_target_end_confidence_distilled_list"][:num_samples],
+                    tracked_values["x_counterfactual_list"][:num_samples],
                 )
             )
+            flipped_samples = list(filter(lambda x: x[0] > 0.5, zipped_list))
             flip_rate_distilled = len(flipped_samples) / flip_rate_reference
             feedback_stats["flip_rate_distilled"] = float(flip_rate_distilled)
             cprint(
@@ -1071,25 +1103,9 @@ class CFKD(Adaptor):
                 self.adaptor_config.tracking_level,
                 2,
             )
-            flipped_samples_tensor = torch.cat(
-                [torch.ones(len(flipped_samples)), torch.zeros(num_samples - len(flipped_samples))]
-            )
-            feedback_stats["flip_rate_distilled_tensor"] = float(flipped_samples_tensor.mean())
-            cprint(
-                "flip_rate_distilled_tensor: " + str(feedback_stats["flip_rate_distilled_tensor"]),
-                self.adaptor_config.tracking_level,
-                2,
-            )
-            flip_rate_distilled_var = flipped_samples_tensor.std() / math.sqrt(len(flipped_samples_tensor))
-            feedback_stats["flip_rate_distilled_var"] = float(flip_rate_distilled_var)
-            cprint(
-                "flip_rate_distilled_var: " + str(flip_rate_distilled_var),
-                self.adaptor_config.tracking_level,
-                2,
-            )
             feedback_stats["non_adversarial_rate"] = (
-                float(feedback_stats["flip_rate_distilled_tensor"] / feedback_stats["flip_rate_tensor"])
-                if feedback_stats["flip_rate_tensor"] > 0
+                float(feedback_stats["flip_rate_distilled"] / feedback_stats["flip_rate"])
+                if feedback_stats["flip_rate"] > 0
                 else 0.0
             )
             cprint(
@@ -1129,16 +1145,45 @@ class CFKD(Adaptor):
                 self.adaptor_config.tracking_level,
                 2,
             )
+            if len(flipped_samples) > 0:
+                x_counterfactuals_non_adversarial_flips = torch.stack([x[1] for x in flipped_samples])
+                validation_samples = []
+                for idx in range(
+                    min(
+                        self.adaptor_config.max_validation_samples,
+                        len(self.val_dataloader.dataset),
+                    )
+                ):
+                    x, y = self.val_dataloader.dataset[idx]
+                    validation_samples.append(x.unsqueeze(0))
+
+                validation_samples = torch.cat(validation_samples, dim=0)
+                self.train_dataloader.dataset.reference_fid = self.train_dataloader.dataset.track_generator_performance(
+                    validation_samples
+                )["dino_fid"]
+                counterfactual_quality = self.train_dataloader.dataset.track_generator_performance(
+                    x_counterfactuals_non_adversarial_flips
+                )["quality_score"]
+                feedback_stats["counterfactual_quality"] = float(counterfactual_quality)
+                cprint(
+                    "counterfactual_quality: " + str(counterfactual_quality),
+                    self.adaptor_config.tracking_level,
+                    2,
+                )
+
+            else:
+                feedback_stats["counterfactual_quality"] = 0.0
+                cprint(
+                    "counterfactual_quality: 0.0",
+                    self.adaptor_config.tracking_level,
+                    2,
+                )
+
             if len(self.adaptor_config.group_accuracies) > 0:
                 group_accuracies = torch.tensor(self.adaptor_config.group_accuracies[-1]).flatten()
                 group_accuracies_idxs = group_accuracies.argsort()
                 r_dominant = (
-                    1
-                    - (
-                        group_accuracies[group_accuracies_idxs[0]]
-                        + group_accuracies[group_accuracies_idxs[1]]
-                    )
-                    / 2
+                    1 - (group_accuracies[group_accuracies_idxs[0]] + group_accuracies[group_accuracies_idxs[1]]) / 2
                 )
                 cprint(
                     "r_dominant: " + str(r_dominant),
@@ -1159,23 +1204,10 @@ class CFKD(Adaptor):
                     2,
                 )
                 r_actual_tensor = torch.cat(
-                    [torch.zeros(num_true_1sided_distilled), torch.ones(num_false_1sided_distilled)]
-                )
-                unbiasedness_tensor = (
-                    (r_actual_tensor / r_dominant) if r_dominant > 0 else torch.zeros(len(r_actual_tensor))
-                )
-                feedback_stats["unbiasedness_tensor"] = float(unbiasedness_tensor.mean())
-                cprint(
-                    "unbiasedness_tensor: " + str(unbiasedness_tensor.mean()),
-                    self.adaptor_config.tracking_level,
-                    2,
-                )
-                unbiasedness_var = unbiasedness_tensor.std() / math.sqrt(len(unbiasedness_tensor))
-                feedback_stats["unbiasedness_var"] = float(unbiasedness_var)
-                cprint(
-                    "unbiasedness_var: " + str(unbiasedness_var),
-                    self.adaptor_config.tracking_level,
-                    2,
+                    [
+                        torch.zeros(num_true_1sided_distilled),
+                        torch.ones(num_false_1sided_distilled),
+                    ]
                 )
 
             tracked_stats = self.explainer.calculate_latent_difference_stats(tracked_values)
@@ -1214,22 +1246,21 @@ class CFKD(Adaptor):
         y_counterfactual_list = []
         sample_names = []
         for sample_idx in range(len(feedback)):
-            """if feedback[sample_idx] == "true":
-            sample_name = (
-                "true_"
-                + str(int(y_source_list[sample_idx]))
-                + "_to_"
-                + str(int(y_target_list[sample_idx]))
-                + "_"
-                + str(sample_idx)
-            )
-            x_list.append(x_counterfactual_list[sample_idx])
-            if not hint_list is None:
-                hint_list_dataset.append(hint_list[sample_idx])
+            if self.adaptor_config.use_true_counterfactuals and feedback[sample_idx] == "true":
+                sample_name = (
+                    "true_"
+                    + str(int(y_source_list[sample_idx]))
+                    + "_to_"
+                    + str(int(y_target_list[sample_idx]))
+                    + "_"
+                    + str(sample_idx)
+                )
+                x_list.append(x_counterfactual_list[sample_idx])
+                if not hint_list is None:
+                    hint_list_dataset.append(hint_list[sample_idx])
 
-            y_counterfactual_list.append(int(y_target_list[sample_idx]))
-            sample_names.append(sample_name)
-            """
+                y_counterfactual_list.append(int(y_target_list[sample_idx]))
+                sample_names.append(sample_name)
 
             if feedback[sample_idx] == "false":
                 sample_name = (
@@ -1284,7 +1315,7 @@ class CFKD(Adaptor):
         )
         if (
             not isinstance(dataloader_val, torch.utils.data.DataLoader)
-            or len(dataloader_val.dataset) < 2 * self.adaptor_config.training.val_batch_size
+            or len(dataloader_val.dataset) < 2 * self.validation_data_config.training.val_batch_size
         ):
             open(
                 os.path.join(
@@ -1358,7 +1389,23 @@ class CFKD(Adaptor):
                 for val_dataloader in self.joint_validation_dataloader.dataloaders:
                     val_dataloader.dataset.disable_idx()
 
-            finetune_trainer.fit(continue_training=True)  # bool(self.adaptor_config.continuous_learning != "retrain"))
+            try:
+                finetune_trainer.fit(
+                    continue_training=True
+                )  # bool(self.adaptor_config.continuous_learning != "retrain"))
+
+            except StopIteration:
+                print("Stopping finetune early due to little data!!!")
+                print("Stopping finetune early due to little data!!!")
+                print("Stopping finetune early due to little data!!!")
+                open(
+                    os.path.join(
+                        self.adaptor_config.base_dir,
+                        "error_iteration_" + str(finetune_iteration) + ".txt",
+                    ),
+                    "w",
+                ).write("dataloader_val in " + str(finetune_iteration) + " is too empty!")
+                return
 
             if self.hints_enabled:
                 self.dataloader_mixer.enable_hints()
@@ -1370,15 +1417,27 @@ class CFKD(Adaptor):
                 for val_dataloader in self.joint_validation_dataloader.dataloaders:
                     val_dataloader.dataset.enable_idx()
 
-        self.student = torch.load(
-            os.path.join(
-                self.base_dir,
-                str(finetune_iteration),
-                "finetuned_model",
-                "model.cpl",
-            ),
-            map_location=self.device,
-        )
+        try:
+            self.student = torch.load(
+                os.path.join(
+                    self.base_dir,
+                    str(finetune_iteration),
+                    "finetuned_model",
+                    "model.cpl",
+                ),
+                map_location=self.device,
+            )
+        except Exception:
+            self.student = torch.load(
+                os.path.join(
+                    self.base_dir,
+                    str(finetune_iteration),
+                    "finetuned_model",
+                    "model.cpl",
+                ),
+                map_location=self.device,
+                weights_only=False
+            )
         self.explainer.predictor = self.student
         self.explainer.predictor_datasources = [
             self.dataloader_mixer,
@@ -1607,13 +1666,20 @@ class CFKD(Adaptor):
                 ) as f:
                     tracked_values_file = {}
                     for key in self.tracked_keys:
-                        if isinstance(validation_tracked_values[key][0], torch.Tensor):
-                            tracked_values_file[key] = torch.stack(validation_tracked_values[key], dim=0).numpy()
+                        try:
+                            if len(validation_tracked_values[key]) == 0:
+                                continue
 
-                        elif isinstance(validation_tracked_values[key][0], int) or isinstance(
-                            validation_tracked_values[key][0], float
-                        ):
-                            tracked_values_file[key] = np.array(validation_tracked_values[key])
+                            elif isinstance(validation_tracked_values[key][0], torch.Tensor):
+                                tracked_values_file[key] = torch.stack(validation_tracked_values[key], dim=0).detach().cpu().numpy()
+
+                            elif isinstance(validation_tracked_values[key][0], int) or isinstance(
+                                validation_tracked_values[key][0], float
+                            ):
+                                tracked_values_file[key] = np.array(validation_tracked_values[key])
+
+                        except Exception as e:
+                            print(f"Failed to log validation stats array for key {key}: {e}")
 
                     np.savez(f, **tracked_values_file)
 
@@ -1974,12 +2040,13 @@ class CFKD(Adaptor):
                     self.adaptor_config.tracking_level,
                     2,
                 )
-                avg_group_accuracy = np.mean(group_accuracies)
+                avg_group_accuracy = float(np.mean(group_accuracies))
                 cprint(
                     "avg_group_accuracy: " + str(avg_group_accuracy),
                     self.adaptor_config.tracking_level,
                     2,
                 )
+                self.adaptor_config.avg_group_accuracies.append(avg_group_accuracy)
                 writer.add_scalar("test_avg_group_accuracy", avg_group_accuracy, finetune_iteration)
                 old_avg_group_accuracy = np.mean(self.adaptor_config.group_accuracies[-2])
                 gain = (avg_group_accuracy - old_avg_group_accuracy) / (1 - old_avg_group_accuracy)

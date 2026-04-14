@@ -288,24 +288,10 @@ class DataloaderMixer(DataLoader):
                 for i in range(len(item)):
                     if isinstance(item[i], list) or isinstance(item[i], tuple):
                         for j in range(len(item[i])):
-                            try:
-                                item[i][j] = torch.cat(
-                                    [item[i][j], subitem[i][j]], dim=0
-                                )
-
-                            except Exception:
-                                import pdb
-
-                                pdb.set_trace()
+                            item[i][j] = torch.cat([item[i][j], subitem[i][j]], dim=0)
 
                     else:
-                        try:
-                            item[i] = torch.cat([item[i], subitem[i]], dim=0)
-
-                        except Exception:
-                            import pdb
-
-                            pdb.set_trace()
+                        item[i] = torch.cat([item[i], subitem[i]], dim=0)
 
             if self.return_src:
                 item = (item, 0)

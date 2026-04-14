@@ -69,6 +69,7 @@ def find_subclasses(base_class, directory):
 
     def check_module(module_name):
         module = importlib.import_module(module_name)
+
         for name, obj in inspect.getmembers(module):
             if inspect.isclass(obj):
                 if issubclass(obj, base_class):
@@ -76,6 +77,9 @@ def find_subclasses(base_class, directory):
 
     project_base_dir = get_project_resource_dir()
     for dirpath, dirnames, filenames in os.walk(directory):
+        if "dependencies" in dirpath:
+            continue
+
         for filename in filenames:
             current_path = os.path.join(dirpath, filename)
             if filename.endswith(".py"):
@@ -250,19 +254,30 @@ def _load_yaml_config(config_path):
             else:
                 raise e
 
-        for key in config.keys():
-            if isinstance(config[key], str):
-                if config[key][: len("$PEAL_RUNS")] == "$PEAL_RUNS":
+        def expand_recursive(cfg):
+            if isinstance(cfg, dict):
+                for key in list(cfg.keys()):
+                    cfg[key] = expand_recursive(cfg[key])
+            elif isinstance(cfg, list):
+                for i in range(len(cfg)):
+                    cfg[i] = expand_recursive(cfg[i])
+            elif isinstance(cfg, str):
+                if cfg.startswith("$PEAL_RUNS"):
                     peal_runs = os.environ.get("PEAL_RUNS", "peal_runs")
-                    config[key] = config[key].replace("$PEAL_RUNS", peal_runs)
+                    cfg = cfg.replace("$PEAL_RUNS", peal_runs)
 
-                if config[key][: len("$PEAL_DATA")] == "$PEAL_DATA":
+                if cfg.startswith("$PEAL_DATA"):
                     peal_data = os.environ.get("PEAL_DATA", "datasets")
-                    config[key] = config[key].replace("$PEAL_DATA", peal_data)
+                    cfg = cfg.replace("$PEAL_DATA", peal_data)
 
-                if config[key][-5:] == ".yaml":
-                    config[key] = _load_yaml_config(config[key])
+                if "<PEAL_BASE>" in cfg:
+                    cfg = cfg.replace("<PEAL_BASE>", get_project_resource_dir())
 
+                if cfg.endswith(".yaml"):
+                    cfg = _load_yaml_config(cfg)
+            return cfg
+
+        config = expand_recursive(config)
         return config
 
     else:
@@ -285,8 +300,11 @@ def get_config_model(config_data):
 
         module_path = os.path.join(
             "peal",
-            config_data["category"] + "s",
+            config_data["category"],
         )
+        if not module_path[-1] == "s":
+             module_path = module_path + "s"
+
         superclass_dir = os.path.join(module_path, "interfaces")
         superclass_module_name = superclass_dir.replace("/", ".")
         module = importlib.import_module(superclass_module_name)
@@ -330,9 +348,7 @@ def load_yaml_config(config_path, config_model=None, return_namespace=True):
     elif not config_model is None and isinstance(config_data, dict):
         for key in config_data.keys():
             if isinstance(config_data[key], dict):
-                config_data[key] = load_yaml_config(
-                    config_data[key], return_namespace=False
-                )
+                config_data[key] = load_yaml_config(config_data[key], return_namespace=False)
 
             elif isinstance(config_data[key], list):
                 for idx in range(len(config_data[key])):
@@ -503,13 +519,7 @@ def get_predictions(args):
             img_file = tuple(img_file)
 
         img = img.to(device)
-        try:
-            lab = lab.to(device)
-
-        except:
-            import pdb
-
-            pdb.set_trace()
+        lab = lab.to(device)
 
         logits = classifier(img)
         if len(logits.shape) > 1:
@@ -518,20 +528,20 @@ def get_predictions(args):
         else:
             pred = (logits > 0).int()
 
-        acc += (pred == lab).float().sum().item()
+        try:
+            acc += (pred == lab).float().sum().item()
+
+        except:
+            import pdb; pdb.set_trace()
         n += lab.size(0)
 
         d["prediction"] += [p.item() for p in pred]
         d["idx"] += list(img_file)
 
-    print(acc / n)
-    try:
-        df = pd.DataFrame(data=d)
-
-    except Exception:
-        import pdb
-
-        pdb.set_trace()
+    print("distilled accuracy: " + str(acc / n))
+    print("distilled accuracy: " + str(acc / n))
+    print("distilled accuracy: " + str(acc / n))
+    df = pd.DataFrame(data=d)
 
     df.to_csv(
         args.label_path,
@@ -542,33 +552,135 @@ def get_predictions(args):
 
 
 def high_contrast_heatmap(x, counterfactual):
-    heatmap_red = torch.maximum(
-        torch.tensor(0.0),
-        torch.sum(x, dim=0) - torch.sum(counterfactual, dim=0),
-    )
-    heatmap_blue = torch.maximum(
-        torch.tensor(0.0),
-        torch.sum(counterfactual, dim=0) - torch.sum(x, dim=0),
-    )
-    if counterfactual.shape[0] == 3:
-        heatmap_green = torch.abs(x[0] - counterfactual[0])
-        heatmap_green = heatmap_green + torch.abs(x[1] - counterfactual[1])
-        heatmap_green = heatmap_green + torch.abs(x[2] - counterfactual[2])
-        heatmap_green = heatmap_green - heatmap_red - heatmap_blue
+    if x.shape[0] == 3:
+        # Per-channel differences
+        diff_channels = counterfactual - x
+        
+        # Intensity change (mean of channel changes)
+        # Red = Intensity Up, Blue = Intensity Down
+        delta_intensity = diff_channels.mean(dim=0)
+        heatmap_red = torch.clamp(delta_intensity, min=0)
+        heatmap_blue = torch.clamp(-delta_intensity, min=0)
+        
+        # Color change (deviance from the mean change)
+        # We boost the green channel by a factor of 1.5 relative to intensity changes
+        # to reflect the stronger subjective impression of color shifts.
+        heatmap_green = (diff_channels - delta_intensity).abs().sum(dim=0) * 1.3
+        
         x_in = torch.clone(x)
         counterfactual_rgb = torch.clone(counterfactual)
-
     else:
+        # For single channel, all changes are intensity changes
+        diff = (counterfactual - x)
+        heatmap_red = torch.clamp(diff, min=0)[0]
+        heatmap_blue = torch.clamp(-diff, min=0)[0]
         heatmap_green = torch.zeros_like(heatmap_red)
         x_in = torch.tile(x, [3, 1, 1])
         counterfactual_rgb = torch.tile(torch.clone(counterfactual), [3, 1, 1])
 
+    # Stack channels: Red (Up), Green (Color Neutral), Blue (Down)
     heatmap = torch.stack([heatmap_red, heatmap_green, heatmap_blue], dim=0)
-    if torch.abs(heatmap.sum() - torch.abs(x - counterfactual).sum()) > 0.1:
-        print("Error: Heatmap does not add up to absolute counterfactual difference.")
-    heatmap_high_contrast = torch.clamp(heatmap / heatmap.max(), 0.0, 1.0)
+
+    # Dilate the heatmap to make connected regions more visible
+    heatmap = torch.nn.functional.max_pool2d(
+        heatmap.unsqueeze(0), kernel_size=3, stride=1, padding=1
+    ).squeeze(0)
+    
+    if heatmap.max() > 0:
+        heatmap_high_contrast = torch.clamp(heatmap / heatmap.max(), 0.0, 1.0)
+    else:
+        heatmap_high_contrast = heatmap
 
     return heatmap_high_contrast, x_in, counterfactual_rgb
+
+
+def generate_overlay(x, counterfactual, alpha_factor=2.0):
+    heatmap, x_in, _ = high_contrast_heatmap(x, counterfactual)
+    if x_in.shape[0] == 3:
+        grey = x_in.mean(dim=0, keepdim=True).repeat(3, 1, 1)
+    else:
+        grey = x_in  # already tiled in high_contrast_heatmap if 1 channel
+
+    # Bring everything closer to the mean (0.5) so that black and white look grey
+    grey = (grey - 0.5) * 0.5 + 0.5
+
+    # alpha mask based on max difference across colors
+    # Since heatmap reached at least one 1.0 value due to normalization in high_contrast_heatmap,
+    # the relative strongest change will be clearly highlighted.
+    alpha = torch.clamp(heatmap.max(dim=0, keepdim=True)[0] * alpha_factor, 0, 1)
+
+    # Blend heatmap onto the low-contrast greyscale background
+    overlay = grey * (1 - alpha) + heatmap * alpha
+    return overlay
+
+
+def ssim_map(img1, img2, window_size=11, C1=0.01**2, C2=0.03**2):
+    """
+    Computes a simplified Structural Similarity Index Measure (SSIM) map between two images locally.
+    img1, img2: (C, H, W) tensors.
+    """
+    import torch.nn.functional as F
+
+    # Add batch dimension and convert to greyscale for structural check
+    if img1.shape[0] == 3:
+        img1_grey = img1.mean(dim=0, keepdim=True).unsqueeze(0)
+        img2_grey = img2.mean(dim=0, keepdim=True).unsqueeze(0)
+    else:
+        img1_grey = img1.unsqueeze(0)
+        img2_grey = img2.unsqueeze(0)
+
+    window = (
+        torch.ones((1, 1, window_size, window_size)).to(img1.device) / (window_size**2)
+    )
+
+    mu1 = F.conv2d(img1_grey, window, padding=window_size // 2)
+    mu2 = F.conv2d(img2_grey, window, padding=window_size // 2)
+
+    mu1_sq = mu1.pow(2)
+    mu2_sq = mu2.pow(2)
+    mu1_mu2 = mu1 * mu2
+
+    sigma1_sq = (
+        F.conv2d(img1_grey * img1_grey, window, padding=window_size // 2) - mu1_sq
+    )
+    sigma2_sq = (
+        F.conv2d(img2_grey * img2_grey, window, padding=window_size // 2) - mu2_sq
+    )
+    sigma12 = (
+        F.conv2d(img1_grey * img2_grey, window, padding=window_size // 2) - mu1_mu2
+    )
+
+    ssim = ((2 * mu1_mu2 + C1) * (2 * sigma12 + C2)) / (
+        (mu1_sq + mu2_sq + C1) * (sigma1_sq + sigma2_sq + C2)
+    )
+
+    # SSIM map: 1.0 is identical, <1.0 is different.
+    # Return 1 - SSIM to highlight differences.
+    return torch.clamp(1.0 - ssim, 0.0, 1.0).squeeze(0).squeeze(0)
+
+
+def generate_ssim_overlay(x, counterfactual, alpha_factor=1.5):
+    diff = ssim_map(x, counterfactual)
+    if diff.max() > 0:
+        diff = diff / diff.max()
+
+    if x.shape[0] == 3:
+        grey = x.mean(dim=0, keepdim=True).repeat(3, 1, 1)
+    else:
+        grey = torch.tile(x, [3, 1, 1])
+
+    # Low-contrast greyscale background (slightly lighter for nuance)
+    grey = (grey - 0.5) * 0.4 + 0.6
+
+    # nuancing: scale red intensity directly by SSIM change map
+    heatmap_red = torch.zeros_like(grey)
+    heatmap_red[0] = diff  # Red channel scaled by SSIM diff map
+
+    # alpha mask for blending (less aggressive factor)
+    alpha = torch.clamp(diff * alpha_factor, 0, 1)
+
+    overlay = grey * (1 - alpha) + heatmap_red * alpha
+    return overlay
 
 
 @torch.no_grad()
@@ -594,38 +706,34 @@ def generate_smooth_mask(x1, x2, dilation, max_avg_combination=0.5):
 
 
 def get_intermediate_output(
-    model: torch.nn.Module, x: torch.Tensor, distance_from_last_layer: int
+    model: torch.nn.Module, x: torch.Tensor, distance_from_last_layer: int = None, layer_name: str = None
 ):
     """
-    Runs the model on input x and returns the activation tensor
-    that is `distance_from_last_layer` layers away from the final layer.
-
-    Args:
-        model (nn.Module): The predictor model.
-        x (torch.Tensor): Input tensor (image).
-        distance_from_last_layer (int): Number of layers away from the final output layer.
-                                        (1 = last layer before logits, 2 = two layers back, etc.)
+    Runs the model on input x and returns the activation tensor.
+    Can specify distance from end or a specific layer name.
     """
     activations = {}
     handles = []
 
-    # Get a flat list of all modules in order
-    layers = [
-        m
-        for m in model.modules()
-        if not isinstance(m, torch.nn.Sequential)
-        and not isinstance(m, torch.nn.ModuleList)
-    ]
-    layers = [
-        m for m in layers if len(list(m.children())) == 0
-    ]  # keep only leaf modules
+    if layer_name is not None:
+        target_layer = dict(model.named_modules())[layer_name]
+    else:
+        # Get a flat list of all modules in order
+        layers = [
+            m
+            for m in model.modules()
+            if not isinstance(m, torch.nn.Sequential)
+            and not isinstance(m, torch.nn.ModuleList)
+        ]
+        layers = [
+            m for m in layers if len(list(m.children())) == 0
+        ]  # keep only leaf modules
 
-    # Select the layer we want
-    target_layer_index = len(layers) - distance_from_last_layer
-    if target_layer_index < 0 or target_layer_index >= len(layers):
-        raise ValueError("distance_from_last_layer is out of range.")
-
-    target_layer = layers[target_layer_index]
+        # Select the layer we want
+        target_layer_index = len(layers) - distance_from_last_layer
+        if target_layer_index < 0 or target_layer_index >= len(layers):
+            raise ValueError("distance_from_last_layer is out of range.")
+        target_layer = layers[target_layer_index]
 
     # Hook to capture the output
     def hook_fn(module, input, output):
@@ -635,13 +743,64 @@ def get_intermediate_output(
     handles.append(handle)
 
     # Run forward pass
-    _ = model(x)
+    try:
+        _ = model(x)
+    except:
+        pass # Some models might fail on full forward pass if we only need intermediate
 
     # Cleanup
     for h in handles:
         h.remove()
 
     return activations["out"]
+
+
+def generate_feature_similarity_overlay(x, counterfactual, model, layer_name='model.layer2', alpha_factor=2.0):
+    """
+    Visualizes similarity of intermediate features.
+    """
+    device = next(model.parameters()).device
+    x_batch = x.unsqueeze(0).to(device)
+    cf_batch = counterfactual.unsqueeze(0).to(device)
+    
+    # Get features
+    try:
+        feat_x = get_intermediate_output(model, x_batch, layer_name=layer_name)
+        feat_cf = get_intermediate_output(model, cf_batch, layer_name=layer_name)
+    except:
+        # Fallback for different model structures
+        if 'model.' in layer_name:
+            layer_name = layer_name.replace('model.', '')
+        feat_x = get_intermediate_output(model, x_batch, layer_name=layer_name)
+        feat_cf = get_intermediate_output(model, cf_batch, layer_name=layer_name)
+
+    # Cosine similarity across channels
+    # feat shape: [1, C, H, W]
+    sim = torch.nn.functional.cosine_similarity(feat_x, feat_cf, dim=1)
+    
+    # Change map: 1 - similarity
+    diff = torch.clamp(1.0 - sim, 0, 2).squeeze(0)
+    if diff.max() > 0:
+        diff = diff / diff.max()
+        
+    # Interpolate to image size
+    diff = torch.nn.functional.interpolate(
+        diff.unsqueeze(0).unsqueeze(0), size=x.shape[1:], mode='bilinear'
+    ).squeeze(0).squeeze(0).cpu()
+    
+    # Standard overlay style
+    if x.shape[0] == 3:
+        grey = x.mean(dim=0, keepdim=True).repeat(3, 1, 1).cpu()
+    else:
+        grey = torch.tile(x, [3, 1, 1]).cpu()
+    
+    grey = (grey - 0.5) * 0.4 + 0.6
+    heatmap_red = torch.zeros_like(grey)
+    heatmap_red[0] = diff
+    
+    alpha = torch.clamp(diff * alpha_factor, 0, 1)
+    overlay = grey * (1 - alpha) + heatmap_red * alpha
+    return overlay
 
 
 def extract_penultima_activation(x, predictor, distance_from_last_layer=1):
@@ -693,3 +852,166 @@ def set_random_seed(seed: int):
         False  # Disable the optimization for specific architectures.
     )
     os.environ["PYTHONHASHSEED"] = str(seed)
+
+
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader
+from transformers import AutoImageProcessor, AutoModel
+from tqdm import tqdm
+
+class DINOEvaluator:
+    def __init__(self, model_name='facebook/dinov2-small', device='cuda'):
+        self.device = device if torch.cuda.is_available() else 'cpu'
+        print(f"Loading {model_name} on {self.device}...")
+
+        # We use the base model (no classification head) as we only need embeddings
+        self.processor = AutoImageProcessor.from_pretrained(model_name)
+        self.model = AutoModel.from_pretrained(model_name).to(self.device)
+        self.model.eval()
+
+        # Storage for distribution statistics (PyTorch Tensors)
+        self.mu_real = None
+        self.sigma_real = None
+        self.sigma_inv_real = None # For Mahalanobis
+        self.fitted = False
+
+    @torch.no_grad()
+    def _get_features(self, inputs):
+        """
+        Internal helper to extract [CLS] token embeddings.
+        inputs: can be a DataLoader or a Tensor (B, C, H, W) or List of Tensors
+        """
+        # If inputs is a dataloader, we iterate and concatenate
+        if isinstance(inputs, DataLoader):
+            features_list = []
+            for batch in tqdm(inputs, desc="Extracting features"):
+                # Handle standard Tuple (img, label) or just img
+                if isinstance(batch, (list, tuple)):
+                    imgs = batch[0]
+                else:
+                    imgs = batch
+
+                imgs = imgs.to(self.device).float()
+                outputs = self.model(pixel_values=imgs)
+                # DINOv2: The [CLS] token is usually the first token or pooled output
+                # transformers implementation usually puts pooled_output in .pooler_output
+                # or we take last_hidden_state[:, 0]
+                if hasattr(outputs, 'pooler_output') and outputs.pooler_output is not None:
+                    feats = outputs.pooler_output
+                else:
+                    feats = outputs.last_hidden_state[:, 0, :]
+
+                features_list.append(feats)
+            return torch.cat(features_list, dim=0)
+
+        # If inputs is a direct tensor batch
+        else:
+            inputs = inputs.to(self.device).float()
+            outputs = self.model(pixel_values=inputs)
+            if hasattr(outputs, 'pooler_output') and outputs.pooler_output is not None:
+                return outputs.pooler_output
+            else:
+                return outputs.last_hidden_state[:, 0, :]
+
+    def fit(self, real_dataloader):
+        """
+        Step 1: Precompute statistics for the Real (Training) distribution.
+        Run this once at the beginning.
+        """
+        print("Fitting evaluator to real data...")
+        real_feats = self._get_features(real_dataloader) # (N, D)
+
+        # 1. Compute Mean
+        self.mu_real = torch.mean(real_feats, dim=0)
+
+        # 2. Compute Covariance
+        # torch.cov requires shape (Variables, Observations), so we transpose
+        self.sigma_real = torch.cov(real_feats.T)
+
+        # 3. Compute Inverse Covariance for Mahalanobis
+        # We add a small epsilon to diagonal for numerical stability (regularization)
+        D = self.sigma_real.shape[0]
+        epsilon = 1e-6
+        reg_sigma = self.sigma_real + torch.eye(D, device=self.device) * epsilon
+
+        # Use pseudo-inverse or inverse (cholesky is faster if positive definite)
+        try:
+            self.sigma_inv_real = torch.linalg.inv(reg_sigma)
+        except torch.linalg.LinAlgError:
+            print("Warning: Covariance matrix singular, using pseudo-inverse.")
+            self.sigma_inv_real = torch.linalg.pinv(reg_sigma)
+
+        self.fitted = True
+        print(f"Fitted on {len(real_feats)} samples. Feature Dim: {D}")
+
+    def compute_fid(self, fake_inputs):
+        """
+        Calculates FID score between the fitted real distribution and the provided fake inputs.
+        """
+        if not self.fitted:
+            raise ValueError("Please run .fit(real_dataloader) before computing FID.")
+
+        fake_feats = self._get_features(fake_inputs)
+
+        mu_fake = torch.mean(fake_feats, dim=0)
+        sigma_fake = torch.cov(fake_feats.T)
+
+        # --- FID Formula in PyTorch ---
+        # FID = ||mu_r - mu_g||^2 + Tr(Sigma_r + Sigma_g - 2*(Sigma_r * Sigma_g)^(1/2))
+
+        # 1. Diff squared term
+        diff = self.mu_real - mu_fake
+        diff_sq = diff.dot(diff)
+
+        # 2. Trace term
+        # Matrix square root of product
+        covmean = self.sigma_real @ sigma_fake
+
+        # Calculating matrix square root in PyTorch
+        # We use SVD for stability: M = U S V*, sqrt(M) approx via eigen decomp
+        # Or usually eigenvalues: M = V L V^{-1}, M^{1/2} = V L^{1/2} V^{-1}
+        vals, vecs = torch.linalg.eig(covmean)
+
+        # Suppress complex parts (numerical noise)
+        vals = vals.real
+        vecs = vecs.real
+
+        # sqrt of eigenvalues
+        sqrt_vals = torch.sqrt(torch.clamp(vals, min=0)) # clamp to avoid nan
+
+        # Reconstruct sqrt matrix
+        # This part can be tricky in pure PyTorch without scipy.linalg.sqrtm
+        # Approximation: Tr((Sigma_r * Sigma_g)^(1/2)) = sum(sqrt(eigenvalues))
+        # strictly true if matrices effectively commute or via trace properties
+
+        trace_sqrt_product = torch.sum(sqrt_vals)
+
+        trace_term = torch.trace(self.sigma_real) + torch.trace(sigma_fake) - 2 * trace_sqrt_product
+
+        fid = diff_sq + trace_term
+        return fid.item()
+
+    def compute_mahalanobis(self, single_image_or_batch):
+        """
+        Calculates Mahalanobis distance for specific samples against the real distribution.
+        Returns a tensor of distances (one per image).
+        """
+        if not self.fitted:
+            raise ValueError("Please run .fit(real_dataloader) first.")
+
+        # Ensure inputs are tensor (preprocess if needed before passing here)
+        feats = self._get_features(single_image_or_batch) # (B, D)
+
+        # Distance = sqrt( (x - mu) * Sigma^-1 * (x - mu)^T )
+        # Centering
+        diff = feats - self.mu_real.unsqueeze(0) # Broadcasting (B, D) - (1, D)
+
+        # Matrix multiplication: (B, D) @ (D, D) -> (B, D)
+        left = diff @ self.sigma_inv_real
+
+        # Dot product: sum(left * diff, dim=1)
+        # This is effectively doing the row-wise dot product
+        mahalanobis_sq = torch.sum(left * diff, dim=1)
+
+        return torch.sqrt(torch.clamp(mahalanobis_sq, min=0))

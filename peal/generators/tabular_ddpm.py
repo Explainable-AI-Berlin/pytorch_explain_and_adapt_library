@@ -11,7 +11,24 @@ from typing import Tuple
 import logging
 from torch.utils.data import DataLoader
 import math
-from peal.generators.interfaces import EditCapableGenerator
+from peal.generators.interfaces import EditCapableGenerator, GeneratorConfig
+from peal.data.interfaces import DataConfig
+import typing
+
+class TabularDDPMConfig(GeneratorConfig):
+    generator_type: str = "TabularDDPM"
+    input_dim: int = 2
+    embed_dim: int = 64
+    num_timesteps: int = 1000
+    model_name: str = "diffusion.pt"
+    var_schedule: str = "linear"
+    base_path: str = ""
+    num_epochs: int = 100
+    learning_rate: float = 1e-3
+    grad_scales: typing.List[float] = [1.0]
+    noise_steps_for_counterfactuals: typing.List[int] = [100]
+    attack_iterations: int = 1
+    data: DataConfig = DataConfig()
 
 logging.getLogger().setLevel(logging.INFO)
 
@@ -20,17 +37,17 @@ class PositionalEncoding(nn.Module):
     def __init__(self, embed_dim, max_len=500):
         super(PositionalEncoding, self).__init__()
         max_len += 1
-        self.P = torch.zeros(max_len, embed_dim)
+        P = torch.zeros(max_len, embed_dim)
         freqs = torch.arange(max_len)[:, None] / (
             torch.pow(
                 10000, torch.arange(0, embed_dim, 2, dtype=torch.float32) / embed_dim
             )
         )
 
-        self.P[:, 0::2] = torch.sin(freqs)
-        self.P[:, 1::2] = torch.cos(freqs)
+        P[:, 0::2] = torch.sin(freqs)
+        P[:, 1::2] = torch.cos(freqs)
 
-        self.P = self.P[1:]
+        self.register_buffer("P", P[1:])
 
     def forward(self, t):
         return self.P[t]
@@ -68,9 +85,9 @@ class BasicDiscreteTimeModel(nn.Module):
         return self.score_network(x, time_embed)
 
 
-class CircleDiffusionAdaptor(EditCapableGenerator):
-    def __init__(self, config, dataset, model_dir=None, device="cpu"):
-        super(CircleDiffusionAdaptor, self).__init__()
+class TabularDDPM(EditCapableGenerator):
+    def __init__(self, config, dataset=None, model_dir=None, device="cpu", **kwargs):
+        super(TabularDDPM, self).__init__()
         # self.config = load_yaml_config(config)
         self.config = config
 
@@ -93,6 +110,10 @@ class CircleDiffusionAdaptor(EditCapableGenerator):
         except KeyError:
             pass
 
+        if dataset is None:
+            from peal.data.dataset_factory import get_datasets
+            dataset = get_datasets(config.data)[0]
+
         self.dataset = dataset
         self.input_idx = [
             idx
@@ -107,7 +128,7 @@ class CircleDiffusionAdaptor(EditCapableGenerator):
         # data = torch.zeros([len(dataset.data),len(dataset.attributes)], dtype=torch.float16)
         # for idx, key in enumerate(dataset.data):
         #    data[idx] = dataset.data[key]
-        self.train_and_load_diffusion(model_name=config.model_name)
+
 
         def schedules(num_timesteps: int, type: str = "linear"):
             scale = 1000 / num_timesteps
@@ -136,14 +157,16 @@ class CircleDiffusionAdaptor(EditCapableGenerator):
         self.register_buffer("alpha", 1 - self.beta)
         self.register_buffer("alpha_bar", self.alpha.cumprod(0))
 
+        self.train_model(model_name=config.model_name)
+
     def forward_diffusion(
         self, clean_x: torch.Tensor, noise: torch.tensor, timestep: torch.Tensor
     ):
         if isinstance(timestep, int):
             timestep = torch.tensor([timestep])
-            alpha_bar_t = self.alpha_bar[timestep].repeat(clean_x.shape[0])[:, None]
+            alpha_bar_t = self.alpha_bar[timestep].repeat(clean_x.shape[0])[:, None].to(clean_x.device)
         else:
-            alpha_bar_t = self.alpha_bar[timestep][:, None]
+            alpha_bar_t = self.alpha_bar[timestep][:, None].to(clean_x.device)
         mu = torch.sqrt(alpha_bar_t)
         std = torch.sqrt(1 - alpha_bar_t)
         noisy_x = mu * clean_x + std * noise
@@ -152,8 +175,8 @@ class CircleDiffusionAdaptor(EditCapableGenerator):
     def reverse_diffusion_ddpm(
         self, noisy_x: torch.Tensor, model: nn.Module, timestep: torch.Tensor
     ):
-        alpha_t = self.alpha[timestep].repeat(noisy_x.shape[0])[:, None]
-        alpha_bar_t = self.alpha_bar[timestep].repeat(noisy_x.shape[0])[:, None]
+        alpha_t = self.alpha[timestep].repeat(noisy_x.shape[0])[:, None].to(noisy_x.device)
+        alpha_bar_t = self.alpha_bar[timestep].repeat(noisy_x.shape[0])[:, None].to(noisy_x.device)
         beta_t = 1 - alpha_t
         eps_hat = model(x=noisy_x, t=timestep)
         posterior_mean = (1 / torch.sqrt(alpha_t)) * (
@@ -170,13 +193,15 @@ class CircleDiffusionAdaptor(EditCapableGenerator):
 
         return denoised_x
 
-    def train_and_load_diffusion(self, model_name="diffusion.pt", mode=None):
+    def train_model(self, model_name="diffusion.pt", mode="train"):
         self.model_path = os.path.join(self.model_dir, model_name)
         model = BasicDiscreteTimeModel(
             input_dim=self.config.input_dim,
             embed_dim=self.config.embed_dim,
             num_timesteps=self.config.num_timesteps,
         )
+        if not os.path.exists(self.model_dir):
+            os.makedirs(self.model_dir)
         if model_name in os.listdir(self.model_dir) and not mode == "train":
             model.load_state_dict(torch.load(self.model_path))
             logging.info(f"Model found with path {self.model_path}")
@@ -214,6 +239,9 @@ class CircleDiffusionAdaptor(EditCapableGenerator):
             return epoch_loss / len(dataloader.dataset)
 
         if mode == "train":
+            from torch.utils.tensorboard import SummaryWriter
+            import matplotlib.pyplot as plt
+            writer = SummaryWriter(os.path.join(self.model_dir, "logs"))
             model.train()
             # num_epochs = self.config['num_epochs']
             num_epochs = self.config.num_epochs
@@ -235,9 +263,25 @@ class CircleDiffusionAdaptor(EditCapableGenerator):
 
                 train_loss = epoch_loss / len(dataloader.dataset)
                 print(f"Epoch: {i}, train_loss: {train_loss}")
-                losses.append(train_loss.detach().numpy())
+                writer.add_scalar("Loss/train", train_loss, i)
+                losses.append(train_loss.detach().cpu().numpy())
+
+                if i % 10 == 0 or i == num_epochs - 1:
+                    model.eval()
+                    with torch.no_grad():
+                        sample_x = self.sample_ddpm(model, n_samples=min(1000, len(self.dataset)))[-1].cpu().numpy()
+                        real_x = next(iter(dataloader))[0][:, self.input_idx].cpu().numpy()
+                        fig, ax = plt.subplots()
+                        ax.scatter(real_x[:, 0], real_x[:, 1], alpha=0.5, label="Real Data", color="blue")
+                        ax.scatter(sample_x[:, 0], sample_x[:, 1], alpha=0.5, label="Generated Data", color="orange")
+                        ax.legend()
+                        writer.add_figure("Generated Data vs Real", fig, i)
+                        plt.close(fig)
+                    model.train()
 
             torch.save(model.state_dict(), self.model_path)
+            from peal.global_utils import save_yaml_config
+            save_yaml_config(self.config, os.path.join(self.model_dir, "config.yaml"))
 
         self.model = model
 
@@ -248,7 +292,7 @@ class CircleDiffusionAdaptor(EditCapableGenerator):
         """
         model.eval()
         x_pred = []
-        x = torch.randn(n_samples, self.input_dim)
+        x = torch.randn(n_samples, self.input_dim).to(next(model.parameters()).device)
         x_pred.append(x)
 
         with torch.no_grad():
@@ -300,9 +344,9 @@ class CircleDiffusionAdaptor(EditCapableGenerator):
         )  # contains evolution from noisy to cleaned instance for each data point
         for i in tqdm(range(0, num_noise_steps)[::-1]):
             # Denoise z_t to create z_t-1 (next z)
-            alpha_i = self.alpha[i].repeat(bs)[:, None]
-            alpha_bar_i = self.alpha_bar[i].repeat(bs)[:, None]
-            sigma_i = torch.sqrt(1 - self.alpha[i])
+            alpha_i = self.alpha[i].repeat(bs)[:, None].to(next_z.device)
+            alpha_bar_i = self.alpha_bar[i].repeat(bs)[:, None].to(next_z.device)
+            sigma_i = torch.sqrt(1 - self.alpha[i]).to(next_z.device)
             eps_hat = model(next_z, i)
 
             # Unconditional mean
@@ -418,9 +462,16 @@ class CircleDiffusionAdaptor(EditCapableGenerator):
         source_classes: torch.Tensor,
         target_classes: nn.Module,
         classifier=None,
+        **kwargs
     ) -> Tuple[
-        list[torch.Tensor], list[torch.Tensor], list[torch.Tensor], list[torch.Tensor]
+        list[torch.Tensor], list[torch.Tensor], list[torch.Tensor], list[torch.Tensor], list[torch.Tensor], list[torch.Tensor]
     ]:
+        if classifier is None:
+            classifier = kwargs.get("predictor", None)
+
+        device = next(classifier.parameters()).device
+        x_in = x_in.to(device)
+        target_classes = target_classes.to(device)
 
         self.original_sample = x_in
 
@@ -471,7 +522,10 @@ class CircleDiffusionAdaptor(EditCapableGenerator):
         self.counterfactuals = minimal_counterfactuals
         self.original_sample = x_in
 
-        return list_counterfactuals, diff_latent, y_target_end_confidence, x_list
+        history_list = [[] for _ in range(len(minimal_counterfactuals))]
+        cluster_list = [None for _ in range(len(minimal_counterfactuals))]
+
+        return list_counterfactuals, diff_latent, y_target_end_confidence, x_list, history_list, cluster_list
 
     def plot_counterfactuals(self):
         plt.figure(figsize=(5, 5))

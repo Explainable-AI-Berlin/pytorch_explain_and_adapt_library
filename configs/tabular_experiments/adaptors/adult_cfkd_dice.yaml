@@ -1,0 +1,30 @@
+# python run_cfkd.py --config configs/tabular_experiments/adaptors/adult_cfkd_dice.yaml
+batch_size                           :  8
+min_train_samples                    :  800
+mixing_ratio                         :  0.5
+finetune_iterations                  :  3
+max_validation_samples               :  200
+continuous_learning                  :  "finetuning"
+calculate_group_accuracies           :  True
+tracking_level                       :  5
+explainer                            :  <PEAL_BASE>/configs/tabular_experiments/explainers/dice_adult.yaml
+training                             :  <PEAL_BASE>/configs/tabular_experiments/training/symbolic_classifier.yaml
+data                                 :  <PEAL_BASE>/configs/tabular_experiments/data/adult.yaml
+test_data                            :  <PEAL_BASE>/configs/tabular_experiments/data/adult.yaml
+student                              :  $PEAL_RUNS/adult/classifier_poisoned/model.cpl
+teacher                              :
+  type: "symbolic"
+  model: peal_runs/adult/classifier_poisoned/model.cpl
+  confounder_name: "gender_Male"
+
+generator                            :  null
+base_dir                             :  $PEAL_RUNS/adult/classifier_poisoned/cfkd
+
+task:
+  criterions:
+    ce     : 1.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [Target]
+  #x_selection             : [age, workclass, fnlwgt, education, educational-num, marital-status, occupation, relationship, race, gender, capital-gain, capital-loss, hours-per-week, native-country]
+  x_selection             : [hours-per-week,educational-num,age,occupation_Other/Unknown,occupation_Professional,occupation_Sales,occupation_Service,occupation_White-Collar,workclass_Other/Unknown,workclass_Private,workclass_Self-Employed,race_Asian-Pac-Islander,race_Black,race_Other,race_White,marital-status_Married,marital-status_Separated,marital-status_Single,marital-status_Widowed,gender_Male]

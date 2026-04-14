@@ -1,0 +1,12 @@
+# python train_predictor.py --config configs/tabular_experiments/models/german_classifier_poisoned.yaml
+model_path        : $PEAL_RUNS/german/classifier_poisoned
+data              : <PEAL_BASE>/configs/tabular_experiments/data/german.yaml
+training          : <PEAL_BASE>/configs/tabular_experiments/training/symbolic_classifier.yaml
+architecture      : <PEAL_BASE>/configs/tabular_experiments/architectures/symbolic2vector.yaml
+task:
+  criterions:
+    ce     : 1.0
+  output_type             : singleclass
+  output_size             : 2
+  y_selection             : [Target]
+  x_selection             : [age, sex, job, housing, savings_status, checking_status, credit_amount, duration, purpose, credit_history, employment, installment_commitment, other_parties, residence_since, property_magnitude, other_payment_plans, existing_credits, num_dependents, own_telephone, foreign_worker]

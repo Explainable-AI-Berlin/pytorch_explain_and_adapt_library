@@ -37,7 +37,10 @@ def get_generator(
         InvertibleGenerator: The generator.
     """
     if isinstance(generator, str) and generator[-4:] == ".cpl":
-        generator_out = torch.load(generator, map_location=device)
+        try:
+            generator_out = torch.load(generator, map_location=device)
+        except Exception:
+            generator_out = torch.load(generator, map_location=device, weights_only=False)
 
     elif not (
         isinstance(generator, InvertibleGenerator)
@@ -68,6 +71,7 @@ def get_generator(
                 device=device,
                 predictor_dataset=predictor_dataset,
             )
+
 
     else:
         generator_out = generator

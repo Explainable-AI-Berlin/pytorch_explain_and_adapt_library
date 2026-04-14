@@ -199,6 +199,14 @@ class DataConfig(BaseModel):
     """
     confounding_factors: Union[type(None), list[str]] = []
     """
+    The foreground categories to use for the experiment.
+    """
+    foreground: Union[type(None), list[str]] = None
+    """
+    The background contexts to use for the experiment.
+    """
+    background: Union[type(None), list[str]] = None
+    """
     The correlation strength of the target and the confounding variable.
     """
     confounder_probability: Union[type(None), float] = None
@@ -269,3 +277,8 @@ class DataConfig(BaseModel):
     sampling_time_fraction: float = 0.3
     num_discretization_steps: int = 20
     batch_wise_augmentation: bool = True
+    """
+    List of preprocessing methods to apply to tabular datasets.
+    Options: ['minmax_-1_1']
+    """
+    tabular_preprocessing: Union[type(None), list[str]] = None
