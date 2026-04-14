@@ -12,6 +12,8 @@ from pathlib import Path
 import torchvision
 import yaml
 from torch import nn
+import collections
+
 from typing import Union
 
 from transformers import AutoModel, AutoImageProcessor
@@ -644,27 +646,41 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             # assert explainer_config.distilled_predictor.task.output_channels == 1
             distilled_path = os.path.join(base_path, "explainer", "distilled_predictor", "model.cpl")
             if not os.path.exists(distilled_path):
-                self.gradient_predictor = distill_predictor(
-                    predictor_distillation=explainer_config.distilled_predictor,
-                    base_path=os.path.join(base_path, "explainer"),
-                    predictor=lambda x: predictor(generator_to_classifier(x)),
-                    predictor_datasource=distilled_datasources,
-                    predictor_distilled=nn.Sequential(
+                try:
+                    self.gradient_predictor = distill_predictor(
+                        predictor_distillation=explainer_config.distilled_predictor,
+                        base_path=os.path.join(base_path, "explainer"),
+                        predictor=lambda x: predictor(generator_to_classifier(x)),
+                        predictor_datasource=distilled_datasources,
+                        predictor_distilled=nn.Sequential(
+                            *[
+                                self.model.ema_model.encoder,
+                                nn.Linear(self.config.encoder_dimensions, 1, bias=False),
+                            ]
+                        ),
+                        only_last_layer=True,
+                        continue_training=True,
+                        task_config=TaskConfig(**explainer_config.distilled_predictor["task"]),
+                    )
+                    
+                except Exception as exp:
+                    import pdb; pdb.set_trace()
+            else:
+                try:
+                    loaded_predictor = torch.load(distilled_path, map_location=self.device)
+                except Exception:
+                    loaded_predictor = torch.load(distilled_path, map_location=self.device, weights_only=False)
+
+                if isinstance(loaded_predictor, (dict, collections.OrderedDict)):
+                    self.gradient_predictor = nn.Sequential(
                         *[
                             self.model.ema_model.encoder,
                             nn.Linear(self.config.encoder_dimensions, 1, bias=False),
                         ]
-                    ),
-                    only_last_layer=True,
-                    continue_training=True,
-                    task_config=TaskConfig(**explainer_config.distilled_predictor["task"]),
-                )
-
-            else:
-                try:
-                    self.gradient_predictor = torch.load(distilled_path, map_location=self.device)
-                except Exception:
-                    self.gradient_predictor = torch.load(distilled_path, map_location=self.device, weights_only=False)
+                    ).to(self.device)
+                    self.gradient_predictor.load_state_dict(loaded_predictor)
+                else:
+                    self.gradient_predictor = loaded_predictor
 
             decision_boundary_path = os.path.join(
                 base_path, "explainer", "distilled_predictor", "decision_boundary.png"

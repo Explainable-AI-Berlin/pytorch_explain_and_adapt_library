@@ -20,6 +20,7 @@ If you find this useful or use SCE (https://arxiv.org/pdf/2506.14698), consider 
   year={2025}
 }
 ```
+You can reproduce the results from the paper with reproduction_scripts/reproduce_sce_results.sh.
 
 If you use CFKD (https://arxiv.org/pdf/2510.17524) useful consider citing:
 
@@ -32,6 +33,8 @@ If you use CFKD (https://arxiv.org/pdf/2510.17524) useful consider citing:
 }
 ```
 
+You can reproduce the results from the paper with reproduction_scripts/reproduce_cfkd_results.sh.
+
 If you use DiDAE (https://arxiv.org/pdf/2601.21851) useful consider citing:
 
 ```
@@ -42,6 +45,8 @@ If you use DiDAE (https://arxiv.org/pdf/2601.21851) useful consider citing:
   year={2026}
 }
 ```
+
+You can reproduce the results from the paper with reproduction_scripts/reproduce_didae_results.sh.
 
 **Setup usage with the command line**
 

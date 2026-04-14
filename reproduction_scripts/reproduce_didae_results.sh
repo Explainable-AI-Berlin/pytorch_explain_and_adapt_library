@@ -51,8 +51,8 @@ python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/squa
 # run FastDiME-CFKD
 python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/square1000x098_fastdime_cfkd.yaml"
 # run DiDAE CFKD
-python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/square1k_resnet18_poisoned098_didae_cfkd.yaml"
-python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/square1kx098_didae_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/square1k_resnet18_poisoned098_didae_procrustes_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/square1kx098_didae_procrustes_cfkd.yaml"
 
 
 # Reproduce SOTA results on CelebA Blond_Hair confounding Male task
@@ -94,11 +94,11 @@ python evaluate_predictor.py --model_path $PEAL_RUNS/celeba1k/Blond_Hair/opencli
 # run DiDAE projection
 python run_adaptor.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/celeba1kx098_didae_projection.yaml"
 # run DiME-CFKD
-python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/celeba1kx098_dime_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/celeba1kx098_openclip_dime_cfkd.yaml"
 # run ACE-CFKD
-python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/celeba1kx098_ace_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/celeba1kx098_openclip_ace_cfkd.yaml"
 # run FastDiME-CFKD
-python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/celeba1kx098_fastdime_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/celeba1kx098_openclip_fastdime_cfkd.yaml"
 # run DiDAE CFKD
-python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/celeba1k_resnet18_poisoned098_didae_cfkd.yaml"
-python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/celeba1kx098_didae_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/celeba1kx098_resnet18_didae_openclip_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/celeba1kx098_openclip_didae_cfkd.yaml"

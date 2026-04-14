@@ -428,12 +428,13 @@ class ModelTrainer:
                 self.model.eval()
                 X = self.attacker.attack(
                     self.model,
-                    X,
+                    torch.clamp(X, 0, 1),
                     y.to(self.device),
                     noise=noise,
                     num_noise_vectors=self.config.training.num_noise_vec,
                     no_grad=self.config.training.no_grad_attack,
                 )
+
                 self.model.train()
                 requires_grad_(self.model, True)
 
