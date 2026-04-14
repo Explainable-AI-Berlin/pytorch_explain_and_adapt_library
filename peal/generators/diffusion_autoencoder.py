@@ -234,14 +234,6 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
                 encoder = DinoV2(model, processor)
 
             elif "open_clip" in self.config.model_type:
-                print("use open clip!!!")
-                print("use open clip!!!")
-                print("use open clip!!!")
-                print("use open clip!!!")
-                print("use open clip!!!")
-                import pdb
-
-                pdb.set_trace()
                 # --- New OpenCLIP Logic ---
                 import open_clip
 
@@ -662,8 +654,11 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
                         continue_training=True,
                         task_config=TaskConfig(**explainer_config.distilled_predictor["task"]),
                     )
-                    
+
                 except Exception as exp:
+                    print('in predictor distillation!')
+                    print('in predictor distillation!')
+                    print('in predictor distillation!')
                     import pdb; pdb.set_trace()
             else:
                 try:

@@ -993,7 +993,7 @@ class CFKD(Adaptor):
             cprint("retrieve feedback!", self.adaptor_config.tracking_level, 2)
             feedback = self.teacher.get_feedback(
                 base_dir=os.path.join(self.base_dir, str(finetune_iteration), mode + "_teacher"),
-                student=self.distilled_predictor, # TODO including this introduces some inconsistencies that should be tracked!
+                student=self.student, # TODO including this introduces some inconsistencies that should be tracked!
                 num_clusters=self.adaptor_config.explainer.num_attempts
                 * self.adaptor_config.explainer.parallel_attempts,
                 mode=mode,
