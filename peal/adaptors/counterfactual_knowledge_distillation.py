@@ -348,6 +348,9 @@ class CFKD(Adaptor):
             print("load sparse dictionary!!!")
             self.generator.sparse_dictionary = get_sparse_dictionary(self.adaptor_config.sparse_dictionary)
 
+        else:
+            self.generator.sparse_dictionary = None
+        
         self.output_size = (
             self.adaptor_config.task.output_channels
             if self.adaptor_config.task.output_channels is not None

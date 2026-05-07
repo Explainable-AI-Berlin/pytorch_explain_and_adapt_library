@@ -227,36 +227,39 @@ class SymbolicDataset(PealDataset):
             diff = cf - original
             attribution_list.append(torch.tensor(np.abs(diff)))
 
-            fig, axes = plt.subplots(3, 1, figsize=(10, 12))
-            
-            # Plot Original
-            axes[0].bar(feature_names, original, color='#3498db')
-            axes[0].set_title(f'Original (Source Class: {int(y_source_list[i])}, Confidence: {float(y_target_start_confidence_list[i]):.2f})', fontweight='bold')
-            axes[0].tick_params(axis='x', rotation=45)
-            axes[0].grid(axis='y', linestyle='--', alpha=0.7)
-            
-            # Plot Counterfactual
-            axes[1].bar(feature_names, cf, color='#2ecc71')
-            axes[1].set_title(f'Counterfactual (Target Class: {int(y_target_list[i])}, Confidence: {float(y_target_end_confidence_list[i]):.2f})', fontweight='bold')
-            axes[1].tick_params(axis='x', rotation=45)
-            axes[1].grid(axis='y', linestyle='--', alpha=0.7)
-            
-            # Plot Difference
-            axes[2].bar(feature_names, diff, color='#e74c3c')
-            axes[2].set_title('Difference (Counterfactual - Original)', fontweight='bold')
-            axes[2].tick_params(axis='x', rotation=45)
-            axes[2].grid(axis='y', linestyle='--', alpha=0.7)
-            
-            plt.tight_layout()
-            
-            collage_path = os.path.join(
-                base_path,
-                embed_numberstring(str(start_idx + i)) + "_collage.png",
-            )
-            plt.savefig(collage_path, dpi=150)
-            plt.close(fig)
-            collage_paths.append(collage_path)
+            try:
+                fig, axes = plt.subplots(3, 1, figsize=(10, 12))
+                
+                # Plot Original
+                axes[0].bar(feature_names, original, color='#3498db')
+                axes[0].set_title(f'Original (Source Class: {int(y_source_list[i])}, Confidence: {float(y_target_start_confidence_list[i]):.2f})', fontweight='bold')
+                axes[0].tick_params(axis='x', rotation=45)
+                axes[0].grid(axis='y', linestyle='--', alpha=0.7)
+                
+                # Plot Counterfactual
+                axes[1].bar(feature_names, cf, color='#2ecc71')
+                axes[1].set_title(f'Counterfactual (Target Class: {int(y_target_list[i])}, Confidence: {float(y_target_end_confidence_list[i]):.2f})', fontweight='bold')
+                axes[1].tick_params(axis='x', rotation=45)
+                axes[1].grid(axis='y', linestyle='--', alpha=0.7)
+                
+                # Plot Difference
+                axes[2].bar(feature_names, diff, color='#e74c3c')
+                axes[2].set_title('Difference (Counterfactual - Original)', fontweight='bold')
+                axes[2].tick_params(axis='x', rotation=45)
+                axes[2].grid(axis='y', linestyle='--', alpha=0.7)
+                
+                plt.tight_layout()
+                
+                collage_path = os.path.join(
+                    base_path,
+                    embed_numberstring(str(start_idx + i)) + "_collage.png",
+                )
+                plt.savefig(collage_path, dpi=150)
+                collage_paths.append(collage_path)
+            finally:
+                plt.close(fig)
 
+        plt.close('all')
         return attribution_list, collage_paths
 
     def serialize_dataset(
@@ -341,85 +344,95 @@ class ImageDataset(PealDataset):
             heatmap_list.append(heatmap_high_contrast)
 
             if tracking_level >= 1:
-                overlay = generate_overlay(x, counterfactual)
                 ssim_overlay = generate_ssim_overlay(x, counterfactual)
-                current_collage = torch.cat(
-                    [x_in, counterfactual_rgb, heatmap_high_contrast, overlay, ssim_overlay], -1
-                )
-                current_collage = torchvision.utils.make_grid(current_collage, nrow=5)
-                plt.gcf()
-                plt.imshow(current_collage.permute(1, 2, 0))
-                # Robustly build title string with length checks
-                def safe_int_str(val):
-                    if torch.is_tensor(val):
-                        if val.numel() == 1:
-                            return str(int(val.item()))
-                        else:
-                            return str(int(val.argmax()))
-                    try:
-                        return str(int(val))
-                    except (ValueError, TypeError):
-                        return str(val)
+                fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+                try:
+                    # Show images with padding and labels below
+                    axes[0].imshow(x_in.permute(1, 2, 0).cpu().numpy())
+                    axes[0].axis("off")
+                    axes[0].text(0.5, -0.15, "factual", transform=axes[0].transAxes, ha='center', fontweight='bold')
+                    
+                    axes[1].imshow(counterfactual_rgb.permute(1, 2, 0).cpu().numpy())
+                    axes[1].axis("off")
+                    axes[1].text(0.5, -0.15, "counterfactual", transform=axes[1].transAxes, ha='center', fontweight='bold')
+                    
+                    axes[2].imshow(ssim_overlay.permute(1, 2, 0).cpu().numpy())
+                    axes[2].axis("off")
+                    axes[2].text(0.5, -0.15, "SSIM difference", transform=axes[2].transAxes, ha='center', fontweight='bold')
+                    # Robustly build title string with length checks
+                    def safe_int_str(val):
+                        if torch.is_tensor(val):
+                            if val.numel() == 1:
+                                return str(int(val.item()))
+                            else:
+                                return str(int(val.argmax()))
+                        try:
+                            return str(int(val))
+                        except (ValueError, TypeError):
+                            return str(val)
 
-                title_string = "Original: "
-                if len(y_list) > i:
-                    title_string += safe_int_str(y_list[i])
-                else:
-                    title_string += "?"
-                
-                title_string += " -> Prediction: "
-                if len(y_source_list) > i:
-                    title_string += safe_int_str(y_source_list[i])
-                else:
-                    title_string += "?"
-                
-                title_string += " -> Target: "
-                if len(y_target_list) > i:
-                    title_string += safe_int_str(y_target_list[i])
-                else:
-                    title_string += "?"
-                
-                title_string += "\n"
+                    title_string = "Original: "
+                    if len(y_list) > i:
+                        title_string += safe_int_str(y_list[i])
+                    else:
+                        title_string += "?"
+                    
+                    title_string += " -> Prediction: "
+                    if len(y_source_list) > i:
+                        title_string += safe_int_str(y_source_list[i])
+                    else:
+                        title_string += "?"
+                    
+                    title_string += " -> Target: "
+                    if len(y_target_list) > i:
+                        title_string += safe_int_str(y_target_list[i])
+                    else:
+                        title_string += "?"
+                    
+                    title_string += "\n"
 
-                start_conf = float(y_target_start_confidence_list[i]) if len(y_target_start_confidence_list) > i else 0.0
-                end_conf = float(y_target_end_confidence_list[i]) if len(y_target_end_confidence_list) > i else 0.0
-                
-                title_string += (
-                    "Target Confidence: "
-                    + str(round(start_conf, 2))
-                    + " -> "
-                    + str(round(end_conf, 2))
-                    + "\n"
-                )
-                if not hint_list is None and not idx_to_info is None:
+                    start_conf = float(y_target_start_confidence_list[i]) if len(y_target_start_confidence_list) > i else 0.0
+                    end_conf = float(y_target_end_confidence_list[i]) if len(y_target_end_confidence_list) > i else 0.0
+                    
                     title_string += (
-                        idx_to_info(x_list[i], x_counterfactual_list[i], hint_list[i])
+                        "Target Confidence: "
+                        + str(round(start_conf, 2))
+                        + " -> "
+                        + str(round(end_conf, 2))
                         + "\n"
                     )
+                    if not hint_list is None and not idx_to_info is None:
+                        title_string += (
+                            idx_to_info(x_list[i], x_counterfactual_list[i], hint_list[i])
+                            + "\n"
+                        )
 
-                if not feedback_list is None:
-                    title_string += (
-                        ", Teacher: "
-                        + str(int(y_original_teacher_list[i]))
-                        + " -> "
-                        + str(int(y_counterfactual_teacher_list[i]))
-                        + " -> "
-                        + str(feedback_list[i])
+                    if not feedback_list is None:
+                        title_string += (
+                            ", Teacher: "
+                            + str(int(y_original_teacher_list[i]))
+                            + " -> "
+                            + str(int(y_counterfactual_teacher_list[i]))
+                            + " -> "
+                            + str(feedback_list[i])
+                        )
+
+                    fig.suptitle(title_string)
+                    plt.tight_layout()
+                    collage_path = os.path.join(
+                        base_path,
+                        embed_numberstring(str(start_idx + i)) + "_collage.png",
                     )
-
-                plt.title(title_string)
-                collage_path = os.path.join(
-                    base_path,
-                    embed_numberstring(str(start_idx + i)) + "_collage.png",
-                )
-                plt.axis("off")
-                plt.savefig(collage_path)
-                print("Saved collage to " + collage_path)
-                collage_paths.append(collage_path)
+                    plt.savefig(collage_path)
+                    print("Saved collage to " + collage_path)
+                    collage_paths.append(collage_path)
+                finally:
+                    plt.close(fig)
 
             else:
                 collage_paths.append(None)
 
+        plt.close('all')
         return heatmap_list, collage_paths
 
     def serialize_dataset(

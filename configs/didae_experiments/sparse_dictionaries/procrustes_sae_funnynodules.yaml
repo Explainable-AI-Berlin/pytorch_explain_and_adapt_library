@@ -3,9 +3,9 @@ n_components: 5
 sparse_dictionaries_type: OrthogonalProcrustesDictionary
 category: sparse_dictionaries
 task:
-  y_selection: [Roundness, Spiculation, EdgeSharpness, Size, Intensity]
+  y_selection: [InternalStructure, Roundness, Spiculation, EdgeSharpness, Size, Intensity]
   output_type: regression
-  output_channels: 5
+  output_channels: 6
   criterions:
     mse: 1.0
     l2: 100.0

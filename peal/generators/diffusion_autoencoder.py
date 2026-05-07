@@ -70,7 +70,7 @@ class DiffusionAutoencoderConfig(GeneratorConfig):
     is_torchvision_resnet: bool = False
     is_loaded: bool = True
     model_type: Union[str, None] = None
-    sparse_dictionary: Union[str, SparseDictionaryConfig, None] = SVDDictionaryConfig()
+    sparse_dictionary: Union[str, SparseDictionaryConfig, None] = None
     visualizations_per_component: Union[int, None] = 100
 
 
@@ -638,28 +638,22 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             # assert explainer_config.distilled_predictor.task.output_channels == 1
             distilled_path = os.path.join(base_path, "explainer", "distilled_predictor", "model.cpl")
             if not os.path.exists(distilled_path):
-                try:
-                    self.gradient_predictor = distill_predictor(
-                        predictor_distillation=explainer_config.distilled_predictor,
-                        base_path=os.path.join(base_path, "explainer"),
-                        predictor=lambda x: predictor(generator_to_classifier(x)),
-                        predictor_datasource=distilled_datasources,
-                        predictor_distilled=nn.Sequential(
-                            *[
-                                self.model.ema_model.encoder,
-                                nn.Linear(self.config.encoder_dimensions, 1, bias=False),
-                            ]
-                        ),
-                        only_last_layer=True,
-                        continue_training=True,
-                        task_config=TaskConfig(**explainer_config.distilled_predictor["task"]),
-                    )
+                self.gradient_predictor = distill_predictor(
+                    predictor_distillation=explainer_config.distilled_predictor,
+                    base_path=os.path.join(base_path, "explainer"),
+                    predictor=lambda x: predictor(generator_to_classifier(x)),
+                    predictor_datasource=distilled_datasources,
+                    predictor_distilled=nn.Sequential(
+                        *[
+                            self.model.ema_model.encoder,
+                            nn.Linear(self.config.encoder_dimensions, 1, bias=False),
+                        ]
+                    ),
+                    only_last_layer=True,
+                    continue_training=True,
+                    task_config=TaskConfig(**explainer_config.distilled_predictor["task"]),
+                )
 
-                except Exception as exp:
-                    print('in predictor distillation!')
-                    print('in predictor distillation!')
-                    print('in predictor distillation!')
-                    import pdb; pdb.set_trace()
             else:
                 try:
                     loaded_predictor = torch.load(distilled_path, map_location=self.device)
@@ -778,9 +772,35 @@ class DiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             reflected = a - 2 * proj
             return reflected, None, torch.norm(reflected - z_sem, p=2, dim=-1, keepdim=False)
 
+        elif self.sparse_dictionary is None:
+            # reflection on w with all linesearch factors
+            b = w
+            a = z_sem
+            dot_ab = torch.sum(a * b, dim=-1, keepdim=True)  # shape (batch, 1)
+            dot_bb = torch.sum(b * b)  # scalar
+            proj = dot_ab / dot_bb * b  # shape (batch, n)
+
+            line_search_factors = torch.tensor(explainer_config.linesearch_factors).to(z_sem.device)
+            # Apply the update: [Batch, 1, S, Dim]
+            z_reflected = (
+                a.unsqueeze(1).unsqueeze(1) - line_search_factors.view(1, 1, -1, 1) * proj.unsqueeze(1).unsqueeze(1)
+            )
+            # Tile to [Batch, num_attempts, S, Dim]
+            z_reflected = torch.tile(z_reflected, [1, num_attempts, 1, 1])
+
+            # distances: [Batch, num_attempts, S]
+            distances = torch.norm(a.unsqueeze(1).unsqueeze(1) - z_reflected, p=2, dim=-1)
+            # component_indices: [Batch, num_attempts]
+            component_indices = (
+                torch.arange(num_attempts, device=z_sem.device).unsqueeze(0).tile([z_sem.shape[0], 1])
+            )
+
+            return z_reflected, component_indices, distances
+
         else:
             component_indices = range(num_attempts)
             W_all = self.sparse_dictionary.get_components()[:, :num_attempts]
+            
 
             if component_indices is not None:
                 W = W_all[:, component_indices].to(z_sem.device)

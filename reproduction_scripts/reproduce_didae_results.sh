@@ -102,3 +102,112 @@ python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/cele
 # run DiDAE CFKD
 python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/celeba1kx098_resnet18_didae_openclip_cfkd.yaml"
 python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/celeba1kx098_openclip_didae_cfkd.yaml"
+
+
+
+# Reproduce SOTA results on funnynodules  confounding Male task
+python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/funnynodules_classifier_unpoisoned.yaml"
+python train_generator.py --config "<PEAL_BASE>/configs/cfkd_experiments/generators/funnynodules1k_ddpm_poisoned098.yaml"
+python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/funnynodules1k_classifier_poisoned098.yaml"
+# run DFR
+python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/funnynodules1k_classifier_poisoned098_dfr.yaml"
+python evaluate_predictor.py --model_path $PEAL_RUNS/funnynodules1k/Blond_Hair/classifier_poisoned098/dfr/model.cpl --data_config configs/cfkd_experiments/data/funnynodules.yaml --model_config configs/cfkd_experiments/predictors/funnynodules1k_classifier_poisoned098.yaml
+# run GroupDRO
+python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/group_dro/blond_confounding_male_1k_poisoned098_group_dro.yaml"
+python evaluate_predictor.py --model_path $PEAL_RUNS/funnynodules1k/Blond_Hair/classifier_poisoned098/group_dro/model.cpl --data_config configs/cfkd_experiments/data/funnynodules.yaml --model_config configs/cfkd_experiments/predictors/funnynodules1k_classifier_poisoned098.yaml
+# run P-ClarC
+python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/clarc/blond_confounding_male_poisoned098_pclarc.yaml"
+cat ${PEAL_RUNS}/funnynodules1k/Blond_Hair/classifier_poisoned098/pclarc/best_model_result.txt
+# run RR-ClarC
+python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/clarc/blond_confounding_male_poisoned098_rrclarc.yaml"
+cat ${PEAL_RUNS}/funnynodules1k/Blond_Hair/classifier_poisoned098/rrclarc/best_model_result.txt
+# run DiME CFKD
+python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/funnynodules1kx098_resnet18_dime_cfkd.yaml"
+# run ACE CFKD
+python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/funnynodules1kx098_resnet18_ace_cfkd.yaml"
+# run FastDiME CFKD
+python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/funnynodules1kx098_resnet18_fastdime_cfkd.yaml"
+# run SCE CFKD
+python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/funnynodules1kx098_resnet18_sce_cfkd.yaml"
+# train funnynodule foundation model
+ython train_predictor.py --config "<PEAL_BASE>/configs/didae_experiments/predictors/funnynodules_all_attributes_resnet18.yaml"
+# train funnynodules diffusion autoencoder
+python train_predictor.py --config "<PEAL_BASE>/configs/didae_experiments/predictors/funnynodules1k_foundation_linear_poisoned098.yaml"
+# run DFR
+python train_predictor.py --config "<PEAL_BASE>/configs/didae_experiments/predictors/funnynodules1k_foundation_linear_poisoned098_dfr.yaml"
+python evaluate_predictor.py --model_path $PEAL_RUNS/funnynodules1k/internalstructure_confounding_roundness/torchvision/foundation_poisoned098/dfr/model.cpl --data_config configs/cfkd_experiments/data/funnynodules.yaml --model_config configs/didae_experiments/predictors/funnynodules1k_linear_poisoned098.yaml
+# run GroupDRO
+python run_adaptor.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/funnynodules_1k_foundation_linear_poisoned098_group_dro.yaml"
+python evaluate_predictor.py --model_path $PEAL_RUNS/funnynodules1k/internalstructure_confounding_roundness/torchvision/foundation_poisoned098/group_dro/model.cpl --data_config configs/cfkd_experiments/data/funnynodules_unpoisoned.yaml --model_config configs/cfkd_experiments/predictors/funnynodules1k_classifier_poisoned098.yaml
+# run DiDAE projection
+python run_adaptor.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/funnynodules1kx098_didae_projection.yaml"
+# run DiME-CFKD
+python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/funnynodules1kx098_dime_cfkd.yaml"
+# run ACE-CFKD
+python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/funnynodules1kx098_ace_cfkd.yaml"
+# run FastDiME-CFKD
+python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/funnynodules1kx098_fastdime_cfkd.yaml"
+# train original DAE
+python train_generator.py --config "<PEAL_BASE>/configs/didae_experiments/generators/funnynodules_diffusion_autoencoder_original.yaml"
+# run CFKD with original DAE
+python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/funnynodules1kx098_dae_original_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/funnynodules1kx098_resnet18_dae_original_cfkd.yaml"
+# train diffusion autoencoder with foundation backbone
+python train_generator.py --config "<PEAL_BASE>/configs/didae_experiments/generators/funnynodules_diffusion_autoencoder.yaml"
+# run DAE CFKD with foundation backbone
+python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/funnynodules1kx098_dae_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/funnynodules1kx098_resnet18_dae_cfkd.yaml"
+# train funnynodules component analysis
+python run_component_analysis.py --config $PEAL_RUNS/funnynodules/diffusion_autoencoder/config.yaml --sd_config configs/didae_experiments/sparse_dictionaries/procrustes_sae_funnynodules.yaml
+# run DiDAE CFKD
+python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/funnynodules1kx098_didae_procrustes_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/funnynodules1kx098_resnet18_didae_procrustes_cfkd.yaml"
+
+
+# Reproduce SOTA results on Camelyon17 task
+python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/camelyon17_classifier_unpoisoned.yaml"
+python train_generator.py --config "<PEAL_BASE>/configs/cfkd_experiments/generators/camelyon17_1k_ddpm_poisoned098.yaml"
+python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/camelyon17_1k_classifier_poisoned098.yaml"
+# run DFR
+python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/camelyon17_1k_classifier_poisoned098_dfr.yaml"
+python evaluate_predictor.py --model_path $PEAL_RUNS/camelyon17_1k/classifier_poisoned098/dfr/model.cpl --data_config configs/cfkd_experiments/data/camelyon17_unpoisoned.yaml --model_config configs/cfkd_experiments/predictors/camelyon17_1k_classifier_poisoned098.yaml
+# run GroupDRO
+python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/group_dro/camelyon17_1k_poisoned098_group_dro.yaml"
+python evaluate_predictor.py --model_path $PEAL_RUNS/camelyon17_1k/classifier_poisoned098/group_dro/model.cpl --data_config configs/cfkd_experiments/data/camelyon17_unpoisoned.yaml --model_config configs/cfkd_experiments/predictors/camelyon17_1k_classifier_poisoned098.yaml
+# run P-ClarC
+python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/clarc/camelyon17_poisoned098_pclarc.yaml"
+cat ${PEAL_RUNS}/camelyon17_1k/classifier_poisoned098/pclarc/best_model_result.txt
+# run RR-ClarC
+python run_adaptor.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/clarc/camelyon17_poisoned098_rrclarc.yaml"
+cat ${PEAL_RUNS}/camelyon17_1k/classifier_poisoned098/rrclarc/best_model_result.txt
+# run DiME CFKD
+python run_cfkd.py --config "<PEAL_BASE>/configs/diffae_experiments/adaptors/camelyon17_1k_poisoned098_dime_cfkd.yaml"
+# run ACE CFKD
+python run_cfkd.py --config "<PEAL_BASE>/configs/diffae_experiments/adaptors/camelyon17_1k_poisoned098_ace_cfkd.yaml"
+# run FastDiME CFKD
+python run_cfkd.py --config "<PEAL_BASE>/configs/diffae_experiments/adaptors/camelyon17_1k_poisoned098_fastdime_cfkd.yaml"
+# run SCE CFKD
+python run_cfkd.py --config "<PEAL_BASE>/configs/diffae_experiments/adaptors/camelyon17_1k_poisoned098_sce_cfkd.yaml"
+# train camelyon diffusion autoencoder
+python train_generator.py --config "<PEAL_BASE>/configs/diffae_experiments/generators/camelyon_diffusion_autoencoder.yaml"
+# train linear probe from foundation model
+python train_predictor.py --config "<PEAL_BASE>/configs/diffae_experiments/predictors/camelyon1k_foundation_linear_poisoned098.yaml"
+# train camelyon component analysis
+python run_component_analysis.py --config $PEAL_RUNS/camelyon/diffusion_autoencoder/config.yaml --sd_config configs/diffae_experiments/sparse_dictionaries/procrustes_sae_camelyon.yaml
+# run DFR
+python train_predictor.py --config configs/cfkd_experiments/predictors/camelyon17_1k_dinov2_finetuned_poisoned098_dfr.yaml
+python evaluate_predictor.py --model_path $PEAL_RUNS/camelyon17_1k/dinov2_finetuned_poisoned098/dfr/model.cpl --data_config configs/cfkd_experiments/data/camelyon17_unpoisoned.yaml --model_config configs/cfkd_experiments/predictors/camelyon17_1k_dinov2_finetuned_poisoned098_dfr.yaml
+# run GroupDRO
+python run_adaptor.py --config "<PEAL_BASE>/configs/diffae_experiments/camelyon_1k_foundation_linear_poisoned098_group_dro.yaml"
+python evaluate_predictor.py --model_path $PEAL_RUNS/camelyon1k/colora_confounding_colorb/torchvision/foundation_linear_poisoned098/group_dro/model.cpl --data_config configs/cfkd_experiments/data/camelyon_unpoisoned.yaml --model_config configs/cfkd_experiments/predictors/camelyon17_1k_classifier_poisoned098.yaml
+# run didae projection
+python run_adaptor.py --config "<PEAL_BASE>/configs/diffae_experiments/adaptors/camelyon1kx098_didae_projection.yaml"
+# run DiME-CFKD
+python run_cfkd.py --config "<PEAL_BASE>/configs/diffae_experiments/adaptors/camelyon1kx098_dime_cfkd.yaml"
+# run ACE-CFKD
+python run_cfkd.py --config "<PEAL_BASE>/configs/diffae_experiments/adaptors/camelyon1kx098_ace_cfkd.yaml"
+# run FastDiME-CFKD
+python run_cfkd.py --config "<PEAL_BASE>/configs/diffae_experiments/adaptors/camelyon1kx098_fastdime_cfkd.yaml"
+# run didae CFKD
+python run_cfkd.py --config "<PEAL_BASE>/configs/diffae_experiments/adaptors/camelyon1k_resnet18_poisoned098_didae_cfkd.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/diffae_experiments/adaptors/camelyon1kx098_didae_cfkd.yaml"
