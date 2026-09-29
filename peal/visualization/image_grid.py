@@ -1,3 +1,13 @@
+"""PIL/NumPy helpers that assemble PEAL's annotated image grids.
+
+Explainers and teachers render feedback collages as columns: a rotated title,
+then one image per row with a caption underneath. Columns of checkbox icons
+(``<resource_dir>/imgs/checkbox_right.png`` / ``checkbox_wrong.png``) mark
+boolean per-row facts such as "flipped". :func:`make_image_grid` concatenates
+such columns into one image; the other functions build the pieces. Image
+tensors are ``[N, C, H, W]`` floats in ``[0, 1]``.
+"""
+
 import numpy as np
 import os
 import torch
@@ -8,6 +18,19 @@ from peal.global_utils import get_project_resource_dir
 
 
 def zip_tensors(tensor_list):
+    """Interleave several image batches sample by sample along the width.
+
+    Parameters
+    ----------
+    tensor_list : list of torch.Tensor
+        Batches of shape ``[N, 3, H, W_j]`` with a common ``N`` and ``H``.
+
+    Returns
+    -------
+    torch.Tensor
+        ``[N, 3, H, sum(W_j) + 5 * (len(tensor_list) - 1)]``: sample ``i`` of
+        every batch placed side by side, separated by 5-pixel white bars.
+    """
     padding = torch.ones([3, tensor_list[0].shape[2], 5])
     tensor_list_out = []
     for i in range(tensor_list[0].shape[0]):
@@ -23,6 +46,23 @@ def zip_tensors(tensor_list):
 
 
 def bool_list_to_checkboxes(bool_list, height):
+    """Render a list of booleans as a batch of checkbox icons.
+
+    Parameters
+    ----------
+    bool_list : list of bool or indexable tensor
+        One flag per row; a tensor is converted element-wise.
+    height : int
+        Row height in pixels; the 24x24 icon is centred vertically with white
+        padding.
+
+    Returns
+    -------
+    torch.Tensor
+        ``[N, 3, height, 24]`` floats in ``[0, 1]``; ``True`` rows show
+        ``checkbox_right.png``, ``False`` rows ``checkbox_wrong.png`` from the
+        project resource directory.
+    """
     if not isinstance(bool_list, list):
         bool_list = list(map(lambda idx: bool_list[idx], range(bool_list.shape[0])))
 
@@ -61,6 +101,16 @@ def bool_list_to_checkboxes(bool_list, height):
 
 
 def embed_text_in_image(text, width, height):
+    """Draw ``text`` centred on a white ``width`` x ``height`` RGB canvas.
+
+    Uses PIL's built-in default font, so the text is small and does not scale
+    with the canvas.
+
+    Returns
+    -------
+    PIL.Image.Image
+        The canvas with the black text.
+    """
     # add title to center of image
     # create Image that contains title
     image = Image.new("RGB", (width, height), (255, 255, 255))
@@ -69,15 +119,12 @@ def embed_text_in_image(text, width, height):
     draw = ImageDraw.Draw(image)
 
     # Add text to image
-    """font = ImageFont.truetype(
-        "/usr/share/fonts/truetype/freefont/FreeMono.ttf", size=10
-    )"""
     font = ImageFont.load_default()
     bbox = font.getbbox(text)
     w = bbox[2] - bbox[0]
     h = bbox[3] - bbox[1]
 
-    # calculate x,y cordinate for text
+    # calculate x,y coordinate for text
     x = (image.width - w) / 2
     y = (image.height - h) / 2
 
@@ -87,6 +134,25 @@ def embed_text_in_image(text, width, height):
 
 
 def make_column(images, labels, title):
+    """Stack images vertically into one titled, captioned column.
+
+    Parameters
+    ----------
+    images : torch.Tensor
+        ``[N, 3, H, W]`` floats in ``[0, 1]`` on the CPU.
+    labels : list of str
+        Caption drawn under each image; ``N`` entries.
+    title : str
+        Column title, rendered rotated by 90 degrees above the first image.
+
+    Returns
+    -------
+    numpy.ndarray
+        ``uint8`` RGB array of shape
+        ``[(N + 2) * (H + H // 2) + H // 2, W + 2 * (H // 8), 3]`` with a
+        white background. The height depends only on ``N`` and ``H``, which is
+        what lets :func:`make_image_grid` concatenate columns.
+    """
     # Create a new image with a white background
     x_padding = int(images.shape[2] / 8)
     y_padding = int(images.shape[2] / 2)
@@ -94,7 +160,7 @@ def make_column(images, labels, title):
     column_width = images.shape[3] + 2 * x_padding
     output_image = Image.new("RGB", (column_width, column_height), (255, 255, 255))
 
-    # Set x,y cordinates for each images
+    # Set x,y coordinates for each image
     x = x_padding
     y = y_padding
 
@@ -127,6 +193,24 @@ def make_column(images, labels, title):
 
 
 def make_image_grid(checkbox_dict, image_dicts):
+    """Compose checkbox columns and image columns into a single grid image.
+
+    Parameters
+    ----------
+    checkbox_dict : dict
+        Maps a column title to a list of booleans (one per row); each becomes
+        a column of checkbox icons without captions.
+    image_dicts : dict
+        Maps a column title to a pair ``(images, labels)`` where ``images`` is
+        an ``[N, 3, H, W]`` tensor or a list of such tensors (interleaved with
+        :func:`zip_tensors`) and ``labels`` holds the ``N`` captions.
+
+    Returns
+    -------
+    PIL.Image.Image
+        All columns concatenated horizontally, checkbox columns first. Every
+        column must share ``N`` and the image height ``H``.
+    """
     # create column for grid
     columns = []
     image_height = list(image_dicts.values())[0][0].shape[2]
@@ -156,8 +240,6 @@ def make_image_grid(checkbox_dict, image_dicts):
                 )
             )
         except Exception:
-            import pdb
-
-            pdb.set_trace()
+            raise
 
     return Image.fromarray(np.concatenate(columns, axis=1))

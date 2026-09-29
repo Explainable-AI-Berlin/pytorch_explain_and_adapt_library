@@ -1,0 +1,41 @@
+# python train_generator.py --config "<PEAL_BASE>/configs/didae_experiments/generators/imagenet_rae_clip.yaml"
+# continue: python train_generator.py --config $PEAL_RUNS/imagenet/rae_clip/config.yaml --continue_training True
+# 4-GPU launcher with retry loop: bash reproduction_scripts/run_imagenet_rae_clip.sh all
+#
+# ImageNet Representation Autoencoder (RAEv2, two-stage) whose frozen
+# representation encoder is OpenAI CLIP ViT-L/14 -- see the "ImageNet RAE"
+# block of reproduction_scripts/reproduce_didae_results.sh. Both stages are
+# trained from scratch by peal/generators/rae_pipeline.py:
+#   stage 1  ViT-XL decoder on the 16x16x1024 CLIP patch-token latent
+#            (rae_clip/stage1_imagenet_clip_vitl14.yaml)
+#   stage 2  DDT flow-matching model on that latent, conditioned on the CLIP
+#            image embedding (rae_clip/stage2_imagenet_clip_vitl14.yaml)
+# z_sem for SAE/DiDAE is the 768-d CLIP image embedding (clip.encode_image),
+# i.e. the space the MSAE dictionaries were fitted in; the stage-2 model is
+# conditioned on exactly that vector, so dictionary edits stay decodable.
+generator_type : RAEDiffusionAutoencoder
+category : generator
+base_path : $PEAL_RUNS/imagenet/rae_clip
+data: <PEAL_BASE>/configs/sce_experiments/data/imagenet_generator.yaml
+image_size: 256
+encoder_dimensions : 768
+encoder: "clip:ViT-L/14"
+encoder_input_space: pytorch_default
+stage1_config: <PEAL_BASE>/configs/didae_experiments/generators/rae_clip/stage1_imagenet_clip_vitl14.yaml
+stage2_config: <PEAL_BASE>/configs/didae_experiments/generators/rae_clip/stage2_imagenet_clip_vitl14.yaml
+stage1_experiment: clip_vitl14_vitxl
+stage2_experiment: ddt_xl_cls
+stage1_precision: bf16
+stage2_precision: bf16
+stats_num_samples: 100000
+stats_batch_size: 128
+keep_checkpoints: 2
+# node-local NVMe; stage 2 trains from this premixed latent+CLS cache (rebuilt if missing)
+cache_dir: /tmp/rae_clip_stage2_cache
+# ODE steps for decode() / inversion; sampler type names mirror the DiffAE ones
+# so DiDAE/CFKD/SAE code paths select them unchanged.
+sampler:
+  type: ddim
+  num_steps: 50
+batch_size: 32
+continue_training: false

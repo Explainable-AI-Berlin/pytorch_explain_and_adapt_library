@@ -1,0 +1,24 @@
+# CURATED twin (2026-09-16): training images filtered so the water-jet atom #5717 is present on every fireboat
+# and absent on every lifeboat; validation and test are the natural splits of the original pair dataset.
+# ImageNet pair for shortcut discovery: fireboat (ImageNet 554) = class 0, whose
+# training images carry the harmful spurious feature "water jet" according to
+# "Spurious Features Everywhere" (arXiv:2212.04871); lifeboat (ImageNet 625) = class 1
+# is the visually similar control. 1300 + 1300 train images, symlinked by
+#   python tools/generate_imagenet_binary_dataset.py --class1 554 --class2 625 --name fireboat_vs_lifeboat --symlink
+# Class is the only attribute; confounding_factors names it so DiDAE's ground-truth
+# concept matching reports which dictionary atom carries the label.
+dataset_class           : Image2MixedDataset
+dataset_path            : $PEAL_DATA/fireboat_vs_lifeboat_curated5717
+num_samples             : 1926
+# split fractions chosen so the seed-0 shuffle yields exactly curated train | natural val | natural test
+split                   : [0.7300104, 0.8650052]
+input_type              : image
+input_size              : [3, 224, 224]
+output_type             : singleclass
+output_size             : [2]
+downsize                : Resize
+x_selection             : imgs
+confounding_factors     : [Class]
+# null: the DINOv3 predictor normalizes internally (ImageNet mean/std after its own
+# 224 resize); a dataset normalization on top would be applied twice.
+normalization           : null

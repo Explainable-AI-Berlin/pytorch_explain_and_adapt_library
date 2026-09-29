@@ -7,4 +7,4 @@ output_type             : multiclass
 output_size             : [40]
 downsize                : Resize
 delimiter               : ","
-confounding_factors     : [Blond_Hair, Male]
+confounding_factors     : [Smiling, Blond_Hair]

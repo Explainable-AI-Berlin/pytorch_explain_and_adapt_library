@@ -1,0 +1,359 @@
+name: peal_ldm_combined
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  # Python and Core Libraries
+  - python=3.9.15  # Upgraded from 3.9 (peal) and 3.8 (ldm) for broader compatibility with newer pip packages
+  - pip
+  - jupyter # Common to both
+  - readline=8.2 # Common to both, higher in peal
+  - setuptools=68.0.0 # From peal, higher
+  - wheel=0.41.0 # From peal, higher
+  - tk=8.6.12 # Common to both, higher in peal
+  - tzdata=2023c # From peal, newer
+  - ca-certificates=2023.7.22 # From peal, newer
+  - openssl=3.1.2 # From peal, newer
+  - xz=5.2.6 # From peal, newer
+  - bzip2=1.0.8 # From peal
+  - libffi=3.4.2 # From peal, newer
+  - ncurses=6.4 # Common to both
+  - ld_impl_linux-64=2.40 # From peal, newer
+  - libgcc-ng=13.1.0 # From peal, newer
+  - libgfortran-ng=7.5.0 # From peal (ldm has newer libgfortran5, but this is ng)
+  - libgfortran4=7.5.0 # From peal
+  - libgomp=13.1.0 # From peal, newer
+  - libstdcxx-ng=13.1.0 # From peal, newer
+  - _libgcc_mutex=0.1 # From both (conda-forge/main)
+  - _openmp_mutex=4.5=2_gnu # From peal, newer (ldm has 5.1=1_gnu) - `2_gnu` is from conda-forge, `1_gnu` from defaults. Prefer conda-forge.
+  - libnsl=2.0.0 # From peal
+  - libuuid=2.38.1 # From peal
+  - libzlib=1.2.13 # From peal, newer (ldm has zlib)
+  - mpi=1.0=mpich # From peal
+  - mpi4py=3.1.4 # From peal
+  - mpich=3.3.2 # From peal
+  
+  # Core Numerical and Graphics Libraries (prioritizing newer versions and CUDA 11)
+  - cudatoolkit=11.7  # Upgrading from 11.0.221 (ldm) to a more recent 11.x for broader compatibility with newer PyTorch/TF. This will likely pull in appropriate NVIDIA libs.
+  - blas=1.0=mkl # From ldm
+  - intel-openmp=2021.4.0 # From ldm
+  - mkl=2021.4.0 # From ldm
+  - mkl-service=2.4.0 # From ldm
+  - mkl_fft=1.3.1 # From ldm
+  - mkl_random=1.2.2 # From ldm
+  # - jpeg=9e # From ldm
+  - libpng=1.6.39 # From ldm
+  # - libtiff=4.5.0=h6a678d5_2 # From ldm
+  - lcms2=2.12 # From ldm
+  - libdeflate=1.17 # From ldm
+  - lerc=3.0 # From ldm
+  - libuv=1.44.2 # From ldm
+  - libwebp=1.2.4 # From ldm
+  - libwebp-base=1.2.4 # From ldm
+  - lz4-c=1.9.4 # From ldm
+  - zstd=1.5.5 # From ldm
+  - giflib=5.2.1 # From ldm
+
+  # SQLite (Special Handling)
+  # ldm has sqlite=3.41.2 from defaults. peal has libsqlite=3.42.0 from conda-forge.
+  # The previous error "Could not find a version that satisfies the requirement sqlite==3.41.2" implies pip was looking for a *pip* package,
+  # but the conda environment *did* have sqlite=3.41.2.
+  # The `peal` environment has `libsqlite=3.42.0`, which is newer and from `conda-forge`.
+  # I will keep `libsqlite=3.42.0` from `conda-forge` as it's newer and from a more comprehensive channel.
+  # If the pip requirement for `sqlite==3.41.2` persists, it means a *Python binding* for sqlite was missing.
+  # Typically, the `sqlite3` module is built into Python. If a project explicitly needs `sqlite==3.41.2` via pip,
+  # it might refer to `pysqlite3` or a similar wrapper.
+  # Given `libsqlite=3.42.0` is provided by conda-forge, this should satisfy the underlying C library.
+  # If pip still fails, we may need to specifically add a python binding.
+  - libsqlite=3.42.0=h2797004_0 # From peal, newer
+
+  # Python-graphviz is only in ldm's conda section
+  - python-graphviz>=0.20.1
+
+  # Pip dependencies
+  - pip:
+      # Core ML Libraries (prioritizing peal's newer versions)
+      - torch==2.1.2 # From peal, significantly newer than ldm's 2.0.1
+      - torchvision==0.16.2 # From peal, significantly newer than ldm's 0.15.2
+      - transformers==4.44.0 # From peal, significantly newer than ldm's 4.30.2
+      - accelerate==0.33.0 # From peal, significantly newer than ldm's 0.21.0
+      - bitsandbytes==0.45.5 # From peal, newer than ldm's 0.41.1 (requires CUDA 11.x, hence cudatoolkit 11.7)
+      - numpy==1.24.3 # From ldm, newer than peal's 1.22.3 (compatible with Torch 2.1.2)
+      - scipy==1.9.1 # From ldm, newer than peal's 1.8.0 (compatible with Torch 2.1.2)
+      - scikit-learn==1.3.0 # From ldm, newer than peal's 1.0.2
+      - matplotlib==3.7.1 # From ldm, newer than peal's 3.5.1
+      - pandas==2.0.2 # From ldm, newer than peal's 1.5.2
+      - Pillow==10.3.0 # From peal, newer than ldm's 9.4.0
+      - omegaconf==2.1.1 # From ldm, not in peal
+      - open-clip-torch==2.20.0 # From ldm, not in peal
+      # - safetensors==0.3.1 # From ldm, not in peal
+      - einops # From ldm, not in peal
+
+      # Jupyter and related tools
+      - ipykernel==6.23.1 # From ldm, not in peal
+      - ipython==8.12.2 # From ldm, not in peal
+      - jupyter-client==8.2.0 # From ldm, not in peal
+      - jupyter-core==5.3.0 # From ldm, not in peal
+      - jupyterlab==4.0.1 # From ldm, newer. This is a suite.
+      - jupyter-server==2.6.0 # From ldm, newer
+      - nbclient==0.8.0 # From ldm
+      - nbconvert==7.4.0 # From ldm
+      - nbformat==5.9.0 # From ldm
+      - notebook==6.5.4 # From ldm
+      - jupyterlab-widgets==3.0.7 # From ldm
+      - widgetsnbextension==4.0.7 # From ldm
+      - jupyter-contrib-core==0.4.2 # From ldm
+      - jupyter-contrib-nbextensions==0.7.0 # From ldm
+      - jupyter-nbextensions-configurator==0.6.3 # From ldm
+      - jupyter-events==0.6.3 # From ldm
+      - jupyter-highlight-selected-word==0.2.0 # From ldm
+      - jupyter-lsp==2.2.0 # From ldm
+      - jupyter-server-terminals==0.4.4 # From ldm
+      - jupyterlab-execute-time==3.0.0 # From ldm
+      - jupyterlab-pygments==0.2.2 # From ldm
+      - jupyterlab-server==2.22.1 # From ldm
+      - nbclassic==1.0.0 # From ldm
+      - notebook-shim==0.2.3 # From ldm
+      - send2trash==1.8.2 # From ldm
+
+      # Image/Video/Vision related
+      - imageio==2.31.1 # From peal, newer than ldm's 2.9.0
+      - imgaug==0.4.0 # From peal, newer than ldm's 0.2.6
+      - opencv-python==4.5.5.62 # From peal, preferred over ldm's older 4.1.2.30 and headless 4.7.0.72. This should cover both.
+      - lpips==0.1.4 # Common to both
+      - moviepy==1.0.3 # From peal
+      - scikit-image==0.20.0 # From ldm, newer than peal's 0.19.2
+      - tifffile==2023.7.18 # From peal, newer than ldm's 2023.4.12
+      - kornia==0.5.0 # From ldm
+      - pytorch-msssim==1.0.0 # From ldm
+      - torchstain==1.3.0 # From ldm
+      - torchview==0.2.6 # From ldm
+      - torchviz==0.0.2 # From ldm
+      # - albumentations==0.4.3 # From ldm
+      # - imageio-ffmpeg==0.4.2 # From ldm
+
+      # Other ML/Deep Learning/Data Science
+      - flax # From peal
+      - datasets==2.19.1 # From peal, newer
+      - diffusers==0.33.1 # From peal, newer
+      - tensorflow==2.9.1 # From peal, newer. Note: TensorFlow 2.9.1 needs Python 3.7-3.9. This might be a conflict with Python 3.10.
+                               # If this causes issues, we may need to downgrade TensorFlow or upgrade Python further to 3.11 for TF2.1x+.
+                               # Given the other versions, trying to keep 2.9.1 for now, but anticipate potential issues.
+      - tensorflow-estimator==2.9.0 # From peal
+      - tensorflow-io-gcs-filesystem==0.33.0 # From peal
+      - keras==2.9.0 # From peal
+      - keras-preprocessing==1.1.2 # From peal
+      - lightning-utilities==0.9.0 # Common to both
+      - torch-fidelity==0.3.0 # Common to both
+      - torchmetrics==0.5.0 # From peal, newer (peal has 1.3.0)
+      - tqdm==4.64.0 # From peal, newer (ldm has 4.65.0, slightly newer, but stick with peal's version unless conflict)
+      - triton==2.1.0 # From peal, newer (ldm has 2.0.0)
+      - umap-learn==0.5.3 # Common to both
+      - natsort==8.1.0 # From peal
+      - networkx==3.1 # Common to both
+      - numba==0.57.1 # Common to both
+      - llvmlite==0.40.1 # Common to both
+      - seaborn==0.12.2 # From ldm, newer
+      - bitsandbytes==0.45.5 # From peal, newer
+      - open-clip-torch==2.20.0 # From ldm (not in peal)
+      - pytorch-lightning==1.4.2 # From ldm (not in peal)
+      - pytorch-fid==0.3.0 # From ldm (not in peal)
+      - test-tube==0.7.5 # From ldm (not in peal)
+      - timm==0.9.2 # From ldm (not in peal)
+      - torch-geometric==2.0.1 # From peal
+      - zennit==0.5.0 # From peal
+      - ml-collections==0.1.0 # From peal
+      - peft==0.11.1 # From peal
+      - wilds # From peal
+
+      # Hugging Face ecosystem
+      - huggingface-hub>=0.27.0 # From peal, newer than ldm's 0.15.1
+      # - tokenizers==0.13.3 # From ldm (not in peal, likely a sub-dependency of transformers)
+      - sacremoses==0.0.53 # From ldm (not in peal, common for NLP)
+
+      # Google API related
+      - google-api-core==2.11.1 # From peal
+      - google-api-python-client==2.97.0 # From peal
+      - google-auth==2.22.0 # From peal, newer (ldm has 2.19.1)
+      - google-auth-httplib2==0.1.0 # From peal
+      - google-auth-oauthlib==0.4.6 # From peal, older than ldm's 1.0.0. Prefer peal's for consistency, but if auth issues, check here.
+      - googleapis-common-protos==1.60.0 # From peal
+      - grpcio==1.56.2 # From peal, newer (ldm has 1.54.2)
+      - gdown==4.6.0 # From peal, older than ldm's 4.7.1. Prefer peal's unless conflict.
+      - oauth2client==4.1.3 # From peal
+      - oauthlib==3.2.2 # Common to both
+      - rsa==4.9 # Common to both
+      - pyasn1==0.5.0 # Common to both
+      - pyasn1-modules==0.3.0 # Common to both
+      - httplib2==0.22.0 # From peal
+      - google-pasta==0.2.0 # From peal
+      - protobuf==3.19.6 # From peal, older than ldm's 3.20.3. Sticking with peal's for TF 2.9.1 compatibility.
+
+      # Web/Networking/Serialization
+      - requests==2.31.0 # Common to both
+      # - urllib3==1.26.8 # From peal, older than ldm's 1.26.16
+      - idna==3.4 # Common to both
+      - charset-normalizer==3.2.0 # From peal, newer than ldm's 3.1.0
+      - beautifulsoup4==4.12.2 # Common to both
+      - soupsieve==2.4.1 # Common to both
+      - Flask==2.2.1 # From peal
+      - Flask-Cors==3.0.10 # From peal
+      - gunicorn==21.2.0 # From peal
+      - itsdangerous==2.1.2 # Common to both
+      - markupsafe==2.1.3 # Common to both
+      - werkzeug==2.2.1 # From peal, older than ldm's 2.3.4. Sticking with peal's unless conflict.
+      - click==8.1.6 # From peal, newer than ldm's 8.1.3
+      - aiohttp==3.8.4 # From ldm
+      - aiosignal==1.3.1 # From ldm
+      - async-timeout==4.0.2 # From ldm
+      - frozenlist==1.3.3 # From ldm
+      - multidict==6.0.4 # From ldm
+      - yarl==1.9.2 # From ldm
+      # - fastapi==0.88.0 # From ldm
+      - h11==0.14.0 # From ldm
+      - python-multipart==0.0.6 # From ldm
+      - sniffio==1.3.0 # Common to both
+      - starlette==0.22.0 # From ldm
+      - uvicorn==0.22.0 # From ldm
+      - websockets==11.0.3 # From ldm
+      - websocket-client==1.5.2 # From ldm
+
+      # Utility/General Purpose
+      - absl-py==1.4.0 # Common to both
+      - cachetools==5.3.1 # Common to both
+      - filelock==3.12.2 # From peal, newer than ldm's 3.12.0
+      - fsspec==2023.6.0 # From peal, newer than ldm's 2023.5.0
+      - joblib==1.3.1 # From peal, newer than ldm's 1.2.0
+      - packaging==23.1 # Common to both
+      - pyyaml==6.0 # Common to both
+      - regex==2023.6.3 # Common to both
+      - six==1.16.0 # Common to both
+      - sympy==1.12 # Common to both
+      - typing-extensions==4.7.1 # From peal, newer than ldm's 4.6.3
+      - zipp==3.16.2 # From peal, newer than ldm's 3.15.0
+      - ml-collections==0.1.0 # From peal
+      - mpmath==1.3.0 # Common to both
+      - natsort==8.1.0 # From peal
+      - pynndescent==0.5.10 # Common to both
+      - pyparsing==3.1.1 # From peal, newer than ldm's 3.0.9
+      - pysocks==1.7.1 # Common to both
+      - python-dateutil==2.8.2 # Common to both
+      - pywavelets==1.4.1 # Common to both
+      - wget==3.2 # From peal
+      - Wrapt==1.15.0 # From peal
+      - annotated-types==0.5.0 # From peal
+      - pydantic==2.0.3 # From peal, newer than ldm's 1.10.11
+      - pydantic-core==2.3.0 # From peal
+      - uritemplate==4.1.1 # From peal
+      - pycryptodomex==3.18.0 # From peal
+      - pydrive==1.3.1 # From peal
+      - pygame==2.1.2 # From peal
+      - pygments==2.15.1 # Common to both
+      - traitlets==5.9.0 # Common to both
+      - contextlib2==21.6.0 # From peal
+      - corelay==0.2.1 # From peal
+      - metrohash-python==1.1.3.3 # From peal
+      - virelay==0.4.0 # From peal
+      - docutils==0.19 # From peal
+      - sphinx==6.1.3 # From peal
+      - sphinxcontrib-applehelp==1.0.4 # From peal
+      - sphinxcontrib-devhelp==1.0.2 # From peal
+      - sphinxcontrib-htmlhelp==2.0.1 # From peal
+      - sphinxcontrib-jsmath==1.0.1 # From peal
+      - sphinxcontrib-qthelp==1.0.3 # From peal
+      - sphinxcontrib-serializinghtml==1.1.5 # From peal
+      - babel==2.12.1 # Common to both
+      - matplotlib-inline==0.1.6 # Common to both
+      - astunparse==1.6.3 # From peal (TF dep)
+      - gast==0.4.0 # From peal (TF dep)
+      - libclang==16.0.6 # From peal
+      - lit==16.0.6 # From peal, newer (ldm has 16.0.5.post0)
+      - markdown==3.4.4 # From peal, newer (ldm has 3.4.3)
+      - tensorboard==2.9.1 # From peal, older than ldm's 2.13.0. Sticking with peal's for TF 2.9.1 compatibility.
+      - tensorboard-data-server==0.6.1 # From peal, older than ldm's 0.7.0.
+      - tensorboard-plugin-wit==1.8.1 # From peal
+      - termcolor==2.3.0 # From peal
+      - threadpoolctl==3.2.0 # From peal, newer (ldm has 3.1.0)
+      - pydeck==0.8.1b0 # From ldm
+      - deepdiff==6.3.1 # From ldm
+      - blessed==1.20.0 # From ldm
+      - croniter==1.3.15 # From ldm
+      - dateutils==0.6.12 # From ldm
+      - pathspec==0.11.1 # From ldm
+      - pathtools==0.1.2 # From ldm
+      - isoduration==20.11.0 # From ldm
+      - jsonpointer==2.3 # From ldm
+      - jsonschema==4.17.3 # From ldm
+      - rfc3339-validator==0.1.4 # From ldm
+      - rfc3986-validator==0.1.1 # From ldm
+      - anyio==3.7.0 # From ldm
+      - appdirs==1.4.4 # From ldm
+      - fastjsonschema==2.17.1 # From ldm
+      - platformdirs==3.5.1 # From ldm
+      - tomli==2.0.1 # From ldm
+      - markdown-it-py==2.2.0 # From ldm
+      - mdurl==0.1.2 # From ldm
+      - mistune==2.0.5 # From ldm
+      - pendulum==2.1.2 # From ldm (indirect dependency)
+      - rich==13.4.1 # From ldm
+      - tabulate==0.9.0 # From ldm
+      - tenacity==8.2.2 # From ldm
+      - fonttools==4.39.4 # From ldm, newer than peal's 4.30.0
+      - antlr4-python3-runtime==4.8 # From ldm
+      - pydeprecate==0.3.1 # From ldm
+      - pyjwt==2.7.0 # From ldm
+      - pympler==1.0.1 # From ldm
+      - pyrankvote==2.0.6 # From ldm
+      - pyre-extensions==0.0.29 # From ldm
+      - pyrsistent==0.19.3 # From ldm
+      - python-editor==1.0.4 # From ldm
+      - python-json-logger==2.0.7 # From ldm
+      - setproctitle==1.3.2 # From ldm
+      - toolz==0.12.0 # From ldm
+      - urwid==2.1.2 # From ldm
+      - webcolors==1.13 # From ldm
+      - webencodings==0.5.1 # From ldm
+      - xformers # From ldm (requires CUDA 11.x, hence cudatoolkit 11.7)
+      - asttokens==2.2.1 # From ldm
+      - backcall==0.2.0 # From ldm
+      - debugpy==1.6.7 # From ldm
+      # - decorator==5.1.1 # From ldm
+      - executing==1.2.0 # From ldm
+      - jedi==0.18.2 # From ldm
+      - parso==0.8.3 # From ldm
+      - pexpect==4.8.0 # From ldm
+      - pickleshare==0.7.5 # From ldm
+      - prompt-toolkit==3.0.38 # From ldm
+      - ptyprocess==0.7.0 # From ldm
+      - pudb==2019.2 # From ldm
+      - pure-eval==0.2.2 # From ldm
+      - readchar==4.0.5 # From ldm
+      - stack-data==0.6.2 # From ldm
+      - termcolor==2.3.0 # From ldm (also in peal, keeping peal's version)
+      - timezonefinder==6.1.0 # From ldm (implicit dependency)
+      - tzlocal==4.3 # From ldm
+      - wandb==0.15.4 # From ldm
+      - watchdog==3.0.0 # From ldm
+      - wcwidth==0.2.6 # From ldm
+      - prometheus-client==0.17.0 # From ldm
+      - pyarrow==12.0.0 # From ldm
+      - pyzmq==25.1.0 # From ldm
+      - smmap==5.0.0 # From ldm
+      - argon2-cffi==21.3.0 # From ldm
+      - argon2-cffi-bindings==21.2.0 # From ldm
+      - cffi==1.15.1 # From ldm
+      - defusedxml==0.7.1 # From ldm
+      - pycparser==2.21 # From ldm
+      - jinja2==3.1.2 # Common to both
+      - black==23.7.0 # From ldm
+      - toolz==0.12.0 # From ldm
+      - urllib3==1.26.16 # From ldm (newer)
+      - requests==2.31.0 # Common
+      - certifi==2023.7.22 # From peal (newer)
+      # - certifi==2023.5.7 # From ldm (older)
+      - typing-inspect==0.9.0 # From ldm
+
+      # Git dependencies (must be last in pip section)
+      - -e git+https://github.com/CompVis/taming-transformers.git@master#egg=taming-transformers
+      - -e git+https://github.com/openai/CLIP.git@main#egg=clip
+      - -e .

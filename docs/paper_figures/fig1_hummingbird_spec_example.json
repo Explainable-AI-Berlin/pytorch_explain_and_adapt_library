@@ -1,0 +1,17 @@
+{
+  "placeholder": false,
+  "n_dirs": "10,240",
+  "n_sweep": 512,
+  "n_show": 3,
+  "rows": [
+    {"rank": 1, "dim": "#2113", "name": "bird feeder",        "verdict": "spurious", "latent": 391, "ambient": 274, "verified": 231,
+     "orig": ["/path/r1_orig_a.png", "/path/r1_orig_b.png", "/path/r1_orig_c.png"], "cf": ["/path/r1_cf_a.png", "/path/r1_cf_b.png", "/path/r1_cf_c.png"]},
+    {"rank": 2, "dim": "#0877", "name": "red flowers",        "verdict": "spurious", "latent": 350, "ambient": 240, "verified": 198, "orig": [], "cf": []},
+    {"rank": 3, "dim": "#4402", "name": "long thin beak",     "verdict": "valid",    "latent": 330, "ambient": 215, "verified": 180, "orig": [], "cf": []},
+    {"rank": 4, "dim": "#0091", "name": "iridescent plumage", "verdict": "valid",    "latent": 300, "ambient": 190, "verified": 151, "orig": [], "cf": []},
+    {"rank": 5, "dim": "#7730", "name": "hovering wing blur", "verdict": "valid",    "latent": 280, "ambient": 160, "verified": 122, "orig": [], "cf": []}
+  ],
+  "fix_before": 0.57, "fix_after": 0.13,
+  "fix2_before": 0.61, "fix2_after": 0.79,
+  "out": "figure1_didae_hummingbird_filled"
+}

@@ -1,5 +1,5 @@
 import unittest
-import torch
+from types import SimpleNamespace
 import numpy as np
 
 from torch.utils.data import Dataset, DataLoader
@@ -30,7 +30,7 @@ class TestDataStack(unittest.TestCase):
 class TestDataloaderMixer(unittest.TestCase):
     def test_priorities1(self):
         dataloader = DataloaderMixer(
-            {"iterations_per_episode": 10000}, DataLoader(DummyDataset([1]))
+            SimpleNamespace(steps_per_epoch=10000), DataLoader(DummyDataset([1]))
         )
         dataloader.append(DataLoader(DummyDataset([2])), priority=9)
         value_list = []
@@ -41,8 +41,8 @@ class TestDataloaderMixer(unittest.TestCase):
 
     def test_priorities2(self):
         dataloader = DataloaderMixer(
-            {"iterations_per_episode": 10000},
-            DataLoader(DummyDataset(list(np.ones([9], dtype=np.int)))),
+            SimpleNamespace(steps_per_epoch=10000),
+            DataLoader(DummyDataset(list(np.ones([9], dtype=int)))),
         )
         dataloader.append(DataLoader(DummyDataset([2])), priority=9)
         value_list = []

@@ -1,20 +1,12 @@
-import argparse
+"""Run any PEAL adaptor from its YAML config.
 
-from peal.global_utils import load_yaml_config, set_random_seed
-from peal.adaptors.adaptor_factory import get_adaptor
+Thin wrapper. The implementation moved to ``peal.entrypoints.run_adaptor`` so that an
+installed PEAL exposes it as the ``peal-adapt`` console command; this file is kept
+because the reproduction scripts, notebooks and README all invoke ``python
+run_adaptor.py ...``. See that module for the full documentation.
+"""
 
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, required=True)
-    args = parser.parse_args()
-
-    adaptor_config = load_yaml_config(args.config)
-    set_random_seed(adaptor_config.seed)
-
-    adaptor = get_adaptor(adaptor_config)
-    adaptor.run()
-
+from peal.entrypoints.run_adaptor import main
 
 if __name__ == "__main__":
     main()

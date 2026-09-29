@@ -1,0 +1,49 @@
+experiment_id: i0_in100_siglip2_region_language_cards
+
+model_name: google/siglip2-base-patch16-256
+model_revision: 3f9f96cb90da5dbc758b01813f2f6f1aee24c1ab
+model_path: external/models/google__siglip2-base-patch16-256/snapshots/3f9f96cb90da5dbc758b01813f2f6f1aee24c1ab
+asset_manifest: external/models/google__siglip2-base-patch16-256/snapshots/3f9f96cb90da5dbc758b01813f2f6f1aee24c1ab/asset_manifest.json
+train_cache: artifacts/ada/atlas/embeddings/imagenet100/train/facebook__dinov2-with-registers-base/cls/combined_train_full_4shards
+validation_cache: artifacts/ada/atlas/embeddings/imagenet100/val/facebook__dinov2-with-registers-base/cls/cache-6ec1e8a1b614f414
+image_cache_mode: encode
+train_image_root: /home/space/datasets/imagenet_torchvision/imagenet100/train
+validation_image_root: /home/space/datasets/imagenet_torchvision/imagenet100/val
+
+enriched_regions_dir: artifacts/ada/actionability/regions/e4a_in100_dinov2_cls_k10_enriched_seed0
+pilot_regions_dir: artifacts/ada/actionability/pilot_regions/e4a_in100_dinov2_cls_k10_pilot_seed0
+deletion_controls_dir: artifacts/ada/actionability/deletion_pilot/e4a_in100_dinov2_cls_k10_controlled_seed0
+deletion_evaluation_csv: artifacts/ada/actionability/evaluation/e4a_in100_dinov2_cls_k10_deletion_probe_pilot_full_seed0/dose_response_effects.csv
+restoration_evaluation_csv: artifacts/ada/actionability/evaluation/e5a_in100_dinov2_cls_k10_real_restoration_pilot_seed0/restoration_evaluation.csv
+
+phrase_bank_dir: artifacts/ada/interpretability/i0_in100_siglip2_region_language/phrase_bank
+phrase_bank_csv: artifacts/ada/interpretability/i0_in100_siglip2_region_language/phrase_bank/phrase_bank.csv
+interpretability_manifest_dir: artifacts/ada/interpretability/manifests/in100_eight_causal_regions
+vlm_shared_dir: artifacts/ada/interpretability/i0_in100_siglip2_region_language/siglip2_shared_image_text
+region_cards_dir: artifacts/ada/interpretability/i0_in100_siglip2_region_language/region_cards
+
+imagenet_meta: /home/space/datasets/imagenet_torchvision/data/meta.bin
+include_general_phrases: true
+include_class_prompts: true
+include_class_attribute_prompts: true
+
+batch_size: 64
+text_batch_size: 256
+feature_precision: fp32
+canary_max_images: 128
+device: auto
+
+control_max_count: 256
+top_k_phrases: 12
+bootstrap_samples: 100
+bootstrap_top_k: 20
+permutation_samples: 100
+min_bootstrap_frequency: 0.0
+min_supporting_images: 5
+sparse_enabled: true
+sparse_max_terms: 8
+text_temperature:
+text_logit_scale:
+temperature_calibration_samples: 2048
+seed: 0
+overwrite: true

@@ -1,0 +1,8 @@
+# Documentation build only. The library's own dependencies are in
+# requirements.txt; docs/conf.py mocks whichever of them is not installed so
+# the API reference can be built on a machine without torch or a GPU.
+sphinx>=6.1,<8
+furo
+myst-parser
+numpy
+pyyaml

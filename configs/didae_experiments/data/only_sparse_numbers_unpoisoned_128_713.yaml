@@ -1,0 +1,18 @@
+dataset_class           : OnlySparseNumbersDataset
+dataset_path            : $PEAL_DATA/only_sparse_numbers_128_confounding_713
+num_samples             : 16000
+split                   : [0.8,0.9]
+input_type              : image
+input_size              : [3, 128, 128]
+x_selection             : imgs
+output_split            : 1000
+output_type             : mixed
+output_size             : [8]
+downsize                : Resize
+delimiter               : ","
+confounder_probability  : 0.5
+confounding_factors     : [Num128, Num713]
+has_hints               : false
+set_negative_to_zero    : false
+seed                    : 1
+font_path               : '/opt/conda/envs/peal/fonts/DejaVuSans.ttf'

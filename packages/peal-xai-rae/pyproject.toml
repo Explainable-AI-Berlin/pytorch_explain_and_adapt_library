@@ -1,0 +1,75 @@
+# peal-xai-rae: the non-commercial companion of peal-xai.
+#
+# Built separately from the repository root so that `pip install peal-xai`
+# stays LGPL-only; users opt in with `pip install "peal-xai[rae]"` (or
+# `pip install ./packages/peal-xai-rae` from a clone). See ../../LICENSING.md.
+[build-system]
+requires = ["setuptools>=62.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "peal-xai-rae"
+dynamic = ["version"]
+description = "RAEv2 fork for PEAL's RAE generators (CC BY-NC 4.0, non-commercial use only)."
+readme = "README.md"
+license = {text = "CC-BY-NC-4.0"}
+authors = [{name = "Sidney Bender and the PEAL contributors"}]
+requires-python = ">=3.9,<3.12"
+classifiers = [
+    "License :: Free for non-commercial use",
+    "Programming Language :: Python :: 3",
+    "Operating System :: POSIX :: Linux",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+# What the inference path imports (encoders, stage-1 decoder, stage-2 DDT and
+# sampler). Deliberately loose bounds: RAEv2's own pyproject pins numpy 2.2 and
+# torch 2.10, which would fight peal-xai's numpy<2. OpenAI CLIP (the clip:ViT-L/14
+# encoder) is not on PyPI; install it with
+#   pip install "clip @ git+https://github.com/openai/CLIP.git"
+dependencies = [
+    "peal-xai",
+    "omegaconf>=2.3",
+    "einops>=0.6",
+    "safetensors>=0.4",
+    "timm>=0.9",
+    "diffusers>=0.28",
+    "transformers>=4.36",
+    "huggingface-hub>=0.23",
+]
+
+[project.optional-dependencies]
+# Retraining stage 1 / stage 2 and RAEv2's offline evaluation.
+train = [
+    "datasets>=2.14",
+    "lpips>=0.1.4",
+    "torch-fidelity>=0.3",
+    "wandb>=0.15",
+    "webdataset>=0.2",
+    "gram-newton-schulz",
+]
+
+[project.urls]
+Source = "https://github.com/Explainable-AI-Berlin/pytorch_explain_and_adapt_library"
+Upstream = "https://github.com/nanovisionx/RAEv2"
+Weights = "https://huggingface.co/sidney1505/peal-rae-clip-imagenet"
+
+[tool.setuptools]
+packages = ["peal_rae"]
+license-files = ["LICENSE"]
+
+[tool.setuptools.dynamic]
+version = {attr = "peal_rae.__version__"}
+
+# RAEv2 ships as data, not as importable packages (see peal_rae/__init__.py).
+[tool.setuptools.package-data]
+peal_rae = [
+    "RAEv2/LICENSE",
+    "RAEv2/README.md",
+    "RAEv2/MODIFICATIONS.md",
+    "RAEv2/src/**/*.py",
+    "RAEv2/configs/**/*.yaml",
+    # the decoder architectures <PEAL_RAEV2>/configs/decoder/ViTXL etc. resolve to
+    "RAEv2/configs/**/*.json",
+    "RAEv2/scripts/**/*",
+]

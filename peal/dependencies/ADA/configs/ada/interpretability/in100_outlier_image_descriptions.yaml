@@ -1,0 +1,13 @@
+experiment_id: i0c_in100_outlier_image_descriptions
+
+interpretability_manifest_dir: artifacts/ada/interpretability/manifests/in100_eight_causal_regions
+region_cards_dir: artifacts/ada/interpretability/i0_in100_siglip2_region_language/region_cards
+region_cards_csv: artifacts/ada/interpretability/i0_in100_siglip2_region_language/region_cards/region_language_cards.csv
+text_ambiguity_csv: artifacts/ada/interpretability/i0_in100_siglip2_region_language/region_cards/region_text_ambiguity.csv
+outlier_report_dir: artifacts/ada/interpretability/i0c_in100_outlier_image_descriptions
+train_image_root: /home/space/datasets/imagenet_torchvision/imagenet100/train
+validation_image_root: /home/space/datasets/imagenet_torchvision/imagenet100/val
+
+max_images: 12
+top_concepts: 4
+overwrite: true

@@ -1,0 +1,55 @@
+# # python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/celeba_Blond_Hair_natural_pdc_cfkd.yaml"
+adaptor_type                         :  "CFKD"
+category                             :  "adaptor"
+batch_size                           :  2
+tracking_level                       :  4
+min_train_samples                    :  900
+finetune_iterations                  :  1
+max_validation_samples               :  100
+continuous_learning                  :  "finetune"
+replace_model                        :  True
+use_visualization                    :  True
+calculate_group_accuracies           :  False
+explainer                            :  <PEAL_BASE>/configs/explainers/waterbirds_sd3.yaml
+training                             :  <PEAL_BASE>/configs/training/img_classifier_balanced_water_bird.yaml
+data                                 :  <PEAL_BASE>/configs/data/waterbirds256x256_sd3.yaml
+test_data                            :  <PEAL_BASE>/configs/data/waterbirds256x256_sd3.yaml
+student                              :  <PEAL_BASE>/peal_runs/waterbirds_classifier_resnet_18_class_balance/model.cpl
+teacher                              :  Baseline:false
+generator                            :  <PEAL_BASE>/configs/generators/stable_diffusion_3_waterbird.yaml
+base_dir                             :  <PEAL_BASE>/peal_runs/sce_cfkd/waterbirds_sd3
+seed                                 : 42
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [y]
+
+
+# adaptor_type                         :  "CFKD"
+# category                             :  "adaptor"
+# batch_size                           :  1
+# tracking_level                       :  4
+# min_train_samples                    :  400 #480
+# finetune_iterations                  :  1
+# max_validation_samples               :  100 #59
+# continuous_learning                  :  "finetune"
+# use_visualization                    :  True
+# calculate_group_accuracies           :  True
+# explainer                            :  <PEAL_BASE>/configs/explainers/waterbirds_sd3.yaml
+# training                             :  <PEAL_BASE>/configs/training/img_classifier_balanced_water_bird.yaml
+# data                                 :  <PEAL_BASE>/configs/data/waterbirds256x256_sd3.yaml
+# test_data                            :  <PEAL_BASE>/configs/data/waterbirds256x256_sd3.yaml
+# student                              :  <PEAL_BASE>/peal_runs/waterbirds_classifier_best_val_resnet18/model.cpl
+# teacher                              :  Baseline:true
+# generator                            :  <PEAL_BASE>/configs/generators/stable_diffusion_3_waterbird.yaml
+# base_dir                             :  <PEAL_BASE>/peal_runs/waterbirds256x256_sd3
+# task:
+#   criterions:
+#     ce     : 1.0
+#     l2     : 100.0
+#   output_type             : singleclass
+#   output_channels         : 2
+#   y_selection             : [y]

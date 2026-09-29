@@ -1,0 +1,52 @@
+# python train_generator.py --config "<PEAL_BASE>/configs/didae_experiments/generators/celeba_rae_clip.yaml"
+# continue: python train_generator.py --config $PEAL_RUNS/celeba/rae_clip/config.yaml --continue_training True
+# 1-GPU launcher with retry loop: bash reproduction_scripts/run_celeba_rae_clip.sh all
+#
+# CelebA Representation Autoencoder (RAEv2, two-stage) whose frozen
+# representation encoder is OpenAI CLIP ViT-L/14 -- the CelebA twin of
+# imagenet_rae_clip.yaml, and the RAE counterpart of
+# celeba_diffusion_autoencoder_openai_clip_vit_l14.yaml. Both stages are trained
+# from scratch by peal/generators/rae_pipeline.py:
+#   stage 1  ViT-XL decoder on the 16x16x1024 CLIP patch-token latent
+#            (rae_clip/stage1_celeba_clip_vitl14.yaml)
+#   stage 2  DDT flow-matching model (0.35B) on that latent, conditioned on the
+#            CLIP image embedding (rae_clip/stage2_celeba_clip_vitl14.yaml)
+# z_sem for SAE/DiDAE is the 768-d CLIP image embedding (clip.encode_image),
+# i.e. the space the MSAE dictionaries were fitted in and the space the CelebA
+# DiffAE at $PEAL_RUNS/celeba/diffusion_autoencoder_openai_clip_vit_l14 is
+# conditioned on; the stage-2 model is conditioned on exactly that vector, so
+# dictionary edits stay decodable and the two generators are directly
+# comparable on the same discovered directions.
+#
+# The dataset is read as an ImageFolder tree: <base_path>/imagefolder/train/all
+# is a symlink to $PEAL_DATA/celeba/imgs (202599 jpgs, 178x218), created once by
+# reproduction_scripts/run_celeba_rae_clip.sh. RAEv2's ImageNet loader falls back to torchvision's
+# ImageFolder when there is no Arrow dataset, and compute_encoder_stats.py reads
+# that directory directly.
+generator_type : RAEDiffusionAutoencoder
+category : generator
+base_path : $PEAL_RUNS/celeba/rae_clip
+data: <PEAL_BASE>/configs/sce_experiments/data/celeba_generator.yaml
+image_size: 256
+encoder_dimensions : 768
+encoder: "clip:ViT-L/14"
+encoder_input_space: pytorch_default
+stage1_config: <PEAL_BASE>/configs/didae_experiments/generators/rae_clip/stage1_celeba_clip_vitl14.yaml
+stage2_config: <PEAL_BASE>/configs/didae_experiments/generators/rae_clip/stage2_celeba_clip_vitl14.yaml
+stage1_experiment: clip_vitl14_vitxl
+stage2_experiment: ddt_l_cls
+stage1_precision: bf16
+stage2_precision: bf16
+stats_num_samples: 100000
+stats_batch_size: 128
+keep_checkpoints: 2
+# node-local NVMe; stage 2 trains from this premixed latent+CLS cache (rebuilt if
+# missing). 202599 images x {original, hflip} x 1024x16x16 bf16 = ~210 GB.
+cache_dir: /tmp/rae_clip_celeba_stage2_cache
+# ODE steps for decode() / inversion; sampler type names mirror the DiffAE ones
+# so DiDAE/CFKD/SAE code paths select them unchanged.
+sampler:
+  type: ddim
+  num_steps: 50
+batch_size: 32
+continue_training: false

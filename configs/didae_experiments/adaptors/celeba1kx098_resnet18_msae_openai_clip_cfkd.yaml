@@ -1,0 +1,45 @@
+# CONTROL: classical CFKD (no discovery) with the pretrained MSAE as the dictionary, told the
+# atoms 'blondes' (5018) and 'homme' (4898) -- the MSAE twin of the Procrustes-CFKD baseline.
+# Bounds: c_min_and_maxes.txt copied from the DiDAE MSAE run into <generator>/MSAEDecomposition/.
+# Usage: python -W ignore run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/celeba1kx098_resnet18_msae_openai_clip_cfkd.yaml"
+adaptor_type                         :  "CFKD"
+category                             :  "adaptor"
+batch_size                           :  200
+tracking_level                       :  5
+min_train_samples                    :  800
+finetune_iterations                  :  1
+max_validation_samples               :  200
+continuous_learning                  :  "finetune"
+calculate_group_accuracies           :  True
+calculate_explainer_stats            :  True
+explainer                            :  <PEAL_BASE>/configs/didae_experiments/explainers/dae_distill_ddpm.yaml
+training                             :  <PEAL_BASE>/configs/cfkd_experiments/training/img_finetuning.yaml
+data                                 :  <PEAL_BASE>/configs/cfkd_experiments/data/celeba1k_Blond_Hair_confounding_Male_poisoned098.yaml
+test_data                            :  <PEAL_BASE>/configs/cfkd_experiments/data/celeba.yaml
+student                              :  $PEAL_RUNS/celeba1k/Blond_Hair/classifier_poisoned098/model.cpl
+teacher                              :  $PEAL_RUNS/celeba/Blond_Hair/classifier_unpoisoned/model.cpl
+# _slim = the same final.ckpt (step 40000) minus optimizer state and frozen CLIP encoder
+# keys; identical weights, fits the 16 GiB cgroup. See the README.txt in that directory.
+generator                            :  $PEAL_RUNS/celeba/diffusion_autoencoder_openai_clip_vit_l14_slim/config.yaml
+# The pretrained MSAE (6144 atoms in OpenAI CLIP ViT-L/14 space); CFKD is TOLD the two atoms:
+# 5018 'blondes' (matched to Blond_Hair) and 4898 'homme' (matched to Male).
+# inline so base_path can point at the c_min_and_maxes.txt CFKD's dynamic step clamps to
+sparse_dictionary:
+  base_path: $PEAL_RUNS/celeba/diffusion_autoencoder_openai_clip_vit_l14/MSAEDecomposition
+  category: sparse_dictionaries
+  ckpt_url: https://huggingface.co/WolodjaZ/MSAE/resolve/main/ViT-L_14/centered/6144_768_TopKReLU_64_RW_False_False_0.0_cc3m_ViT-L~14_train_image_2905936_768.pth
+  clip_model: clip:ViT-L/14
+  interp_url: https://huggingface.co/WolodjaZ/MSAE/resolve/main/ViT-L_14/centered/Concept_Interpreter_6144_768_TopKReLU_64_RW_False_False_0.0_cc3m_ViT-L~14_train_image_2905936_768_disect_ViT-L~14_-1_text_20000_768.npy
+  local_dir: /tmp/msae_weights
+  n_components: 6144
+  sparse_dictionaries_type: MSAEDecomposition
+  vocab_filename: clip_disect_20k.txt
+component_indices                    :  [5018, 4898]
+base_dir                             :  $PEAL_RUNS/celeba1k/Blond_Hair/classifier_poisoned098/msae_openai_clip_cfkd_ddpm
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [Blond_Hair]

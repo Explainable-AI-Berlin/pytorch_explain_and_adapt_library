@@ -1,0 +1,15 @@
+# python train_predictor.py --config "<PEAL_BASE>/configs/sae_experiments_tests/predictors/only_sparse_numbers.yaml"
+model_path        : $PEAL_RUNS/only_sparse_numbers_tests/sparse_numbers_predictor
+data              : <PEAL_BASE>/configs/sae_experiments_tests/data/only_sparse_numbers.yaml
+training          : <PEAL_BASE>/configs/sae_experiments_tests/training/img_classifier_only_sparse_numbers.yaml
+architecture      : torchvision_resnet18
+tracking_level    : 5
+continue_training : False
+only_last_layer   : False
+task:
+  criterions:
+    focal  : 1.0
+  focal_alpha             : 0.25
+  focal_gamma             : 1.0
+  output_type             : mixed
+  output_channels         : 1000

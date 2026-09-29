@@ -28,7 +28,7 @@ class TestMakeImageGrid(unittest.TestCase):
             "tensor1": [tensor_one, ["a", "b", "c"]],
             "tensor2": [[tensor_two, tensor_three], ["d", "e", "f"]],
         }
-        grid = make_image_grid(checkboxes, images, 64)
+        grid = make_image_grid(checkboxes, images)
         if not os.path.exists(os.path.join("tests", "outputs")):
             os.makedirs(os.path.join("tests", "outputs"))
 

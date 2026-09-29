@@ -1,0 +1,17 @@
+experiment_id: e4a_in100_k10_pilot_selection_seed0
+enriched_regions_dir: artifacts/ada/actionability/regions/e4a_in100_dinov2_cls_k10_enriched_seed0
+output_dir: artifacts/ada/actionability/pilot_regions/e4a_in100_dinov2_cls_k10_pilot_seed0
+sparse_interior_count: 4
+dense_interior_count: 2
+sparse_boundary_count: 2
+min_train_count: 100
+min_validation_count: 15
+sparse_support_pct_min: 0.75
+dense_support_pct_max: 0.25
+purity_min: 0.90
+entropy_max: 0.20
+margin_min: 0.0
+boundary_entropy_min: 0.40
+boundary_margin_max: 0.0
+one_region_per_class: true
+overwrite: false

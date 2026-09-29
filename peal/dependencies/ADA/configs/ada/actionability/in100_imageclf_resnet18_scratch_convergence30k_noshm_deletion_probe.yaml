@@ -1,0 +1,29 @@
+experiment_id: e8d_in100_imageclf_resnet18_scratch_convergence30k_noshm_deletion_probe
+eval_experiment_id: e8d_in100_imageclf_resnet18_scratch_convergence30k_noshm_deletion_evaluation
+model_id: resnet18_scratch_imageclf
+architecture: torchvision_resnet18
+pretrained: false
+freeze_backbone: false
+allow_weight_download: false
+
+train_cache: artifacts/ada/atlas/embeddings/imagenet100/train/facebook__dinov2-with-registers-base/cls/combined_train_full_4shards
+validation_cache: artifacts/ada/atlas/embeddings/imagenet100/val/facebook__dinov2-with-registers-base/cls/cache-6ec1e8a1b614f414
+train_image_root: /home/space/datasets/imagenet_torchvision/imagenet100/train
+validation_image_root: /home/space/datasets/imagenet_torchvision/imagenet100/val
+enriched_regions_dir: artifacts/ada/actionability/regions/e4a_in100_dinov2_cls_k10_enriched_seed0
+deletion_controls_dir: artifacts/ada/actionability/deletion_pilot/e4a_in100_dinov2_cls_k10_controlled_seed0
+probe_output_dir: artifacts/ada/actionability/probes/e8d_in100_imageclf_resnet18_scratch_convergence30k_noshm_deletion_seed0
+eval_output_dir: artifacts/ada/actionability/evaluation/e8d_in100_imageclf_resnet18_scratch_convergence30k_noshm_deletion_seed0
+report_path: notes/ada/actionability/imageclf_resnet18_scratch_convergence30k_noshm_deletion_report.md
+
+fixed_steps: 30000
+batch_size: 128
+eval_batch_size: 256
+lr: 0.0003
+weight_decay: 0.0001
+image_size: 224
+train_augmentation: standard
+precision: bf16
+num_workers: 0
+device: auto
+overwrite: false

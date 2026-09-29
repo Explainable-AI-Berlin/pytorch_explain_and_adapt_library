@@ -1,4 +1,0 @@
-ending: .npz
-n_components: 100
-sparse_dictionaries_type: MatryoshkaSAE
-category: sparse_dictionaries

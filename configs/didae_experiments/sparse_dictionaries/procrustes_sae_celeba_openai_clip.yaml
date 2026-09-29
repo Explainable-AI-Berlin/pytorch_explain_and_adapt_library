@@ -1,0 +1,19 @@
+# 2-component OrthogonalProcrustes dictionary [Blond_Hair, Male] fitted in the z_sem
+# space of the OpenAI CLIP ViT-L/14 diffusion autoencoder -- the Procrustes-CFKD
+# baseline's direction set on that generator. Same as procrustes_sae_celeba.yaml but
+# fitted on the 6400-sample group-balanced generator split instead of all of CelebA.
+# Fit with: scratchpad/fit_dictionary.py (see reproduction_scripts/reproduce_didae_results.sh)
+# Weights land in $PEAL_RUNS/celeba/diffusion_autoencoder_openai_clip_vit_l14/OrthogonalProcrustesDictionary/
+ending: .npz
+n_components: 2
+name: OrthogonalProcrustesDictionary
+sparse_dictionaries_type: OrthogonalProcrustesDictionary
+category: sparse_dictionaries
+data: <PEAL_BASE>/configs/didae_experiments/data/celeba_unpoisoned_generator.yaml
+task:
+  y_selection: [Blond_Hair, Male]
+  output_type: multiclass
+  output_channels: 2
+  criterions:
+    bce: 1.0
+    l2: 100.0

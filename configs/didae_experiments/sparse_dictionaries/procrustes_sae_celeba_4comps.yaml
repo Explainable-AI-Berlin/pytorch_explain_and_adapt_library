@@ -1,0 +1,12 @@
+ending: .npz
+n_components: 4
+name: OrthogonalProcrustesDictionary4Comps
+sparse_dictionaries_type: OrthogonalProcrustesDictionary
+category: sparse_dictionaries
+task:
+  y_selection: [Blond_Hair, Male, Heavy_Makeup, Attractive]
+  output_type: multiclass
+  output_channels: 4
+  criterions:
+    bce: 1.0
+    l2: 100.0

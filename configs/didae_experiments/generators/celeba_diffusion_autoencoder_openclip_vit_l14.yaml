@@ -1,0 +1,12 @@
+# python train_generator.py --config "<PEAL_BASE>/configs/didae_experiments/generators/celeba_diffusion_autoencoder_openclip_vit_l14.yaml"
+# python run_component_analysis.py --config $PEAL_RUNS/celeba/diffusion_autoencoder_openclip_vit_l14/config.yaml --sd_config configs/didae_experiments/sparse_dictionaries/msae_decomposition.yaml
+generator_type : DiffusionAutoencoder
+category : generator
+base_path : $PEAL_RUNS/celeba/diffusion_autoencoder_openclip_vit_l14
+data: <PEAL_BASE>/configs/sce_experiments/data/celeba_generator.yaml
+image_size: 64
+batch_size: 100
+save_every_samples: 20000
+total_samples: 40000001
+encoder_dimensions : 768
+encoder: "open_clip:ViT-L-14:laion2b_s32b_b82k"

@@ -1,0 +1,97 @@
+# RAEv2 Stage 1 for the ImageNet RAE generator with a frozen OpenAI CLIP ViT-L/14
+# encoder (imagenet_rae_clip.yaml). Trained from scratch: the pinned RAEv2/ADA
+# stage-1 decoders are DINOv2-L/DINOv3-L specific.
+#
+# Consumed by RAEv2's src/train_stage1.py (OmegaConf-merged into Stage1Config),
+# launched through peal/generators/rae_pipeline.py. All paths are absolute
+# because RAEv2 resolves them against its own working directory.
+#
+# Recipe = RAEv2's configs/stage1/training/dinov3l-k7-imagenet.yaml with:
+#   encoder_name  clipproj-vit-L : CLIP ViT-L/14 patch tokens (1024-d, 16x16 at
+#                  256px) as the latent; the global token is ln_post+proj, i.e.
+#                  clip.encode_image() (768-d), the MSAE / PEAL z_sem space.
+#   epochs        16 as upstream; the cosine schedule and disc_start scale with
+#                  it, so change all three together (see rae_pipeline.py).
+#   dataset       raw ImageNet ImageFolder (RAEv2's HF loader falls back to
+#                  torchvision ImageFolder when no Arrow dataset exists).
+#   eval          psnr/ssim on 2000 val images every 5000 steps; rFID would need
+#                  a reference npz and is not worth the time here.
+stage_1:
+  target: stage1.RAE
+  params:
+    encoder_name: clipproj-vit-L
+    resolution: 256
+    decoder_config_path: <PEAL_RAEV2>/configs/decoder/ViTXL
+    noise_tau: 0.8
+
+dataset:
+  target: imagenet
+  type: hf
+  data_dir: /home/space/datasets/imagenet/2012
+  split: train_set
+  condition_type: label
+  shared_tmpdir: /tmp/rae_clip_tmp
+
+training:
+  epochs: 16
+  ema_decay: 0.9978
+  global_batch_size: 512
+  grad_accum_steps: 4   # 32 images per H100; 64 OOMs in the GAN phase (measured 2026-09-11)
+  num_workers: 10
+  clip_grad: 0.0
+  log_interval: 100
+  checkpoint_interval: 1
+  sample_every: 2500
+  image_size: 256
+  global_seed: 0
+  optimizer:
+    type: adamw
+    lr: 2.0e-4
+    betas: [0.9, 0.95]
+    weight_decay: 0.0
+  scheduler:
+    type: cosine
+    warmup_epochs: 1
+    decay_end_epoch: 16
+    base_lr: 2.0e-4
+    final_lr: 2.0e-5
+    warmup_from_zero: true
+
+# eval disabled 2026-09-11 18:43: RAEv2's reconstruction eval unconditionally needs
+# a reference NPZ of the val images (only the datasets.py check made it look
+# optional for psnr/ssim) and crashed the run at step 5000. Reconstruction quality
+# is tracked from the EMA checkpoints by the supervising session instead.
+eval: null
+
+gan:
+  arch:
+    dino_ckpt_path: <PEAL_RAEV2>/pretrained_models/encoders/dino/dino_vit_small_patch8_224.pth
+    ks: 9
+    norm_type: bn
+    using_spec_norm: true
+    recipe: S_8
+  optimizer:
+    type: adamw
+    lr: 2.0e-4
+    betas: [0.9, 0.95]
+    weight_decay: 0.0
+  scheduler:
+    type: cosine
+    warmup_epochs: 1
+    decay_end_epoch: 16
+    base_lr: 2.0e-4
+    final_lr: 2.0e-5
+    warmup_from_zero: true
+  augment:
+    prob: 1.0
+    cutout: 0.0
+  loss:
+    disc_loss: hinge
+    gen_loss: vanilla
+    disc_weight: 0.75
+    perceptual_weight: 1.0
+    disc_start: 8
+    disc_upd_start: 6
+    lpips_start: 0
+    max_d_weight: 10000.0
+    disc_updates: 1

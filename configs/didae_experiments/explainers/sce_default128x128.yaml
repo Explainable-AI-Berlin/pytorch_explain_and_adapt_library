@@ -1,11 +1,34 @@
-# python -W ignore run_explainer.py --config "<PEAL_BASE>/configs/cfkd_experiments/explainers/ace_pe_only.yaml"
-explainer_type : ACE
-category : explainer
-attack_iterations: 100
+category: explainer
+explainer_type: SCE
+# parameters analyzed in ablation study
+use_gradient_filtering: true
+distilled_predictor: <PEAL_BASE>/configs/cfkd_experiments/predictors/sensitive_distillation.yaml
+dist_l1: 0.0005
+inpaint: 0.15
+allow_overlap: false
+# parameters constant in ablation study
+dilation: 13
+clustering_strategy: highest_activation
+gradient_clipping: 1000000000000.0
+gradient_steps: 50
+greedy: false
+iterationwise_encoding: true
+learning_rate: 300.0
+mask_momentum: 0.0
+max_samples: null
+merge_clusters: concatenate
+momentum: 0.9
+num_attempts: 2
+num_discretization_steps: 20
+optimizer: SGD
+replace_with_activation: leakysoftplus
 sampling_time_fraction: 0.3
-sampling_inpaint: 0.7
-attack_step: 1
-dist_l1: 0.001
-y_target_goal_confidence: 1.1
-num_attempts: 4
+seed: 0
+stochastic: fully
+temperature: 3.0
+transition_restrictions: null
 use_clustering: false
+use_masking: true
+validate_generator: false
+visualize_gradients: true
+y_target_goal_confidence: null

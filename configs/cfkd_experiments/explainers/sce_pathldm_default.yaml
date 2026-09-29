@@ -1,0 +1,17 @@
+explainer_type : SCE
+attack_iterations: 100
+attack_step: 1.0
+category: explainer
+distilled_predictor: <PEAL_BASE>/configs/cfkd_experiments/explainers/sce_default128x128.yaml
+y_target_goal_confidence: 0.8
+timestep_respacing: 100
+# distilled_predictor                  :  <PEAL_BASE>/configs/predictors/sensitive_distillation_follicle.yaml
+sampling_time_fraction: 0.3
+gradient_clipping: 1
+learning_rate: 1.0
+merge_clusters: concatenate
+momentum: 0.9
+num_attempts: 2
+num_discretization_steps: 20
+optimizer: SGD
+replace_with_activation: leakysoftplus

@@ -1,0 +1,4 @@
+category: generator
+generator_type: DDPMPathLDM
+data: <PEAL_BASE>/configs/data/camelyon17_1k_poisoned098_generator.yaml
+base_path : $PEAL_RUNS/celeba/DDPMPathLDM

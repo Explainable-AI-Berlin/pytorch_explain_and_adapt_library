@@ -9,8 +9,8 @@ optimizer = "adam"
 dist_ps = ["none", "l1", "l2"]  # TODO: new scheme
 dist_types = ["latent", "pixel"]
 rmodel_paths = [
-    "/home/tha/thesis_runs/regressor/imdb_wiki_densenet_linear_only-256/version_0/checkpoints/last.ckpt",
-    "/home/tha/thesis_runs/regressor/imdb_wiki_densenet_fullft-256/version_0/checkpoints/last.ckpt",
+    os.path.join(os.environ.get("PEAL_RUNS", "peal_runs"), "regressor/imdb_wiki_densenet_linear_only-256/version_0/checkpoints/last.ckpt"),
+    os.path.join(os.environ.get("PEAL_RUNS", "peal_runs"), "regressor/imdb_wiki_densenet_fullft-256/version_0/checkpoints/last.ckpt"),
 ]
 
 # Iterate through all combinations of hyperparameters

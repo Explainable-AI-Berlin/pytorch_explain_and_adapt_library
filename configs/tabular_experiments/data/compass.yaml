@@ -1,6 +1,6 @@
 dataset_class: CompassDataset
 category: data
-dataset_path: datasets/compass
+dataset_path: $PEAL_DATA/compass
 output_size: [ 1 ]
 input_size: [ 11 ]
 input_type: "symbolic"

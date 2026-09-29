@@ -1,0 +1,14 @@
+experiment_id: e4a_in100_deletion_manifests_seed0
+train_cache: artifacts/ada/atlas/embeddings/imagenet100/train/facebook__dinov2-with-registers-base/cls/combined_train_full_4shards
+regions_dir: artifacts/ada/actionability/regions/e4a_in100_dinov2_cls_train_regions_k5_k10_seed0
+output_dir: artifacts/ada/actionability/deletion/e4a_in100_dinov2_cls_train_regions_k5_k10_seed0
+retention_levels: [1.0, 0.5, 0.25, 0.1, 0.0]
+seed: 0
+max_regions: 30
+overwrite: false
+eligibility:
+  min_train_count: 100
+  min_val_count: 10
+  same_class_purity: 0.90
+  min_positive_class_margin: 0.0
+  max_duplicate_fraction: 0.10

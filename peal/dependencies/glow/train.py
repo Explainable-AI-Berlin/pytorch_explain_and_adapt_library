@@ -118,9 +118,7 @@ def train(args, model, optimizer, model_single):
         z_new = torch.randn(args.n_sample, *z) * args.temp
         z_sample.append(z_new.to(device))
 
-    fid = torchmetrics.image.fid.FrechetInceptionDistance(
-        feature=192, reset_real_features=False
-    )
+    fid = torchmetrics.image.fid.FrechetInceptionDistance(feature=192, reset_real_features=False)
     fid.to(device)
     real_images = []
     for i in range(min(len(args.val_dataloader.dataset), 100)):

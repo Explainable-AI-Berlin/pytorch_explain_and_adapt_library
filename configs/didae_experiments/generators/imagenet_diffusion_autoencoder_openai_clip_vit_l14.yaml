@@ -1,0 +1,96 @@
+# python train_generator.py --config "<PEAL_BASE>/configs/didae_experiments/generators/imagenet_diffusion_autoencoder_openai_clip_vit_l14.yaml"
+# continue: python train_generator.py --config $PEAL_RUNS/imagenet/diffusion_autoencoder_openai_clip_vit_l14/config.yaml --continue_training True
+# 4-GPU launcher with retry loop: bash reproduction_scripts/run_imagenet_dae_clip_vitl14.sh full
+#
+# ImageNet diffusion autoencoder whose semantic encoder is frozen OpenAI CLIP
+# ViT-L/14 -- the space the pretrained MSAE dictionaries (arXiv:2502.20578) were
+# trained in. This makes the MSAE usable as the dictionary for DiDAE's latent
+# edits AND leaves those edits decodable, which is the whole point: the CelebA
+# twin of this file (celeba_diffusion_autoencoder_openai_clip_vit_l14.yaml) does
+# the same for faces.
+#
+# Differences from imagenet_diffusion_autoencoder.yaml, both load-bearing:
+#
+#   encoder: "clip:ViT-L/14"     NOT "open_clip:ViT-L-14:laion2b_s32b_b82k".
+#       Same architecture, same 768 dimensions, different weights, hence a
+#       different embedding space -- and nothing about the shapes catches the
+#       swap. MSAE's precompute_activations.py does `import clip; clip.load(...)`,
+#       so its dictionary only means anything on top of these weights.
+#
+#   encoder_input_space: pytorch_default    The old config omits this, so it
+#       defaults to "legacy", which applies the dataset normalization a SECOND
+#       time before the encoder. OpenAICLIPEncoder applies CLIP's own resize and
+#       mean/std and therefore needs a [0, 1] image. Left at "legacy" the decoder
+#       would be trained against z_sem from doubly-normalized pixels, i.e. off
+#       the manifold MSAE was fitted on, and the dictionary would be meaningless
+#       here even though every shape matches.
+#
+# LitModel.__init__ does `if not conf.encoder is None: self.model.encoder =
+# conf.encoder`, and ema_model is deep-copied from it, so the encoder is frozen
+# and the decoder is trained conditioned on these embeddings.
+#
+generator_type : DiffusionAutoencoder
+category : generator
+base_path : $PEAL_RUNS/imagenet/diffusion_autoencoder_openai_clip_vit_l14
+data: <PEAL_BASE>/configs/sce_experiments/data/imagenet_generator.yaml
+# NOTE image_size here is decorative. adjust_config() sets both conf.img_size and
+# conf.model_conf.image_size from generator_dataset.config.input_size[-1], so the
+# training resolution comes from the *data* config (imagenet_generator.yaml:
+# input_size [3, 256, 256]). Change resolution there, not here.
+image_size: 256
+encoder_dimensions : 768
+encoder: "clip:ViT-L/14"
+encoder_input_space: pytorch_default
+
+# --- long run: 7 days on 4 x H100 (launch with reproduction_scripts/run_imagenet_dae_clip_vitl14.sh) ---
+#
+# Why every number is what it is (measured 2026-09-11 on an A100-80GB PCIe,
+# fp16, then scaled x1.8 for an H100 SXM):
+#
+#   architecture   The template (net_ch 64, mult (1,2,4,8)) is diffae's 64px
+#                  design. At 256px it bottlenecks at 32x32, never reaches its
+#                  attention resolution, needs 50 GiB at batch 32 and after a
+#                  20 h prototype its DINO-LPIPS was still 0.86-0.99. The
+#                  settings below are diffae's own ffhq256 recipe: 149M decoder
+#                  params, attention at 16x16, bottleneck 8x8, 36 GiB at 16/GPU,
+#                  34 img/s per A100 (vs 47 for the template).
+#   batch_size     is the GLOBAL batch; Lightning splits it over the visible
+#                  GPUs (must be divisible by their number). 64 = 16 per GPU is
+#                  exactly diffae's ffhq256 setting, with its lr 1e-4 / EMA
+#                  0.9999 / grad_clip 1 / dropout 0.1 left untouched. Bigger
+#                  micro-batches did not raise img/s, so extra optimizer steps
+#                  are worth more than a bigger batch.
+#   total_samples  the plan assumed ~215 img/s on 4 H100 SXM; measured on
+#                  2026-09-13 on 4 x H100 PCIe (head073): 117 img/s = 1.83
+#                  optimizer steps/s, i.e. ~65M samples (~60 epochs of the 80 %
+#                  train split, ~1M steps) inside max_time. 120M stays as the
+#                  nominal target; max_time is what ends the diffusion stage.
+#   max_time       6 d 12 h: the run was launched 6.5 h into a 7-day allocation
+#                  (ends Sun 2026-09-20 06:58), leaving ~5 h for the "infer"
+#                  pass (CLIP over the train split, ~20 min measured on the
+#                  smoke subset rate) and the latent DPM, which is not needed by
+#                  DiDAE and simply runs until the allocation ends. A later
+#                  --continue_training resumes toward total_samples if wanted.
+#   save_every     1M samples = one 2 x 4.7 GB checkpoint write every ~80 min
+#                  (model + EMA, each includes the frozen CLIP weights). The old
+#                  20000 would have written every ~90 s at this throughput.
+#   eval_fid       off: the template evaluates FID on 24 images (values in the
+#                  thousands, meaningless) and builds DINOv2 three times per
+#                  eval. Progress is read from loss and the rec_loss*/lpips
+#                  curves (note: those are rendered from FIXED random x_T with
+#                  the encoder's z_sem, i.e. semantic samples, not true DDIM
+#                  reconstructions, so their PSNR stays ~9 dB by construction).
+#   precision      bf16-mixed on H100: no loss scaler, no fp16 overflow risk.
+net_ch: 128
+net_ch_mult: [1, 1, 2, 2, 4, 4]
+net_attn: [16]
+net_enc_channel_mult: [1, 1, 2, 2, 4, 4, 4]
+batch_size: 64
+accum_batches: 1
+total_samples: 120000000
+save_every_samples: 1000000
+max_time: "06:12:00:00"
+precision: bf16-mixed
+continue_training: false
+eval_fid: false
+eval_lpips: false

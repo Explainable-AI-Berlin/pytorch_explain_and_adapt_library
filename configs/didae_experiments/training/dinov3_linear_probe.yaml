@@ -1,0 +1,12 @@
+# Linear-probe training on a frozen foundation backbone (only_last_layer: True in
+# the predictor config). The backbone is never updated, so a handful of passes over
+# ~2000 images is all the head needs; img_finetuning_adamw.yaml's 50 x 400 steps at
+# lr 1e-5 is sized for finetuning, not for a probe.
+dropout: 0.0
+learning_rate: 1.0e-03
+max_epochs: 4
+optimizer: adamw
+steps_per_epoch: 100
+test_batch_size: 64
+train_batch_size: 32
+val_batch_size: 32

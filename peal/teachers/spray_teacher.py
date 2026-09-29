@@ -1,3 +1,14 @@
+"""SpRAy teacher: find confounded samples by clustering LRP attributions.
+
+Spectral Relevance Analysis (SpRAy) computes layer-wise relevance attributions
+of a classifier over the dataset, clusters them per class with corelay's
+spectral clustering pipeline, and serves the result in a ViReLay web GUI. A
+human selects the clusters that show a confounding (Clever-Hans) feature and
+exports them; the teacher turns those selections into per-sample group labels
+that downstream adaptors (e.g. ClArC or GroupDRO) can train against. All
+intermediate HDF5 databases are written under ``base_dir``.
+"""
+
 import json
 import multiprocessing
 import os
@@ -5,42 +16,113 @@ import pathlib
 import time
 from typing import Union
 
-import h5py
 import torch
 import numpy as np
 import csv
 import yaml
-from corelay.pipeline.spectral import SpectralClustering
-from corelay.processor.base import Processor
-from corelay.processor.clustering import (
-    KMeans,
-    AgglomerativeClustering,
-    HDBSCAN,
-    DBSCAN,
-)
-from corelay.processor.embedding import EigenDecomposition, TSNEEmbedding, UMAPEmbedding
-from corelay.processor.flow import Sequential, Parallel
-from crp.attribution import CondAttribution
-from crp.concepts import ChannelConcept
 from pydantic import BaseModel
 from torch.utils.data import ConcatDataset, DataLoader, Subset
 from tqdm import tqdm
-from virelay.model import Workspace
-from virelay.server import Server
-from zennit.attribution import Gradient, IntegratedGradients, SmoothGrad
-from zennit.composites import EpsilonPlusFlat, EpsilonGammaBox
-from zennit.image import imgify, imsave
+from zennit.attribution import SmoothGrad
+from zennit.composites import EpsilonGammaBox
 from zennit.torchvision import ResNetCanonizer
 
+from peal._optional import require
 from peal.adaptors.clarc import get_layer_name
 from peal.architectures.interfaces import TaskConfig
 from peal.data.dataset_factory import get_datasets
 from peal.data.interfaces import DataConfig
 from peal.global_utils import save_yaml_config
 from peal.teachers.interfaces import TeacherInterface
+from peal.log import get_logger
+
+_log = get_logger(__name__)
+
+
+# ``corelay.processor.base.Processor`` is the base class of the processors
+# defined at the bottom of this module, so it cannot be imported lazily inside
+# a function. The import is guarded instead: without the optional ``xai``
+# extra the module still imports, but building a processor raises.
+try:
+    from corelay.processor.base import Processor
+except ImportError as _exc:  # pragma: no cover - depends on the installed extras
+    _CORELAY_IMPORT_ERROR = _exc
+
+    class Processor:
+        """Placeholder for ``corelay.processor.base.Processor``.
+
+        Used when the optional ``corelay`` dependency is missing, so that this
+        module stays importable and only the SpRAy processors themselves fail.
+        """
+
+        def __init__(self, *args, **kwargs):
+            """
+            Reject construction because ``corelay`` is not installed.
+
+            Parameters
+            ----------
+            *args, **kwargs
+                Ignored; accepted so the signature matches the real processor.
+
+            Raises
+            ------
+            ImportError
+                Always, naming the ``pip install peal-xai[xai]`` command that
+                installs the missing dependency.
+            """
+            raise ImportError(
+                "PEAL needs the optional module 'corelay' for the SpRAy "
+                "teacher's processors, but it is not installed. Install it "
+                "with: pip install peal-xai[xai]"
+            ) from _CORELAY_IMPORT_ERROR
 
 
 class SprayConfig(BaseModel):
+    """Config for the :class:`Spray` teacher.
+
+    Parameters
+    ----------
+    base_dir : str
+        Directory the analysis (HDF5 databases, ViReLay project, labels) is
+        written to.
+    data : DataConfig
+        Dataset the classifier is analysed on; ``dataset_path/data.csv`` is
+        re-written with a ``SprayLabel`` column.
+    dataset_name : str, optional
+        Key into ``CLASS_NAMES``; defaults to ``data.dataset_class``.
+    model : str
+        Path of the ``torch.load``-able classifier.
+    port : int, optional
+        Port of the ViReLay GUI. Default 8080.
+    use_relative_concept_importance : bool, optional
+        Cluster CRP channel importances instead of raw attributions.
+    sum_attribution_channels, normalize_attribtions : bool, optional
+        Preprocessing steps applied before spectral clustering.
+    attribution_layer : int, optional
+        Index of the layer whose relevances are clustered; 0 means the input
+        heatmaps. Default -2.
+    classes_total : int
+        Number of classes to analyse.
+    num_clusters_max : int, optional
+        k-means and agglomerative clusterings are run for k in ``2..max``.
+    num_eigval : int, optional
+        Eigenvectors kept by the spectral embedding. Default 32.
+    tsne_perplexity, umap_neighbors : float/int or list
+        One t-SNE and UMAP embedding is stored per value.
+    task : TaskConfig
+        Task of the classifier, passed to ``get_datasets``.
+    skip_wrongly_classified_samples : bool, optional
+        Drop misclassified samples from the attribution database.
+    max_samples : int, optional
+        Random subset size of the train split. Default 10000.
+    split_dataset : bool, optional
+        Analyse train/val(/test) separately instead of concatenated.
+    conditioning_layer, conditioning_channels : optional
+        Restrict CRP attribution to given channels of a layer.
+    include_testsplit : bool, optional
+        Also include the test split in the analysis.
+    """
+
     config_name: str = "SprayConfig"
     base_dir: str
     data: DataConfig
@@ -66,16 +148,58 @@ class SprayConfig(BaseModel):
 
 
 class LogitDifference(torch.nn.Module):
+    """Module returning ``y[0] - y[1]``; a binary logit-difference head."""
+
     def __init__(self):
+        """Stateless module; only calls ``nn.Module.__init__``."""
         super().__init__()
 
     def forward(self, y):
+        """Return the difference of the first two entries of ``y``."""
         return y[0] - y[1]
 
 
 class Spray(TeacherInterface):
-    def __init__(self, config: Union[dict, SprayConfig], device: str = None):
+    """Teacher that derives confounder group labels from a SpRAy analysis.
 
+    The constructor loads the classifier (unwrapping a ``.model`` attribute
+    if present), loads the train/val/test datasets with URLs and groups
+    enabled, and prepares ``base_dir``. :meth:`get_feedback` then runs the
+    attribution, clustering and ViReLay steps and returns a filename ->
+    group-label map.
+
+    Parameters
+    ----------
+    config : dict or SprayConfig
+        See :class:`SprayConfig`.
+    device : str, optional
+        Torch device; CUDA when available by default.
+
+    Attributes
+    ----------
+    analysis_dir : str
+        ``<base_dir>/attrbs-layer-<n>_analysis``, set by ``get_feedback``.
+    attribution_db_path, heatmaps_db_path, concept_importance_db_path, input_db_path, analysis_db_path : str
+        HDF5 files produced by the analysis.
+    """
+
+    def __init__(self, config: Union[dict, SprayConfig], device: str = None):
+        """Load the classifier and the datasets and create ``base_dir``.
+
+        Scalar ``tsne_perplexity``/``umap_neighbors`` entries are wrapped in a
+        list, the model is unwrapped (``model.model``) and put in eval mode,
+        and the train/val/test datasets are loaded with URLs and groups
+        enabled and class restrictions disabled, so that every sample can be
+        attributed and matched back to its file. The HDF5 paths are only set
+        later, by :meth:`get_feedback`.
+
+        Parameters
+        ----------
+        config : dict or SprayConfig
+            See :class:`SprayConfig`; a dict is validated into one.
+        device : str, optional
+            Torch device; CUDA when available by default.
+        """
         if not isinstance(config, SprayConfig):
             config = SprayConfig(**config)
         self.config = config
@@ -90,7 +214,7 @@ class Spray(TeacherInterface):
         if device is None:
             device = "cuda" if torch.cuda.is_available() else "cpu"
         self.device = device
-        print("running on device: ", self.device)
+        _log.info("%s %s", "running on device: ", self.device)
 
         self.model = torch.load(config.model, map_location=self.device)
         if hasattr(self.model, "model"):
@@ -123,6 +247,34 @@ class Spray(TeacherInterface):
         self.test_data.enable_groups()
 
     def get_feedback(self, **args) -> dict[str, int]:
+        """Run the full SpRAy pipeline and return per-sample confounder labels.
+
+        Steps: compute attributions into HDF5 databases, spectrally cluster
+        them per class, write a label map and ViReLay project, run the GUI
+        until the user has exported ``<cls>-confounders.json`` /
+        ``<cls>-nonconfounders.json`` into ``group-labels/`` (the process
+        exits and must be re-run after that), then read the selections. Side
+        effects: ``config.yaml``, ``data_spray_labels.csv`` (the dataset's
+        ``data.csv`` plus a ``SprayLabel`` column, -1 for unlabelled) and
+        ``result_summary.txt`` (label accuracy against ``has_confounder``)
+        under ``analysis_dir``.
+
+        Parameters
+        ----------
+        **args
+            Ignored; present for the ``TeacherInterface`` signature.
+
+        Returns
+        -------
+        dict of str to int
+            Sample filename -> 1 (confounder selected) or 0 (non-confounder).
+
+        Raises
+        ------
+        ImportError
+            If the optional ``h5py`` dependency is not installed.
+        """
+        h5py = require("h5py", "xai", "reading the SpRAy HDF5 databases")
 
         layer_name = (
             "input"
@@ -151,8 +303,9 @@ class Spray(TeacherInterface):
             group_label_map[filenames[id]] = 0
 
         true_labels = np.array(list(group_label_map.values()))
-        print(
-            f"found {len(true_labels[true_labels == 1])} confounders and {len(true_labels[true_labels == 0])} non-confounders"
+        _log.info(
+            "%s",
+            f"found {len(true_labels[true_labels == 1])} confounders and {len(true_labels[true_labels == 0])} non-confounders",
         )
 
         new_data_file = []
@@ -210,6 +363,23 @@ class Spray(TeacherInterface):
         return group_label_map
 
     def _compute_attributions(self, attribution_layer: str):
+        """Write attribution, heatmap, concept-importance and input HDF5 DBs.
+
+        Skipped when ``input.h5`` already exists. Uses zennit ``SmoothGrad``
+        with an ``EpsilonGammaBox`` composite for input heatmaps and CRP
+        ``CondAttribution`` for the relevances of ``attribution_layer``.
+
+        Raises
+        ------
+        ImportError
+            If the optional ``crp`` dependency is not installed.
+        """
+        CondAttribution = require(
+            "crp.attribution", "xai", "conditional CRP attributions"
+        ).CondAttribution
+        ChannelConcept = require(
+            "crp.concepts", "xai", "CRP channel concepts"
+        ).ChannelConcept
 
         self.attribution_db_path = os.path.join(self.analysis_dir, "attribution.h5")
         self.heatmaps_db_path = os.path.join(self.analysis_dir, "heatmaps.h5")
@@ -286,6 +456,13 @@ class Spray(TeacherInterface):
                     # out = self.model(x)
 
                     def one_hot_max(output):
+                        """Attribution target: the ground-truth logit, one-hot placed.
+
+                        Returns a ``(batch, num_classes)`` tensor that is zero
+                        everywhere except at the label ``y`` of each sample,
+                        where it carries that sample's logit, so the backward
+                        pass attributes the true-class evidence.
+                        """
                         # return torch.eye(output.shape[1], device=self.device)[y]
                         logits = output[torch.arange(output.shape[0]), y]
                         return (
@@ -343,8 +520,8 @@ class Spray(TeacherInterface):
                     x = x[non_zero]
 
                     if number_samples_processed == 0:
-                        print("attributions shape: ", attributions.shape)
-                        print("heatmaps shape: ", heatmaps.shape)
+                        _log.info("%s %s", "attributions shape: ", attributions.shape)
+                        _log.info("%s %s", "heatmaps shape: ", heatmaps.shape)
                         attribution_db_file = create_attribution_database(
                             self.attribution_db_path,
                             attributions[0].shape,
@@ -404,7 +581,7 @@ class Spray(TeacherInterface):
                         f"computing relevances ({number_samples_processed}/{len_data}) in dataset split {split} at layer {attribution_layer}..."
                     )
 
-        print(f"{number_samples_processed} of {len_data} processed")
+        _log.info("%s", f"{number_samples_processed} of {len_data} processed")
         resize_input_db(input_db_file, number_samples_processed)
         resize_attribution_db(attribution_db_file, number_samples_processed)
         resize_attribution_db(heatmaps_db_file, number_samples_processed)
@@ -415,8 +592,42 @@ class Spray(TeacherInterface):
         input_db_file.close()
 
     def _spectral_clustering(self):
+        """Cluster the attributions per class and split into ``analysis.h5``.
 
-        analysis_db_path = os.path.join(self.analysis_dir, f"analysis.h5")
+        Stores the spectral embedding, t-SNE/UMAP embeddings and k-means,
+        agglomerative, DBSCAN and HDBSCAN labels in the ViReLay HDF5 layout.
+        Returns the database path (reused if it already exists).
+
+        Raises
+        ------
+        ImportError
+            If the optional ``corelay`` or ``h5py`` dependencies are not
+            installed.
+        """
+        h5py = require("h5py", "xai", "reading the SpRAy HDF5 databases")
+        SpectralClustering = require(
+            "corelay.pipeline.spectral", "xai", "the SpRAy spectral clustering pipeline"
+        ).SpectralClustering
+        _clustering = require(
+            "corelay.processor.clustering", "xai", "the SpRAy clustering processors"
+        )
+        KMeans = _clustering.KMeans
+        AgglomerativeClustering = _clustering.AgglomerativeClustering
+        HDBSCAN = _clustering.HDBSCAN
+        DBSCAN = _clustering.DBSCAN
+        _embedding = require(
+            "corelay.processor.embedding", "xai", "the SpRAy embedding processors"
+        )
+        EigenDecomposition = _embedding.EigenDecomposition
+        TSNEEmbedding = _embedding.TSNEEmbedding
+        UMAPEmbedding = _embedding.UMAPEmbedding
+        _flow = require(
+            "corelay.processor.flow", "xai", "the SpRAy processor flow combinators"
+        )
+        Sequential = _flow.Sequential
+        Parallel = _flow.Parallel
+
+        analysis_db_path = os.path.join(self.analysis_dir, "analysis.h5")
         if pathlib.Path(analysis_db_path).is_file():
             return analysis_db_path
 
@@ -478,7 +689,7 @@ class Spray(TeacherInterface):
             labels = attributions_file["label"][:]
             splits = attributions_file["dataset_split"][:]
             assert len(labels) == len(splits)
-            print("total number of samples to be processed:", len(labels))
+            _log.info("%s %s", "total number of samples to be processed:", len(labels))
 
         if self.config.split_dataset:
             split_names = [(0, "train"), (1, "val")]
@@ -494,21 +705,26 @@ class Spray(TeacherInterface):
                     (indices_of_samples,) = np.nonzero(
                         (labels == class_idx) & (splits == split)
                     )
-                    print(
-                        f"number of samples in class {class_idx}: {(labels == class_idx).sum()}"
+                    _log.info(
+                        "%s",
+                        f"number of samples in class {class_idx}: {(labels == class_idx).sum()}",
                     )
-                    print(
-                        f"number of samples in split {split}: {(splits == split).sum()}"
+                    _log.info(
+                        "%s",
+                        f"number of samples in split {split}: {(splits == split).sum()}",
                     )
-                    print(
-                        f"process {len(indices_of_samples)} samples (class {class_idx}, split {split})"
+                    _log.info(
+                        "%s",
+                        f"process {len(indices_of_samples)} samples (class {class_idx}, split {split})",
                     )
                     attribution_data = attributions_file["attribution"][
                         indices_of_samples, :
                     ]
-                    print("attribution data shape:", attribution_data.shape)
+                    _log.info(
+                        "%s %s", "attribution data shape:", attribution_data.shape
+                    )
 
-                print("running spray pipeline...")
+                _log.info("%s", "running spray pipeline...")
                 (eigenvalues, embedding), (kmeans, ac, dbscan, hdbscan, tsne, umap) = (
                     pipeline(attribution_data)
                 )
@@ -597,10 +813,11 @@ class Spray(TeacherInterface):
                         embedding.shape[1], dtype=np.uint32
                     )
 
-        print("spray analysis finished!")
+        _log.info("%s", "spray analysis finished!")
         return analysis_db_path
 
     def _create_label_map(self) -> str:
+        """Write ViReLay's ``label_map.json`` from ``CLASS_NAMES`` and return its path."""
         label_map_file_path = os.path.join(self.analysis_dir, "label_map.json")
         if pathlib.Path(label_map_file_path).is_file():
             return label_map_file_path
@@ -616,6 +833,7 @@ class Spray(TeacherInterface):
         return label_map_file_path
 
     def _create_project(self, input_size: tuple[int]) -> str:
+        """Write the ViReLay ``virelay_project.yml`` and return its path."""
 
         output_file_path = os.path.join(self.analysis_dir, "virelay_project.yml")
         if pathlib.Path(output_file_path).is_file():
@@ -654,6 +872,20 @@ class Spray(TeacherInterface):
         return output_file_path
 
     def _run_virelay(self) -> tuple[list[int], list[int]]:
+        """Serve the ViReLay GUI until ``group-labels/`` exists, then read it.
+
+        On the first call the server runs in a subprocess and this process
+        exits once the directory appears; on a later call the exported JSON
+        selections are read and returned as ``(confounder_ids,
+        non_confounder_ids)`` of database indices.
+
+        Raises
+        ------
+        ImportError
+            If the optional ``virelay`` dependency is not installed.
+        """
+        Workspace = require("virelay.model", "xai", "the ViReLay workspace").Workspace
+        Server = require("virelay.server", "xai", "serving the ViReLay GUI").Server
 
         group_label_dir = os.path.join(self.analysis_dir, "group-labels")
 
@@ -666,22 +898,26 @@ class Spray(TeacherInterface):
                 target=lambda: app.run(host=host_name, port=self.config.port), args=()
             )
             proc.start()
-            print(f"ViReLay GUI is active on {host_name}:{self.config.port}")
+            _log.info("%s", f"ViReLay GUI is active on {host_name}:{self.config.port}")
 
-            print(
+            _log.info(
+                "%s",
                 f"For each class, select the samples containing the confounding feature and export, "
                 f"then do the same for the samples without the confounding feature. Rename the files to "
                 f'"<cls-idx>-confounders.json" and "<cls-idx>-nonconfounders.json", respectively, and place '
                 f"them in the directory {group_label_dir} (leaving out some datapoints completely is generally "
                 f"ok, but might make it harder to correctly assess avg/worst group accuracy later, especially "
-                f"if some groups only have very few samples)."
+                f"if some groups only have very few samples).",
             )
 
             while not os.path.exists(group_label_dir):
                 time.sleep(4.0)
 
             proc.terminate()
-            print("Re-run script after placing the files in order to process results")
+            _log.info(
+                "%s",
+                "Re-run script after placing the files in order to process results",
+            )
             exit()
 
         confounder_ids = []
@@ -700,6 +936,7 @@ class Spray(TeacherInterface):
         return confounder_ids, non_confounder_ids
 
     def _get_preprocessing_pipeline(self) -> list[Processor]:
+        """corelay processors applied before clustering, per the config flags."""
         preprocessing = []
         if self.config.sum_attribution_channels:
             preprocessing.append(SumChannel())
@@ -710,6 +947,28 @@ class Spray(TeacherInterface):
 
 
 def create_input_database(dataset_file_path, samples_shape, number_of_samples):
+    """Create an HDF5 file with resizable ``data``, ``label`` and ``filenames`` sets.
+
+    Parameters
+    ----------
+    dataset_file_path : str
+        Path of the HDF5 file to create (overwritten).
+    samples_shape : tuple of int
+        Shape of one input sample, e.g. ``(C, H, W)``.
+    number_of_samples : int
+        Initial length of the datasets.
+
+    Returns
+    -------
+    h5py.File
+        The open file handle.
+
+    Raises
+    ------
+    ImportError
+        If the optional ``h5py`` dependency is not installed.
+    """
+    h5py = require("h5py", "xai", "writing the SpRAy HDF5 databases")
 
     dataset_file = h5py.File(dataset_file_path, "w")
     dataset_file.create_dataset(
@@ -731,6 +990,7 @@ def create_input_database(dataset_file_path, samples_shape, number_of_samples):
 
 
 def append_inputs(dataset_file, index, sample, label, filenames):
+    """Write a batch of inputs, labels and filenames at row ``index``."""
     dataset_file["data"][index : sample.shape[0] + index] = (
         sample.detach().cpu().numpy()
     )
@@ -739,6 +999,7 @@ def append_inputs(dataset_file, index, sample, label, filenames):
 
 
 def resize_input_db(database_file, new_size):
+    """Truncate the input database's datasets to ``new_size`` rows."""
     database_file["data"].resize(new_size, axis=0)
     database_file["label"].resize(new_size, axis=0)
     database_file["filenames"].resize(new_size, axis=0)
@@ -750,6 +1011,31 @@ def create_attribution_database(
     number_of_classes,
     number_of_samples,
 ):
+    """Create an HDF5 attribution database in the ViReLay layout.
+
+    Parameters
+    ----------
+    attribution_database_file_path : str
+        Path of the HDF5 file to create (overwritten).
+    attribution_shape : tuple of int
+        Shape of one attribution (e.g. ``(C, H, W)`` for a layer).
+    number_of_classes : int
+        Width of the ``prediction`` dataset.
+    number_of_samples : int
+        Initial length of the datasets.
+
+    Returns
+    -------
+    h5py.File
+        Open file with ``attribution``, ``prediction``, ``label`` and
+        ``dataset_split`` datasets.
+
+    Raises
+    ------
+    ImportError
+        If the optional ``h5py`` dependency is not installed.
+    """
+    h5py = require("h5py", "xai", "writing the SpRAy HDF5 databases")
 
     attribution_database_file = h5py.File(attribution_database_file_path, "w")
     attribution_database_file.create_dataset(
@@ -781,6 +1067,7 @@ def append_attributions(
     labels: torch.Tensor,
     dataset_split: np.ndarray,
 ):
+    """Write a batch of attributions, predictions, labels and splits at ``index``."""
 
     attribution_database_file["attribution"][index : attributions.shape[0] + index] = (
         attributions.detach().cpu().numpy()
@@ -797,6 +1084,7 @@ def append_attributions(
 
 
 def resize_attribution_db(database_file, new_size):
+    """Truncate the attribution database's datasets to ``new_size`` rows."""
     database_file["attribution"].resize(new_size, axis=0)
     database_file["prediction"].resize(new_size, axis=0)
     database_file["label"].resize(new_size, axis=0)
@@ -816,16 +1104,25 @@ CLASS_NAMES = {
 
 
 class Flatten(Processor):
+    """corelay processor flattening each sample to a vector."""
+
     def function(self, data):
+        """Reshape ``(n, ...)`` to ``(n, prod(...))``."""
         return data.reshape(data.shape[0], np.prod(data.shape[1:]))
 
 
 class Normalize(Processor):
+    """corelay processor dividing each sample by its total sum."""
+
     def function(self, data):
+        """Normalise every sample so its entries sum to one."""
         data = data / data.sum(tuple(range(1, len(data.shape))), keepdims=True)
         return data
 
 
 class SumChannel(Processor):
+    """corelay processor summing attributions over the channel axis."""
+
     def function(self, data):
+        """Sum over axis 1 (channels)."""
         return data.sum(1)

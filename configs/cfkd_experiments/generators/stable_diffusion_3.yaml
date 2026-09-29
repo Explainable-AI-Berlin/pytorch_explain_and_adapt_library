@@ -1,0 +1,6 @@
+category: generator
+generator_type: DiffusionGenerator
+data: <PEAL_BASE>/configs/cfkd_experiments/data/celeba.yaml
+base_path : $PEAL_RUNS/celeba/stable_diffusion3
+shift : 1
+gradient_smoothing: vanilla

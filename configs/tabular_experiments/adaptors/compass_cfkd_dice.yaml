@@ -16,7 +16,7 @@ student                              :  $PEAL_RUNS/compass/classifier_poisoned/m
 
 teacher                              :
   type: "symbolic"
-  model: peal_runs/compass/classifier_poisoned/model.cpl
+  model: $PEAL_RUNS/compass/classifier_poisoned/model.cpl
   confounder_name: "African_American" # the user specifies to use 'being black' as the confounder
 
 

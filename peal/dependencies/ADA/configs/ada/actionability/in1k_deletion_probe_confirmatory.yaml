@@ -1,0 +1,20 @@
+experiment_id: e7b_in1k_dinov2_cls_k10_confirmatory_deletion_probe
+eval_experiment_id: e7b_in1k_dinov2_cls_k10_confirmatory_deletion_evaluation
+model_id: dinov2_cls_linear_probe
+feature_id: facebook__dinov2-with-registers-base/cls
+
+train_cache: artifacts/ada/atlas/embeddings/imagenet1k/train/facebook__dinov2-with-registers-base/cls/combined_train_full_8shards
+validation_cache: artifacts/ada/atlas/embeddings/imagenet1k/val/facebook__dinov2-with-registers-base/cls/cache-4e4e26580544477f
+enriched_regions_dir: artifacts/ada/actionability/regions/e7a_in1k_dinov2_cls_k10_enriched_seed0
+deletion_controls_dir: artifacts/ada/actionability/deletion_confirmatory/e7b_in1k_dinov2_cls_k10_confirmatory_seed0
+probe_output_dir: artifacts/ada/actionability/probes/e7b_in1k_dinov2_cls_k10_confirmatory_deletion_seed0
+eval_output_dir: artifacts/ada/actionability/evaluation/e7b_in1k_dinov2_cls_k10_confirmatory_deletion_full_seed0
+report_path: notes/ada/actionability/in1k_k10_confirmatory_deletion_probe_evaluation_report.md
+
+fixed_steps: 1000
+batch_size: 2048
+lr: 0.01
+weight_decay: 0.0001
+device: auto
+support_k: 50
+overwrite: false

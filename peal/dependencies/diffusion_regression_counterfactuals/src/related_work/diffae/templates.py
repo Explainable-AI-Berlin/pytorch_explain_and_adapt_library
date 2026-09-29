@@ -296,15 +296,6 @@ def bedroom128_autoenc():
     return conf
 
 
-def ffhq64_ddpm():
-    conf = ddpm()
-    conf.data_name = "ffhqlmdb256"
-    conf.warmup = 0
-    conf.total_samples = 72_000_000
-    conf.scale_up_gpus(4)
-    return conf
-
-
 def pretrain_celeba64d2c_72M():
     conf = celeba64d2c_autoenc()
     conf.pretrain = PretrainConfig(

@@ -1,0 +1,12 @@
+# python train_predictor.py --config "<PEAL_BASE>/configs/didae_experiments/predictors/only_sparse_numbers_classifier_unpoisoned_128_713.yaml"
+model_path        : $PEAL_RUNS/only_sparse_numbers/num128_confounding_num713/torchvision/classifier_unpoisoned
+data              : <PEAL_BASE>/configs/didae_experiments/data/only_sparse_numbers_unpoisoned_128_713.yaml
+training          : <PEAL_BASE>/configs/cfkd_experiments/training/img_classifier.yaml
+architecture      : torchvision_vit_b_16
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [Num128]

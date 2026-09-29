@@ -1,11 +1,21 @@
+"""Minimal DDPM for low-dimensional tabular data with guided counterfactuals.
+
+PEAL's image generators (DiffusionAutoencoder, PathLDM, Stable Diffusion) do
+not apply to the toy tabular tasks (2-D "circle"-style datasets from
+``peal.data.tabular_datasets``). This module provides an MLP score network
+trained with the standard epsilon-prediction loss, plus an ``edit`` method in
+the ``EditCapableGenerator`` protocol that produces counterfactuals by
+classifier-guided reverse diffusion from a partially noised input. Training
+writes ``diffusion.pt``, ``config.yaml`` and TensorBoard scatter plots into
+``config.base_path``.
+"""
+
 import os
-import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.optim as optim
 from tqdm import tqdm, trange
 from typing import Tuple
 import logging
@@ -14,8 +24,43 @@ import math
 from peal.generators.interfaces import EditCapableGenerator, GeneratorConfig
 from peal.data.interfaces import DataConfig
 import typing
+from peal.log import get_logger
+
+_log = get_logger(__name__)
+
 
 class TabularDDPMConfig(GeneratorConfig):
+    """Config of :class:`TabularDDPM`.
+
+    Parameters
+    ----------
+    generator_type : str
+        Registry name, ``"TabularDDPM"``.
+    input_dim : int
+        Number of non-label feature columns the score network denoises.
+    embed_dim : int
+        Width of the timestep embedding and of the hidden MLP layers.
+    num_timesteps : int
+        Length of the forward noising chain (``T``).
+    model_name : str
+        Filename of the saved state dict inside ``base_path``.
+    var_schedule : str
+        ``"linear"`` or ``"cosine"`` beta schedule.
+    base_path : str
+        Directory used as ``model_dir`` when none is passed to the generator.
+    num_epochs, learning_rate : int, float
+        Adam training budget. The batch size comes from
+        ``GeneratorConfig.batch_size``.
+    grad_scales : list of float
+        Classifier-gradient weights tried by :meth:`TabularDDPM.edit`.
+    noise_steps_for_counterfactuals : list of int
+        Forward-diffusion depths (``t``) tried by :meth:`TabularDDPM.edit`.
+    attack_iterations : int
+        How many times the (steps x scales) grid is repeated in ``edit``.
+    data : DataConfig
+        Dataset config used when no dataset object is passed.
+    """
+
     generator_type: str = "TabularDDPM"
     input_dim: int = 2
     embed_dim: int = 64
@@ -30,11 +75,25 @@ class TabularDDPMConfig(GeneratorConfig):
     attack_iterations: int = 1
     data: DataConfig = DataConfig()
 
+
 logging.getLogger().setLevel(logging.INFO)
 
 
 class PositionalEncoding(nn.Module):
+    """Fixed sinusoidal timestep embeddings looked up by integer timestep.
+
+    Parameters
+    ----------
+    embed_dim : int
+        Embedding width (even sizes fill sin/cos pairs exactly).
+    max_len : int
+        Number of timesteps; the table has ``max_len`` rows for steps
+        ``0 .. max_len - 1`` (row 0 of the internal table is dropped so that
+        timestep 0 does not map to the all-zero/one row).
+    """
+
     def __init__(self, embed_dim, max_len=500):
+        """Precompute the ``[max_len, embed_dim]`` table as buffer ``P``."""
         super(PositionalEncoding, self).__init__()
         max_len += 1
         P = torch.zeros(max_len, embed_dim)
@@ -50,11 +109,28 @@ class PositionalEncoding(nn.Module):
         self.register_buffer("P", P[1:])
 
     def forward(self, t):
+        """Return the embeddings of timesteps ``t`` (int or LongTensor)."""
         return self.P[t]
 
 
 class ScoreNetwork(nn.Module):
+    """Four-layer MLP predicting the noise ``eps`` from ``x_t`` and a time embedding.
+
+    Parameters
+    ----------
+    input_dim : int
+        Feature dimension of the data (output width).
+    embed_dim : int
+        Hidden width; the time embedding is added after the first layer.
+
+    Notes
+    -----
+    The layers are ``nn.LazyLinear`` so the input width is fixed on the first
+    forward pass.
+    """
+
     def __init__(self, input_dim, embed_dim):
+        """Build the lazy linear layers and the LayerNorm before the output."""
         super(ScoreNetwork, self).__init__()
         self.embed_dim = embed_dim
         self.layer1 = nn.LazyLinear(embed_dim)
@@ -64,6 +140,8 @@ class ScoreNetwork(nn.Module):
         self.layer4 = nn.LazyLinear(input_dim)
 
     def forward(self, x, time_embed):
+        """Predict noise for ``x`` ``[B, input_dim]`` given ``time_embed``
+        ``[B, embed_dim]``."""
         x = self.layer1(x) + time_embed
         x = F.silu(self.layer2(x))
         x = F.silu(self.layer3(x))
@@ -71,7 +149,20 @@ class ScoreNetwork(nn.Module):
 
 
 class BasicDiscreteTimeModel(nn.Module):
+    """Score network plus timestep embedding: the trainable part of the DDPM.
+
+    Parameters
+    ----------
+    input_dim : int
+        Feature dimension of the data.
+    embed_dim : int
+        Width of the timestep embedding and MLP.
+    num_timesteps : int
+        Size of the positional-encoding table.
+    """
+
     def __init__(self, input_dim: int, embed_dim: int, num_timesteps: int):
+        """Instantiate the :class:`PositionalEncoding` and :class:`ScoreNetwork`."""
         super(BasicDiscreteTimeModel, self).__init__()
 
         self.positional_embeddings = PositionalEncoding(
@@ -81,12 +172,44 @@ class BasicDiscreteTimeModel(nn.Module):
         # self.decoder = ScoreNetwork(input_dim=input_dim, embed_dim=embed_dim)
 
     def forward(self, x, t):
+        """Return the predicted noise for ``x`` at timestep(s) ``t``."""
         time_embed = self.positional_embeddings(t)
         return self.score_network(x, time_embed)
 
 
 class TabularDDPM(EditCapableGenerator):
+    """DDPM generator for tabular data with classifier-guided counterfactual edits.
+
+    On construction the beta/alpha/alpha_bar schedule is registered as
+    buffers and :meth:`train_model` is called with ``mode="train"``, i.e.
+    the score network is (re)trained every time the generator is built.
+
+    Parameters
+    ----------
+    config : TabularDDPMConfig
+        Generator config (already a pydantic object, not a path).
+    dataset : Dataset, optional
+        Tabular dataset with an ``attributes`` list; loaded from
+        ``config.data`` via ``get_datasets`` when ``None``. Columns named
+        ``"Confounder"`` and ``"Target"`` are excluded from the diffused
+        features (``input_idx``); ``"Target"`` columns form ``target_idx``.
+    model_dir : str, optional
+        Where the model and logs are written; defaults to ``config.base_path``.
+    device : str
+        Unused; tensors follow the classifier's device in ``edit``.
+
+    Attributes
+    ----------
+    beta, alpha, alpha_bar : torch.Tensor
+        ``[num_timesteps]`` schedule buffers.
+    model : BasicDiscreteTimeModel
+        The trained score network (set by :meth:`train_model`).
+    counterfactuals, original_sample : torch.Tensor
+        Last ``edit`` result and input, used by :meth:`plot_counterfactuals`.
+    """
+
     def __init__(self, config, dataset=None, model_dir=None, device="cpu", **kwargs):
+        """Resolve the dataset and schedule, then train the score network."""
         super(TabularDDPM, self).__init__()
         # self.config = load_yaml_config(config)
         self.config = config
@@ -112,6 +235,7 @@ class TabularDDPM(EditCapableGenerator):
 
         if dataset is None:
             from peal.data.dataset_factory import get_datasets
+
             dataset = get_datasets(config.data)[0]
 
         self.dataset = dataset
@@ -128,7 +252,6 @@ class TabularDDPM(EditCapableGenerator):
         # data = torch.zeros([len(dataset.data),len(dataset.attributes)], dtype=torch.float16)
         # for idx, key in enumerate(dataset.data):
         #    data[idx] = dataset.data[key]
-
 
         def schedules(num_timesteps: int, type: str = "linear"):
             scale = 1000 / num_timesteps
@@ -162,9 +285,30 @@ class TabularDDPM(EditCapableGenerator):
     def forward_diffusion(
         self, clean_x: torch.Tensor, noise: torch.tensor, timestep: torch.Tensor
     ):
+        """Sample ``x_t = sqrt(alpha_bar_t) x_0 + sqrt(1 - alpha_bar_t) eps``.
+
+        Parameters
+        ----------
+        clean_x : torch.Tensor
+            ``[B, D]`` clean features.
+        noise : torch.Tensor
+            ``[B, D]`` standard normal noise ``eps``.
+        timestep : int or torch.Tensor
+            A single timestep applied to the whole batch, or a ``[B]`` tensor
+            of per-sample timesteps.
+
+        Returns
+        -------
+        torch.Tensor
+            ``[B, D]`` noised features.
+        """
         if isinstance(timestep, int):
             timestep = torch.tensor([timestep])
-            alpha_bar_t = self.alpha_bar[timestep].repeat(clean_x.shape[0])[:, None].to(clean_x.device)
+            alpha_bar_t = (
+                self.alpha_bar[timestep]
+                .repeat(clean_x.shape[0])[:, None]
+                .to(clean_x.device)
+            )
         else:
             alpha_bar_t = self.alpha_bar[timestep][:, None].to(clean_x.device)
         mu = torch.sqrt(alpha_bar_t)
@@ -175,8 +319,30 @@ class TabularDDPM(EditCapableGenerator):
     def reverse_diffusion_ddpm(
         self, noisy_x: torch.Tensor, model: nn.Module, timestep: torch.Tensor
     ):
-        alpha_t = self.alpha[timestep].repeat(noisy_x.shape[0])[:, None].to(noisy_x.device)
-        alpha_bar_t = self.alpha_bar[timestep].repeat(noisy_x.shape[0])[:, None].to(noisy_x.device)
+        """One ancestral DDPM step ``x_t -> x_{t-1}`` with variance ``beta_t``.
+
+        Parameters
+        ----------
+        noisy_x : torch.Tensor
+            ``[B, D]`` current sample ``x_t``.
+        model : nn.Module
+            Score network called as ``model(x=noisy_x, t=timestep)``.
+        timestep : int
+            Scalar timestep shared by the batch; no noise is added at ``0``.
+
+        Returns
+        -------
+        torch.Tensor
+            ``[B, D]`` sample ``x_{t-1}``.
+        """
+        alpha_t = (
+            self.alpha[timestep].repeat(noisy_x.shape[0])[:, None].to(noisy_x.device)
+        )
+        alpha_bar_t = (
+            self.alpha_bar[timestep]
+            .repeat(noisy_x.shape[0])[:, None]
+            .to(noisy_x.device)
+        )
         beta_t = 1 - alpha_t
         eps_hat = model(x=noisy_x, t=timestep)
         posterior_mean = (1 / torch.sqrt(alpha_t)) * (
@@ -194,6 +360,25 @@ class TabularDDPM(EditCapableGenerator):
         return denoised_x
 
     def train_model(self, model_name="diffusion.pt", mode="train"):
+        """Train the score network or load it from ``model_dir``.
+
+        Parameters
+        ----------
+        model_name : str
+            State-dict filename inside ``model_dir``.
+        mode : str
+            ``"train"`` always trains for ``config.num_epochs`` epochs with
+            Adam on the epsilon-MSE loss and saves the state dict plus
+            ``config.yaml``; any other value loads ``model_name`` if it
+            exists and otherwise only logs a hint.
+
+        Notes
+        -----
+        Training logs ``Loss/train`` and, every 10 epochs, a scatter plot of
+        generated versus real points to ``<model_dir>/logs`` (TensorBoard).
+        The trained/loaded network is stored as ``self.model``. The nested
+        ``run_epoch`` helper is defined but never called.
+        """
         self.model_path = os.path.join(self.model_dir, model_name)
         model = BasicDiscreteTimeModel(
             input_dim=self.config.input_dim,
@@ -241,6 +426,7 @@ class TabularDDPM(EditCapableGenerator):
         if mode == "train":
             from torch.utils.tensorboard import SummaryWriter
             import matplotlib.pyplot as plt
+
             writer = SummaryWriter(os.path.join(self.model_dir, "logs"))
             model.train()
             # num_epochs = self.config['num_epochs']
@@ -262,18 +448,38 @@ class TabularDDPM(EditCapableGenerator):
                     optimizer.step()
 
                 train_loss = epoch_loss / len(dataloader.dataset)
-                print(f"Epoch: {i}, train_loss: {train_loss}")
+                _log.info("%s", f"Epoch: {i}, train_loss: {train_loss}")
                 writer.add_scalar("Loss/train", train_loss, i)
                 losses.append(train_loss.detach().cpu().numpy())
 
                 if i % 10 == 0 or i == num_epochs - 1:
                     model.eval()
                     with torch.no_grad():
-                        sample_x = self.sample_ddpm(model, n_samples=min(1000, len(self.dataset)))[-1].cpu().numpy()
-                        real_x = next(iter(dataloader))[0][:, self.input_idx].cpu().numpy()
+                        sample_x = (
+                            self.sample_ddpm(
+                                model, n_samples=min(1000, len(self.dataset))
+                            )[-1]
+                            .cpu()
+                            .numpy()
+                        )
+                        real_x = (
+                            next(iter(dataloader))[0][:, self.input_idx].cpu().numpy()
+                        )
                         fig, ax = plt.subplots()
-                        ax.scatter(real_x[:, 0], real_x[:, 1], alpha=0.5, label="Real Data", color="blue")
-                        ax.scatter(sample_x[:, 0], sample_x[:, 1], alpha=0.5, label="Generated Data", color="orange")
+                        ax.scatter(
+                            real_x[:, 0],
+                            real_x[:, 1],
+                            alpha=0.5,
+                            label="Real Data",
+                            color="blue",
+                        )
+                        ax.scatter(
+                            sample_x[:, 0],
+                            sample_x[:, 1],
+                            alpha=0.5,
+                            label="Generated Data",
+                            color="orange",
+                        )
                         ax.legend()
                         writer.add_figure("Generated Data vs Real", fig, i)
                         plt.close(fig)
@@ -281,14 +487,29 @@ class TabularDDPM(EditCapableGenerator):
 
             torch.save(model.state_dict(), self.model_path)
             from peal.global_utils import save_yaml_config
+
             save_yaml_config(self.config, os.path.join(self.model_dir, "config.yaml"))
 
         self.model = model
 
     @torch.no_grad()
     def sample_ddpm(self, model: nn.Module, n_samples: int = 256, label=None):
-        """
-        iteratively denoises pure noise to produce a list of denoised samples at each timestep
+        """Iteratively denoise pure noise, keeping the sample after every step.
+
+        Parameters
+        ----------
+        model : nn.Module
+            Score network (switched to eval mode).
+        n_samples : int
+            Number of samples drawn from ``N(0, I)`` in ``input_dim`` dims.
+        label : optional
+            Unused.
+
+        Returns
+        -------
+        list of torch.Tensor
+            ``num_timesteps + 1`` tensors of shape ``[n_samples, input_dim]``,
+            from the initial noise to the final sample (``[-1]``).
         """
         model.eval()
         x_pred = []
@@ -303,6 +524,7 @@ class TabularDDPM(EditCapableGenerator):
         return x_pred
 
     def sample_x(self, batch_size=1):
+        """Return ``batch_size`` fully denoised samples ``[batch_size, input_dim]``."""
         x = self.sample_ddpm(model=self.model, n_samples=batch_size)[-1]
         return x
 
@@ -315,6 +537,41 @@ class TabularDDPM(EditCapableGenerator):
         target_classes: int,
         classifier_grad_weight: float,
     ):
+        """Classifier-guided reverse diffusion from a partially noised batch.
+
+        The clean batch is noised to ``num_noise_steps`` and denoised again;
+        at every step the posterior mean is shifted by the (scaled) gradient
+        of the cross-entropy towards ``target_classes``, evaluated on the
+        fully denoised estimate of the previous step. After each guided step
+        the intermediate sample is denoised to ``t = 0`` without guidance to
+        obtain a candidate counterfactual.
+
+        Parameters
+        ----------
+        clean_batch : torch.Tensor
+            ``[B, D]`` inputs to edit.
+        model : nn.Module
+            Score network.
+        classifier : nn.Module
+            Differentiable predictor on the ``D`` features.
+        num_noise_steps : int
+            Forward-diffusion depth ``t`` to start from.
+        target_classes : torch.Tensor
+            ``[B]`` target labels.
+        classifier_grad_weight : float
+            Scale of the classifier gradient.
+
+        Returns
+        -------
+        tuple
+            ``(counterfactuals, guided_grads, unguided_grads, total_series)``:
+            ``counterfactuals`` ``[B, num_noise_steps, D]`` (the clean input
+            first, then one candidate per guided step), the guided and
+            unconditional update terms with the same shape, and a list of the
+            per-step denoising trajectories. The first three are also stored
+            as attributes ``counterfactuals_series``, ``guided_grads`` and
+            ``unguided_grads``.
+        """
         classifier.eval()
         self.classifier = classifier
 
@@ -416,6 +673,31 @@ class TabularDDPM(EditCapableGenerator):
         minimal_counterfactuals,
         tolerance=0.1,
     ):
+        """Keep, per sample, the earliest candidate that reaches ``target_confidence``.
+
+        Parameters
+        ----------
+        counterfactuals : torch.Tensor
+            ``[B, S, D]`` candidates per sample from
+            :meth:`sample_counterfactual_ddpm`.
+        classifier : nn.Module
+            Predictor whose softmax confidence is checked.
+        target_classes : torch.Tensor
+            ``[B]`` target labels.
+        target_confidence : float
+            Required target-class confidence.
+        minimal_counterfactuals : torch.Tensor
+            ``[B, D]`` current best counterfactuals, updated in place.
+        tolerance : float
+            Unused.
+
+        Returns
+        -------
+        torch.Tensor
+            ``minimal_counterfactuals``: unchanged rows that already satisfy
+            the confidence, otherwise the first satisfying candidate, or the
+            last candidate when none satisfies it.
+        """
 
         # compute distance of current minimal_counterefactuals from radius 1.0
         # current_counterfactual_distance_from_manifold = torch.abs((torch.pow(minimal_counterfactuals, 2).sum(dim=-1) - 1.0))
@@ -462,10 +744,49 @@ class TabularDDPM(EditCapableGenerator):
         source_classes: torch.Tensor,
         target_classes: nn.Module,
         classifier=None,
-        **kwargs
+        **kwargs,
     ) -> Tuple[
-        list[torch.Tensor], list[torch.Tensor], list[torch.Tensor], list[torch.Tensor], list[torch.Tensor], list[torch.Tensor]
+        list[torch.Tensor],
+        list[torch.Tensor],
+        list[torch.Tensor],
+        list[torch.Tensor],
+        list[torch.Tensor],
+        list[torch.Tensor],
     ]:
+        """Produce counterfactuals for ``x_in`` (``EditCapableGenerator`` protocol).
+
+        Loops ``config.attack_iterations`` times over every
+        ``noise_steps_for_counterfactuals`` x ``grad_scales`` combination,
+        running :meth:`sample_counterfactual_ddpm` from the current best
+        counterfactuals and keeping the first candidate that reaches
+        ``target_confidence_goal`` via :meth:`discard_counterfactuals`.
+
+        Parameters
+        ----------
+        x_in : torch.Tensor
+            ``[B, D]`` inputs (moved to the classifier's device).
+        target_confidence_goal : float
+            Required confidence for the target class.
+        source_classes : torch.Tensor
+            ``[B]`` source labels (unused).
+        target_classes : torch.Tensor
+            ``[B]`` target labels.
+        classifier : nn.Module, optional
+            Predictor; taken from ``kwargs["predictor"]`` when ``None``.
+        **kwargs
+            Other explainer arguments (``predictor``, ``explainer_config``,
+            ...); only ``predictor`` is read.
+
+        Returns
+        -------
+        tuple
+            ``(counterfactual_list, diff_latent, y_target_end_confidence,
+            x_list, history_list, cluster_list)``: per-sample counterfactuals,
+            ``x_in - counterfactuals`` as a ``[B, D]`` tensor, per-sample
+            target-class confidences, per-sample inputs, and two lists of
+            empty/``None`` placeholders. The counterfactuals and inputs are
+            also stored as ``self.counterfactuals`` / ``self.original_sample``.
+        """
         if classifier is None:
             classifier = kwargs.get("predictor", None)
 
@@ -525,16 +846,25 @@ class TabularDDPM(EditCapableGenerator):
         history_list = [[] for _ in range(len(minimal_counterfactuals))]
         cluster_list = [None for _ in range(len(minimal_counterfactuals))]
 
-        return list_counterfactuals, diff_latent, y_target_end_confidence, x_list, history_list, cluster_list
+        return (
+            list_counterfactuals,
+            diff_latent,
+            y_target_end_confidence,
+            x_list,
+            history_list,
+            cluster_list,
+        )
 
     def plot_counterfactuals(self):
+        """Show a 2-D scatter of the dataset with arrows from each ``original_sample``
+        to its counterfactual (uses the first two ``input_idx`` columns)."""
         plt.figure(figsize=(5, 5))
         data = torch.zeros(
             [len(self.dataset.data), len(self.dataset.attributes)], dtype=torch.float16
         )
         for idx, key in enumerate(self.dataset.data):
             data[idx] = self.dataset.data[key]
-        print(data)
+        _log.info("%s", data)
         plt.scatter(
             data[:, self.input_idx[0]],
             data[:, self.input_idx[1]],

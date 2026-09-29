@@ -1,0 +1,32 @@
+# DiDAE: Automated counterfactual discovery and correction for sparse numbers dataset
+# Usage: python -W ignore run_didae.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/only_sparse_numbers1kx098_didae.yaml"
+adaptor_type                         :  "DiDAE"
+category                             :  "adaptor"
+tracking_level                       :  5
+n_samples                            :  200
+top_k_directions                     :  10
+max_cf_per_direction                 :  5
+linesearch_factors                   :  ["dynamic"]
+decode_batch_size                    :  32
+batch_size                           :  200
+min_train_samples                    :  800
+max_validation_samples               :  200
+finetune_iterations                  :  1
+continuous_learning                  :  "deep_feature_reweighting"
+calculate_group_accuracies           :  True
+explainer                            :  <PEAL_BASE>/configs/didae_experiments/explainers/dae_distill.yaml
+training                             :  <PEAL_BASE>/configs/cfkd_experiments/training/img_finetuning.yaml
+data                                 :  <PEAL_BASE>/configs/didae_experiments/data/only_sparse_numbers1k_poisoned098.yaml
+test_data                            :  <PEAL_BASE>/configs/didae_experiments/data/only_sparse_numbers_unpoisoned.yaml
+student                              :  $PEAL_RUNS/only_sparse_numbers1k/num164_confounding_num671/torchvision/classifier_poisoned098/model.cpl
+teacher                              :  cluster@8000
+generator                            :  $PEAL_RUNS/only_sparse_numbers/diffusion_autoencoder/config.yaml
+sparse_dictionary                    :  $PEAL_RUNS/only_sparse_numbers/diffusion_autoencoder/BatchTopKSAE/config.yaml
+base_dir                             :  $PEAL_RUNS/only_sparse_numbers1k/num164_confounding_num671/torchvision/classifier_poisoned098/didae
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [Num164]

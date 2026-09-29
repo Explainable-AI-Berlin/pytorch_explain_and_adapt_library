@@ -1,0 +1,19 @@
+# The same checks the pre-commit hooks run locally, so an unformatted file
+# cannot slip in through a clone that never ran `pre-commit install`.
+name: lint
+
+on:
+  push:
+    branches: [master, dev]
+  pull_request:
+
+jobs:
+  black:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install black==24.8.0
+      - run: black --check --diff .

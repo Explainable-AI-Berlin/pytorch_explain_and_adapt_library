@@ -1,0 +1,11 @@
+'encoder':
+  'layers' : [
+    ['fc', 512],
+    ['fc', 512]
+  ]
+  'activation'              : 'ReLU'
+'decoder':
+  'layers' : [
+    ['fc', 512]
+  ]
+  'activation'              : 'ReLU'

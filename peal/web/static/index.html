@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PEAL Clever Hans analysis</title>
+<style>
+  :root { --bg:#f7f7f5; --fg:#1b1b1b; --muted:#666; --line:#ddd; --accent:#2b5aa7; --ok:#1e7f45; --bad:#a8322a; --warn:#9a6b00; }
+  body { margin:0; padding:0 16px; font:15px/1.45 system-ui, sans-serif; background:var(--bg); color:var(--fg); }
+  main { max-width: 960px; margin: 0 auto; padding-block: 24px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  h2 { font-size: 1.1rem; margin: 28px 0 8px; }
+  p.lead { color: var(--muted); margin-top: 0; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:10px; padding:16px; margin:12px 0; }
+  .drop { border:2px dashed #bbb; border-radius:10px; padding:28px; text-align:center; color:var(--muted); cursor:pointer; }
+  .drop.over { border-color: var(--accent); color: var(--accent); }
+  .drop.done { border-style: solid; border-color: var(--ok); color: var(--ok); }
+  .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap:12px; }
+  label { display:block; font-size:.85rem; color:var(--muted); margin-bottom:3px; }
+  label b { color: var(--bad); }
+  input, select { width:100%; box-sizing:border-box; padding:7px 9px; border:1px solid #ccc; border-radius:6px; font: inherit; background:#fff; }
+  button { padding:9px 16px; border:0; border-radius:8px; background:var(--accent); color:#fff; font:inherit; cursor:pointer; }
+  button.secondary { background:#eee; color:var(--fg); }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .muted { color: var(--muted); }
+  .err { color: var(--bad); white-space: pre-wrap; }
+  .status { display:flex; gap:16px; flex-wrap:wrap; align-items:baseline; }
+  .pill { display:inline-block; padding:2px 10px; border-radius:999px; background:#eee; font-size:.85rem; }
+  .pill.running, .pill.awaiting_feedback { background:#fff3cd; color:var(--warn); }
+  .pill.finished { background:#d9f2e3; color:var(--ok); }
+  .pill.failed, .pill.cancelled { background:#f8d7d5; color:var(--bad); }
+  table { border-collapse: collapse; width:100%; font-size:.9rem; }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); vertical-align: top; }
+  .tbl { overflow-x:auto; }
+  .collage { max-width:100%; border:1px solid var(--line); border-radius:6px; }
+  .judge { display:grid; grid-template-columns: repeat(auto-fit, minmax(280px,1fr)); gap:14px; }
+  .judge .item { border:1px solid var(--line); border-radius:8px; padding:10px; background:#fff; }
+  .judge .btns { display:flex; gap:6px; margin-top:8px; }
+  .judge .btns button { flex:1; background:#eee; color:var(--fg); }
+  .judge .btns button.sel-true { background:#d9f2e3; color:var(--ok); }
+  .judge .btns button.sel-false { background:#f8d7d5; color:var(--bad); }
+  .judge .btns button.sel-ood { background:#eee; color:var(--muted); outline:2px solid #999; }
+  .judge.by-direction { grid-template-columns: minmax(0, 1fr); }
+  .dir-card { min-width: 0; }
+  :root { --c-latent:#bcd3ee; --c-ambient:#5f93cf; --c-verified:#22683f; --c-spurious:#c0392b; }
+  .headline { font-size:1.05rem; }
+  .headline b { font-size:1.4rem; }
+  svg.bars { width:100%; height:auto; display:block; }
+  svg.bars text { font: 12px system-ui, sans-serif; fill: var(--fg); }
+  svg.bars text.num { font-size:11px; fill: var(--muted); }
+  svg.bars text.spurious { fill: var(--c-spurious); font-weight:700; }
+  .legend { display:flex; gap:14px; flex-wrap:wrap; font-size:.8rem; color:var(--muted); margin-top:4px; }
+  .legend i { display:inline-block; width:12px; height:10px; border-radius:2px; margin-right:4px; vertical-align:-1px; }
+  table.groups { border-collapse:collapse; font-size:.85rem; margin-top:8px; width:100%; max-width:560px; }
+  table.groups td, table.groups th { padding:3px 8px 3px 0; text-align:left; border-bottom:1px solid var(--line); }
+  table.groups td.acc { width:45%; }
+  table.groups .meter { height:8px; background:#e6e6e2; border-radius:4px; overflow:hidden; }
+  table.groups .meter span { display:block; height:100%; background:var(--c-ambient); }
+  table.groups tr.summary td { font-weight:600; }
+  table.groups tr.worst .meter span { background:var(--c-spurious); }
+  .strip { display:flex; gap:10px; overflow-x:auto; scroll-snap-type:x mandatory; padding:8px 2px 10px; margin-top:8px; }
+  .strip figure { margin:0; flex:0 0 min(520px, 88%); scroll-snap-align:start; }
+  .strip img { width:100%; border:1px solid var(--line); border-radius:6px; display:block; }
+  .strip figcaption { font-size:.78rem; color:var(--muted); margin-top:3px; }
+  .dir-card .section { font-size:.8rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin-top:14px; }
+  .dir-card h3 { margin:0 0 2px; font-size:1rem; }
+  .dir-card .pairs { display:grid; grid-template-columns: repeat(auto-fit, minmax(420px,1fr)); gap:10px; margin-top:8px; }
+  @media (max-width: 520px) { .dir-card .pairs { grid-template-columns: 1fr; } }
+  .dir-card .pairs img { width:100%; border:1px solid var(--line); border-radius:6px; }
+  .dir-card .btns.main button { padding:10px 8px; font-weight:600; }
+  .dir-card details { margin-top:8px; }
+  .dir-card .single { display:flex; gap:6px; align-items:center; margin-top:6px; font-size:.85rem; }
+  .dir-card .single button { flex:none; padding:4px 8px; font-size:.8rem; }
+  ul.queue-list { list-style:none; margin:8px 0 0; padding:0; font-size:.9rem; }
+  ul.queue-list li { padding:3px 0; }
+  ul.queue-list li.mine { font-weight:600; }
+  ol.steps { list-style:none; margin:12px 0 0; padding:0; font-size:.9rem; }
+  ol.steps li { display:flex; gap:10px; padding:3px 0; color:var(--muted); }
+  ol.steps li .mark { width:1.2em; text-align:center; }
+  ol.steps li .when { margin-left:auto; font-variant-numeric:tabular-nums; }
+  ol.steps li.done { color:var(--fg); }
+  ol.steps li.done .mark { color:var(--ok); }
+  ol.steps li.current { color:var(--fg); font-weight:600; }
+  ol.steps li.current .mark { color:var(--warn); }
+  .activity { margin-top:10px; font:.8rem/1.4 ui-monospace, monospace; background:#f0f0ec; padding:6px 10px; border-radius:6px; white-space:pre-wrap; word-break:break-word; }
+  pre.log { max-height: 260px; overflow:auto; background:#111; color:#ddd; padding:10px; border-radius:8px; font-size:.78rem; }
+  [hidden] { display:none !important; }
+  small.hint { display:block; color:var(--muted); margin-top:4px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>PEAL Clever Hans analysis</h1>
+  <p class="lead">Upload an ONNX image classifier and a zip with one folder per class. DiDAE distils the classifier into a sparse concept space, renders counterfactuals with a pretrained representation autoencoder, and asks you which edits are spurious. (Handing back a corrected classifier is switched off in this demo for now.)</p>
+  <div class="card" id="queue-card">
+    <span class="pill">queue</span> <span id="queue-text" class="muted">loading…</span>
+    <ul class="queue-list" id="queue-list"></ul>
+  </div>
+
+  <section id="submit">
+    <h2>1. Files</h2>
+    <div class="grid">
+      <div class="card">
+        <div class="drop" id="drop-model">Drop the <b>ONNX classifier</b> here or click to choose<br><small class="hint">single input [batch, 3, H, W]; up to <span id="max-onnx"></span> MB</small></div>
+        <input type="file" id="file-model" accept=".onnx" hidden>
+        <div id="model-info" class="muted"></div>
+      </div>
+      <div class="card">
+        <div class="drop" id="drop-dataset">Drop the <b>dataset zip</b> here or click to choose<br><small class="hint">&lt;class_a&gt;/*.jpg, &lt;class_b&gt;/*.jpg, …; up to <span id="max-zip"></span> MB</small></div>
+        <input type="file" id="file-dataset" accept=".zip" hidden>
+        <div id="dataset-info" class="muted"></div>
+      </div>
+    </div>
+
+    <h2>2. What the model expects <span class="muted">(all fields required)</span></h2>
+    <div class="card">
+      <div class="grid">
+        <div><label>Class A folder <b>*</b></label><select id="class_a"></select></div>
+        <div><label>Class B folder <b>*</b></label><select id="class_b"></select></div>
+        <div><label>Class A name (as shown to you when judging) <b>*</b></label><input id="class_a_name" placeholder="e.g. cheeseburger"></div>
+        <div><label>Class B name <b>*</b></label><input id="class_b_name" placeholder="e.g. hotdog"></div>
+        <div><label>Model output index for class A <b>*</b></label><input id="output_index_a" type="number" min="0" value="0"><small class="hint" id="n-outputs"></small></div>
+        <div><label>Model output index for class B <b>*</b></label><input id="output_index_b" type="number" min="0" value="1"></div>
+        <div><label>Input normalization <b>*</b></label>
+          <select id="normalization">
+            <option value="">choose…</option>
+            <option value="imagenet">ImageNet mean/std (torchvision)</option>
+            <option value="clip">CLIP mean/std</option>
+            <option value="zero_one">none: pixels in [0, 1]</option>
+            <option value="minus_one_one">pixels in [-1, 1] (mean .5, std .5)</option>
+            <option value="custom">custom mean/std</option>
+          </select></div>
+        <div id="custom-norm" hidden><label>Mean, std (3 values each)</label><input id="mean" placeholder="0.485,0.456,0.406"><input id="std" placeholder="0.229,0.224,0.225" style="margin-top:4px"></div>
+        <div><label>Input height <b>*</b></label><input id="input_height" type="number" min="32" max="1024"></div>
+        <div><label>Input width <b>*</b></label><input id="input_width" type="number" min="32" max="1024"></div>
+        <div><label>Images per class (0 = all)</label><input id="max_per_class" type="number" min="0" value="0"></div>
+        <div><label>Directions to render</label><input id="render_directions" type="number" min="1" max="30" value="10"><small class="hint">every atom is swept in latent space; only the top N directions are rendered as images (each with all its flips). More = longer job.</small></div>
+        <div><label>Renders per direction (0 = all)</label><input id="render_per_direction" type="number" min="0" value="30"><small class="hint">cap on the latent flips rendered per direction (a random subset); 0 = all, which can be thousands of renders and take hours.</small></div>
+        <div><label>Direction type</label>
+          <select id="direction_type">
+            <option value="pairs">concept pairs (one concept off, another on)</option>
+            <option value="single">single concepts (one dictionary concept pushed on or off)</option>
+          </select><small class="hint">pairs found the background shortcut on Waterbirds more often; single concepts are easier to read.</small></div>
+        <div><label>Correction after your verdicts</label>
+          <select id="correction">
+            <option value="none">none: analysis only</option>
+            <option value="dfr" disabled>DFR: refit only the last layer (about a minute)</option>
+            <option value="finetune">full finetuning (hours, experimental)</option>
+          </select><small class="hint" id="correction-hint">DFR becomes available once the model's final linear layer is found in the uploaded graph.</small></div>
+        <div id="dfr-solver-box" hidden><label>DFR solver</label>
+          <select id="dfr_solver">
+            <option value="logistic">logistic regression (as in the DFR paper)</option>
+            <option value="svm">soft-margin linear SVM (Platt-calibrated)</option>
+            <option value="ridge">ridge / least squares, closed form (Platt-calibrated)</option>
+          </select><small class="hint">all three are convex and pick their regularisation by 5-fold cross-validation.</small></div>
+      </div>
+      <p style="margin-top:14px"><label style="display:flex;gap:8px;align-items:flex-start;color:var(--fg)"><input type="checkbox" id="accept_terms" style="width:auto;margin-top:3px"> <span>I accept that this is a non-commercial research demo (the generator weights are CC BY-NC 4.0), that my files are stored on the server until the job is cleaned up, and that I upload only data I am allowed to share. <b>*</b></span></label></p>
+      <div class="status"><button id="submit-btn" disabled>Start analysis</button> <span id="submit-wait" class="muted"></span></div>
+      <div id="submit-err" class="err"></div>
+    </div>
+  </section>
+
+  <section id="job" hidden>
+    <h2>Job <code id="job-id"></code></h2>
+    <div class="card">
+      <div class="status">
+        <span class="pill" id="job-status"></span>
+        <span id="job-stage" class="muted"></span>
+        <span id="job-wait" class="muted"></span>
+        <button class="secondary" id="cancel-btn">Cancel</button>
+      </div>
+      <div id="job-accuracy" style="margin-top:10px" hidden></div>
+      <div class="muted" id="job-why" style="margin-top:6px"></div>
+      <div class="activity" id="job-activity" hidden></div>
+      <ol class="steps" id="job-steps"></ol>
+      <div id="job-live" style="margin-top:12px" hidden></div>
+      <div class="err" id="job-error"></div>
+      <details style="margin-top:10px"><summary class="muted">log</summary><pre class="log" id="job-log"></pre></details>
+    </div>
+
+    <div id="feedback" hidden>
+      <h2>Your verdicts are needed</h2>
+      <p class="muted">Each card is one <b>direction</b>: a concept of the sparse dictionary that DiDAE switched on or off, which flipped the classifier. It shows how often the edit flipped the classifier, how accurate your classifier is on images with and without the concept, and every verified pair (original, edited counterfactual, where the image changed). Judge the direction as a whole: did the edit change the <b>true</b> class feature (<span id="fb-names"></span>), or something <b>spurious</b> the classifier should not rely on? Mark it not plausible if the edited images are broken.</p>
+      <div class="card" id="fb-overview"></div>
+      <div class="judge" id="judge"></div>
+      <p><button id="feedback-btn" disabled>Submit verdicts</button> <span id="feedback-progress" class="muted"></span></p>
+    </div>
+
+    <div id="results" hidden>
+      <h2>Results</h2>
+      <div class="card" id="results-summary"></div>
+      <div class="card" id="results-overview" hidden></div>
+      <div class="card tbl"><table id="results-table"><thead><tr><th>#</th><th>direction</th><th>latent flips</th><th>verified flips</th><th>your verdict</th><th>examples</th></tr></thead><tbody></tbody></table></div>
+    </div>
+  </section>
+
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const state = { model: null, dataset: null, job: null, feedbackRound: null, verdicts: {} };
+const fmtWait = s => s < 90 ? `${Math.round(s)} s` : s < 5400 ? `${Math.round(s/60)} min` : `${(s/3600).toFixed(1)} h`;
+// Elapsed / measured durations to the second (estimates keep fmtWait).
+const fmtDur = s => {
+  s = Math.max(0, Math.floor(s));
+  const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), sec = s % 60;
+  return h ? `${h} h ${String(m).padStart(2, '0')} min` : m ? `${m} min ${String(sec).padStart(2, '0')} s` : `${sec} s`;
+};
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.detail || r.statusText);
+  return j;
+}
+
+async function loadQueue() {
+  try {
+    const q = await api('/api/queue');
+    $('queue-text').textContent = `${q.running} running, ${q.queued} queued; a new job would start in about ${fmtWait(q.estimated_wait_seconds_for_new_job)} and takes about ${fmtWait(q.median_job_seconds)}.`;
+    $('submit-wait').textContent = `estimated start: ${fmtWait(q.estimated_wait_seconds_for_new_job)} after submission`;
+    state.queue = q.jobs || [];
+    renderQueueList();
+  } catch (e) { $('queue-text').textContent = 'queue unavailable'; }
+}
+function renderQueueList() {
+    const now = Date.now() / 1000;
+    $('queue-list').innerHTML = (state.queue || []).map(j => {
+      const mine = state.jobPosition === j.position;
+      const what = j.status === 'queued' ? `waiting for ${fmtDur(now - j.created)}`
+        : j.status === 'awaiting_feedback' ? 'waiting for its owner\'s verdicts; the GPU stays reserved for it until they answer'
+        : `${j.stage || 'starting'}, running for ${fmtDur(now - (j.started || j.created))}`;
+      return `<li class="${mine ? 'mine' : ''}">#${j.position} ${j.status.replace('_', ' ')}: ${what}${mine ? ' (your job)' : ''}</li>`;
+    }).join('');
+}
+async function loadOptions() {
+  try { const o = await api('/api/options'); $('max-onnx').textContent = o.max_onnx_mb; $('max-zip').textContent = o.max_zip_mb; if (o.max_render_directions) $('render_directions').max = o.max_render_directions; } catch (e) {}
+}
+
+function wireDrop(dropId, inputId, handler) {
+  const drop = $(dropId), input = $(inputId);
+  drop.addEventListener('click', () => input.click());
+  input.addEventListener('change', () => input.files[0] && handler(input.files[0]));
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+  drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); e.dataTransfer.files[0] && handler(e.dataTransfer.files[0]); });
+}
+async function uploadFile(kind, file, infoId, dropId) {
+  $(infoId).textContent = `uploading ${file.name} (${(file.size/1048576).toFixed(1)} MB)…`;
+  $(dropId).classList.remove('done');
+  const fd = new FormData(); fd.append('file', file);
+  try {
+    const r = await api(`/api/uploads/${kind}`, { method: 'POST', body: fd });
+    $(dropId).classList.add('done');
+    return r;
+  } catch (e) { $(infoId).innerHTML = `<span class="err">${e.message}</span>`; return null; }
+}
+wireDrop('drop-model', 'file-model', async file => {
+  const r = await uploadFile('model', file, 'model-info', 'drop-model');
+  if (!r) return;
+  state.model = r;
+  const [b, c, h, w] = r.input_shape;
+  $('model-info').textContent = `${r.filename}: input ${JSON.stringify(r.input_shape)}, ${r.num_outputs ?? '?'} outputs, opset ${r.opset}`;
+  if (h) $('input_height').value = h; if (w) $('input_width').value = w;
+  $('n-outputs').textContent = r.num_outputs ? `the model has ${r.num_outputs} outputs (indices 0 to ${r.num_outputs-1})` : '';
+  if (r.num_outputs) { $('output_index_a').max = r.num_outputs-1; $('output_index_b').max = r.num_outputs-1; }
+  const dfrOpt = $('correction').querySelector('option[value="dfr"]');
+  dfrOpt.disabled = !r.dfr_available;
+  $('correction').querySelector('option[value="finetune"]').disabled = r.finetunable === false;
+  if (r.dfr_available) {
+    $('correction').value = 'dfr';
+    $('correction-hint').textContent = `final layer found: ${r.final_layer.op} ${r.final_layer.node} (${r.final_layer.n_features} features → ${r.final_layer.n_classes} outputs); DFR refits it on your images and the counterfactuals.`;
+  } else {
+    if ($('correction').value === 'dfr') $('correction').value = 'none';
+    $('correction-hint').textContent = 'No final linear layer (Gemm or MatMul with constant weights) was found in this graph, so DFR is not available.';
+  }
+  $('dfr-solver-box').hidden = $('correction').value !== 'dfr';
+  validate();
+});
+wireDrop('drop-dataset', 'file-dataset', async file => {
+  const r = await uploadFile('dataset', file, 'dataset-info', 'drop-dataset');
+  if (!r) return;
+  state.dataset = r;
+  const names = Object.keys(r.classes);
+  $('dataset-info').textContent = `${r.filename}: ${names.length} class folders, ${Object.values(r.classes).reduce((a,b)=>a+b,0)} images`;
+  for (const sel of ['class_a', 'class_b']) {
+    $(sel).innerHTML = '<option value="">choose…</option>' + names.map(n => `<option value="${n}">${n} (${r.classes[n]})</option>`).join('');
+  }
+  if (names.length >= 2) { $('class_a').value = names[0]; $('class_b').value = names[1]; }
+  if (!$('class_a_name').value) $('class_a_name').value = names[0] || '';
+  if (!$('class_b_name').value) $('class_b_name').value = names[1] || '';
+  validate();
+});
+$('correction').addEventListener('change', () => { $('dfr-solver-box').hidden = $('correction').value !== 'dfr'; });
+$('normalization').addEventListener('change', () => { $('custom-norm').hidden = $('normalization').value !== 'custom'; validate(); });
+for (const id of ['class_a','class_b','class_a_name','class_b_name','output_index_a','output_index_b','input_height','input_width','accept_terms','mean','std']) {
+  $(id).addEventListener('input', validate); $(id).addEventListener('change', validate);
+}
+function validate() {
+  const ok = state.model && state.dataset && $('class_a').value && $('class_b').value && $('class_a').value !== $('class_b').value
+    && $('class_a_name').value.trim() && $('class_b_name').value.trim() && $('normalization').value
+    && $('input_height').value && $('input_width').value && $('output_index_a').value !== '' && $('output_index_b').value !== ''
+    && $('output_index_a').value !== $('output_index_b').value && $('accept_terms').checked
+    && ($('normalization').value !== 'custom' || ($('mean').value && $('std').value));
+  $('submit-btn').disabled = !ok;
+}
+$('submit-btn').addEventListener('click', async () => {
+  $('submit-err').textContent = '';
+  const fd = new FormData();
+  fd.append('model_token', state.model.token); fd.append('dataset_token', state.dataset.token);
+  for (const id of ['class_a','class_b','class_a_name','class_b_name','output_index_a','output_index_b','normalization','input_height','input_width','mean','std','max_per_class','render_directions','render_per_direction','direction_type','correction','dfr_solver']) fd.append(id, $(id).value);
+  fd.append('accept_terms', $('accept_terms').checked ? 'true' : 'false');
+  $('submit-btn').disabled = true;
+  try {
+    const job = await api('/api/jobs', { method: 'POST', body: fd });
+    location.hash = job.id; showJob(job.id);
+  } catch (e) { $('submit-err').textContent = e.message; $('submit-btn').disabled = false; }
+});
+
+let pollTimer = null;
+function showJob(id) {
+  state.job = id; $('submit').hidden = true; $('job').hidden = false; $('job-id').textContent = id;
+  poll();
+}
+async function poll() {
+  clearTimeout(pollTimer);
+  try {
+    const j = await api(`/api/jobs/${state.job}`);
+    const pill = $('job-status'); pill.textContent = j.status.replace('_', ' '); pill.className = 'pill ' + j.status;
+    $('job-stage').textContent = j.stage || '';
+    state.lastJob = j; renderClock(j);
+    $('job-error').textContent = j.error || '';
+    const prevPosition = state.jobPosition;
+    state.jobPosition = j.queue_position;
+    if (prevPosition !== state.jobPosition) loadQueue();
+    renderWhy(j); renderAccuracy(j);
+    if (j.step === '2-6' || (j.step === '7' && !j.feedback_pending)) await renderLive(); else $('job-live').hidden = true;
+    $('job-activity').hidden = !j.activity;
+    $('job-activity').textContent = j.activity ? `currently: ${j.activity}` : '';
+    $('cancel-btn').hidden = !['queued','running','awaiting_feedback'].includes(j.status);
+    if (j.feedback_pending) await loadFeedback(); else { $('feedback').hidden = true; }
+    if (j.has_results) await loadResults();
+    if (['queued','running','awaiting_feedback'].includes(j.status)) pollTimer = setTimeout(poll, j.status === 'queued' ? 10000 : 5000);
+    try { const l = await api(`/api/jobs/${state.job}/log?tail=6000`); const el = $('job-log'); const atEnd = el.scrollTop + el.clientHeight >= el.scrollHeight - 20; el.textContent = l.log; if (atEnd) el.scrollTop = el.scrollHeight; } catch (e) {}
+  } catch (e) { $('job-error').textContent = e.message; pollTimer = setTimeout(poll, 15000); }
+}
+const STEPS = [
+  ['queued', 'queued'],
+  ['check', 'checking your classifier on the uploaded images'],
+  ['starting', 'loading the classifier, the generator and the dictionary'],
+  ['1', 'step 1: distilling the classifier into the CLIP / SAE space'],
+  ['2-6', 'steps 2–6: sweeping dictionary directions, rendering and verifying counterfactuals (longest part)'],
+  ['7', 'step 7: building collages for the top directions'],
+  ['8', 'step 8: waiting for your verdicts'],
+  ['9', 'step 9: correcting the classifier'],
+  ['analysis', 'evaluating the classifier per direction (group accuracies)'],
+  ['done', 'done'],
+];
+const STEP9 = {
+  dfr: 'step 9: refitting the last layer (DFR) with your verdicts',
+  finetune: 'step 9: finetuning on the directions you marked spurious',
+  none: 'step 9: no correction requested',
+};
+// The job-wait line and the step timers, from the last polled job; called on
+// every poll and once a second in between, so the times run continuously.
+function renderClock(j) {
+  const now = Date.now() / 1000;
+  $('job-wait').textContent = j.status === 'queued'
+    ? `position ${j.queue_position}, waiting for ${fmtDur(now - j.created)}; starts in about ${fmtWait(j.estimated_wait_seconds)}, then about ${fmtWait(j.median_job_seconds)}`
+    : j.started && ['running', 'awaiting_feedback'].includes(j.status)
+      ? `running for ${fmtDur(now - j.started)} of about ${fmtWait(j.median_job_seconds)}`
+      : j.duration ? `total ${fmtDur(j.duration)}` : '';
+  renderSteps(j);
+}
+setInterval(() => { renderQueueList(); if (state.lastJob && !$('job').hidden) renderClock(state.lastJob); }, 1000);
+function renderSteps(j) {
+  const seen = j.steps || {};
+  const reached = STEPS.map(([k]) => k).filter(k => seen[k]);
+  const current = ['finished', 'failed', 'cancelled'].includes(j.status) ? null : (j.step || reached[reached.length - 1]);
+  // Each reached step ends where the next reached step began; the current one
+  // is still running.
+  const order = STEPS.map(([k]) => k).filter(k => seen[k]);
+  const end = ['finished', 'failed', 'cancelled'].includes(j.status) ? (j.finished || Date.now() / 1000) : Date.now() / 1000;
+  const correction = (j.fields || {}).correction;
+  $('job-steps').innerHTML = STEPS.map(([k, label]) => {
+    if (k === '9') label = STEP9[correction] || label;
+    if (k === 'analysis' && !seen[k]) return '';
+    const at = seen[k];
+    const cls = k === current ? 'current' : at ? 'done' : '';
+    const mark = k === current ? '▶' : at ? '✓' : '·';
+    const next = order[order.indexOf(k) + 1];
+    const until = next ? seen[next] : end;
+    const running = k === 'queued' ? 'waiting for' : k === '8' ? 'waiting for' : 'running for';
+    const when = !at || k === 'done' ? '' : k === current ? `${running} ${fmtDur(until - at)}` : `took ${fmtDur(until - at)}`;
+    return `<li class="${cls}"><span class="mark">${mark}</span><span>${label}</span><span class="when">${when}</span></li>`;
+  }).join('');
+}
+function renderAccuracy(j) {
+  const a = j.accuracy_check, el = $('job-accuracy');
+  if (!a || a.accuracy === null || a.accuracy === undefined) { el.hidden = true; return; }
+  const names = [j.fields.class_a_name, j.fields.class_b_name];
+  const per = Object.entries(a.per_class).map(([c, v]) => `${esc(names[c] ?? c)} ${pct(v.accuracy)} (n=${v.n})`).join(', ');
+  const worstClass = Math.min(...Object.values(a.per_class).map(v => v.accuracy));
+  const suspicious = a.accuracy < 0.65 || worstClass < 0.3;
+  el.innerHTML = `<div class="headline">Your classifier gets <b>${pct(a.accuracy)}</b> of the ${a.n_images} uploaded images right <span class="muted" style="font-size:.9rem">(${per})</span>.</div>`
+    + (suspicious ? `<div class="err" style="margin-top:4px">That is close to chance or one class is almost never predicted. Check the input size, the normalization and which output index belongs to which class folder; if they are wrong, cancel and resubmit.</div>` : '');
+  el.hidden = false;
+}
+async function renderLive() {
+  let p;
+  try { p = await api(`/api/jobs/${state.job}/progress`); } catch (e) { return; }
+  if (!p.stage) { $('job-live').hidden = true; return; }
+  const rows = p.directions.map((d, i) => ({ label: `${i + 1}. ${shortName(d.name)}`, latent: d.latent_flips, ambient: d.ambient_flips, verified: d.verified_flips }));
+  const head = p.stage === 'inverting'
+    ? `Ranking by latent flips is ready; inverting the ${p.n_candidates ? 'selected' : ''} images before rendering ${p.n_candidates} counterfactuals…`
+    : `Rendered ${p.decoded} / ${p.n_candidates} counterfactuals; ambient and verified flips fill in as they are checked.`;
+  $('job-live').innerHTML = `<div class="muted" style="font-size:.85rem">${head}</div>${barsSVG(rows)}${LEGEND}`;
+  $('job-live').hidden = false;
+}
+function renderWhy(j) {
+  let why = '';
+  if (j.status === 'queued') {
+    const ahead = (state.queue || []).filter(q => q.position < j.queue_position);
+    const fb = ahead.filter(q => q.status === 'awaiting_feedback').length;
+    why = `One GPU runs one job at a time, so this job waits for the ${ahead.length || j.queue_position - 1} job(s) ahead of it.`
+      + (fb ? ` ${fb} of them is waiting for its owner's verdicts and keeps the GPU until they answer.` : '');
+  } else if (j.status === 'awaiting_feedback') {
+    why = 'The analysis is paused until you submit your verdicts below; other jobs wait meanwhile.';
+  }
+  $('job-why').textContent = why;
+}
+$('cancel-btn').addEventListener('click', async () => { await api(`/api/jobs/${state.job}/cancel`, { method: 'POST' }); poll(); });
+
+const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pct = v => v === null || v === undefined ? '–' : `${(v * 100).toFixed(1)}%`;
+const shortName = n => String(n).replace(/\s*\(SAE #(\d+)\)/g, ' #$1').replace(/\s*->\s*/g, ' → ').replace(/\s+/g, ' ').trim();
+const VERDICTS = [['true', 'true: class feature changed'], ['false', 'false: spurious edit'], ['ood', 'not plausible']];
+
+// Horizontal bars as in the DiDAE paper's ranking figure: latent, ambient and
+// verified flips per direction on a log scale; spurious directions in red.
+function barsSVG(rows, opts = {}) {
+  const labelW = opts.labelW ?? 330, W = opts.width ?? 860, rowH = 44, h = 10, pad = 26;
+  const max = Math.max(10, ...rows.flatMap(r => [r.latent || 0, r.ambient || 0, r.verified || 0]));
+  const lo = 0.7, x = v => labelW + (Math.log10(Math.max(v, lo)) - Math.log10(lo)) / (Math.log10(max * 1.6) - Math.log10(lo)) * (W - labelW - 40);
+  const H = rows.length * rowH + pad;
+  const ticks = [1, 10, 100, 1000, 10000].filter(t => t <= max * 1.6);
+  let out = `<svg class="bars" viewBox="0 0 ${W} ${H}" role="img" aria-label="latent, ambient and verified flips per direction">`;
+  for (const t of ticks) out += `<line x1="${x(t)}" x2="${x(t)}" y1="0" y2="${H - pad + 4}" stroke="#d5d8dc" stroke-dasharray="2 3"/><text class="num" x="${x(t)}" y="${H - 8}" text-anchor="middle">${t}</text>`;
+  rows.forEach((r, i) => {
+    const y0 = i * rowH + 6;
+    const cls = r.verdict === 'false' ? 'spurious' : '';
+    const mark = r.verdict === 'false' ? ' ✗' : r.verdict === 'true' ? ' ✓' : '';
+    const maxChars = Math.floor((labelW - 12) / 6.6) - (mark ? 2 : 0);
+    const label = esc(String(r.label).length > maxChars ? String(r.label).slice(0, maxChars - 1) + '…' : r.label);
+    out += `<text class="${cls}" x="${labelW - 8}" y="${y0 + 3 * h / 2 + 4}" text-anchor="end">${label}${mark}</text>`;
+    [['latent', 'var(--c-latent)'], ['ambient', 'var(--c-ambient)'], ['verified', 'var(--c-verified)']].forEach(([k, c], j) => {
+      const v = r[k] || 0, yy = y0 + j * h;
+      out += `<rect x="${labelW}" y="${yy}" width="${Math.max(x(v) - labelW, 1.5)}" height="${h - 1}" fill="${c}" rx="1.5"><title>${k} flips: ${v}</title></rect>`;
+      out += `<text class="num" x="${x(v) + 4}" y="${yy + h - 1.5}">${v}</text>`;
+    });
+  });
+  return out + '</svg>';
+}
+const LEGEND = `<div class="legend"><span><i style="background:var(--c-latent)"></i>latent flips (edit flips the distilled probe)</span><span><i style="background:var(--c-ambient)"></i>ambient flips (rendered image flips your classifier)</span><span><i style="background:var(--c-verified)"></i>verified flips (and the edit is realised in the image)</span><span>log scale</span></div>`;
+
+function groupTable(d, names) {
+  const rows = d.groups.map(g => `<tr><td>${esc(names[g.class] ?? g.class)}, ${g.concept ? 'with' : 'without'} concept</td><td>n=${g.n}</td><td>${pct(g.accuracy)}</td><td class="acc"><div class="meter"><span style="width:${(g.accuracy ?? 0) * 100}%"></span></div></td></tr>`).join('');
+  return `<table class="groups"><tbody>${rows}
+    <tr class="summary"><td>average group accuracy</td><td></td><td>${pct(d.average)}</td><td class="acc"><div class="meter"><span style="width:${(d.average ?? 0) * 100}%"></span></div></td></tr>
+    <tr class="summary worst"><td>worst group accuracy</td><td></td><td>${pct(d.worst)}</td><td class="acc"><div class="meter"><span style="width:${(d.worst ?? 0) * 100}%"></span></div></td></tr></tbody></table>
+    <div class="muted" style="font-size:.78rem;margin-top:3px">"concept" = SAE atom${d.atoms.length > 1 ? 's' : ''} ${d.atoms.map(a => '#' + a).join(', ')} active on the image's CLIP embedding (${d.n_concept_present} of the images).</div>`;
+}
+
+function pairStrip(d, names) {
+  if (!d.pairs.length) return `<div class="muted" style="margin-top:8px">No verified pairs for this direction.</div>`;
+  return `<div class="strip">${d.pairs.map((p, k) => `<figure><a href="${p.image_url}" target="_blank"><img loading="lazy" src="${p.image_url}" alt="verified pair ${k + 1}"></a><figcaption>${k + 1}/${d.pairs.length} · ${esc(names[p.orig_class] ?? p.orig_class)} → ${esc(names[p.target_class] ?? p.target_class)} at ${(p.confidence * 100).toFixed(0)}% · original | counterfactual | difference</figcaption></figure>`).join('')}</div>`;
+}
+
+function renderOverview(el, a, verdictOf) {
+  const rows = a.directions.map(d => ({ label: `#${d.rank} ${shortName(d.name)}`, latent: d.latent_flips, ambient: d.ambient_flips, verified: d.verified_flips, verdict: verdictOf(d.direction_idx) }));
+  el.innerHTML = `<p class="headline">Your classifier gets <b>${pct(a.accuracy)}</b> of the ${a.n_images} uploaded images right.</p>
+    <div class="section muted" style="font-size:.8rem;text-transform:uppercase;letter-spacing:.04em">top directions</div>${barsSVG(rows)}${LEGEND}`;
+}
+
+async function loadAnalysis() {
+  try { return await api(`/api/jobs/${state.job}/analysis`); } catch (e) { return { status: 'failed' }; }
+}
+
+async function loadFeedback() {
+  const fb = await api(`/api/jobs/${state.job}/feedback`);
+  if (fb.round === null) { $('feedback').hidden = true; return; }
+  const an = state.analysis?.status === 'ready' ? state.analysis : (state.analysis = await loadAnalysis());
+  const key = `${fb.round}:${an.status}`;
+  if (state.feedbackKey === key && !$('feedback').hidden) return;
+  if (state.feedbackRound !== fb.round) state.verdicts = {};
+  state.feedbackRound = fb.round; state.feedbackKey = key;
+  const j = await api(`/api/jobs/${state.job}`);
+  $('fb-names').textContent = `${j.fields.class_a_name} vs ${j.fields.class_b_name}`;
+  const names = [j.fields.class_a_name, j.fields.class_b_name];
+  const byIndex = Object.fromEntries(fb.items.map(it => [it.index, it]));
+  const reqDirs = (fb.directions && fb.directions.length) ? fb.directions
+    : fb.items.map(it => ({ rank: null, direction_idx: null, name: `pair ${it.index}`, items: [it.index] }));
+  const itemsOf = Object.fromEntries(reqDirs.filter(d => d.direction_idx !== null).map(d => [d.direction_idx, d.items]));
+  // Cards: every ranked direction of the analysis when it is ready, else the
+  // directions of the feedback request.
+  const cards = an.status === 'ready'
+    ? an.directions.map(d => ({ ...d, items: itemsOf[d.direction_idx] || [] }))
+    : reqDirs.map(d => ({ ...d, items: d.items }));
+  const verdictOf = idx => { const its = itemsOf[idx] || []; const vs = its.map(i => state.verdicts[i]); return vs.length && vs.every(v => v && v === vs[0]) ? vs[0] : null; };
+
+  if (an.status === 'ready') renderOverview($('fb-overview'), an, verdictOf);
+  else $('fb-overview').innerHTML = `<p class="muted">${an.status === 'failed' ? 'The accuracy analysis failed (see analysis.log); you can still judge the pairs below.' : 'Computing accuracies and group accuracies…'}</p>`;
+
+  $('judge').className = 'judge by-direction';
+  $('judge').innerHTML = cards.map((d, di) => {
+    const title = `${d.rank !== null && d.rank !== undefined ? `#${d.rank} ` : ''}${esc(shortName(d.name))}`;
+    const body = an.status === 'ready' ? `
+      ${barsSVG([{ label: 'flips', latent: d.latent_flips, ambient: d.ambient_flips, verified: d.verified_flips }], { labelW: 60, width: 860 })}
+      <div class="section">group accuracies of your classifier</div>${groupTable(d, names)}
+      <div class="section">all ${d.pairs.length} verified pairs${d.verified_flips > d.pairs.length ? ` (of ${d.verified_flips})` : ''}</div>${pairStrip(d, names)}`
+      : `<div class="strip">${d.items.map(i => { const it = byIndex[i]; const u = it.detail_collage_url || it.collage_url; return `<figure><a href="${u}" target="_blank"><img src="${u}" alt="pair ${i}"></a></figure>`; }).join('')}</div>`;
+    const vote = d.items.length ? `
+      <div class="section">your verdict for this direction</div>
+      <div class="btns main">${VERDICTS.map(([v, label]) => `<button data-v="${v}">${label}</button>`).join('')}</div>
+      <details><summary class="muted">judge the ${d.items.length} shown pair${d.items.length === 1 ? '' : 's'} individually</summary>
+        ${d.items.map((i, k) => { const it = byIndex[i]; return `<div class="single btns" data-index="${i}"><a href="${it.detail_collage_url || it.collage_url}" target="_blank">pair ${k + 1}</a>${VERDICTS.map(([v, label]) => `<button data-v="${v}">${label.split(':')[0]}</button>`).join('')}</div>`; }).join('')}
+      </details>` : `<div class="muted" style="margin-top:10px;font-size:.85rem">Not up for judgement: no rendered flip of this direction passed verification with enough confidence.</div>`;
+    return `<div class="item dir-card" data-dir="${di}"><h3>${title}</h3>${body}${vote}</div>`;
+  }).join('');
+  const refresh = () => {
+    $('judge').querySelectorAll('.dir-card').forEach(card => {
+      const d = cards[card.dataset.dir];
+      const vs = d.items.map(i => state.verdicts[i]);
+      const same = vs.length && vs.every(v => v && v === vs[0]) ? vs[0] : null;
+      card.querySelectorAll('.btns.main button').forEach(b => b.className = b.dataset.v === same ? 'sel-' + same : '');
+      card.querySelectorAll('.single').forEach(row => row.querySelectorAll('button').forEach(b => b.className = state.verdicts[row.dataset.index] === b.dataset.v ? 'sel-' + b.dataset.v : ''));
+    });
+    const judgeable = cards.filter(d => d.items.length);
+    const nDone = judgeable.filter(d => d.items.every(i => state.verdicts[i])).length;
+    $('feedback-progress').textContent = `${nDone} / ${judgeable.length} directions judged`;
+    $('feedback-btn').disabled = Object.keys(state.verdicts).length < fb.n_items;
+    if (an.status === 'ready') renderOverview($('fb-overview'), an, verdictOf);
+  };
+  $('judge').querySelectorAll('.btns.main button').forEach(b => b.addEventListener('click', () => {
+    for (const i of cards[b.closest('.dir-card').dataset.dir].items) state.verdicts[i] = b.dataset.v;
+    refresh();
+  }));
+  $('judge').querySelectorAll('.single button').forEach(b => b.addEventListener('click', () => {
+    state.verdicts[b.closest('.single').dataset.index] = b.dataset.v;
+    refresh();
+  }));
+  refresh();
+  $('feedback').hidden = false;
+}
+$('feedback-btn').addEventListener('click', async () => {
+  $('feedback-btn').disabled = true;
+  try {
+    await api(`/api/jobs/${state.job}/feedback`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ round: state.feedbackRound, verdicts: state.verdicts }) });
+    $('feedback').hidden = true; state.feedbackRound = null; state.feedbackKey = null; poll();
+  } catch (e) { $('job-error').textContent = e.message; $('feedback-btn').disabled = false; }
+});
+
+function dfrSummary(d, names) {
+  const b = d.before, a = d.after, cv = d.cv_after || {};
+  const per = (x) => Object.entries(x || {}).map(([c, v]) => `${esc(names[c] ?? c)} ${pct(v)}`).join(', ');
+  return `<p><b>Last-layer correction (DFR, ${esc(d.solver)}, C=${d.C})</b> on ${d.n_counterfactuals} counterfactuals (${d.n_false_counterfactuals} from spurious directions):</p>
+    <ul style="margin:4px 0 10px 18px;padding:0">
+      <li>held-out test accuracy ${pct(b.test_accuracy)} → <b>${pct(a.test_accuracy)}</b> (${per(b.test_per_class)} → ${per(a.test_per_class)})</li>
+      ${b.false_cf_consistency !== undefined ? `<li>spurious edits no longer flip the classifier: ${pct(b.false_cf_consistency)} → <b>${pct(cv.false_cf_consistency ?? a.false_cf_consistency)}</b> (cross-validated)</li>` : ''}
+      ${b.true_cf_consistency !== undefined ? `<li>true edits still flip it: ${pct(b.true_cf_consistency)} → <b>${pct(cv.true_cf_consistency ?? a.true_cf_consistency)}</b> (cross-validated)</li>` : ''}
+    </ul>`;
+}
+async function loadResults() {
+  const r = await api(`/api/jobs/${state.job}/results`);
+  const j0 = await api(`/api/jobs/${state.job}`);
+  const acc = r.accuracies || {};
+  const accText = Object.entries(acc).map(([k, v]) => `${k.replace(/_/g,' ')}: ${(v*100).toFixed(1)}%`).join(', ');
+  const dl = r.download_urls || {};
+  $('results-summary').innerHTML = `
+    <p>${r.directions.length} directions ranked; ${r.false_directions.length} judged spurious${r.false_directions.length ? ` (${r.false_directions.join(', ')})` : ''}.</p>
+    ${accText ? `<p>${accText}</p>` : ''}
+    ${r.dfr ? dfrSummary(r.dfr, [j0.fields.class_a_name, j0.fields.class_b_name]) : ''}
+    <p>${dl['model.onnx'] ? `<a href="${dl['model.onnx']}" download>Download the ${r.corrected ? 'corrected' : 'unchanged'} classifier (ONNX, two outputs: class A, class B)</a>` : 'No ONNX export available for this job.'}</p>`;
+  $('results-table').querySelector('tbody').innerHTML = r.directions.slice(0, 40).map(d => `
+    <tr><td>${d.rank}</td><td>${d.name}</td><td>${d.latent_flips ?? '–'}</td><td>${d.verified_flips ?? '–'}${d.total_attempted ? ' / ' + d.total_attempted : ''}</td>
+    <td>${d.feedback ? `<span class="pill ${d.feedback === 'false' ? 'failed' : 'finished'}">${d.feedback === 'false' ? 'spurious' : 'true'}</span>` : ''}</td>
+    <td>${(d.collage_urls || []).slice(0, 2).map(u => `<a href="${u}" target="_blank"><img src="${u}" class="collage" style="max-width:160px"></a>`).join(' ')}</td></tr>`).join('');
+  const an = await loadAnalysis();
+  if (an.status === 'ready') {
+    const fbOf = Object.fromEntries(r.directions.map(d => [d.direction_idx, d.feedback]));
+    renderOverview($('results-overview'), an, idx => fbOf[idx]);
+    const hasAfter = an.directions.some(d => d.after);
+    if (hasAfter) {
+      const arrow = (b, a) => `${pct(b)} → <b>${pct(a)}</b>`;
+      $('results-overview').innerHTML += `<div class="section muted" style="font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;margin-top:14px">group accuracies before → after the correction</div>
+        <div class="tbl"><table class="groups" style="max-width:none"><thead><tr><th>direction</th><th>your verdict</th><th>average group accuracy</th><th>worst group accuracy</th></tr></thead><tbody>
+        ${an.directions.map(d => `<tr><td>#${d.rank} ${esc(shortName(d.name))}</td><td>${fbOf[d.direction_idx] === 'false' ? '<span class="pill failed">spurious</span>' : fbOf[d.direction_idx] === 'true' ? '<span class="pill finished">true</span>' : ''}</td><td>${arrow(d.average, d.after.average)}</td><td>${arrow(d.worst, d.after.worst)}</td></tr>`).join('')}
+        </tbody></table></div>
+        <div class="muted" style="font-size:.78rem">On all ${an.n_images} uploaded images: ${pct(an.accuracy)} → ${pct(an.accuracy_after)}. These include the images the correction was fitted on; the held-out test split is reported above.</div>`;
+    }
+    $('results-overview').hidden = false;
+  }
+  $('results').hidden = false;
+}
+
+loadOptions(); loadQueue(); setInterval(loadQueue, 30000);
+if (location.hash.length > 1) showJob(location.hash.slice(1));
+</script>
+</body>
+</html>

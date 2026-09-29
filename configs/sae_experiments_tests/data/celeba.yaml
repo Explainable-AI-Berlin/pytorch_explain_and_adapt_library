@@ -1,0 +1,19 @@
+dataset_class           : CelebADataset
+dataset_path            : $PEAL_DATA/celeba
+num_samples             : 202599
+split                   : [0.8,0.9]
+input_type              : image
+input_size              : [3, 128, 128]
+x_selection             : imgs
+output_type             : multiclass
+# 40 binary CelebA attributes; the 41st parsed column ("split") is dropped by
+# Image2MixedDataset (targets[:output_size[0]]).
+output_size             : [40]
+downsize                : Resize
+delimiter               : ","
+has_hints               : false
+# CelebA stores attributes as -1/1. Must be true, otherwise every downstream
+# sklearn binary metric sees {-1,0,1} and errors out as "multiclass".
+set_negative_to_zero    : true
+seed                    : 1
+normalization           : [0.5,0.5]

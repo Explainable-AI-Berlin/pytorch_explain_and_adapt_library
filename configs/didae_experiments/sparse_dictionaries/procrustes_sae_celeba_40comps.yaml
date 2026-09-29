@@ -1,0 +1,13 @@
+ending: .npz
+n_components: 40
+name: OrthogonalProcrustesDictionary40Comps
+sparse_dictionaries_type: OrthogonalProcrustesDictionary
+category: sparse_dictionaries
+data: <PEAL_BASE>/configs/didae_experiments/data/celeba_unpoisoned_generator.yaml
+task:
+  y_selection: [5_o_Clock_Shadow,Arched_Eyebrows,Attractive,Bags_Under_Eyes,Bald,Bangs,Big_Lips,Big_Nose,Black_Hair,Blond_Hair,Blurry,Brown_Hair,Bushy_Eyebrows,Chubby,Double_Chin,Eyeglasses,Goatee,Gray_Hair,Heavy_Makeup,High_Cheekbones,Male,Mouth_Slightly_Open,Mustache,Narrow_Eyes,No_Beard,Oval_Face,Pale_Skin,Pointy_Nose,Receding_Hairline,Rosy_Cheeks,Sideburns,Smiling,Straight_Hair,Wavy_Hair,Wearing_Earrings,Wearing_Hat,Wearing_Lipstick,Wearing_Necklace,Wearing_Necktie,Young]
+  output_type: multiclass
+  output_channels: 40
+  criterions:
+    bce: 1.0
+    l2: 100.0

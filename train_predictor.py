@@ -1,37 +1,12 @@
-import argparse
-import sys
+"""Train a predictor (student or test model) from a ``PredictorConfig`` YAML.
 
-from peal.global_utils import (
-    load_yaml_config,
-    add_class_arguments,
-    integrate_arguments,
-    set_random_seed,
-)
-from peal.training.trainers import ModelTrainer
-from peal.training.interfaces import PredictorConfig
+Thin wrapper. The implementation moved to ``peal.entrypoints.train_predictor`` so that
+an installed PEAL exposes it as the ``peal-train-predictor`` console command; this file
+is kept because the reproduction scripts, notebooks and README all invoke ``python
+train_predictor.py ...``. See that module for the full documentation.
+"""
 
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, required=True)
-    add_class_arguments(parser, PredictorConfig)
-    args = parser.parse_args()
-
-    if hasattr(args, "config"):
-        config = args.config
-
-    else:
-        config = sys.argv[-1]
-
-    config = load_yaml_config(config, PredictorConfig)
-    integrate_arguments(args, config, exclude=["config"])
-    set_random_seed(config.seed)
-
-    model_trainer = ModelTrainer(config)
-    model_trainer.fit(
-        continue_training=config.continue_training, is_initialized=config.is_loaded
-    )
-
+from peal.entrypoints.train_predictor import main
 
 if __name__ == "__main__":
     main()

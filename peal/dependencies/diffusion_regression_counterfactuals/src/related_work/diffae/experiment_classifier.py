@@ -294,6 +294,7 @@ def train_cls(conf: TrainConfig, gpus):
         dirpath=f"{conf.logdir}",
         save_last=True,
         save_top_k=1,
+        monitor="loss",
         # every_n_train_steps=conf.save_every_samples //
         # conf.batch_size_effective,
     )

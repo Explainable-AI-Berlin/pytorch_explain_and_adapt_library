@@ -1,18 +1,25 @@
 """
 These test primarily assure the proper functionality of the get_group_stats function in LossComputer
+
+Requires a GPU: the vendored ``peal/dependencies/group_dro/loss.py`` calls
+``.cuda()`` unconditionally in ``LossComputer.__init__`` (line 51). That file is
+third-party code kept byte-compatible with upstream, so the skip belongs here
+rather than in a patch to it.
 """
 
 import unittest
-import os
-import sys
 
 import torch
-import numpy as np
 from torch import nn
 
 from torch.utils.data import Dataset
 
 from peal.dependencies.group_dro.loss import LossComputer
+
+
+requires_cuda = unittest.skipUnless(
+    torch.cuda.is_available(), "LossComputer.__init__ calls .cuda() unconditionally"
+)
 
 
 class DummyConfig:
@@ -28,6 +35,7 @@ class DummyDataset(Dataset):
         self.data = data
 
 
+@requires_cuda
 class TestGetGroupStats(unittest.TestCase):
 
     def setUp(self):

@@ -1,29 +1,59 @@
+"""Dataloader construction and mixing for PEAL training loops.
+
+``get_dataloader`` and ``create_dataloaders_from_datasource`` turn a config
+plus a dataset path, dataset tuple or dataloader tuple into the
+train/val/test dataloaders used by trainers and adaptors. ``DataloaderMixer``
+is the training-side wrapper that samples batches from several dataloaders
+with priorities (e.g. original data plus counterfactuals appended by CFKD),
+supports concatenated class-balanced batches and epochs of a fixed number of
+steps; ``DataStack`` and ``create_class_ordered_batch`` build small
+class-ordered batches for visualizations.
+"""
+
 import copy
+import os
 
 import torch
 import numpy as np
 
 from torch.utils.data import DataLoader
 import torch.multiprocessing
+from peal.log import get_logger
+
+_log = get_logger(__name__)
+
 
 torch.multiprocessing.set_sharing_strategy("file_system")
 
 from peal.data.dataset_factory import get_datasets
+from peal.global_utils import load_yaml_config
+from peal.training.interfaces import TrainingConfig, TaskConfig
 
 
 class DataStack:
     """
-    This class is used to create a stack of data for each class.
+    Per-class FIFO buffer of samples drawn from a dataset or dataloader.
+
+    ``data[c]`` holds ``[X, y]`` pairs of class ``c``. The stack is refilled
+    from the source whenever some class runs empty, so ``pop(c)`` always
+    returns a sample of class ``c``; it is used to assemble class-ordered
+    batches for visualizations.
+
+    Parameters
+    ----------
+    datasource : torch.utils.data.Dataset or DataLoader or DataloaderMixer
+        Where samples come from. A dataset is walked sequentially and
+        cyclically via ``current_idx``; a dataloader is drawn from with
+        ``next(iter(...))``.
+    num_classes : int
+        Number of classes, i.e. number of per-class lists.
+    transform : callable, optional
+        Transform temporarily swapped into ``dataset.transform`` while the
+        stack is being filled.
     """
 
     def __init__(self, datasource, num_classes, transform=None):
-        """
-        This function is used to initialize the DataStack class.
-
-        Args:
-            datasource (_type_): _description_
-            num_classes (_type_): _description_
-        """
+        """Create the per-class lists and fill them once."""
         self.datasource = datasource
         if isinstance(datasource, torch.utils.data.Dataset):
             self.dataset = datasource
@@ -42,7 +72,10 @@ class DataStack:
 
     def fill_stack(self):
         """
-        This function is used to fill the stack with data.
+        Draw samples from the source until every class list is non-empty.
+
+        With hints or indices enabled the label is a tuple and its first
+        element is used as the class index.
         """
         if not self.transform is None:
             data_transform = self.dataset.transform
@@ -54,7 +87,8 @@ class DataStack:
                 if (
                     hasattr(self.dataset, "hints_enabled")
                     and self.dataset.hints_enabled
-                    or self.dataset.idx_enabled
+                    or hasattr(self.dataset, "idx_enabled")
+                    and self.dataset.idx_enabled
                 ):
                     y_index = y[0]
 
@@ -81,9 +115,7 @@ class DataStack:
                             y_out = tuple([y_elem[i] for y_elem in y])
 
                         except Exception:
-                            import pdb
-
-                            pdb.set_trace()
+                            raise
 
                         self.data[int(y[0][i])].append([X[i], y_out])
 
@@ -96,22 +128,24 @@ class DataStack:
 
     def pop(self, class_idx):
         """
-        This function is used to pop a sample from the stack.
+        Remove and return the oldest buffered sample of one class.
 
-        Args:
-            class_idx (_type_): _description_
+        Parameters
+        ----------
+        class_idx : int
+            Class whose sample is popped.
 
-        Returns:
-            _type_: _description_
+        Returns
+        -------
+        list
+            ``[X, y]`` of the sample; the stack is refilled afterwards.
         """
         sample = self.data[class_idx].pop(0)
         self.fill_stack()
         return sample
 
     def reset(self):
-        """
-        This function is used to reset the stack.
-        """
+        """Empty all class lists, reset a ``DataloaderMixer`` source and refill."""
         self.data = []
         for idx in range(self.num_classes):
             self.data.append([])
@@ -125,30 +159,26 @@ class DataStack:
 
 class DataIterator:
     """
-    This class is used to iterate over the data in a dataset.
+    Iterator over a ``DataloaderMixer`` yielding a fixed number of batches.
+
+    One pass yields ``dataloader.train_config.steps_per_epoch`` batches
+    obtained from ``dataloader.sample()``, independent of the underlying
+    dataset sizes.
+
+    Parameters
+    ----------
+    dataloader : DataloaderMixer
+        The mixer to draw batches from.
     """
 
     def __init__(self, dataloader):
-        """
-        _summary_
-
-        Args:
-            dataloader (_type_): _description_
-        """
+        """Store the mixer and start the step counter at 0."""
         self.dataloader = dataloader
         # member variable to keep track of current index
         self._index = 0
 
     def __next__(self):
-        """
-        _summary_
-
-        Raises:
-            StopIteration: _description_
-
-        Returns:
-            _type_: _description_
-        """
+        """Return the next mixed batch or raise ``StopIteration`` after the epoch."""
         if self._index < self.dataloader.train_config.steps_per_epoch:
             self._index += 1
             return self.dataloader.sample()
@@ -159,20 +189,40 @@ class DataIterator:
 
 class DataloaderMixer(DataLoader):
     """
-    _summary_
+    Dataloader that samples batches from several dataloaders.
 
-    Args:
-        DataLoader (_type_): _description_
+    Starts with one dataloader; ``append`` adds more (e.g. counterfactual
+    datasets during CFKD) with priorities proportional to dataset size. In
+    the default mode every ``sample()`` picks one dataloader by multinomial
+    draw over ``priorities``; with ``train_config.concatenate_batches`` one
+    batch from each dataloader is concatenated instead (used for class
+    balancing). Exhausted iterators are restarted transparently, and one
+    epoch is ``train_config.steps_per_epoch`` batches. Only the attribute
+    interface of ``DataLoader`` is reused; ``DataLoader.__init__`` is not
+    called.
+
+    Parameters
+    ----------
+    train_config : TrainingConfig
+        Provides ``steps_per_epoch`` and optionally ``concatenate_batches``.
+    initial_dataloader : DataLoader
+        First member; its ``batch_size`` and ``dataset`` are adopted.
+    return_src : bool, optional
+        If ``True`` (and batches are not concatenated) ``sample`` returns
+        ``(batch, dataloader_index)``.
+
+    Attributes
+    ----------
+    dataloaders : list of DataLoader
+    iterators : list
+        One live iterator per dataloader.
+    priorities : numpy.ndarray or None
+        Sampling probabilities, ``None`` while only one dataloader exists.
+    hints_enabled, class_balancing_enabled : bool
     """
 
     def __init__(self, train_config, initial_dataloader, return_src=False):
-        """
-        _summary_
-
-        Args:
-            train_config (_type_): _description_
-            initial_dataloader (_type_): _description_
-        """
+        """Register the first dataloader (``DataLoader.__init__`` is skipped)."""
         self.train_config = train_config
         self.dataloaders = [initial_dataloader]
         self.batch_size = initial_dataloader.batch_size
@@ -183,7 +233,12 @@ class DataloaderMixer(DataLoader):
         self.hints_enabled = False
         self.class_balancing_enabled = False
 
+    def update_dataset(self, dataset):
+        """Re-point ``self.dataset`` at the first member's dataset (arg ignored)."""
+        self.dataset = self.dataloaders[0].dataset
+
     def __getstate__(self):
+        """Pickle everything except the live iterators."""
         return {
             "train_config": self.train_config,
             "dataloaders": self.dataloaders,
@@ -196,6 +251,7 @@ class DataloaderMixer(DataLoader):
         }
 
     def __setstate__(self, state):
+        """Restore the pickled attributes and rebuild the iterators via ``reset``."""
         self.train_config = state["train_config"]
         self.dataloaders = state["dataloaders"]
         self.batch_size = state["batch_size"]
@@ -209,6 +265,7 @@ class DataloaderMixer(DataLoader):
 
     @property
     def return_src(self):
+        """Whether ``sample`` also returns the source index (off when concatenating)."""
         if (
             hasattr(self.train_config, "concatenate_batches")
             and self.train_config.concatenate_batches
@@ -220,11 +277,23 @@ class DataloaderMixer(DataLoader):
 
     def append(self, dataloader, priority=1, weight_added_dataloader=None):
         """
-        _summary_
+        Add another dataloader and recompute the sampling priorities.
 
-        Args:
-            dataloader (_type_): _description_
-            priority (int, optional): _description_. Defaults to 1.
+        Parameters
+        ----------
+        dataloader : DataLoader
+            Dataloader to add.
+        priority : float, optional
+            Multiplier on the new dataloader's dataset size before the
+            priorities are normalized. Defaults to 1.
+        weight_added_dataloader : float, optional
+            If given, priorities become ``[1 - w, w]`` regardless of sizes
+            (only meaningful with exactly two dataloaders).
+
+        Notes
+        -----
+        With ``train_config.concatenate_batches`` all members are reset to
+        half the batch size so concatenated batches keep the original size.
         """
         self.dataloaders.append(dataloader)
         self.iterators.append(iter(self.dataloaders[-1]))
@@ -248,9 +317,44 @@ class DataloaderMixer(DataLoader):
             self.reset(batch_size=self.batch_size // 2)
 
     def __iter__(self):
+        """Return a ``DataIterator`` over ``steps_per_epoch`` mixed batches."""
         return DataIterator(self)
 
+    # def return_iter(self, dataloader):
+    #     """Recursively reset dataloader and return fresh iterator.
+
+    #     Args:
+    #         dataloader: The dataloader to reset (can be DataloaderMixer or DataLoader)
+
+    #     Returns:
+    #         A fresh iterator from the reset dataloader
+    #     """
+    #     if isinstance(dataloader, DataloaderMixer):
+    #         # Recursively reset all nested dataloaders
+    #         for nested_dl in dataloader.dataloaders:
+    #             if isinstance(nested_dl, DataloaderMixer):
+    #                 nested_dl.reset()
+    #         # Reset this dataloader's iterators
+    #         dataloader.reset()
+    #     return iter(dataloader)
+
     def sample(self):
+        """
+        Draw one batch.
+
+        In priority mode one dataloader is chosen by multinomial draw and
+        its next batch returned; in concatenation mode the next batch of
+        every dataloader is fetched and the tensors (also inside nested
+        lists/tuples) are concatenated along dim 0. Exhausted iterators are
+        restarted once; a dataloader that is still empty afterwards raises
+        ``StopIteration``.
+
+        Returns
+        -------
+        object
+            The batch as produced by the member dataloader(s), or
+            ``(batch, source_index)`` when ``return_src`` is set.
+        """
         if (
             not hasattr(self.train_config, "concatenate_batches")
             or not self.train_config.concatenate_batches
@@ -265,7 +369,10 @@ class DataloaderMixer(DataLoader):
             item = next(self.iterators[idx], "STOP")
             if isinstance(item, str) and item == "STOP":
                 self.iterators[idx] = iter(self.dataloaders[idx])
-                item = next(self.iterators[idx])
+                item = next(self.iterators[idx], "STOP")
+                # If still STOP after reset, dataloader is empty - raise StopIteration
+                if isinstance(item, str) and item == "STOP":
+                    raise StopIteration
 
             if self.return_src:
                 item = (item, idx)
@@ -276,13 +383,22 @@ class DataloaderMixer(DataLoader):
                 item = next(self.iterators[idx], "STOP")
                 if isinstance(item, str) and item == "STOP":
                     self.iterators[idx] = iter(self.dataloaders[idx])
-                    item = next(self.iterators[idx])
+                    item = next(self.iterators[idx], "STOP")
+                    # If still STOP after reset, dataloader is empty - raise StopIteration
+                    if isinstance(item, str) and item == "STOP":
+                        raise StopIteration
 
                 subitems.append(item)
 
+            if not subitems:
+                # No iterators at all: every constituent dataloader was dropped as empty
+                # (class-balanced training splits the counterfactual set per class, and a
+                # ~40-row set whose "false" verdicts all land in one class leaves the other
+                # side empty). The two branches above already signal exhaustion with
+                # StopIteration; do the same here instead of IndexError on subitems[0].
+                raise StopIteration
+
             item = subitems[0]
-            """if isinstance(item[1], tuple) or isinstance(item[1], list):
-                item[1] = item[1][0]"""
 
             for subitem in subitems[1:]:
                 for i in range(len(item)):
@@ -299,6 +415,15 @@ class DataloaderMixer(DataLoader):
         return item
 
     def reset(self, batch_size=None):
+        """
+        Rebuild every member dataloader and its iterator.
+
+        Parameters
+        ----------
+        batch_size : int, optional
+            New batch size for the rebuilt ``DataLoader`` objects; nested
+            mixers are reset recursively with the same value.
+        """
         for i in range(len(self.dataloaders)):
             if isinstance(self.dataloaders[i], DataloaderMixer):
                 self.dataloaders[i].reset(batch_size)
@@ -313,7 +438,46 @@ class DataloaderMixer(DataLoader):
 
             self.iterators[i] = iter(self.dataloaders[i])
 
+    def remove_empty_dataloaders(self):
+        """Recursively remove dataloaders with zero-length datasets.
+
+        This method iterates through all nested dataloaders and removes any
+        that have no data (len(dataset) == 0), including nested DataloaderMixers
+        that become empty after recursive cleaning.
+        """
+        # First, recursively clean nested DataloaderMixers
+        for dataloader in self.dataloaders:
+            if isinstance(dataloader, DataloaderMixer):
+                dataloader.remove_empty_dataloaders()
+
+        # Track indices to remove (iterate backwards to avoid index shift)
+        indices_to_remove = []
+        for i in range(len(self.dataloaders) - 1, -1, -1):
+            dataloader = self.dataloaders[i]
+            # Check if dataset is empty
+            if len(dataloader.dataset) == 0:
+                indices_to_remove.append(i)
+
+        # Remove empty dataloaders and their iterators
+        for idx in indices_to_remove:
+            _log.info(
+                "%s", f"Removing empty dataloader at index {idx} (dataset size: 0)"
+            )
+            del self.dataloaders[idx]
+            del self.iterators[idx]
+
+        # Recalculate priorities if needed
+        if len(indices_to_remove) > 0 and self.priorities is not None:
+            if len(self.dataloaders) > 0:
+                self.priorities = np.zeros(len(self.dataloaders))
+                for i in range(len(self.dataloaders)):
+                    self.priorities[i] = self.dataloaders[i].dataset.__len__()
+                self.priorities = self.priorities / self.priorities.sum()
+            else:
+                self.priorities = None
+
     def __len__(self):
+        """Total number of samples over all member datasets."""
         length = 0
         for dataloader in self.dataloaders:
             length += len(dataloader.dataset)
@@ -321,6 +485,7 @@ class DataloaderMixer(DataLoader):
         return length
 
     def enable_hints(self):
+        """Enable hint outputs on all member datasets and reset the iterators."""
         for dataloader in self.dataloaders:
             if isinstance(dataloader, DataloaderMixer):
                 dataloader.enable_hints()
@@ -332,6 +497,7 @@ class DataloaderMixer(DataLoader):
         self.hints_enabled = True
 
     def disable_hints(self):
+        """Disable hint outputs on all member datasets and reset the iterators."""
         for dataloader in self.dataloaders:
             if isinstance(dataloader, DataloaderMixer):
                 dataloader.disable_hints()
@@ -343,6 +509,7 @@ class DataloaderMixer(DataLoader):
         self.hints_enabled = False
 
     def enable_idx(self):
+        """Make member datasets return sample indices and reset the iterators."""
         for dataloader in self.dataloaders:
             if isinstance(dataloader, DataloaderMixer):
                 dataloader.enable_idx()
@@ -354,6 +521,7 @@ class DataloaderMixer(DataLoader):
         self.idx_enabled = True
 
     def disable_idx(self):
+        """Stop member datasets returning sample indices and reset the iterators."""
         for dataloader in self.dataloaders:
             if isinstance(dataloader, DataloaderMixer):
                 dataloader.disable_idx()
@@ -365,6 +533,15 @@ class DataloaderMixer(DataLoader):
         self.idx_enabled = False
 
     def enable_class_balancing(self):
+        """
+        Replace every plain member dataloader by a per-class concatenating mixer.
+
+        For each class ``i`` in ``dataset.output_size`` a deep copy of the
+        dataloader restricted to that class is created; the copies are
+        wrapped in a nested ``DataloaderMixer`` with ``concatenate_batches``
+        and ``steps_per_epoch = 200`` so each batch holds an equal share of
+        every class. No-op if already enabled.
+        """
         if not self.class_balancing_enabled:
             for idx, dataloader in enumerate(self.dataloaders):
                 if isinstance(dataloader, DataloaderMixer):
@@ -372,11 +549,16 @@ class DataloaderMixer(DataLoader):
 
                 else:
                     new_dataloaders = []
+
                     for i in range(dataloader.dataset.output_size):
+                        # TODO this is a hacky way to get the class restriction
+                        # if i not in [248, 269]:
+                        #     continue
+                        # print(f"using {i}")
+
                         dataloader_copy = copy.deepcopy(dataloader)
                         dataloader_copy.dataset.enable_class_restriction(i)
                         new_dataloaders.append(dataloader_copy)
-
                     new_config = copy.deepcopy(self.train_config)
                     new_config.steps_per_epoch = 200
                     new_config.concatenate_batches = True
@@ -390,6 +572,12 @@ class DataloaderMixer(DataLoader):
             self.class_balancing_enabled = True
 
     def disable_class_balancing(self):
+        """
+        Undo ``enable_class_balancing``.
+
+        Keeps only the first plain member dataloader found (with its class
+        restriction removed) and drops the priorities. No-op if not enabled.
+        """
         if self.class_balancing_enabled:
             for idx, dataloader in enumerate(self.dataloaders):
                 if not isinstance(dataloader, DataloaderMixer):
@@ -405,7 +593,19 @@ class DataloaderMixer(DataLoader):
 
 
 class WeightedDataloaderList:
+    """
+    A list of ``DataLoader`` objects with associated sampling weights.
+
+    Parameters
+    ----------
+    dataloaders : list of DataLoader
+        Members; each is asserted to be a ``torch.utils.data.DataLoader``.
+    weights : torch.Tensor, optional
+        Initial weights. Defaults to uniform ``1 / len(dataloaders)``.
+    """
+
     def __init__(self, dataloaders, weights=None):
+        """Validate the members and set uniform weights if none are given."""
         for dataloader in dataloaders:
             assert isinstance(dataloader, torch.utils.data.DataLoader), (
                 str(dataloader) + " is not dataloader!"
@@ -419,12 +619,41 @@ class WeightedDataloaderList:
             self.weights = torch.ones([len(self.dataloaders)]) / len(self.dataloaders)
 
     def append(self, dataloader):
+        """Add a dataloader, halving the existing weights and giving it weight 0.5."""
         assert isinstance(dataloader, torch.utils.data.DataLoader), (
             str(dataloader) + " is not dataloader!"
         )
         self.dataloaders.append(dataloader)
         self.weights *= 0.5
         self.weights = torch.cat([self.weights, torch.tensor([0.5])])
+
+
+def resolve_num_workers(training_config=None):
+    """Worker processes for the loaders ``get_dataloader`` builds.
+
+    The default stays 0, i.e. the behaviour before 2026-09-25: images are
+    decoded and resized on the training process between GPU steps, which the
+    generator code measured at ~15 % GPU utilisation. Raise it per config
+    (``training.num_workers``) or globally (``$PEAL_NUM_WORKERS``); the config
+    wins when it is non-zero. It is not raised by default because a dataset that
+    lazily attaches a CUDA model (``calculate_outlier_score``) cannot be forked
+    into workers, and that has to be checked per dataset first.
+
+    Parameters
+    ----------
+    training_config : TrainingConfig, optional
+        Read for its ``num_workers`` field.
+
+    Returns
+    -------
+    int
+        Number of worker processes, ``0`` for in-process loading.
+    """
+    configured = getattr(training_config, "num_workers", None)
+    if configured:
+        return int(configured)
+    env = os.environ.get("PEAL_NUM_WORKERS")
+    return int(env) if env else 0
 
 
 def get_dataloader(
@@ -435,6 +664,33 @@ def get_dataloader(
     batch_size=None,
     steps_per_epoch=None,
 ):
+    """
+    Wrap a PEAL dataset in a ``DataLoader`` (and a mixer for training).
+
+    Parameters
+    ----------
+    dataset : PealDataset
+        Dataset to load; ``dataset.task_config`` is set to ``task_config``
+        and a ``task_config.class_restriction`` is enabled on it.
+    training_config : TrainingConfig, optional
+        Supplies ``<mode>_batch_size`` when ``batch_size`` is ``None`` and
+        ``steps_per_epoch`` for the mixer. Required if ``batch_size`` is
+        ``None``.
+    mode : str, optional
+        ``"train"`` (shuffled) or ``"val"``/``"test"`` (in order).
+    task_config : TaskConfig, optional
+        Task config attached to the dataset.
+    batch_size : int, optional
+        Explicit batch size overriding the training config.
+    steps_per_epoch : int, optional
+        If given (or set on ``training_config``) and ``mode == "train"``,
+        the loader is wrapped in a ``DataloaderMixer``.
+
+    Returns
+    -------
+    DataLoader or DataloaderMixer
+        Single-process (``num_workers=0``) loader.
+    """
     assert (
         not training_config is None or not batch_size is None
     ), "the batch size has to be given!"
@@ -443,20 +699,27 @@ def get_dataloader(
     if task_config is not None and task_config.class_restriction is not None:
         dataset.enable_class_restriction(task_config.class_restriction)
 
+    num_workers = resolve_num_workers(training_config)
+    loader_kwargs = dict(
+        num_workers=num_workers,
+        shuffle=bool(mode == "train"),
+    )
+    if num_workers > 0:
+        loader_kwargs["persistent_workers"] = True
+        loader_kwargs["pin_memory"] = torch.cuda.is_available()
+
     if batch_size is None:
         dataloader = DataLoader(
             dataset,
             batch_size=getattr(training_config, mode + "_batch_size"),
-            num_workers=0,
-            shuffle=bool(mode == "train"),
+            **loader_kwargs,
         )
 
     else:
         dataloader = DataLoader(
             dataset,
             batch_size=batch_size,
-            num_workers=0,
-            shuffle=bool(mode == "train"),
+            **loader_kwargs,
         )
 
     if mode == "train" and (
@@ -469,6 +732,22 @@ def get_dataloader(
 
 
 def create_class_ordered_batch(dataset, config):
+    """
+    Build a small batch with two consecutive samples of every class.
+
+    Parameters
+    ----------
+    dataset : PealDataset or DataLoader
+        Source handed to ``DataStack``.
+    config : object
+        Config whose ``task.output_size`` (or ``data.output_size``) gives
+        the number of classes.
+
+    Returns
+    -------
+    tuple of torch.Tensor
+        ``(X, y)`` with ``2 * output_size`` samples ordered by class.
+    """
     if "output_size" in config.task.keys():
         output_size = config.task.output_size
 
@@ -498,8 +777,39 @@ def create_dataloaders_from_datasource(
     test_config=None,
 ):
     """
-    This function creates the dataloaders from a given datasource.
+    Create the train/val/test dataloaders for a config from a datasource.
+
+    Parameters
+    ----------
+    config : object
+        Config with a ``data`` (or ``data_config``) section and optionally
+        ``training``, ``task``, ``predictor`` (dict with ``training`` and
+        ``task`` yaml paths, used when no ``training`` section exists) and
+        ``transition_restrictions`` (its first entry becomes a class
+        restriction on the train and val sets).
+    datasource : str or tuple or list, optional
+        A dataset root passed to ``get_datasets``, a tuple of two or three
+        ``Dataset`` objects, or a tuple of two or three ``DataLoader``
+        objects returned as-is. Defaults to ``data_config.dataset_path``.
+    enable_hints : bool, optional
+        Call ``enable_hints`` on the training dataset.
+    test_config : object, optional
+        Forwarded to ``get_datasets`` for a differently configured test set.
+
+    Returns
+    -------
+    tuple
+        ``(train_dataloader, val_dataloader, test_dataloader)``; a member is
+        ``None`` when its dataset is empty. Training loaders are
+        ``DataloaderMixer`` instances when ``steps_per_epoch`` is set.
+
+    Notes
+    -----
+    As a side effect ``config.data`` is replaced by the training dataset's
+    config when that dataset is not ``multiclass``. An unrecognized
+    ``datasource`` prints a message and calls ``quit()``.
     """
+    data_config = config.data if "data" in dir(config) else config.data_config
     if (isinstance(datasource, tuple) or isinstance(datasource, list)) and isinstance(
         datasource[0], DataLoader
     ):
@@ -514,15 +824,13 @@ def create_dataloaders_from_datasource(
 
     else:
         if datasource is None:
-            datasource = config.data.dataset_path
-
+            datasource = data_config.dataset_path
         if isinstance(datasource, str):
             dataset_train, dataset_val, dataset_test = get_datasets(
-                config=config.data,
+                config=data_config,
                 base_dir=datasource,
                 test_config=test_config,
             )
-
         elif isinstance(datasource[0], torch.utils.data.Dataset):
             if len(datasource) == 2:
                 dataset_train, dataset_val = datasource
@@ -532,62 +840,111 @@ def create_dataloaders_from_datasource(
                 dataset_train, dataset_val, dataset_test = datasource
 
         else:
-            print("datasource is not a valid input!")
+            _log.info("%s", "datasource is not a valid input!")
             quit()
 
-        """
-        if hasattr(config, "architecture") and isinstance(
-            config.architecture, VAEConfig
-        ):
-            dataset_train = VAEDatasetWrapper(dataset_train)
-            dataset_val = VAEDatasetWrapper(dataset_val)
-            dataset_test = VAEDatasetWrapper(dataset_test)
-
-        # TODO reintegrate normalizing flows
-        if "n_bits" in config.architecture.keys():
-            dataset_train = GlowDatasetWrapper(
-                dataset_train, config.architecture.n_bits
-            )
-            dataset_val = GlowDatasetWrapper(
-                dataset_val, config.architecture.n_bits
-            )
-            dataset_test = GlowDatasetWrapper(
-                dataset_test, config.architecture.n_bits
-            )
-        
-        # TODO reintegrate hints
-        """
         if enable_hints:
             dataset_train.enable_hints()
-
+        # this is hacky needs to be done properly
+        training_config = config.training if "training" in dir(config) else None
+        task_config = config.task if "task" in dir(config) else None
+        if "predictor" in dir(config) and training_config is None:
+            training_config = load_yaml_config(
+                config.predictor["training"], config_model=TrainingConfig
+            )
+            task_config = load_yaml_config(
+                config.predictor["task"], config_model=TaskConfig
+            )
+            if config.transition_restrictions is not None:
+                training_config.class_restriction = config.transition_restrictions[0]
         if len(dataset_train) > 0:
+            if training_config is not None and isinstance(training_config, dict):
+                batch_size = (
+                    training_config["train_batch_size"]
+                    if isinstance(training_config, dict)
+                    else training_config.batch_size
+                )
+                step_per_epoch = training_config["steps_per_epoch"]
+            else:
+                batch_size = None
+                step_per_epoch = None
+            if "transition_restrictions" in dir(config):
+                if config.transition_restrictions is not None:
+                    _log.info(
+                        "%s",
+                        f"enabling class restriction training set{config.transition_restrictions[0]}",
+                    )
+                    dataset_train.enable_class_restriction(
+                        config.transition_restrictions[0]
+                    )
+                    training_config.class_restriction = config.transition_restrictions[
+                        0
+                    ]
+
             train_dataloader = get_dataloader(
                 dataset=dataset_train,
-                training_config=config.training,
+                training_config=training_config,
                 mode="train",
-                task_config=config.task,
+                task_config=task_config,
+                batch_size=batch_size,
+                steps_per_epoch=step_per_epoch,
             )
 
         else:
             train_dataloader = None
 
         if len(dataset_val) > 0:
+            if training_config is not None and isinstance(training_config, dict):
+                batch_size = (
+                    training_config["val_batch_size"]
+                    if isinstance(training_config, dict)
+                    else training_config.batch_size
+                )
+            else:
+                batch_size = None
+            # if training_config is None and config.transition_restrictions is not None:
+            if "transition_restrictions" in dir(config):
+                if config.transition_restrictions is not None:
+                    _log.info(
+                        "%s",
+                        f"enabling class restriction validation set{config.transition_restrictions[0]}",
+                    )
+                    dataset_val.enable_class_restriction(
+                        config.transition_restrictions[0]
+                    )
+                    training_config.class_restriction = config.transition_restrictions[
+                        0
+                    ]
+                    _log.info("%s", "restriction enabled")
+            step_per_epoch = None
             val_dataloader = get_dataloader(
                 dataset=dataset_val,
-                training_config=config.training,
+                training_config=training_config,
+                batch_size=batch_size,
+                steps_per_epoch=step_per_epoch,
                 mode="val",
-                task_config=config.task,
+                task_config=task_config,
             )
-
+            # print(len(val_dataloader))
         else:
             val_dataloader = None
 
         if len(dataset_test) > 0:
+            if training_config is not None and isinstance(training_config, dict):
+                batch_size = (
+                    training_config["test_batch_size"]
+                    if isinstance(training_config, dict)
+                    else training_config.batch_size
+                )
+            else:
+                batch_size = None
             test_dataloader = get_dataloader(
                 dataset=dataset_test,
-                training_config=config.training,
+                training_config=training_config,
+                batch_size=batch_size,
+                steps_per_epoch=step_per_epoch,
                 mode="test",
-                task_config=config.task,
+                task_config=task_config,
             )
 
         else:
@@ -600,11 +957,8 @@ def create_dataloaders_from_datasource(
         and train_dataloader.dataset.config.output_type != "multiclass"
     ):
         # TODO sanity check or warning
-        config.data = train_dataloader.dataset.config
+        if "data" in dir(config):
+            config.data = train_dataloader.dataset.config
 
     # TODO deal with other datasets
-    """for dataloader in [train_dataloader, val_dataloader, test_dataloader]:
-        if not isinstance(dataloader.dataset, PealDataset):
-            dataloader.dataset = wrap_dataset(dataloader.dataset, config.data)"""
-
     return train_dataloader, val_dataloader, test_dataloader

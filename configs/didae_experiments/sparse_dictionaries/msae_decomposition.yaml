@@ -1,0 +1,8 @@
+sparse_dictionaries_type : MSAEDecomposition
+category                 : sparse_dictionaries
+clip_model               : "clip:ViT-L/14"
+ckpt_url                 : "https://huggingface.co/WolodjaZ/MSAE/resolve/main/ViT-L_14/centered/6144_768_TopKReLU_64_RW_False_False_0.0_cc3m_ViT-L~14_train_image_2905936_768.pth"
+interp_url               : "https://huggingface.co/WolodjaZ/MSAE/resolve/main/ViT-L_14/centered/Concept_Interpreter_6144_768_TopKReLU_64_RW_False_False_0.0_cc3m_ViT-L~14_train_image_2905936_768_disect_ViT-L~14_-1_text_20000_768.npy"
+local_dir                : "/tmp/msae_weights"
+vocab_filename           : "clip_disect_20k.txt"
+n_components             : 6144

@@ -3,7 +3,7 @@ adaptor_type: "GroupDROv2"
 base_dir: $PEAL_RUNS/funnynodules1k/internalstructure_confounding_roundness/classifier_poisoned098/group_dro
 model_path: $PEAL_RUNS/funnynodules1k/internalstructure_confounding_roundness/classifier_poisoned098/model.cpl
 data: <PEAL_BASE>/configs/cfkd_experiments/data/funnynodules1k_poisoned098.yaml
-unpoisoned_data: <PEAL_BASE>/configs/cfkd_experiments/data/funnynodules_unpoisoned.yaml
+unpoisoned_data: <PEAL_BASE>/configs/cfkd_experiments/data/funnynodules_natural.yaml
 alpha: 0.2
 generalization_adjustment: 1
 automatic_adjustment: True

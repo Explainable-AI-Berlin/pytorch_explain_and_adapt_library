@@ -40,7 +40,10 @@ from datasets import load_dataset
 from diffusers.callbacks import PipelineCallback, MultiPipelineCallbacks
 from diffusers.image_processor import PipelineImageInput
 from diffusers.pipelines.stable_diffusion import StableDiffusionPipelineOutput
-from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import rescale_noise_cfg, retrieve_timesteps
+from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import (
+    rescale_noise_cfg,
+    retrieve_timesteps,
+)
 from huggingface_hub import create_repo, upload_folder
 from packaging import version
 from peft import LoraConfig
@@ -48,8 +51,13 @@ from peft.utils import get_peft_model_state_dict
 from torchvision import transforms
 from torchvision.transforms import ToTensor
 from tqdm.auto import tqdm
-from transformers import CLIPTextModel, CLIPTokenizer
-
+from transformers import (
+    CLIPTextModel,
+    CLIPTextModelWithProjection,
+    CLIPTokenizer,
+    T5EncoderModel,
+    T5TokenizerFast,
+)
 import diffusers
 from diffusers import (
     AutoencoderKL,
@@ -57,6 +65,9 @@ from diffusers import (
     DiffusionPipeline,
     StableDiffusionPipeline,
     UNet2DConditionModel,
+    StableDiffusion3Pipeline,
+    FlowMatchEulerDiscreteScheduler,
+    SD3Transformer2DModel,
 )
 from diffusers.optimization import get_scheduler
 from diffusers.training_utils import cast_training_params, compute_snr
@@ -222,7 +233,9 @@ def parse_args():
         default=None,
         help="The directory where the downloaded predictors and datasets will be stored.",
     )
-    parser.add_argument("--seed", type=int, default=None, help="A seed for reproducible training.")
+    parser.add_argument(
+        "--seed", type=int, default=None, help="A seed for reproducible training."
+    )
     parser.add_argument(
         "--resolution",
         type=int,
@@ -337,14 +350,18 @@ def parse_args():
         default=0.999,
         help="The beta2 parameter for the Adam optimizer.",
     )
-    parser.add_argument("--adam_weight_decay", type=float, default=1e-2, help="Weight decay to use.")
+    parser.add_argument(
+        "--adam_weight_decay", type=float, default=1e-2, help="Weight decay to use."
+    )
     parser.add_argument(
         "--adam_epsilon",
         type=float,
         default=1e-08,
         help="Epsilon value for the Adam optimizer",
     )
-    parser.add_argument("--max_grad_norm", default=1.0, type=float, help="Max gradient norm.")
+    parser.add_argument(
+        "--max_grad_norm", default=1.0, type=float, help="Max gradient norm."
+    )
     parser.add_argument(
         "--push_to_hub",
         action="store_true",
@@ -432,7 +449,9 @@ def parse_args():
         action="store_true",
         help="Whether or not to use xformers.",
     )
-    parser.add_argument("--noise_offset", type=float, default=0, help="The scale of noise offset.")
+    parser.add_argument(
+        "--noise_offset", type=float, default=0, help="The scale of noise offset."
+    )
     parser.add_argument(
         "--rank",
         type=int,
@@ -469,7 +488,9 @@ def lora_finetune(args=None):
 
     logging_dir = Path(args.base_path, args.logging_dir)
 
-    accelerator_project_config = ProjectConfiguration(project_dir=args.base_path, logging_dir=logging_dir)
+    accelerator_project_config = ProjectConfiguration(
+        project_dir=args.base_path, logging_dir=logging_dir
+    )
 
     accelerator = Accelerator(
         gradient_accumulation_steps=args.gradient_accumulation_steps,
@@ -484,7 +505,9 @@ def lora_finetune(args=None):
 
     if args.report_to == "wandb":
         if not is_wandb_available():
-            raise ImportError("Make sure to install wandb if you want to use it for logging during training.")
+            raise ImportError(
+                "Make sure to install wandb if you want to use it for logging during training."
+            )
         import wandb
 
     # Make one log on every process with the configuration for debugging.
@@ -521,8 +544,12 @@ def lora_finetune(args=None):
 
     if not hasattr(args, "pipeline"):
         # Load scheduler, tokenizer and predictors.
-        tokenizer = CLIPTokenizer.from_pretrained(args.sd_model, subfolder="tokenizer", revision=args.revision)
-        text_encoder = CLIPTextModel.from_pretrained(args.sd_model, subfolder="text_encoder", revision=args.revision)
+        tokenizer = CLIPTokenizer.from_pretrained(
+            args.sd_model, subfolder="tokenizer", revision=args.revision
+        )
+        text_encoder = CLIPTextModel.from_pretrained(
+            args.sd_model, subfolder="text_encoder", revision=args.revision
+        )
         vae = AutoencoderKL.from_pretrained(
             args.sd_model, subfolder="vae", revision=args.revision, variant=args.variant
         )
@@ -533,7 +560,42 @@ def lora_finetune(args=None):
             variant=args.variant,
         )
         pipeline = StableDiffusionPipeline(args.sd_model)
-        pipeline_semantic_conditioning = StableDiffusionPipelineImgConditioned(args.sd_model)
+        noise_scheduler = DDPMScheduler.from_pretrained(
+            args.sd_model, subfolder="scheduler"
+        )
+        if args.model_str == "sd":
+            tokenizer1 = CLIPTokenizer.from_pretrained(
+                args.sd_model, revision=args.revision
+            )
+            tokenizer2 = CLIPTokenizer.from_pretrained(
+                args.sd_model, revision=args.revision
+            )
+            text_encoder1 = CLIPTextModelWithProjection.from_pretrained(
+                args.sd_model, subfolder="text_encoder", revision=args.revision
+            )
+            text_encoder2 = CLIPTextModelWithProjection.from_pretrained(
+                args.sd_model, subfolder="text_encoder", revision=args.revision
+            )
+            if args.text_enocder3 is not None:
+                tokenizer3 = T5TokenizerFast.from_pretrained(
+                    args.sd_model, subfolder="text_encoder", revision=args.revision
+                )
+                text_encoder3 = T5EncoderModel.from_pretrained(
+                    args.sd_model, subfolder="text_encoder", revision=args.revision
+                )
+            vae = AutoencoderKL.from_pretrained(
+                args.sd_model,
+                subfolder="vae",
+                revision=args.revision,
+                variant=args.variant,
+            )
+            sd3_transformer = SD3Transformer2DModel.from_pretrained(
+                args.sd_model, subfolder="sd3_transformer", revision=args.revision
+            )
+            pipeline = StableDiffusion3Pipeline(args.sd_model)
+            noise_scheduler = FlowMatchEulerDiscreteScheduler.from_pretrained(
+                args.sd_model, subfolder="scheduler"
+            )
 
     else:
         tokenizer = args.pipeline.tokenizer
@@ -541,14 +603,23 @@ def lora_finetune(args=None):
         vae = args.pipeline.vae
         unet = args.pipeline.unet
         pipeline = args.pipeline
-        pipeline_semantic_conditioning = StableDiffusionPipelineImgConditioned.from_pretrained(
-            args.sd_model,
-        )
-        pipeline_semantic_conditioning.to('cuda')
+        if args.model_str == "sd3":
+            tokenizer1 = args.pipeline.tokenizer_1
+            text_encoder1 = args.pipeline.text_encoder_1
+            tokenizer2 = args.pipeline.tokenizer_2
+            text_encoder2 = args.pipeline.text_encoder_2
+            if args.text_enocder3 is not None:
+                tokenizer3 = args.pipeline.tokenizer
+                text_encoder3 = args.pipeline.text_encoder
+            vae = args.pipeline.vae
+            transformer = args.pipeline.transformer
+            pipeline = args.pipeline
 
-    noise_scheduler = DDPMScheduler.from_pretrained(args.sd_model, subfolder="scheduler")
+    noise_scheduler = DDPMScheduler.from_pretrained(
+        args.sd_model, subfolder="scheduler"
+    )
 
-    # freeze parameters of predictors to save more memory
+    # freeze parameters of models to save more memory
     unet.requires_grad_(False)
     vae.requires_grad_(False)
     text_encoder.requires_grad_(False)
@@ -577,10 +648,14 @@ def lora_finetune(args=None):
 
             xformers_version = version.parse(xformers.__version__)
             if xformers_version == version.parse("0.0.16"):
-                logger.warning("xFormers 0.0.16 cannot be used for training in some GPUs.")
+                logger.warning(
+                    "xFormers 0.0.16 cannot be used for training in some GPUs."
+                )
             unet.enable_xformers_memory_efficient_attention()
         else:
-            raise ValueError("xformers is not available. Make sure it is installed correctly")
+            raise ValueError(
+                "xformers is not available. Make sure it is installed correctly"
+            )
 
     # python
     if args.use_lora:
@@ -605,8 +680,10 @@ def lora_finetune(args=None):
         lora_layers = list(filter(lambda p: p.requires_grad, unet.parameters()))
 
     if hasattr(args, "img_semantic_encoder"):
-        linear_projection = torch.nn.Linear(768, 768).to('cuda')
-        args.img_semantic_encoder_projection = lambda x: linear_projection(args.img_semantic_encoder(x))[:,None]
+        linear_projection = torch.nn.Linear(768, 768).to("cuda")
+        args.img_semantic_encoder_projection = lambda x: linear_projection(
+            args.img_semantic_encoder(x)
+        )[:, None]
         lora_layers.extend(list(linear_projection.parameters()))
 
     if args.gradient_checkpointing:
@@ -619,7 +696,10 @@ def lora_finetune(args=None):
 
     if args.scale_lr:
         args.learning_rate = (
-            args.learning_rate * args.gradient_accumulation_steps * args.train_batch_size * accelerator.num_processes
+            args.learning_rate
+            * args.gradient_accumulation_steps
+            * args.train_batch_size
+            * accelerator.num_processes
         )
 
     # Initialize the optimizer
@@ -677,7 +757,9 @@ def lora_finetune(args=None):
         # 6. Get the column names for input/target.
         dataset_columns = DATASET_NAME_MAPPING.get(args.train_dataset_name, None)
         if args.image_column is None:
-            image_column = dataset_columns[0] if dataset_columns is not None else column_names[0]
+            image_column = (
+                dataset_columns[0] if dataset_columns is not None else column_names[0]
+            )
         else:
             image_column = args.image_column
             if image_column not in column_names:
@@ -686,7 +768,9 @@ def lora_finetune(args=None):
                 )
 
         if args.caption_column is None:
-            caption_column = dataset_columns[1] if dataset_columns is not None else column_names[1]
+            caption_column = (
+                dataset_columns[1] if dataset_columns is not None else column_names[1]
+            )
 
         else:
             caption_column = args.caption_column
@@ -722,13 +806,19 @@ def lora_finetune(args=None):
         # Preprocessing the datasets.
         train_transforms = transforms.Compose(
             [
-                transforms.Resize(args.resolution, interpolation=transforms.InterpolationMode.BILINEAR),
+                transforms.Resize(
+                    args.resolution, interpolation=transforms.InterpolationMode.BILINEAR
+                ),
                 (
                     transforms.CenterCrop(args.resolution)
                     if args.center_crop
                     else transforms.RandomCrop(args.resolution)
                 ),
-                (transforms.RandomHorizontalFlip() if args.random_flip else transforms.Lambda(lambda x: x)),
+                (
+                    transforms.RandomHorizontalFlip()
+                    if args.random_flip
+                    else transforms.Lambda(lambda x: x)
+                ),
                 transforms.ToTensor(),
                 transforms.Normalize([0.5], [0.5]),
             ]
@@ -742,13 +832,21 @@ def lora_finetune(args=None):
 
         with accelerator.main_process_first():
             if args.max_train_samples is not None:
-                dataset["train"] = dataset["train"].shuffle(seed=args.seed).select(range(args.max_train_samples))
+                dataset["train"] = (
+                    dataset["train"]
+                    .shuffle(seed=args.seed)
+                    .select(range(args.max_train_samples))
+                )
             # Set the training transforms
             train_dataset = dataset["train"].with_transform(preprocess_train)
 
         def collate_fn(examples):
-            pixel_values = torch.stack([example["pixel_values"] for example in examples])
-            pixel_values = pixel_values.to(memory_format=torch.contiguous_format).float()
+            pixel_values = torch.stack(
+                [example["pixel_values"] for example in examples]
+            )
+            pixel_values = pixel_values.to(
+                memory_format=torch.contiguous_format
+            ).float()
             input_ids = torch.stack([example["input_ids"] for example in examples])
             return {"pixel_values": pixel_values, "input_ids": input_ids}
 
@@ -783,7 +881,9 @@ def lora_finetune(args=None):
 
     # Scheduler and math around the number of training steps.
     overrode_max_train_steps = False
-    num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
+    num_update_steps_per_epoch = math.ceil(
+        len(train_dataloader) / args.gradient_accumulation_steps
+    )
     if args.max_train_steps is None:
         args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
         overrode_max_train_steps = True
@@ -801,7 +901,9 @@ def lora_finetune(args=None):
     )
 
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
-    num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
+    num_update_steps_per_epoch = math.ceil(
+        len(train_dataloader) / args.gradient_accumulation_steps
+    )
     if overrode_max_train_steps:
         args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
     # Afterwards we recalculate our number of training epochs
@@ -813,13 +915,19 @@ def lora_finetune(args=None):
         accelerator.init_trackers("text2image-fine-tune")  # , config=vars(args))
 
     # Train!
-    total_batch_size = args.train_batch_size * accelerator.num_processes * args.gradient_accumulation_steps
+    total_batch_size = (
+        args.train_batch_size
+        * accelerator.num_processes
+        * args.gradient_accumulation_steps
+    )
 
     logger.info("***** Running training *****")
     logger.info(f"  Num examples = {len(train_dataset)}")
     logger.info(f"  Num Epochs = {args.num_train_epochs}")
     logger.info(f"  Instantaneous batch size per device = {args.train_batch_size}")
-    logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}")
+    logger.info(
+        f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}"
+    )
     logger.info(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
     logger.info(f"  Total optimization steps = {args.max_train_steps}")
     global_step = 0
@@ -856,7 +964,9 @@ def lora_finetune(args=None):
     else:
         initial_global_step = 0
 
-    fid = torchmetrics.image.fid.FrechetInceptionDistance(feature=192, reset_real_features=False)
+    fid = torchmetrics.image.fid.FrechetInceptionDistance(
+        feature=192, reset_real_features=False
+    )
     fid.to(accelerator.device)
     real_images = []
     for i in range(min(len(args.train_dataset), 100)):
@@ -866,17 +976,28 @@ def lora_finetune(args=None):
     fid.update(torch.tensor(255 * real_images, dtype=torch.uint8), real=True)
     if isinstance(args.train_dataset, Image2MixedDataset):
         if len(args.train_dataset.task_config.y_selection) >= 2:
-            target_idx0 = args.train_dataset.attributes.index(args.train_dataset.task_config.y_selection[0])
-            target_idx1 = args.train_dataset.attributes.index(args.train_dataset.task_config.y_selection[1])
+            target_idx0 = args.train_dataset.attributes.index(
+                args.train_dataset.task_config.y_selection[0]
+            )
+            target_idx1 = args.train_dataset.attributes.index(
+                args.train_dataset.task_config.y_selection[1]
+            )
             pos0 = args.train_dataset.attributes_positive[target_idx0]
             pos1 = args.train_dataset.attributes_positive[target_idx1]
             neg0 = args.train_dataset.attributes_negative[target_idx0]
             neg1 = args.train_dataset.attributes_negative[target_idx1]
-            prompt = [neg0 + " " + neg1, neg0 + " " + pos1, pos0 + " " + neg1, pos0 + " " + pos1]
+            prompt = [
+                neg0 + " " + neg1,
+                neg0 + " " + pos1,
+                pos0 + " " + neg1,
+                pos0 + " " + pos1,
+            ]
 
         else:
             if len(args.train_dataset.task_config.y_selection) > 0:
-                target_idx = args.train_dataset.attributes.index(args.train_dataset.task_config.y_selection[0])
+                target_idx = args.train_dataset.attributes.index(
+                    args.train_dataset.task_config.y_selection[0]
+                )
 
             else:
                 target_idx = 0
@@ -894,8 +1015,12 @@ def lora_finetune(args=None):
     prompt = 2 * [""] + prompt
     images = pipeline(prompt).images
     images_torch = torch.stack([ToTensor()(image) for image in images])
-    images_torch_resized = torchvision.transforms.Resize(real_images.shape[-2:])(images_torch)
-    concatenated_imgs = torch.cat([real_images[: len(prompt)].cpu(), images_torch_resized], dim=0)
+    images_torch_resized = torchvision.transforms.Resize(real_images.shape[-2:])(
+        images_torch
+    )
+    concatenated_imgs = torch.cat(
+        [real_images[: len(prompt)].cpu(), images_torch_resized], dim=0
+    )
     output_dir = os.path.join(args.base_path, "outputs")
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     torchvision.utils.save_image(
@@ -918,10 +1043,16 @@ def lora_finetune(args=None):
 
     if hasattr(args, "img_semantic_encoder"):
         semantic_latents = args.img_semantic_encoder_projection(real_images[:6])
-        images = pipeline_semantic_conditioning(prompt=6 * [""], semantic_latents=semantic_latents, progress=0.0).images
+        images = pipeline_semantic_conditioning(
+            prompt=6 * [""], semantic_latents=semantic_latents, progress=0.0
+        ).images
         images_torch = torch.stack([ToTensor()(image) for image in images])
-        images_torch_resized = torchvision.transforms.Resize(real_images.shape[-2:])(images_torch)
-        concatenated_imgs = torch.cat([real_images[: len(prompt)].cpu(), images_torch_resized], dim=0)
+        images_torch_resized = torchvision.transforms.Resize(real_images.shape[-2:])(
+            images_torch
+        )
+        concatenated_imgs = torch.cat(
+            [real_images[: len(prompt)].cpu(), images_torch_resized], dim=0
+        )
         output_dir = os.path.join(args.base_path, "outputs")
         Path(output_dir).mkdir(parents=True, exist_ok=True)
         torchvision.utils.save_image(
@@ -952,7 +1083,9 @@ def lora_finetune(args=None):
                     input_ids = batch[-1][-1]
 
                 # Convert images to latent space
-                latents = vae.encode(pixel_values.to(dtype=weight_dtype)).latent_dist.sample()
+                latents = vae.encode(
+                    pixel_values.to(dtype=weight_dtype)
+                ).latent_dist.sample()
                 latents = latents * vae.config.scaling_factor
 
                 # Sample noise that we'll add to the latents
@@ -979,53 +1112,81 @@ def lora_finetune(args=None):
                 noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
 
                 # Get the text embedding for conditioning
-                is_unconditional = step % 2 #random.randint(0, 1)
+                is_unconditional = step % 2  # random.randint(0, 1)
                 if is_unconditional:
-                    encoder_hidden_states = text_encoder(empty_input_ids[:bsz], return_dict=False)[0]
+                    encoder_hidden_states = text_encoder(
+                        empty_input_ids[:bsz], return_dict=False
+                    )[0]
 
                 else:
                     if hasattr(args, "img_semantic_encoder"):
-                        encoder_hidden_states = text_encoder(empty_input_ids[:bsz], return_dict=False)[0]
-                        preprocessed_pixel_values = args.img_semantic_encoder_projection(pixel_values)
-                        progress = global_step / args.max_train_steps if args.max_train_steps else 0.0
-                        encoder_hidden_states = (1 - progress) * encoder_hidden_states + progress * preprocessed_pixel_values
+                        encoder_hidden_states = text_encoder(
+                            empty_input_ids[:bsz], return_dict=False
+                        )[0]
+                        preprocessed_pixel_values = (
+                            args.img_semantic_encoder_projection(pixel_values)
+                        )
+                        progress = (
+                            global_step / args.max_train_steps
+                            if args.max_train_steps
+                            else 0.0
+                        )
+                        encoder_hidden_states = (
+                            (1 - progress) * encoder_hidden_states
+                            + progress * preprocessed_pixel_values
+                        )
 
                     else:
-                        encoder_hidden_states = text_encoder(input_ids, return_dict=False)[0]
+                        encoder_hidden_states = text_encoder(
+                            input_ids, return_dict=False
+                        )[0]
 
                 # Get the target for loss depending on the prediction type
                 if args.prediction_type is not None:
                     # set prediction_type of scheduler if defined
-                    noise_scheduler.register_to_config(prediction_type=args.prediction_type)
+                    noise_scheduler.register_to_config(
+                        prediction_type=args.prediction_type
+                    )
 
                 if noise_scheduler.config.prediction_type == "epsilon":
                     target = noise
                 elif noise_scheduler.config.prediction_type == "v_prediction":
                     target = noise_scheduler.get_velocity(latents, noise, timesteps)
                 else:
-                    raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
+                    raise ValueError(
+                        f"Unknown prediction type {noise_scheduler.config.prediction_type}"
+                    )
 
                 # Predict the noise residual and compute loss
-                model_pred = unet(noisy_latents, timesteps, encoder_hidden_states, return_dict=False)[0]
+                model_pred = unet(
+                    noisy_latents, timesteps, encoder_hidden_states, return_dict=False
+                )[0]
 
                 if args.snr_gamma is None:
-                    loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
+                    loss = F.mse_loss(
+                        model_pred.float(), target.float(), reduction="mean"
+                    )
 
                 else:
                     # Compute loss-weights as per Section 3.4 of https://arxiv.org/abs/2303.09556.
                     # Since we predict the noise instead of x_0, the original formulation is slightly changed.
                     # This is discussed in Section 4.2 of the same paper.
                     snr = compute_snr(noise_scheduler, timesteps)
-                    mse_loss_weights = torch.stack([snr, args.snr_gamma * torch.ones_like(timesteps)], dim=1).min(
-                        dim=1
-                    )[0]
+                    mse_loss_weights = torch.stack(
+                        [snr, args.snr_gamma * torch.ones_like(timesteps)], dim=1
+                    ).min(dim=1)[0]
                     if noise_scheduler.config.prediction_type == "epsilon":
                         mse_loss_weights = mse_loss_weights / snr
                     elif noise_scheduler.config.prediction_type == "v_prediction":
                         mse_loss_weights = mse_loss_weights / (snr + 1)
 
-                    loss = F.mse_loss(model_pred.float(), target.float(), reduction="none")
-                    loss = loss.mean(dim=list(range(1, len(loss.shape)))) * mse_loss_weights
+                    loss = F.mse_loss(
+                        model_pred.float(), target.float(), reduction="none"
+                    )
+                    loss = (
+                        loss.mean(dim=list(range(1, len(loss.shape))))
+                        * mse_loss_weights
+                    )
                     loss = loss.mean()
 
                 # Gather the losses across all processes for logging (if we use distributed training).
@@ -1034,7 +1195,11 @@ def lora_finetune(args=None):
 
                 for tracker in accelerator.trackers:
                     if tracker.name == "tensorboard":
-                        tracker.writer.add_scalar("train_loss_" + str(is_unconditional), train_loss, global_step)
+                        tracker.writer.add_scalar(
+                            "train_loss_" + str(is_unconditional),
+                            train_loss,
+                            global_step,
+                        )
 
                 # Backpropagate
                 accelerator.backward(loss)
@@ -1058,25 +1223,37 @@ def lora_finetune(args=None):
                         # _before_ saving state, check if this save would set us over the `checkpoints_total_limit`
                         if args.checkpoints_total_limit is not None:
                             checkpoints = os.listdir(args.base_path)
-                            checkpoints = [d for d in checkpoints if d.startswith("checkpoint")]
-                            checkpoints = sorted(checkpoints, key=lambda x: int(x.split("-")[1]))
+                            checkpoints = [
+                                d for d in checkpoints if d.startswith("checkpoint")
+                            ]
+                            checkpoints = sorted(
+                                checkpoints, key=lambda x: int(x.split("-")[1])
+                            )
 
                             # before we save the new checkpoint, we need to have at _most_
                             # `checkpoints_total_limit - 1` checkpoints
                             if len(checkpoints) >= args.checkpoints_total_limit:
-                                num_to_remove = len(checkpoints) - args.checkpoints_total_limit + 1
+                                num_to_remove = (
+                                    len(checkpoints) - args.checkpoints_total_limit + 1
+                                )
                                 removing_checkpoints = checkpoints[0:num_to_remove]
 
                                 logger.info(
                                     f"{len(checkpoints)} checkpoints already exist, removing {len(removing_checkpoints)} checkpoints"
                                 )
-                                logger.info(f"removing checkpoints: {', '.join(removing_checkpoints)}")
+                                logger.info(
+                                    f"removing checkpoints: {', '.join(removing_checkpoints)}"
+                                )
 
                                 for removing_checkpoint in removing_checkpoints:
-                                    removing_checkpoint = os.path.join(args.base_path, removing_checkpoint)
+                                    removing_checkpoint = os.path.join(
+                                        args.base_path, removing_checkpoint
+                                    )
                                     shutil.rmtree(removing_checkpoint)
 
-                        save_path = os.path.join(args.base_path, f"checkpoint-{global_step}")
+                        save_path = os.path.join(
+                            args.base_path, f"checkpoint-{global_step}"
+                        )
                         accelerator.save_state(save_path)
 
                         unwrapped_unet = unwrap_model(unet)
@@ -1095,12 +1272,21 @@ def lora_finetune(args=None):
 
                         logger.info(f"Saved state to {save_path}")
                         images = pipeline(prompt).images
-                        images_torch = torch.stack([ToTensor()(image) for image in images])
-                        images_torch_resized = torchvision.transforms.Resize(real_images.shape[-2:])(images_torch)
-                        concatenated_imgs = torch.cat([real_images[: len(prompt)].cpu(), images_torch_resized], dim=0)
+                        images_torch = torch.stack(
+                            [ToTensor()(image) for image in images]
+                        )
+                        images_torch_resized = torchvision.transforms.Resize(
+                            real_images.shape[-2:]
+                        )(images_torch)
+                        concatenated_imgs = torch.cat(
+                            [real_images[: len(prompt)].cpu(), images_torch_resized],
+                            dim=0,
+                        )
                         torchvision.utils.save_image(
                             concatenated_imgs,
-                            os.path.join(output_dir, embed_numberstring(global_step) + ".png"),
+                            os.path.join(
+                                output_dir, embed_numberstring(global_step) + ".png"
+                            ),
                             nrow=len(prompt),
                         )
 
@@ -1117,21 +1303,41 @@ def lora_finetune(args=None):
                                 tracker.writer.add_scalar("fid", fid_score, global_step)
 
                         if hasattr(args, "img_semantic_encoder"):
-                            semantic_latents = args.img_semantic_encoder_projection(real_images[:6])
-                            progress = global_step / args.max_train_steps if args.max_train_steps else 0.0
+                            semantic_latents = args.img_semantic_encoder_projection(
+                                real_images[:6]
+                            )
+                            progress = (
+                                global_step / args.max_train_steps
+                                if args.max_train_steps
+                                else 0.0
+                            )
                             images = pipeline_semantic_conditioning(
-                                prompt=6 * [""], semantic_latents=semantic_latents, progress=progress,
+                                prompt=6 * [""],
+                                semantic_latents=semantic_latents,
+                                progress=progress,
                             ).images
-                            images_torch = torch.stack([ToTensor()(image) for image in images])
-                            images_torch_resized = torchvision.transforms.Resize(real_images.shape[-2:])(images_torch)
+                            images_torch = torch.stack(
+                                [ToTensor()(image) for image in images]
+                            )
+                            images_torch_resized = torchvision.transforms.Resize(
+                                real_images.shape[-2:]
+                            )(images_torch)
                             concatenated_imgs = torch.cat(
-                                [real_images[: len(prompt)].cpu(), images_torch_resized], dim=0
+                                [
+                                    real_images[: len(prompt)].cpu(),
+                                    images_torch_resized,
+                                ],
+                                dim=0,
                             )
                             output_dir = os.path.join(args.base_path, "outputs")
                             Path(output_dir).mkdir(parents=True, exist_ok=True)
                             torchvision.utils.save_image(
                                 concatenated_imgs,
-                                os.path.join(output_dir, embed_numberstring(global_step) + "reconstruction.png"),
+                                os.path.join(
+                                    output_dir,
+                                    embed_numberstring(global_step)
+                                    + "reconstruction.png",
+                                ),
                                 nrow=len(prompt),
                             )
 
@@ -1145,7 +1351,10 @@ def lora_finetune(args=None):
                 break
 
         if accelerator.is_main_process:
-            if args.validation_prompt is not None and epoch % args.validation_epochs == 0:
+            if (
+                args.validation_prompt is not None
+                and epoch % args.validation_epochs == 0
+            ):
                 logger.info(
                     f"Running validation... \n Generating {args.num_validation_images} images with prompt:"
                     f" {args.validation_prompt}."
@@ -1184,12 +1393,16 @@ def lora_finetune(args=None):
                 for tracker in accelerator.trackers:
                     if tracker.name == "tensorboard":
                         np_images = np.stack([np.asarray(img) for img in images])
-                        tracker.writer.add_images("validation", np_images, epoch, dataformats="NHWC")
+                        tracker.writer.add_images(
+                            "validation", np_images, epoch, dataformats="NHWC"
+                        )
                     if tracker.name == "wandb":
                         tracker.log(
                             {
                                 "validation": [
-                                    wandb.Image(image, caption=f"{i}: {args.validation_prompt}")
+                                    wandb.Image(
+                                        image, caption=f"{i}: {args.validation_prompt}"
+                                    )
                                     for i, image in enumerate(images)
                                 ]
                             }
@@ -1273,12 +1486,16 @@ def lora_finetune(args=None):
                 if len(images) != 0:
                     if tracker.name == "tensorboard":
                         np_images = np.stack([np.asarray(img) for img in images])
-                        tracker.writer.add_images("test", np_images, epoch, dataformats="NHWC")
+                        tracker.writer.add_images(
+                            "test", np_images, epoch, dataformats="NHWC"
+                        )
                     if tracker.name == "wandb":
                         tracker.log(
                             {
                                 "test": [
-                                    wandb.Image(image, caption=f"{i}: {args.validation_prompt}")
+                                    wandb.Image(
+                                        image, caption=f"{i}: {args.validation_prompt}"
+                                    )
                                     for i, image in enumerate(images)
                                 ]
                             }
@@ -1314,7 +1531,11 @@ class StableDiffusionPipelineImgConditioned(StableDiffusionPipeline):
         guidance_rescale: float = 0.0,
         clip_skip: Optional[int] = None,
         callback_on_step_end: Optional[
-            Union[Callable[[int, int, Dict], None], PipelineCallback, MultiPipelineCallbacks]
+            Union[
+                Callable[[int, int, Dict], None],
+                PipelineCallback,
+                MultiPipelineCallbacks,
+            ]
         ] = None,
         callback_on_step_end_tensor_inputs: List[str] = ["latents"],
         semantic_latents=None,
@@ -1462,7 +1683,11 @@ class StableDiffusionPipelineImgConditioned(StableDiffusionPipeline):
         device = self._execution_device
 
         # 3. Encode input prompt
-        lora_scale = self.cross_attention_kwargs.get("scale", None) if self.cross_attention_kwargs is not None else None
+        lora_scale = (
+            self.cross_attention_kwargs.get("scale", None)
+            if self.cross_attention_kwargs is not None
+            else None
+        )
 
         prompt_embeds, negative_prompt_embeds = self.encode_prompt(
             prompt,
@@ -1477,7 +1702,9 @@ class StableDiffusionPipelineImgConditioned(StableDiffusionPipeline):
         )
 
         if not semantic_latents is None:
-            prompt_embeds = (1 - progress) * prompt_embeds + progress * semantic_latents.to(prompt_embeds)
+            prompt_embeds = (
+                1 - progress
+            ) * prompt_embeds + progress * semantic_latents.to(prompt_embeds)
 
         # For classifier free guidance, we need to do two forward passes.
         # Here we concatenate the unconditional and text embeddings into a single batch
@@ -1525,7 +1752,9 @@ class StableDiffusionPipelineImgConditioned(StableDiffusionPipeline):
         # 6.2 Optionally get Guidance Scale Embedding
         timestep_cond = None
         if self.unet.config.time_cond_proj_dim is not None:
-            guidance_scale_tensor = torch.tensor(self.guidance_scale - 1).repeat(batch_size * num_images_per_prompt)
+            guidance_scale_tensor = torch.tensor(self.guidance_scale - 1).repeat(
+                batch_size * num_images_per_prompt
+            )
             timestep_cond = self.get_guidance_scale_embedding(
                 guidance_scale_tensor, embedding_dim=self.unet.config.time_cond_proj_dim
             ).to(device=device, dtype=latents.dtype)
@@ -1539,8 +1768,14 @@ class StableDiffusionPipelineImgConditioned(StableDiffusionPipeline):
                     continue
 
                 # expand the latents if we are doing classifier free guidance
-                latent_model_input = torch.cat([latents] * 2) if self.do_classifier_free_guidance else latents
-                latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
+                latent_model_input = (
+                    torch.cat([latents] * 2)
+                    if self.do_classifier_free_guidance
+                    else latents
+                )
+                latent_model_input = self.scheduler.scale_model_input(
+                    latent_model_input, t
+                )
 
                 # predict the noise residual
                 noise_pred = self.unet(
@@ -1556,14 +1791,22 @@ class StableDiffusionPipelineImgConditioned(StableDiffusionPipeline):
                 # perform guidance
                 if self.do_classifier_free_guidance:
                     noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
-                    noise_pred = noise_pred_uncond + self.guidance_scale * (noise_pred_text - noise_pred_uncond)
+                    noise_pred = noise_pred_uncond + self.guidance_scale * (
+                        noise_pred_text - noise_pred_uncond
+                    )
 
                 if self.do_classifier_free_guidance and self.guidance_rescale > 0.0:
                     # Based on 3.4. in https://arxiv.org/pdf/2305.08891.pdf
-                    noise_pred = rescale_noise_cfg(noise_pred, noise_pred_text, guidance_rescale=self.guidance_rescale)
+                    noise_pred = rescale_noise_cfg(
+                        noise_pred,
+                        noise_pred_text,
+                        guidance_rescale=self.guidance_rescale,
+                    )
 
                 # compute the previous noisy sample x_t -> x_t-1
-                latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs, return_dict=False)[0]
+                latents = self.scheduler.step(
+                    noise_pred, t, latents, **extra_step_kwargs, return_dict=False
+                )[0]
 
                 if callback_on_step_end is not None:
                     callback_kwargs = {}
@@ -1573,18 +1816,28 @@ class StableDiffusionPipelineImgConditioned(StableDiffusionPipeline):
 
                     latents = callback_outputs.pop("latents", latents)
                     prompt_embeds = callback_outputs.pop("prompt_embeds", prompt_embeds)
-                    negative_prompt_embeds = callback_outputs.pop("negative_prompt_embeds", negative_prompt_embeds)
+                    negative_prompt_embeds = callback_outputs.pop(
+                        "negative_prompt_embeds", negative_prompt_embeds
+                    )
 
                 # call the callback, if provided
-                if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
+                if i == len(timesteps) - 1 or (
+                    (i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0
+                ):
                     progress_bar.update()
                     if callback is not None and i % callback_steps == 0:
                         step_idx = i // getattr(self.scheduler, "order", 1)
                         callback(step_idx, t, latents)
 
         if not output_type == "latent":
-            image = self.vae.decode(latents / self.vae.config.scaling_factor, return_dict=False, generator=generator)[0]
-            image, has_nsfw_concept = self.run_safety_checker(image, device, prompt_embeds.dtype)
+            image = self.vae.decode(
+                latents / self.vae.config.scaling_factor,
+                return_dict=False,
+                generator=generator,
+            )[0]
+            image, has_nsfw_concept = self.run_safety_checker(
+                image, device, prompt_embeds.dtype
+            )
         else:
             image = latents
             has_nsfw_concept = None
@@ -1594,7 +1847,9 @@ class StableDiffusionPipelineImgConditioned(StableDiffusionPipeline):
         else:
             do_denormalize = [not has_nsfw for has_nsfw in has_nsfw_concept]
 
-        image = self.image_processor.postprocess(image, output_type=output_type, do_denormalize=do_denormalize)
+        image = self.image_processor.postprocess(
+            image, output_type=output_type, do_denormalize=do_denormalize
+        )
 
         # Offload all models
         self.maybe_free_model_hooks()
@@ -1602,7 +1857,9 @@ class StableDiffusionPipelineImgConditioned(StableDiffusionPipeline):
         if not return_dict:
             return (image, has_nsfw_concept)
 
-        return StableDiffusionPipelineOutput(images=image, nsfw_content_detected=has_nsfw_concept)
+        return StableDiffusionPipelineOutput(
+            images=image, nsfw_content_detected=has_nsfw_concept
+        )
 
 
 if __name__ == "__main__":

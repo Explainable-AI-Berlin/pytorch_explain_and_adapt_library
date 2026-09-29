@@ -97,7 +97,6 @@ def clean_multiclass_cond_fn(x_t, y, classifier, s, use_logits):
     selected = -selected[range(len(y)), y]
     selected = selected * s
     grads = torch.autograd.grad(selected.sum(), x_in)[0]
-
     return grads
 
 
@@ -115,8 +114,16 @@ def dist_cond_fn(x_tau, z_t, x_t, alpha_t, l1_loss, l2_loss, l_perc, scale_grads
     z_in = z_t.detach().requires_grad_(True)
     x_in = x_t.detach().requires_grad_(True)
 
-    m1 = l1_loss * torch.norm(z_in - x_tau, p=1, dim=1).sum() if l1_loss != 0 else 0
-    m2 = l2_loss * torch.norm(z_in - x_tau, p=2, dim=1).sum() if l2_loss != 0 else 0
+    m1 = (
+        l1_loss * torch.norm(z_in - x_tau.to(z_in.device), p=1, dim=1).sum()
+        if l1_loss != 0
+        else 0
+    )
+    m2 = (
+        l2_loss * torch.norm(z_in - x_tau.to(z_in.device), p=2, dim=1).sum()
+        if l2_loss != 0
+        else 0
+    )
     mv = l_perc(x_in, x_tau) if l_perc is not None else 0
 
     if isinstance(m1 + m2 + mv, int):
@@ -502,7 +509,7 @@ def get_GMD_iterative_sampling(use_sampling=False):
                               has at least an input, x_t.
         :param class_grad_kwargs: Additional arguments for class_grad_fn
         :param dist_grad_fn: Similar as class_grad_fn, uses z_t, x_t, x_tau, and alpha_t as inputs
-        :param dist_grad_kwargs: Additional args fot dist_grad_fn
+        :param dist_grad_kwargs: Additional args for dist_grad_fn
         :param x_t_sampling: use sampling when computing x_t
         :param is_x_t_sampling: useful flag to distinguish when x_t is been generated
         :param guided_iterations: Early stop the guided iterations
@@ -519,12 +526,6 @@ def get_GMD_iterative_sampling(use_sampling=False):
         indices = list(range(num_timesteps))[::-1]
 
         for jdx, i in enumerate(indices):
-            x_t_0_clone = torch.clone(x_t)
-            x_t_0_clone.requires_grad_(True)
-
-            x_t_clone = torch.clone(z_t)
-            x_t_clone.requires_grad_(True)
-
             t = torch.tensor([i] * shape[0], device=device)
             x_t_steps.append(x_t.detach())
             z_t_steps.append(z_t.detach())
@@ -533,7 +534,7 @@ def get_GMD_iterative_sampling(use_sampling=False):
             # 'mean', 'variance', 'log_variance'
             out = diffusion.p_mean_variance(
                 model,
-                x_t_clone,
+                z_t,
                 t,
                 clip_denoised=clip_denoised,
                 denoised_fn=None,
@@ -566,17 +567,15 @@ def get_GMD_iterative_sampling(use_sampling=False):
                     selected = -F.logsigmoid(selected)
                 selected = selected * s
 
-                grads = grads + torch.autograd.grad(selected.sum(), x_t_clone)[0]
+                grads = grads + torch.autograd.grad(selected.sum(), z_t)[0]
 
                 m1 = (
-                    dist_grad_kargs["l1_loss"]
-                    * torch.norm(x_t_clone - img, p=1, dim=1).sum()
+                    dist_grad_kargs["l1_loss"] * torch.norm(z_t - img, p=1, dim=1).sum()
                     if dist_grad_kargs["l1_loss"] != 0
                     else 0
                 )
                 m2 = (
-                    dist_grad_kargs["l2_loss"]
-                    * torch.norm(x_t_clone - img, p=2, dim=1).sum()
+                    dist_grad_kargs["l2_loss"] * torch.norm(z_t - img, p=2, dim=1).sum()
                     if dist_grad_kargs["l2_loss"] != 0
                     else 0
                 )
@@ -585,7 +584,7 @@ def get_GMD_iterative_sampling(use_sampling=False):
                     if dist_grad_kargs["l_perc"] is not None
                     else 0
                 )
-                dist_grads = torch.autograd.grad(m1 + m2, x_t_clone)[0]
+                dist_grads = torch.autograd.grad(m1 + m2, z_t)[0]
                 dist_grads = (
                     dist_grads + torch.autograd.grad(mv, x_t_0_denoise_clone)[0]
                 )

@@ -1,0 +1,18 @@
+# Waterbirds (bird type y confounded with the background place) at 256x256, for the
+# DINOv3 linear probe. Same fields as the 128x128 data the first probe
+# ($PEAL_RUNS/waterbirds/dinov3_linear) was trained on; the DINOv3 predictor resizes
+# to 224 internally, so 256 is downscaled rather than upscaled from 128.
+dataset_class           : WaterbirdsDataset
+dataset_path            : $PEAL_DATA/waterbirds
+split                   : []
+input_type              : image
+input_size              : [3, 256, 256]
+output_type             : multiclass
+output_size             : [2]
+confounding_factors     : [y, place]
+has_hints               : True
+invariances             : ["hflipping", "rotation10", "random_resize10"]
+x_selection             : img_filename
+# null: the DINOv3 predictor normalizes internally (ImageNet mean/std after its
+# own 224 resize); a dataset normalization on top would be applied twice.
+normalization           : null

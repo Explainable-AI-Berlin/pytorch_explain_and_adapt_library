@@ -74,7 +74,7 @@ def arguments():
     parser.add_argument("--label_query", type=int, default=31)
     parser.add_argument("--label_target", type=int, default=-1)
     parser.add_argument(
-        "--data_dir", type=str, default="/home/personnels/jeanner211/DATASETS/celeba"
+        "--data_dir", type=str, default=os.path.join(os.environ.get("PEAL_DATA", "datasets"), "celeba")
     )
     parser.add_argument("--dataset", type=str, default="CelebAHQ")
     parser.add_argument("--batch_size", type=int, default=1)
@@ -84,7 +84,7 @@ def arguments():
     parser.add_argument(
         "--classifier_path",
         type=str,
-        default="/home/personnels/jeanner211/RESULTS/HQCelebA/classifier/checkpoint.tar",
+        default=os.path.join(os.environ.get("PEAL_RUNS", "peal_runs"), "HQCelebA/classifier/checkpoint.tar"),
     )
 
     # Others

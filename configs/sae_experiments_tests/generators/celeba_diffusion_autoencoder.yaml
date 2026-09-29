@@ -1,0 +1,35 @@
+# CelebA diffusion autoencoder, retrained with a CORRECTLY normalized encoder
+# input (encoder_input_space: pytorch_default). Train first, then analyse:
+#
+#   python train_generator.py --config \
+#     "<PEAL_BASE>/configs/sae_experiments_tests/generators/celeba_diffusion_autoencoder.yaml"
+#
+#   python run_component_analysis.py \
+#     --config "<PEAL_BASE>/configs/sae_experiments_tests/generators/celeba_diffusion_autoencoder.yaml" \
+#     --sd_config "<PEAL_BASE>/configs/sae_experiments_tests/sparse_dictionaries/batch_topk_celeba.yaml"
+#
+# The old double-normalized run stays untouched in diffusion_autoencoder_10;
+# use celeba_diffusion_autoencoder_legacy.yaml to analyse that one.
+generator_type : DiffusionAutoencoder
+category : generator
+base_path : $PEAL_RUNS/celeba_tests/diffusion_autoencoder
+data: <PEAL_BASE>/configs/sae_experiments_tests/data/celeba.yaml
+image_size: 128
+batch_size: 100
+save_every_samples: 20000
+total_samples: 10000000
+encoder_dimensions : 512
+# Frozen semantic encoder: open_clip ViT-B-32 (laion2b_s34b_b79k), 512-d.
+model_type: open_clip
+# The dataset transform already applies Normalization(0.5, 0.5), so the
+# dataloader yields [-1, 1]. open_clip's own preprocess expects [0, 1] and
+# applies the CLIP mean/std itself -> undo the dataset normalization here.
+# Without this the encoder sees 4p-3 instead of p, i.e. heavily out-of-
+# distribution images, and the CLIP embedding loses most of its semantics.
+encoder_input_space: pytorch_default
+sparse_dictionary: <PEAL_BASE>/configs/sae_experiments_tests/sparse_dictionaries/batch_topk_celeba.yaml
+visualizations_per_component: 1
+sampler:
+  type: ddpm
+  num_steps: 50
+  spacing: uniform

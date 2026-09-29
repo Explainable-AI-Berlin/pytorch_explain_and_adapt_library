@@ -1,0 +1,12 @@
+# Extra dependencies of the web demo (peal/web) on top of requirements.txt.
+# Install into the PEAL environment: pip install -r requirements-web.txt
+onnx>=1.15
+onnxruntime>=1.17      # CPU wheel; the ONNX classifier is small. onnxruntime-gpu is optional.
+onnx2torch>=1.5
+fastapi>=0.110
+uvicorn[standard]>=0.27
+python-multipart>=0.0.9
+# huggingface-hub is a core dependency of peal-xai, so it is not repeated
+# here; a second spelling produced a duplicate Requires-Dist entry.
+omegaconf>=2.3          # RAE stage-2 loading (RAEv2 configs)
+httpx>=0.27            # tests only

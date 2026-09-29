@@ -1,0 +1,11 @@
+# Wolf (grey wolf) = class 0 (ImageNet index 269)
+# Eskimo Dog = class 1 (ImageNet index 248)
+# Use: python tools/convert_imagenet_resnet18_to_binary_onnx.py --class1 269 --class2 248 --name wolf_vs_eskimo_dog
+model_path        : $PEAL_RUNS/imagenet/wolf_vs_eskimo_dog_classifier
+architecture      : onnx
+data              : <PEAL_BASE>/configs/cfkd_fastdime_hq/data/imagenet_wolf_vs_eskimo_dog.yaml
+task:
+  criterions:
+    ce     : 1.0
+  output_type             : singleclass
+  output_channels         : 2

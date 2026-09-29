@@ -13,11 +13,11 @@ explainer                            :  <PEAL_BASE>/configs/didae_experiments/ex
 training                             :  <PEAL_BASE>/configs/cfkd_experiments/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/cfkd_experiments/data/celeba1k_Blond_Hair_confounding_Male_poisoned098.yaml
 test_data                            :  <PEAL_BASE>/configs/cfkd_experiments/data/celeba.yaml
-student                              :  $PEAL_RUNS/celeba1k/Blond_Hair/openclip_linear_poisoned098/model.cpl
+student                              :  $PEAL_RUNS/celeba1k/Blond_Hair/openai_clip_vit_l14_linear_poisoned098/model.cpl
 teacher                              :  $PEAL_RUNS/celeba/Blond_Hair/classifier_unpoisoned/model.cpl
-generator                            :  $PEAL_RUNS/celeba/diffusion_autoencoder_openclip/config.yaml
-sparse_dictionary                    :  $PEAL_RUNS/celeba/diffusion_autoencoder_openclip/OrthogonalProcrustesDictionary/config.yaml
-base_dir                             :  $PEAL_RUNS/celeba1k/Blond_Hair/openclip_linear_poisoned098/didae_cfkd
+generator                            :  $PEAL_RUNS/celeba/diffusion_autoencoder_openai_clip_vit_l14/config.yaml
+sparse_dictionary                    :  $PEAL_RUNS/celeba/diffusion_autoencoder_openai_clip_vit_l14/OrthogonalProcrustesDictionary/config.yaml
+base_dir                             :  $PEAL_RUNS/celeba1k/Blond_Hair/openai_clip_vit_l14_linear_poisoned098/didae_cfkd
 task:
   criterions:
     ce     : 1.0

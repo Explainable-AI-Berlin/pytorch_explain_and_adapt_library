@@ -1,0 +1,9 @@
+'layers' : [
+  ['vgg', 64, 2, True],
+  ['resnet', 128, 3, True],
+  ['resnet', 256, 4, True],
+  ['resnet', 512, 6, True],
+  ['resnet', 1024, 3, True],
+  ['mean'],
+]
+'activation'              : 'ReLU'

@@ -1,0 +1,30 @@
+# python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_fastdime_hq/adaptors/imagenet_wolf_vs_eskimo_dog_sd3_cfkd.yaml"
+# Wolf (grey wolf) = class 0 (ImageNet index 269)
+# Eskimo Dog = class 1 (ImageNet index 248)
+adaptor_type                         :  "CFKD"
+category                             :  "adaptor"
+batch_size                           :  1
+tracking_level                       :  3
+min_train_samples                    :  900
+finetune_iterations                  :  0
+max_validation_samples               :  100
+continuous_learning                  :  "retrain"
+replace_model                        :  True
+use_visualization                    :  True
+calculate_group_accuracies           :  False
+explainer                            :  <PEAL_BASE>/configs/cfkd_fastdime_hq/explainers/imagenet_wolf_vs_eskimo_dog_sd3.yaml
+training                             :  <PEAL_BASE>/configs/sce_experiments/training/img_finetuning.yaml
+data                                 :  <PEAL_BASE>/configs/cfkd_fastdime_hq/data/imagenet_wolf_vs_eskimo_dog.yaml
+test_data                            :  <PEAL_BASE>/configs/cfkd_fastdime_hq/data/imagenet_wolf_vs_eskimo_dog.yaml
+student                              :  $PEAL_RUNS/imagenet/husky_vs_wulf_classifier/model.onnx
+teacher                              :  $PEAL_RUNS/imagenet/husky_vs_wulf_classifier/model.onnx
+generator                            :  <PEAL_BASE>/configs/cfkd_fastdime_hq/generators/stable_diffusion_3_wolf_vs_eskimo_dog.yaml
+base_dir                             :  $PEAL_RUNS/huskey_wolf
+seed                                 : 42
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [Class]

@@ -1,0 +1,26 @@
+# python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_experiments/adaptors/celeba1k_Blond_Hair_confounding_Male_poisoned098_sce_cfkd.yaml"
+adaptor_type                         :  "CFKD"
+category                             :  "adaptor"
+batch_size                           :  1
+tracking_level                       :  4
+min_train_samples                    :  800
+finetune_iterations                  :  1
+max_validation_samples               :  200
+continuous_learning                  :  "finetune"
+calculate_group_accuracies           :  True
+calculate_explainer_stats            :  False
+explainer                            :  <PEAL_BASE>/configs/cfkd_fastdime_hq/explainers/sce_convex_predictor.yaml
+training                             :  <PEAL_BASE>/configs/cfkd_fastdime_hq/training/img_finetuning.yaml
+data                                 :  <PEAL_BASE>/configs/cfkd_fastdime_hq/data/celebaHQ_1k_poisoned.yaml
+test_data                            :  <PEAL_BASE>/configs/cfkd_fastdime_hq/data/celebaHQ_1k_poisoned.yaml
+student                              :  <PEAL_BASE>/peal_runs/celebaHQ_classifier_resnet18_poisoned098/model.cpl
+teacher                              :  <PEAL_BASE>/peal_runs/celebaHQ_classifier_resnet18/model.cpl
+generator                            :  <PEAL_BASE>/configs/cfkd_fastdime_hq/generators/stable_diffusion_3_poisoned.yaml
+base_dir                             :  <PEAL_BASE>/peal_runs/sce_cfkd/blonde_hair_hq_poisoned098
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [Blond_Hair]

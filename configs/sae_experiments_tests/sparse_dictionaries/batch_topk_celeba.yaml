@@ -1,0 +1,39 @@
+sparse_dictionaries_type: BatchTopKSAE
+category: sparse_dictionaries
+weights_name: sae_weights.npz
+
+# --- dictionary geometry ---------------------------------------------------
+# 8x expansion over the 512-d CLIP z_sem. Only ~182k activations are available
+# (train+val of CelebA), so 16384 components would leave ~11 samples per
+# component and most of the dictionary dead.
+n_components: 4096
+act_size: 512
+# CelebA faces carry roughly 10-15 active attributes; 4 (the OnlySparseNumbers
+# value) cannot represent that, 64 is denser than the signal.
+top_k: 32
+
+# --- optimisation ----------------------------------------------------------
+batch_size: 4096
+# 182k unique activations -> ~24k steps -> ~550 passes over the data.
+num_tokens: 100000000
+lr: 0.0003
+l1_coeff: 0.0
+model_batch_size: 32
+# Dead-latent revival: top_k_aux must be a real fraction of the dictionary
+# (OpenAI use 512); 4 out of 4096 cannot resurrect anything.
+n_batches_to_dead: 200
+top_k_aux: 256
+aux_penalty: 0.03125
+# Keep false: input_unit_norm standardises each sample individually, which
+# breaks the linear "z_sem - mu, project onto W_enc column" arithmetic that
+# explain_sparse_component_batch / find_counterfactual rely on.
+input_unit_norm: false
+eval_epoch_interval: 500
+seed: 42
+
+# --- analysis --------------------------------------------------------------
+visualizations_per_component: 1
+# Bound the counterfactual sweep: each component costs an encode plus a
+# line-search of decodes. Raise once you know which components matter.
+comp_min: 0
+comp_max: 64

@@ -1,6 +1,6 @@
 dataset_class           : FunnyNodulesDataset
 dataset_path            : $PEAL_DATA/funnynodules
-num_samples             : 16000
+num_samples             : 32000
 split                   : [0.8,0.9]
 input_type              : image
 input_size              : [3, 64, 64]
@@ -10,5 +10,5 @@ output_size             : [6]
 downsize                : Resize
 delimiter               : ","
 confounder_probability  : 0.5
-confounding_factors     : [InternalStructure, Roundness]
+confounding_factors     : [InternalStructure, Roundness, Spiculation, EdgeSharpness, Size, Intensity]
 has_hints               : true

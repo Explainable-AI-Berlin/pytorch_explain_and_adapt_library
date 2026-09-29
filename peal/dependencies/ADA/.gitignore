@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# Local configuration
+.env
+*.local.yaml
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/
+
+# Experiment outputs and logs
+/artifacts/
+/assets/
+/ckpts/
+/checkpoints/
+/logs/
+/outputs/
+/results/
+/wandb/
+slurm-*.out
+*.log
+
+# Models, arrays, datasets, and generated media
+/external/models/
+/pretrained_models/
+/data/
+/datasets/
+*.npy
+*.npz
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.tar
+*.tar.gz
+*.zip
+*.png
+*.jpg
+*.jpeg
+*.webp
+
+# Containers and native build outputs
+*.sif
+*.sqsh
+.deps/
+build/
+dist/

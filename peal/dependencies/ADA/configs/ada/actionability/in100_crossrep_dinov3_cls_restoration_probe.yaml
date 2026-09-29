@@ -1,0 +1,29 @@
+experiment_id: e6b_in100_crossrep_dinov3_cls_restoration_probe
+restoration_eval_experiment_id: e6b_in100_crossrep_dinov3_cls_restoration_evaluation
+model_id: dinov3_cls_linear_probe
+feature_id: facebook__dinov3-vitb16-pretrain-lvd1689m/cls
+
+train_cache: artifacts/ada/atlas/embeddings/imagenet100/train/facebook__dinov3-vitb16-pretrain-lvd1689m/cls/aligned_from_imagenet1k_full
+validation_cache: artifacts/ada/atlas/embeddings/imagenet100/val/facebook__dinov3-vitb16-pretrain-lvd1689m/cls/aligned_from_imagenet1k_full
+enriched_regions_dir: artifacts/ada/actionability/regions/e4a_in100_dinov2_cls_k10_enriched_seed0
+pilot_regions_dir: artifacts/ada/actionability/pilot_regions/e4a_in100_dinov2_cls_k10_pilot_seed0
+deletion_controls_dir: artifacts/ada/actionability/restoration/e5a_in100_dinov2_cls_k10_real_restoration_pilot_seed0
+source_deletion_controls_dir: artifacts/ada/actionability/deletion_pilot/e4a_in100_dinov2_cls_k10_controlled_seed0
+deletion_probe_output_dir: artifacts/ada/actionability/probes/e6a_in100_crossrep_dinov3_cls_deletion_seed0
+restoration_dir: artifacts/ada/actionability/restoration/e5a_in100_dinov2_cls_k10_real_restoration_pilot_seed0
+probe_output_dir: artifacts/ada/actionability/probes/e6b_in100_crossrep_dinov3_cls_restoration_seed0
+restoration_probe_output_dir: artifacts/ada/actionability/probes/e6b_in100_crossrep_dinov3_cls_restoration_seed0
+restoration_eval_output_dir: artifacts/ada/actionability/evaluation/e6b_in100_crossrep_dinov3_cls_restoration_full_seed0
+
+primary_retention: 0.25
+secondary_retention: 0.0
+budget_fractions: [0.10, 0.25, 0.50, 1.00]
+seeds: [0, 1, 2]
+
+fixed_steps: 1000
+batch_size: 2048
+lr: 0.01
+weight_decay: 0.0001
+device: auto
+support_k: 50
+overwrite: false

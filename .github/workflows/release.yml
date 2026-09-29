@@ -1,0 +1,157 @@
+# Build the distributions and publish them to PyPI.
+#
+# Two distributions come out of this repository:
+#   peal-xai      the library, LGPL-3.0-or-later (repository root)
+#   peal-xai-rae  the RAEv2 fork behind the RAE generators, CC BY-NC 4.0
+#                 (packages/peal-xai-rae; `pip install "peal-xai[rae]"` pulls it in)
+# They are built into separate folders and published by separate jobs, so the
+# LGPL upload can never pick up the non-commercial wheel and vice versa.
+#
+# Publishing uses Trusted Publishing (OIDC), so no API token is stored in the
+# repository. Configure it once per project at
+# https://pypi.org/manage/account/publishing/ (and the same on TestPyPI):
+#   project "peal-xai",     workflow "release.yml", environment "pypi"     / "testpypi"
+#   project "peal-xai-rae", workflow "release.yml", environment "pypi-rae" / "testpypi-rae"
+#
+#   * every push and pull request builds and checks the artifacts
+#   * "Run workflow" publishes both to TestPyPI, so a release can be rehearsed
+#   * pushing a tag like v0.1.0 publishes both to PyPI
+#
+# The tag must match the __version__ of BOTH packages (peal/__init__.py and
+# packages/peal-xai-rae/peal_rae/__init__.py); the build job fails if it does
+# not, which is the only thing standing between a typo and a version number
+# that can never be reused on PyPI.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install build twine
+
+      - name: Check the tag matches both __version__ strings
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          for f in peal/__init__.py packages/peal-xai-rae/peal_rae/__init__.py; do
+            version=$(python -c "import re,pathlib,sys; \
+              print(re.search(r'^__version__ = \"([^\"]+)\"', \
+              pathlib.Path(sys.argv[1]).read_text(), re.M).group(1))" "$f")
+            if [ "$version" != "$tag" ]; then
+              echo "tag $tag does not match __version__ $version in $f" >&2
+              exit 1
+            fi
+          done
+
+      - run: python -m build --outdir dist/
+      - run: python -m build packages/peal-xai-rae --outdir dist-rae/
+      - run: twine check dist/* dist-rae/*
+
+      - name: The LGPL wheel must not contain the non-commercial code
+        run: |
+          python - <<'EOF'
+          import glob, zipfile
+          names = zipfile.ZipFile(glob.glob("dist/*.whl")[0]).namelist()
+          bad = [n for n in names if "RAEv2" in n or "peal_rae" in n or "/ADA/" in n]
+          assert not bad, f"peal-xai wheel contains CC BY-NC files: {bad[:5]}"
+          print(f"peal-xai wheel: {len(names)} files, none from RAEv2/ADA")
+          EOF
+
+      - name: Confirm the wheels import with no configs present
+        run: |
+          python -m venv /tmp/check
+          /tmp/check/bin/pip install --quiet dist/*.whl dist-rae/*.whl
+          cd /tmp
+          /tmp/check/bin/python -c "import peal; print(peal.__version__)"
+          # PEAL must resolve RAEv2 to the installed peal-xai-rae (no clone present here)
+          /tmp/check/bin/python -c "import os, peal_rae; \
+            from peal.generators.rae_pipeline import default_raev2_dir; \
+            d = default_raev2_dir(); assert d == peal_rae.raev2_dir(), d; \
+            assert os.path.isfile(os.path.join(d, 'configs', 'decoder', 'ViTXL', 'config.json')); \
+            print('RAEv2 from peal-xai-rae', peal_rae.__version__, '->', d)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: distributions
+          path: dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: distributions-rae
+          path: dist-rae/
+
+  testpypi:
+    # Rehearsal. TestPyPI refuses a version that already exists there, so bump
+    # __version__ (or use a .devN suffix) before repeating a dry run.
+    if: github.event_name == 'workflow_dispatch'
+    needs: build
+    runs-on: ubuntu-latest
+    environment: testpypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: distributions
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  testpypi-rae:
+    if: github.event_name == 'workflow_dispatch'
+    needs: build
+    runs-on: ubuntu-latest
+    environment: testpypi-rae
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: distributions-rae
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  pypi:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: distributions
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  pypi-rae:
+    # After peal-xai, so `pip install "peal-xai[rae]"` never finds the extra's
+    # package on PyPI before the library it depends on.
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build, pypi]
+    runs-on: ubuntu-latest
+    environment: pypi-rae
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: distributions-rae
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

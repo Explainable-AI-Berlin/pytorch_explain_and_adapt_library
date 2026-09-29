@@ -1,0 +1,93 @@
+{
+  "title": "PEAL: PyTorch Explain and Adapt Library",
+  "upload_type": "software",
+  "description": "PEAL is a PyTorch library for generating visual counterfactual explanations and for correcting classifiers and foundation-model probes with them. It contains the official implementations of Smoothed Counterfactual Explorer (SCE), Counterfactual Knowledge Distillation (CFKD) and Disentangled Diffusion Autoencoders (DiDAE), alongside reimplementations of commonly used counterfactual explainers and robustification methods.",
+  "creators": [
+    {
+      "name": "Bender, Sidney",
+      "affiliation": "Technische Universität Berlin",
+      "orcid": "0009-0007-1727-8577"
+    },
+    {
+      "name": "Kunz, Benedikt",
+      "affiliation": "Technische Universität Berlin",
+      "orcid": "0009-0006-9404-6924"
+    },
+    {
+      "name": "Zeid, Ahmed",
+      "affiliation": "Technische Universität Berlin",
+      "orcid": "0009-0001-4375-6356"
+    },
+    {
+      "name": "Delzer, Ole",
+      "affiliation": "Technische Universität Berlin"
+    }
+  ],
+  "license": "LGPL-3.0-or-later",
+  "access_right": "open",
+  "keywords": [
+    "explainable AI",
+    "counterfactual explanations",
+    "spurious correlations",
+    "diffusion models",
+    "sparse autoencoders"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/Explainable-AI-Berlin/pytorch_explain_and_adapt_library",
+      "relation": "isSupplementTo",
+      "resource_type": "software",
+      "scheme": "url"
+    },
+    {
+      "identifier": "10.1016/j.patcog.2025.112811",
+      "relation": "isSupplementTo",
+      "resource_type": "publication-article",
+      "scheme": "doi"
+    },
+    {
+      "identifier": "10.1016/j.inffus.2026.104406",
+      "relation": "isSupplementTo",
+      "resource_type": "publication-article",
+      "scheme": "doi"
+    },
+    {
+      "identifier": "10.1109/ICCVW60793.2023.00275",
+      "relation": "isSupplementTo",
+      "resource_type": "publication-conferencepaper",
+      "scheme": "doi"
+    },
+    {
+      "identifier": "10.48550/arXiv.2601.21851",
+      "relation": "isSupplementTo",
+      "resource_type": "publication-preprint",
+      "scheme": "doi"
+    },
+    {
+      "identifier": "https://huggingface.co/sidney1505/peal-rae-clip-imagenet",
+      "relation": "requires",
+      "resource_type": "dataset",
+      "scheme": "url"
+    }
+  ],
+  "notes": "The RAE extension (peal-xai-rae) is distributed separately under CC BY-NC 4.0; the PathLDM copy is redistributed with the authors' permission. See peal/dependencies/README.md for the licences of vendored third-party code.",
+  "contributors": [
+    {
+      "name": "Morik, Marco",
+      "affiliation": "Technische Universität Berlin",
+      "orcid": "0009-0001-7897-2243",
+      "type": "Supervisor"
+    },
+    {
+      "name": "Montavon, Grégoire",
+      "affiliation": "Technische Universität Berlin",
+      "type": "Supervisor"
+    },
+    {
+      "name": "Müller, Klaus-Robert",
+      "affiliation": "Technische Universität Berlin",
+      "orcid": "0000-0002-3861-7685",
+      "type": "Supervisor"
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+# Evaluation split for the FunnyNodules column of the chapter-4 table.
+#
+# `funnynodules_unpoisoned.yaml` cannot be used for this. That file is the config that
+# GENERATES the raw pool, so it lists all six attributes as confounding factors. Group
+# accuracies are only defined for two, a label and one confounder, and with more than two
+# the dataset returns `has_confounder` as a list, which makes `calculate_test_accuracy`
+# raise `TypeError: unsupported operand type(s) for +: 'Tensor' and 'list'`.
+#
+# This is the same pool at its natural correlation (confounder_probability 0.5) restricted
+# to the label and the one confounder the classifier is trained against, which is exactly
+# what square_unpoisoned.yaml does for Square.
+dataset_class           : FunnyNodulesDataset
+dataset_path            : $PEAL_DATA/funnynodules
+num_samples             : 32000
+split                   : [0.8,0.9]
+input_type              : image
+input_size              : [3, 64, 64]
+output_type             : multiclass
+output_size             : [6]
+downsize                : Resize
+delimiter               : ","
+confounder_probability  : 0.5
+confounding_factors     : [InternalStructure, Roundness]
+has_hints               : true

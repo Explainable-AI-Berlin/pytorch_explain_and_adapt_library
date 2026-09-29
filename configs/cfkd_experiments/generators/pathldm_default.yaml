@@ -1,0 +1,4 @@
+category: generator
+generator_type: DDPMPathLDM
+data: <PEAL_BASE>/configs/data/follicles_pathldm_generator.yaml
+base_path : $PEAL_RUNS/celeba/DDPMPathLDM

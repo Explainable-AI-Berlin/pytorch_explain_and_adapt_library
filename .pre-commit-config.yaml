@@ -1,0 +1,47 @@
+# Install once per clone:  pip install pre-commit && pre-commit install
+# Run on everything:       pre-commit run --all-files
+#
+# The formatting options live in pyproject.toml ([tool.black]: 88 columns, py39
+# target, and a force-exclude that keeps black off peal/dependencies/), so this
+# hook and a hand-run `black .` agree. The exclude below is a second guard in
+# case that table is ever lost again.
+repos:
+  - repo: https://github.com/psf/black
+    rev: 24.8.0
+    hooks:
+      - id: black
+        language_version: python3
+        # peal/dependencies/ is vendored third-party code with its own
+        # licences and upstream formatting; so does the RAEv2 fork under
+        # packages/peal-xai-rae; external/ is the optional RAEv2
+        # clone. pyproject.toml force-excludes them too.
+        exclude: ^(peal/dependencies/|packages/peal-xai-rae/peal_rae/RAEv2/|external/|notebooks/)
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      # Two configs sat in the repository for two months with merge-conflict
+      # markers in them; refuse to commit a file that still has them.
+      - id: check-merge-conflict
+      - id: check-ast
+        exclude: ^(peal/dependencies/|packages/peal-xai-rae/peal_rae/RAEv2/|external/)
+
+  - repo: local
+    hooks:
+      # Two configs sat in the repository for two months with merge-conflict
+      # markers in them, so every run that referenced them died on load.
+      - id: preflight-configs
+        name: run configs parse and point at no personal paths
+        entry: python preflight.py --no-existence --quiet
+        language: system
+        files: ^configs/.*\.ya?ml$
+        pass_filenames: true
+
+      # A breakpoint() reached in a batch run becomes BdbQuit and kills the
+      # process; inside an except handler it also hides the original error.
+      - id: no-debugger-calls
+        name: no breakpoint() or pdb.set_trace() in library code
+        entry: python tools/no_debugger_calls.py
+        language: system
+        files: ^peal/(?!dependencies/).*\.py$
+        pass_filenames: true

@@ -1,7 +1,5 @@
 import unittest
-import numpy as np
 import torch
-import os
 
 from peal.visualization.model_comparison import change_all, create_checkbox_dict
 

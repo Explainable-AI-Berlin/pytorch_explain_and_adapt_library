@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+# Project metadata lives in setup.py, not in a [project] table here. setup.py
+# computes three things a static table cannot express: the package list
+# (find_namespace_packages, because most vendored folders carry no
+# __init__.py), the excluded vendored packages PEAL may not redistribute, and
+# the version, which is parsed out of peal/__init__.py so it is written once.
+# A [project] table would take precedence over all of it and silently win.
+
+[tool.black]
+line-length = 88
+target-version = ["py39"]
+# peal/dependencies/ is vendored third-party research code that keeps its own
+# licence and upstream layout; reformatting it would make every upstream diff
+# unreadable. packages/peal-xai-rae/peal_rae/RAEv2 is the vendored CC BY-NC RAEv2 fork (same reason:
+# its diff against upstream is documented in MODIFICATIONS.md). external/ is the
+# optional RAEv2 clone. force-exclude applies even
+# when a path inside them is passed explicitly, which is what the pre-commit
+# hook does, so a bare `black .` is safe again.
+force-exclude = '''
+/(
+    \.git
+  | \.venv.*
+  | peal/dependencies
+  | packages/peal-xai-rae/peal_rae/RAEv2
+  | external
+  | notebooks
+  | wandb
+  | logs2?
+  | build
+  | dist
+)/
+'''

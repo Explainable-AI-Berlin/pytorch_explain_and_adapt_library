@@ -1,0 +1,35 @@
+explainer_type : SCE
+attack_iterations: 100
+attack_step: 1.0
+category: explainer
+# distilled_predictor: <PEAL_BASE>/configs/predictors/sensitive_distillation_follicle.yaml
+sampling_inpaint: 0.0
+y_target_goal_confidence: 0.8
+dist_l1: 1.0e-08
+timestep_respacing: 100
+distilled_predictor                  :  <PEAL_BASE>/configs/predictors/sensitive_distillation_follicle.yaml
+training                             :  <PEAL_BASE>/configs/training/sensitive_distillation_pathldm.yaml
+data                                 :  <PEAL_BASE>/configs/data/follicles_pathldm.yaml 
+data_config                          :  <PEAL_BASE>/configs/data/follicles_pathldm.yaml
+test_data                            :  <PEAL_BASE>/configs/data/follicles_pathldm.yaml
+student                              :  $PEAL_RUNS/follicles_cut/classifier_natural/model.cpl
+predictor                            :  <PEAL_BASE>/configs/predictors/follicle_cut_classifier_pathldm.yaml
+teacher                              :  SegmentationMask
+generator                            :  <PEAL_BASE>/configs/generators/pathldm.yaml
+explanations_dir                     : <PEAL_BASE>/peal_runs/pathldm_pdc_follicle
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [type]
+
+sampling_time_fraction: 0.1
+learning_rate: 1.0
+merge_clusters: concatenate
+momentum: 0.9
+num_attempts: 2
+num_discretization_steps: 20
+optimizer: SGD
+replace_with_activation: leakysoftplus

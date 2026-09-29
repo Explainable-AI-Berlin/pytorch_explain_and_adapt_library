@@ -15,7 +15,6 @@ from ..model import *
 from ..model.nn import mean_flat
 from typing import NamedTuple, Tuple
 from ..choices import *
-from torch.cuda.amp import autocast
 
 from dataclasses import dataclass
 
@@ -134,8 +133,8 @@ class GaussianDiffusionBeatGans:
             LossType.mse,
             LossType.l1,
         ]:
-            with autocast(self.conf.fp16):
-                # x_t is static wrt. to the diffusion process
+            device = next(model.parameters()).device
+            with th.amp.autocast(device_type=device.type, enabled=self.conf.fp16):                # x_t is static wrt. to the diffusion process
                 model_forward = model.forward(
                     x=x_t.detach(),
                     t=self._scale_timesteps(t),
@@ -325,7 +324,8 @@ class GaussianDiffusionBeatGans:
 
         B, C = x.shape[:2]
         assert t.shape == (B,)
-        with autocast(self.conf.fp16):
+        device = x.device
+        with th.amp.autocast(device_type=device.type, enabled=self.conf.fp16):
             model_forward = model.forward(
                 x=x, t=self._scale_timesteps(t), **model_kwargs
             )
@@ -384,7 +384,7 @@ class GaussianDiffusionBeatGans:
         assert x_t.shape == eps.shape
         return (
             _extract_into_tensor(self.sqrt_recip_alphas_cumprod, t, x_t.shape) * x_t
-            - _extract_into_tensor(self.sqrt_recipm1_alphas_cumprod, t, x_t.shape) * eps
+            - _extract_into_tensor(self.sqrt_recipm1_alphas_cumprod, t, x_t.shape).to(x_t.device) * eps
         )
 
     def _predict_xstart_from_xprev(self, x_t, t, xprev):
@@ -393,7 +393,7 @@ class GaussianDiffusionBeatGans:
             _extract_into_tensor(1.0 / self.posterior_mean_coef1, t, x_t.shape) * xprev
             - _extract_into_tensor(
                 self.posterior_mean_coef2 / self.posterior_mean_coef1, t, x_t.shape
-            )
+            ).to(x_t.device)
             * x_t
         )
 

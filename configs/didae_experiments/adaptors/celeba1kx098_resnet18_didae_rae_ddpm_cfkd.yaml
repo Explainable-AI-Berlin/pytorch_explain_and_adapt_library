@@ -1,0 +1,50 @@
+# DiDAE-CFKD on CelebA (Blond_Hair confounded by Male, 98% poisoned) decoding through the
+# CelebA REPRESENTATION AUTOENCODER instead of the pixel-space diffusion autoencoder, with
+# edit-friendly DDPM inversion. Third row of the generator/inversion ablation
+# (Table "generator_inversion_ablation"); the other two rows are
+# celeba1kx098_resnet18_didae_openclip_cfkd.yaml      (DAE  / DDIM)
+# celeba1kx098_resnet18_didae_openclip_ddpm_cfkd.yaml (DAE  / DDPM)
+#
+# WHAT THIS ROW CONTROLS FOR, AND WHAT IT DOES NOT. The DAE rows encode with the OpenCLIP
+# linear head at 512-d; the RAE encodes with OpenAI CLIP ViT-L/14 at 768-d. The row therefore
+# varies generator AND encoder together. It is still a meaningful comparison because both
+# Procrustes dictionaries are fitted to the SAME ground-truth attribute matrix
+# (y_selection: [Blond_Hair, Male], n_components 2, both exactly orthogonal: |cos| = 0.0000),
+# so the named directions correspond across the two spaces even though the spaces differ.
+# Report it as "RAE / DDPM (CLIP ViT-L/14)" and say in the caption that the encoder changes
+# with the generator; do not present it as an isolated generator swap.
+# Verified 2026-09-18: $PEAL_RUNS/celeba/rae_clip/OrthogonalProcrustesDictionary/weights.npz
+# holds W_ortho (2, 768) and mu (768,), i.e. correctly fitted in the 768-d space. Its config
+# carries a stale act_size: 512, which is harmless -- OrthogonalProcrustesDictionary.load_from_disk
+# reads W_ortho and mu from the checkpoint and never consults act_size.
+#
+# GENERATOR STATE: stage 2 stopped at epoch 20 of 24 (SIGINT 2026-09-17 10:59); ep-last.pt is
+# ep-0000020.pt. Either resume to 24 or record in the paper that the row used the ep-20 decoder.
+#
+# python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/celeba1kx098_resnet18_didae_rae_ddpm_cfkd.yaml"
+adaptor_type                         :  "CFKD"
+category                             :  "adaptor"
+batch_size                           :  200
+tracking_level                       :  5
+min_train_samples                    :  800
+finetune_iterations                  :  1
+max_validation_samples               :  200
+continuous_learning                  :  "finetune"
+calculate_group_accuracies           :  True
+calculate_explainer_stats            :  True
+explainer                            :  <PEAL_BASE>/configs/didae_experiments/explainers/dae_distill_ddpm.yaml
+training                             :  <PEAL_BASE>/configs/cfkd_experiments/training/img_finetuning.yaml
+data                                 :  <PEAL_BASE>/configs/cfkd_experiments/data/celeba1k_Blond_Hair_confounding_Male_poisoned098.yaml
+test_data                            :  <PEAL_BASE>/configs/cfkd_experiments/data/celeba.yaml
+student                              :  $PEAL_RUNS/celeba1k/Blond_Hair/classifier_poisoned098/model.cpl
+teacher                              :  $PEAL_RUNS/celeba/Blond_Hair/classifier_unpoisoned/model.cpl
+generator                            :  $PEAL_RUNS/celeba/rae_clip/config.yaml
+sparse_dictionary                    :  $PEAL_RUNS/celeba/rae_clip/OrthogonalProcrustesDictionary/config.yaml
+base_dir                             :  $PEAL_RUNS/celeba1k/Blond_Hair/classifier_poisoned098/rae_didae_ddpm_cfkd
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [Blond_Hair]

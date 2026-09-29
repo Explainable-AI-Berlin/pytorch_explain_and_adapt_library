@@ -2,7 +2,7 @@
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  4
-tracking_level                       :  4
+tracking_level                       :  3
 min_train_samples                    :  800
 finetune_iterations                  :  1
 max_validation_samples               :  200
@@ -13,7 +13,7 @@ explainer                            :  <PEAL_BASE>/configs/sce_experiments/expl
 training                             :  <PEAL_BASE>/configs/sce_experiments/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/sce_experiments/data/Smiling_confounding_copyrighttag_celeba_poisoned100.yaml
 test_data                            :  <PEAL_BASE>/configs/sce_experiments/data/Smiling_confounding_copyrighttag_celeba.yaml
-base_dir                             :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned100/dime_cfkd
+base_dir                             :  $PEAL_RUNS/copytight_dime
 student                              :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_poisoned100/model.cpl
 teacher                              :  $PEAL_RUNS/celeba_copyrighttag/Smiling_confounding_copyrighttag/regularized0/classifier_unpoisoned/model.cpl
 generator                            :  $PEAL_RUNS/celeba_copyrighttag/ddpm/config.yaml

@@ -16,6 +16,7 @@ test_data                            :  <PEAL_BASE>/configs/sce_experiments/data
 student                              :  $PEAL_RUNS/camelyon17/classifier_poisoned100/model.cpl
 teacher                              :  $PEAL_RUNS/camelyon17/classifier_unpoisoned/model.cpl
 generator                            :  $PEAL_RUNS/camelyon17/ddpm/config.yaml
+# base_dir                             :  $PEAL_RUNS/camelyon17/classifier_poisoned100/ace_cfkd
 base_dir                             :  $PEAL_RUNS/camelyon17/classifier_poisoned100/ace_cfkd
 task:
   criterions:

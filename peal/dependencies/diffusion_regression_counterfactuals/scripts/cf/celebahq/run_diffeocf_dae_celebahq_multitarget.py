@@ -138,7 +138,7 @@ def init_args():
 def get_dataset(args):
     size = 256
     compose = default_transforms(size, ddpm=True)
-    PARTITION_FILE = "/home/space/datasets/celeba/list_eval_partition.txt"
+    PARTITION_FILE = os.path.join(os.environ.get("PEAL_DATA", "datasets"), "celeba/list_eval_partition.txt")
     dataset = CelebAHQDataset(
         root=args.image_folder,
         transform=compose,

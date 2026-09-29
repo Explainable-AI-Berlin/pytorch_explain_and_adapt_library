@@ -1,0 +1,48 @@
+# Run the test suite on every push and pull request. The lint workflow only
+# checks formatting, so until 2026-09-26 nothing in CI executed a single test
+# and the suite had drifted to "4 collected, 11 errors" without anyone noticing.
+#
+# The pinned research environment (requirements.txt) is heavy: the CUDA wheels
+# alone are gigabytes. CI installs the CPU build of torch and filters those
+# lines out; the tests do not need a GPU. TensorFlow/Keras are filtered too as
+# a belt-and-braces measure: nothing in PEAL imports them, and when TensorFlow
+# is merely installed torch's dynamo trace rules import it, costing ~3 s per
+# process.
+name: tests
+
+on:
+  push:
+    branches: [master, dev]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The pins (numpy 1.22, scipy 1.8, scikit-learn 1.0) ship wheels up to
+        # cp310 only; setup.py declares python_requires ">=3.9,<3.12".
+        python-version: ["3.9", "3.10"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-web.txt
+      - name: Install CPU torch and the filtered requirements
+        run: |
+          python -m pip install --upgrade pip wheel
+          grep -viE '^(nvidia-|triton|tensorflow|keras|libclang|tensorboard-data-server)' requirements.txt > /tmp/requirements-ci.txt
+          pip install --extra-index-url https://download.pytorch.org/whl/cpu -r /tmp/requirements-ci.txt -r requirements-web.txt
+          pip install -e . --no-deps
+      - name: Guard against debugger calls
+        run: python tools/no_debugger_calls.py $(git ls-files 'peal/*.py' | grep -v dependencies)
+      - name: Run the suite
+        env:
+          PEAL_LOG_LEVEL: WARNING
+        run: python -m pytest -p no:cacheprovider -q

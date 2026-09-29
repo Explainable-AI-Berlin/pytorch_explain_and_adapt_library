@@ -1,29 +1,19 @@
+"""
+Attribution (heatmap) explainer built on zennit.
+
+Besides counterfactuals PEAL can explain a classifier with pixel-wise
+attribution maps. ``LRPExplainer`` wraps zennit's ``IntegratedGradients``
+attributor with an ``EpsilonGammaBox`` LRP composite and optional model
+canonizers, and exposes the same ``explain_batch``/``run`` interface the
+counterfactual explainers use, so it can be plugged into the visualization
+tools (``peal.visualization.model_comparison``).
+"""
+
 import torch
-import json
-import h5py
 import torchvision.utils
-import yaml
 import os
-import time
-import multiprocessing
-import numpy as np
 
 from tqdm import tqdm
-from os.path import dirname, relpath
-from typing import List
-from corelay.base import Param
-from corelay.processor.base import Processor
-from corelay.processor.affinity import SparseKNN
-from corelay.processor.distance import SciPyPDist
-from corelay.processor.flow import Sequential, Parallel
-from corelay.pipeline.spectral import SpectralClustering
-from corelay.processor.embedding import TSNEEmbedding, UMAPEmbedding, EigenDecomposition
-from corelay.processor.clustering import (
-    KMeans,
-    DBSCAN,
-    HDBSCAN,
-    AgglomerativeClustering,
-)
 from zennit.attribution import IntegratedGradients
 from zennit.composites import EpsilonGammaBox
 from zennit.canonizers import SequentialMergeBatchNorm
@@ -35,6 +25,9 @@ from peal.architectures.predictors import get_predictor
 from peal.architectures.interfaces import TaskConfig
 from peal.data.dataset_factory import get_datasets
 from peal.global_utils import load_yaml_config
+from peal.log import get_logger
+
+_log = get_logger(__name__)
 
 
 CANONIZERS = {
@@ -45,6 +38,35 @@ CANONIZERS = {
 
 
 class LRPExplainer:
+    """
+    Heatmap explainer using zennit Integrated Gradients with an LRP composite.
+
+    The explainer config (a yaml path or loaded config) is read for the keys
+    ``predictor`` (fallback if none is passed), ``data_config`` (fallback to
+    the predictor's data config), ``canonizers`` (list of keys into
+    ``CANONIZERS``), ``composite_kwargs`` (forwarded to ``EpsilonGammaBox``),
+    ``explanations_dir`` and ``max_samples``.
+
+    Parameters
+    ----------
+    explainer_config : str or dict-like
+        Path to the explainer yaml or an already loaded config.
+    predictor : torch.nn.Module or str, optional
+        Model or path to a model; resolved through ``get_predictor``.
+    num_classes : int, optional
+        Number of output classes, used to build one-hot targets.
+    datasets : sequence, optional
+        ``(train, val)`` datasets; when omitted they are created from the
+        data config.
+
+    Attributes
+    ----------
+    attributor : zennit.attribution.IntegratedGradients
+        The attributor whose context manager is entered in ``explain_batch``.
+    predictor_datasets : sequence
+        The first two datasets (train, val); ``run`` iterates over the second.
+    """
+
     def __init__(
         self, explainer_config, predictor=None, num_classes=None, datasets=None
     ):
@@ -66,7 +88,7 @@ class LRPExplainer:
                 data_config = self.predictor_config.data
 
             else:
-                print("No data config found!")
+                _log.info("%s", "No data config found!")
                 raise ValueError
 
             if not self.predictor_config is None:
@@ -93,12 +115,31 @@ class LRPExplainer:
         self.attributor = IntegratedGradients(model=self.predictor, composite=composite)
 
     def explain_batch(self, batch, labels):
-        """ """
+        """
+        Compute attribution heatmaps for a batch of images.
+
+        Parameters
+        ----------
+        batch : torch.Tensor
+            Images of shape ``(N, C, H, W)`` (a single ``(C, H, W)`` image
+            works as well since the attributor broadcasts).
+        labels : torch.Tensor or int
+            Class index per image; turned into one-hot targets with
+            ``num_classes`` entries.
+
+        Returns
+        -------
+        heatmaps : torch.Tensor
+            Shape ``(N, 3, H, W)``: per-pixel relevance (input-normalised,
+            summed over channels, scaled to ``[0, 1]`` per image, squared
+            and repeated over three channels) on CPU.
+        overlays : torch.Tensor
+            Shape ``(N, 3, H, W)``: zennit ``imgify`` renderings of the raw
+            attributions with the ``wred`` colormap.
+        predictions : torch.Tensor
+            Shape ``(N,)``: argmax of the model output on CPU.
+        """
         with self.attributor:
-            """X = torch.clone(batch).to(self.device)
-            X.requires_grad = True
-            X.retain_grad = True
-            heatmaps = torch.abs(X.grad).sum(1)"""
             predictions, attributions = self.attributor(
                 batch.to(self.device),
                 torch.eye(self.num_classes)[labels].to(self.device),
@@ -125,7 +166,19 @@ class LRPExplainer:
 
     def run(self, *args, **kwargs):
         """
-        This function runs the explainer.
+        Explain the validation split and write one image per sample.
+
+        Iterates over ``predictor_datasets[1]`` (enabling hints if the dataset
+        has them), predicts each sample, attributes the predicted class and
+        saves ``explanation_<i>.png`` (input stacked with its heatmap) into
+        ``explainer_config.explanations_dir``. Stops after
+        ``explainer_config.max_samples`` samples when that is set.
+
+        Returns
+        -------
+        dict
+            Keys ``"heatmap"``, ``"x"`` and ``"prediction"`` holding the
+            values of the last processed sample.
         """
         if not os.path.exists(self.explainer_config.explanations_dir):
             os.makedirs(self.explainer_config.explanations_dir)

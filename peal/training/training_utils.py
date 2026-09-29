@@ -1,6 +1,14 @@
+"""Validation helpers shared by PEAL's predictor training loops.
+
+The one public function, :func:`calculate_validation_statistics`, walks
+validation dataloaders, measures the accuracy and error structure of a
+classifier and runs an explainer on every batch so that counterfactual
+statistics (flip rates, hints, indices, ...) are collected alongside the plain
+validation metrics. Adaptors such as CFKD call it once per fine-tuning round.
+"""
+
 import torch
 import numpy as np
-import sys
 
 from torch import nn
 from tqdm import tqdm
@@ -21,23 +29,51 @@ def calculate_validation_statistics(
     explainer: ExplainerInterface,
     max_validation_samples: int,
 ):
-    """
-    This function calculates the validation statistics for a given model and dataloader.
+    """Compute accuracy / error statistics and explainer outputs on validation data.
 
-    Args:
-        model (nn.Module): _description_
-        dataloader (torch.utils.data.DataLoader): _description_
-        tracked_keys (list): _description_
-        base_path (str): _description_
-        output_size (int): _description_
-        device (Union[str, torch.device]): _description_
-        logits_to_prediction (callable): _description_
-        use_confusion_matrix (bool): _description_
-        explainer (ExplainerInterface): _description_
-        max_validation_samples (int): _description_
+    For every dataloader the model is evaluated with temperature-scaled softmax
+    (``explainer.explainer_config.temperature``), the prediction is mapped to a
+    class with ``logits_to_prediction`` and the explainer is asked to explain the
+    batch towards the target ``(y_pred + 1) % output_size``. Keys of the
+    explainer result that appear in ``tracked_keys`` are accumulated.
 
-    Returns:
-        _type_: _description_
+    Parameters
+    ----------
+    model : nn.Module
+        Classifier producing logits of shape ``(B, output_size)``.
+    dataloaders : list of torch.utils.data.DataLoader
+        Validation loaders; the sample budget is split evenly between them and
+        a trailing batch smaller than ``batch_size`` stops the loop.
+    tracked_keys : list of str
+        Explainer result keys to collect, e.g. ``"x_counterfactual_list"``.
+        ``"hint_list"`` / ``"idx_list"`` additionally unpack a list-valued ``y``
+        into label, hints and indices.
+    base_path : str
+        Directory handed to ``explainer.explain_batch`` for its artefacts.
+    output_size : int
+        Number of classes.
+    device : str or torch.device
+        Device the inputs are moved to.
+    logits_to_prediction : callable
+        Maps a confidence tensor to integer predictions.
+    use_confusion_matrix : bool
+        If True and the accuracy is below 1.0, the normalised off-diagonal
+        confusion matrix is returned as ``error_matrix``; otherwise a uniform
+        off-diagonal matrix is used.
+    explainer : ExplainerInterface
+        Explainer whose ``explain_batch`` runs in ``mode="validation"``.
+    max_validation_samples : int
+        Upper bound on the number of samples over all dataloaders.
+
+    Returns
+    -------
+    tracked_values : dict
+        ``{key: list}`` for every key in ``tracked_keys``.
+    validation_stats : dict
+        ``accuracy`` (float), ``confidence_score_stats`` (zero tensor of shape
+        ``(output_size, output_size)``, currently a placeholder) and
+        ``error_matrix`` (flattened tensor of length ``output_size ** 2`` that
+        sums to one). Only the last dataloader's values are returned.
     """
     tracked_values = {key: [] for key in tracked_keys}
     for dataloader in dataloaders:
@@ -63,8 +99,6 @@ def calculate_validation_statistics(
         pbar.stored_values = {}
 
         for it, (x, y) in enumerate(dataloader):
-            """if not it == 41:
-            continue"""
 
             if (
                 num_samples >= int(max_validation_samples / len(dataloaders))
@@ -72,13 +106,17 @@ def calculate_validation_statistics(
             ):
                 break
 
-            pred_confidences = (
-                torch.nn.Softmax(dim=-1)(
-                    model(x.to(device)) / explainer.explainer_config.temperature
-                )
-                .detach()
-                .cpu()
-            )
+            try:
+                with torch.no_grad():
+                    pred_confidences = (
+                        torch.nn.Softmax(dim=-1)(
+                            model(x.to(device)) / explainer.explainer_config.temperature
+                        )
+                        .detach()
+                        .cpu()
+                    )
+            except:
+                raise
             y_pred = logits_to_prediction(pred_confidences)
             if (
                 "hint_list" in tracked_keys or "idx_list" in tracked_keys

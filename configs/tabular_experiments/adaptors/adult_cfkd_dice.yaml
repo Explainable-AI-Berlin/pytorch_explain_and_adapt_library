@@ -14,7 +14,7 @@ test_data                            :  <PEAL_BASE>/configs/tabular_experiments/
 student                              :  $PEAL_RUNS/adult/classifier_poisoned/model.cpl
 teacher                              :
   type: "symbolic"
-  model: peal_runs/adult/classifier_poisoned/model.cpl
+  model: $PEAL_RUNS/adult/classifier_poisoned/model.cpl
   confounder_name: "gender_Male"
 
 generator                            :  null

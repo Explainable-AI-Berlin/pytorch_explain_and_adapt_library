@@ -1,0 +1,16 @@
+Bootstrap: docker
+From: continuumio/miniconda3
+
+%files
+    $PWD/deploy/apptainer/peal_ldm.yaml peal_ldm.yaml
+
+%post
+    # chmod 1777 /tmp
+    apt-get update && apt-get -y install libgl1
+    conda update -n base -c defaults conda -y
+    conda env create -f peal_ldm.yaml -n peal
+    /opt/conda/envs/peal/bin/python -m pip install zennit==0.5.1
+
+    # Source environment at runtime
+    echo ". /opt/conda/etc/profile.d/conda.sh" >> $SINGULARITY_ENVIRONMENT
+    echo "conda activate peal" >> $SINGULARITY_ENVIRONMENT

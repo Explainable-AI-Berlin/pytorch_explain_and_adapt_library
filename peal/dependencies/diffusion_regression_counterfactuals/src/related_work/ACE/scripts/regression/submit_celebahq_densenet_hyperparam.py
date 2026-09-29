@@ -8,8 +8,8 @@ attack_steps = [1.0]
 dist_l1s = [0.0, 0.15]
 dist_l2s = [0.0, 0.05]
 rmodel_paths = [
-    "/home/tha/thesis_runs/regressor/imdb_wiki_densenet_linear_only-256/version_0/checkpoints/last.ckpt",
-    "/home/tha/thesis_runs/regressor/imdb_wiki_densenet_fullft-256/version_0",
+    os.path.join(os.environ.get("PEAL_RUNS", "peal_runs"), "regressor/imdb_wiki_densenet_linear_only-256/version_0/checkpoints/last.ckpt"),
+    os.path.join(os.environ.get("PEAL_RUNS", "peal_runs"), "regressor/imdb_wiki_densenet_fullft-256/version_0"),
 ]
 
 # Iterate through all combinations of hyperparameters

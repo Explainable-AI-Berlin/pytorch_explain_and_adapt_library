@@ -1,35 +1,12 @@
-import argparse
-import os
+"""Run Counterfactual Knowledge Distillation (CFKD) from a YAML config.
 
-os.environ["TORCH_USE_CUDA_DSA"] = "1"
-os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
+Thin wrapper. The implementation moved to ``peal.entrypoints.run_cfkd`` so that an
+installed PEAL exposes it as the ``peal-cfkd`` console command; this file is kept
+because the reproduction scripts, notebooks and README all invoke ``python run_cfkd.py
+...``. See that module for the full documentation.
+"""
 
-from peal.adaptors.counterfactual_knowledge_distillation import CFKDConfig
-from peal.global_utils import (
-    load_yaml_config,
-    add_class_arguments,
-    integrate_arguments,
-    set_random_seed,
-)
-from peal.adaptors.counterfactual_knowledge_distillation import (
-    CFKD,
-)
-
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, required=True)
-    add_class_arguments(parser, CFKDConfig)
-    args = parser.parse_args()
-
-    adaptor_config = load_yaml_config(args.config, CFKDConfig)
-    integrate_arguments(args, adaptor_config, exclude=["config"])
-    if not adaptor_config.seed is None:
-        set_random_seed(adaptor_config.seed)
-
-    cfkd = CFKD(adaptor_config=adaptor_config)
-    cfkd.run()
-
+from peal.entrypoints.run_cfkd import main
 
 if __name__ == "__main__":
     main()

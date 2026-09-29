@@ -2,13 +2,13 @@
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  1
-tracking_level                       :  3
+tracking_level                       :  4
 min_train_samples                    :  900
 finetune_iterations                  :  0
 max_validation_samples               :  100
 continuous_learning                  :  "retrain"
 calculate_explainer_stats            :  True
-calculate_group_accuracies           :  True
+calculate_group_accuracies           :  False
 explainer                            :  <PEAL_BASE>/configs/sce_experiments/explainers/fastdime_default.yaml
 training                             :  <PEAL_BASE>/configs/sce_experiments/training/img_finetuning.yaml
 data                                 :  <PEAL_BASE>/configs/sce_experiments/data/celeba.yaml
@@ -16,7 +16,9 @@ test_data                            :  <PEAL_BASE>/configs/sce_experiments/data
 student                              :  $PEAL_RUNS/celeba/Smiling/classifier_natural/model.cpl
 teacher                              :  $PEAL_RUNS/celeba/Smiling/classifier_natural/model.cpl
 generator                            :  $PEAL_RUNS/celeba/ddpm/config.yaml
-base_dir                             :  $PEAL_RUNS/celeba/Smiling/classifier_natural/fastdime_cfkd
+# base_dir                             :  $PEAL_RUNS/celeba/Smiling/classifier_natural/fastdime_cfkd
+base_dir                             :  $PEAL_RUNS/smiling_other_methods/fastdime_cfkd
+
 task:
   criterions:
     ce     : 1.0

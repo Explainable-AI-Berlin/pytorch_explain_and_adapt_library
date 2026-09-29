@@ -1,3 +1,15 @@
+"""
+Generators for PEAL's synthetic and confounded benchmark datasets.
+
+Each class writes a dataset directory in the layout PEAL's dataset classes
+read (``imgs/``, optional ``masks/`` with segmentation hints, and a
+``data.csv`` or ``.json`` label file with one column per attribute) into
+``data_config.dataset_path`` or a ``datasets/<name>`` folder. The generators
+plant a known confounder next to the true feature (copyright tags, colour
+shifts, staining intensity, square colour/position, specific numbers, nodule
+roundness, ...) so that adaptors can be evaluated against ground truth.
+"""
+
 import os
 import json
 import shutil
@@ -16,7 +28,12 @@ from tqdm import tqdm
 from torchvision.transforms import ToTensor
 
 from peal.global_utils import get_project_resource_dir, embed_numberstring
-#from peal.dependencies.ddpm_inversion.ddpm_inversion import DDPMInversion
+from peal.log import get_logger
+
+_log = get_logger(__name__)
+
+
+# from peal.dependencies.ddpm_inversion.ddpm_inversion import DDPMInversion
 
 
 class ArtificialConfounderTabularDatasetGenerator:
@@ -25,7 +42,7 @@ class ArtificialConfounderTabularDatasetGenerator:
 
     Should mimic symbolic rather low-dimensional data like credit decisions based on known factors about a person.
 
-    Should enable straight foward check for minimality of counterfactuals.
+    Should enable straightforward check for minimality of counterfactuals.
     """
 
     def __init__(
@@ -80,16 +97,6 @@ class ArtificialConfounderTabularDatasetGenerator:
         for sample_idx in range(self.num_samples):
             has_attribute = int(sample_idx % 4 == 0 or sample_idx % 4 == 1)
             has_confounder = int(sample_idx % 2 == 0)
-            """
-            if self.label_noise == 0.0:
-                flipped_label = int(
-                    sample_idx % int(200 * (1 - self.label_noise)) == 0
-                    or sample_idx % int(200 * (1 - self.label_noise)) == 1
-                )
-
-            else:
-                flipped_label = 0
-            """
 
             values = np.random.uniform(0, 1, self.input_size)
             target = int(np.sum(values >= 0.5) > np.sum(values < 0.5))
@@ -98,11 +105,6 @@ class ArtificialConfounderTabularDatasetGenerator:
                 target = int(np.sum(values >= 0.5) > np.sum(values < 0.5))
 
             dataset += ",".join([str(val) for val in values])
-            """
-            if flipped_label == 1:
-                has_attribute = abs(1 - has_attribute)
-                has_confounder = abs(1 - has_confounder)
-            """
 
             dataset += "," + str(has_confounder) + "," + str(has_attribute) + "\n"
 
@@ -116,7 +118,7 @@ class ArtificialConfounderSequenceDatasetGenerator:
 
     Should mimic sequential data like natural language.
 
-    Should enable straight foward check for minimality of counterfactuals.
+    Should enable straightforward check for minimality of counterfactuals.
     """
 
     def __init__(
@@ -206,15 +208,40 @@ class ArtificialConfounderSequenceDatasetGenerator:
 
 
 class MNISTConfounderDatasetGenerator:
+    """
+    Two-digit MNIST subset with a red background as confounder.
+
+    Every digit image is resized to 32x32, tiled to RGB and its red channel
+    is raised to a random background intensity; ``Confounder`` is 1 when
+    that intensity is >= 128. Note the confounder is drawn independently of
+    the digit, so the columns are not correlated by construction. A constant
+    8x8 central hint mask is written for every image.
+
+    Parameters
+    ----------
+    dataset_name : str
+        Output folder ``datasets/<dataset_name>``.
+    mnist_dir : str
+        Folder with one sub-folder of image files per digit.
+    digits : list of str
+        Two digit folders; ``Feature`` is 1 for the second one.
+    """
+
     def __init__(self, dataset_name, mnist_dir="datasets/mnist", digits=["0", "8"]):
-        """ """
+        """Store the paths; nothing is written until ``generate_dataset``."""
         self.dataset_name = dataset_name
         self.dataset_dir = os.path.join("datasets", self.dataset_name)
         self.mnist_dir = mnist_dir
         self.digits = digits
 
     def generate_dataset(self):
-        """ """
+        """
+        Write ``imgs/``, ``masks/`` and ``data.csv`` (ImgName, Feature,
+        Confounder) into the dataset folder.
+
+        An existing folder is moved aside to ``<dataset_dir>_old_<timestamp>``
+        first.
+        """
         if os.path.exists(self.dataset_dir):
             # move self.dataset_dir to self.dataset_dir + "_old_ + {datestamp}
             shutil.move(
@@ -245,7 +272,7 @@ class MNISTConfounderDatasetGenerator:
                 os.listdir(os.path.join(self.mnist_dir, digit))
             ):
                 if it % 100 == 0:
-                    print(it)
+                    _log.info("%s", it)
 
                 img = Image.open(os.path.join(self.mnist_dir, digit, img_name)).resize(
                     [32, 32]
@@ -274,7 +301,39 @@ class MNISTConfounderDatasetGenerator:
 
 
 class ConfounderDatasetGenerator:
-    """ """
+    """
+    Stamp a synthetic confounder onto an existing image dataset (e.g. CelebA).
+
+    Reads the source label file, alternates ``Confounder`` between samples
+    (even index = confounded) and writes modified images plus the original
+    attributes, ``Confounder`` and ``ConfounderStrength`` to
+    ``data_config.dataset_path``. Supported ``confounding`` modes:
+    ``"intensity"`` (brightness shift), ``"color"`` (red/blue shift),
+    ``"copyrighttag"`` (a copyright tag blended into the bottom of the image,
+    with a hint mask) and ``"necklace"`` (young/old edits through DDPM
+    inversion, with an ``_inverse`` twin dataset and a difference mask).
+
+    Parameters
+    ----------
+    dataset_origin_path : str
+        Source dataset root containing ``imgs/`` and the label file.
+    dataset_name : str, optional
+        Unused; the output path comes from ``data_config.dataset_path``.
+    label_dir : str, optional
+        Label file; defaults to ``<dataset_origin_path>/data.csv``. The
+        first two lines are treated as header and skipped.
+    delimiter : str
+        Column delimiter of the label file.
+    confounding : str or None
+        Mode as above; ``None`` takes ``data_config.confounding_factors[-1]``.
+    num_samples : int, optional
+        Number of source samples to process (all when ``None``).
+    attribute : str, optional
+        Stored but unused.
+    data_config : DataConfig
+        Supplies ``dataset_path`` and, optionally, ``inverse`` (a previously
+        generated dataset whose ``ConfounderStrength`` is negated and reused).
+    """
 
     def __init__(
         self,
@@ -288,7 +347,9 @@ class ConfounderDatasetGenerator:
         data_config=None,
         **kwargs,
     ):
-        """ """
+        """Resolve paths and the confounding mode; read the ``inverse``
+        dataset's ``ConfounderStrength`` column if ``data_config.inverse``
+        is set."""
         self.dataset_origin_path = dataset_origin_path
         self.confounding = confounding
 
@@ -302,15 +363,19 @@ class ConfounderDatasetGenerator:
             self.label_dir = label_dir
 
         self.delimiter = delimiter
-        print("self.delimiter")
-        print(self.delimiter)
-        print(self.delimiter)
-        print(self.delimiter)
+        _log.info("%s", "self.delimiter")
+        _log.info("%s", self.delimiter)
+        _log.info("%s", self.delimiter)
+        _log.info("%s", self.delimiter)
         self.dataset_dir = data_config.dataset_path
         self.num_samples = num_samples
         self.attribute = attribute
 
         if self.confounding == "necklace":
+            # Imported here: the vendored module pulls in diffusers at import
+            # time and only this confounder needs it.
+            from peal.dependencies.ddpm_inversion.ddpm_inversion import DDPMInversion
+
             self.ddpm_inversion = DDPMInversion()
 
         if not data_config is None and not data_config.inverse is None:
@@ -330,7 +395,14 @@ class ConfounderDatasetGenerator:
             self.inverse_head = None
 
     def generate_dataset(self):
-        """ """
+        """
+        Write the confounded dataset to ``dataset_dir`` (and ``_inverse``).
+
+        The first 90 % of samples get a random confounder strength in
+        ``[0, 1]``, the rest strength 1. ``data.csv`` is rewritten every
+        100 samples so a partial run is usable. Existing output folders are
+        moved aside with a timestamp suffix.
+        """
         if os.path.exists(self.dataset_dir):
             datestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             # move self.dataset_dir to self.dataset_dir + "_old_ + {datestamp}
@@ -369,7 +441,7 @@ class ConfounderDatasetGenerator:
             data.append(instance_attributes_int)
 
         lines_out = [",".join(attributes)]
-        print(lines_out)
+        _log.info("%s", lines_out)
 
         if self.confounding == "copyrighttag":
             resource_dir = get_project_resource_dir()
@@ -425,7 +497,7 @@ class ConfounderDatasetGenerator:
         )
         for sample_idx in range(num_samples):
             if sample_idx % 100 == 0:
-                print(sample_idx)
+                _log.info("%s", sample_idx)
                 open(os.path.join(self.dataset_dir, "data.csv"), "w").write(
                     "\n".join(lines_out)
                 )
@@ -478,12 +550,6 @@ class ConfounderDatasetGenerator:
                 img_out = Image.fromarray(np.array(img, dtype=np.uint8))
                 if self.confounding == "copyrighttag":
                     mask.save(os.path.join(self.dataset_dir, "masks", name))
-                    """img_and_mask = np.concatenate(
-                        [np.array(255 * img, dtype=np.uint8), mask_np],
-                        axis=1,
-                    )
-                    img_and_mask_out = Image.fromarray(img_and_mask)
-                    img_and_mask_out.save('tmp.png')"""
 
             if self.confounding == "necklace":
                 img_th = ToTensor()(img).unsqueeze(0)
@@ -540,7 +606,25 @@ class ConfounderDatasetGenerator:
 
 
 class StainingConfounderGenerator:
-    """ """
+    """
+    Build a histology dataset whose confounder is the hematoxylin staining.
+
+    Converts the ``MUS`` and ``STR`` tissue classes of a raw NCT-CRC style
+    folder to PNG, estimates the stain vectors of every image (Macenko-style
+    OD/PCA estimation), measures the 99th-percentile intensity of
+    hematoxylin-dominated pixels and splits at the median into weak/strong
+    staining. Then 16000 samples are drawn so that class (``Cancer``: STR=1)
+    and ``Confounder`` (strong staining) follow a fixed 2x2 pattern.
+
+    Parameters
+    ----------
+    raw_data_dir : str
+        Folder with ``MUS/`` and ``STR/`` image sub-folders.
+    dataset_origin_path, delimiter, num_samples
+        Stored but unused by ``generate_dataset``.
+    dataset_name : str
+        Output folder ``datasets/<dataset_name>``.
+    """
 
     def __init__(
         self,
@@ -550,7 +634,7 @@ class StainingConfounderGenerator:
         delimiter=",",
         num_samples=40000,
     ):
-        """ """
+        """Store the paths; nothing is written until ``generate_dataset``."""
         self.dataset_origin_path = dataset_origin_path
         self.dataset_name = dataset_name
         self.delimiter = delimiter
@@ -559,6 +643,13 @@ class StainingConfounderGenerator:
         self.raw_data_dir = raw_data_dir
 
     def generate_dataset(self):
+        """
+        Convert the images, estimate staining and write ``data.csv``.
+
+        The csv columns are ``ImgPath,Cancer,Confounder,ConfounderStrength``
+        with ``ConfounderStrength`` the measured hematoxylin intensity. The
+        output folder must not exist yet.
+        """
         os.makedirs(self.dataset_dir)
         # move the MUS and the STR classes to a new folder and convert them to .png images
         for folder_name in ["MUS", "STR"]:
@@ -579,12 +670,13 @@ class StainingConfounderGenerator:
                 os.listdir(os.path.join(self.dataset_dir, class_name))
             ):
                 if idx % 100 == 0:
-                    print(
+                    _log.info(
+                        "%s",
                         str(idx)
                         + " / "
                         + str(
                             len(os.listdir(os.path.join(self.dataset_dir, class_name)))
-                        )
+                        ),
                     )
 
                 X = (
@@ -671,7 +763,7 @@ class StainingConfounderGenerator:
         idxs = np.zeros([2, 2], dtype=np.int32)
         for sample_idx in range(16000):
             if sample_idx % 100 == 0:
-                print(sample_idx)
+                _log.info("%s", sample_idx)
                 open(os.path.join(self.dataset_dir, "data.csv"), "w").write(
                     "\n".join(lines_out)
                 )
@@ -696,12 +788,13 @@ class StainingConfounderGenerator:
                 + ","
                 + str(sample[-1])
             )
-            print(
+            _log.info(
+                "%s",
                 str(has_attribute)
                 + " "
                 + str(has_confounder)
                 + " "
-                + str(idxs[has_attribute][has_confounder])
+                + str(idxs[has_attribute][has_confounder]),
             )
             idxs[has_attribute][has_confounder] += 1
 
@@ -751,7 +844,7 @@ class CircleDatasetGenerator:
             self.radius = radius
             self.noise_scale = noise_scale
             self.seed = seed
-            
+
             if dataset_name is None:
                 dataset_name = (
                     "size_"
@@ -772,6 +865,17 @@ class CircleDatasetGenerator:
     def generate_dataset(self):
         """
         Generates the dataset.
+
+        Points on a circle of ``radius`` (plus Gaussian noise) get
+        ``Target = x2 > 0`` and ``Confounder = x1 > 0``; the four
+        target/confounder cells are resampled to ``num_samples / 4`` rows
+        each and written to ``data.csv`` with columns
+        ``x1,x2,Confounder,Target``.
+
+        Returns
+        -------
+        CircleDatasetGenerator
+            ``self``, with the generated array stored in ``self.data``.
         """
 
         Path(self.dataset_dir).mkdir(parents=True, exist_ok=True)
@@ -845,6 +949,35 @@ def latent_to_square_image(
     SIZE_BORDER=2,
     noise=None,
 ):
+    """
+    Render one 64x64 "square" image from its generative factors.
+
+    The background is a grey level ``color_b``, a grey border square of
+    intensity 127 is placed at ``(position_x, position_y)`` and its inner
+    ``SIZE_INNER`` square is filled with red intensity ``color_a`` (green
+    and blue 0). Gaussian noise (std 20) is added to everything.
+
+    Parameters
+    ----------
+    color_a : int
+        Red intensity of the inner square, 0-255.
+    color_b : int
+        Grey level of the background, 0-255.
+    position_x, position_y : int, optional
+        Top-left corner of the bordered square; centred when ``None``.
+    SIZE_INNER, SIZE_BORDER : int
+        Inner square side and border width in pixels.
+    noise : numpy.ndarray, optional
+        Noise of shape ``(64, 64, 3)`` to reuse (for an ``_inverse`` twin);
+        drawn fresh when ``None``.
+
+    Returns
+    -------
+    img : PIL.Image.Image
+        The rendered RGB image.
+    noise : numpy.ndarray
+        The noise that was used.
+    """
     SIZE_ADDED = SIZE_INNER + 2 * SIZE_BORDER
     img = np.ones([64, 64, 3], dtype=np.float32) * color_b
     if noise is None:
@@ -894,18 +1027,39 @@ def latent_to_square_image(
 
 
 class SquareDatasetGenerator:
-    """ """
+    """
+    Synthetic 64x64 "square" dataset with four independent binary factors.
+
+    Sample ``i`` gets ``ClassA = i % 2`` (inner square bright/dark red),
+    ``ClassB = (i // 2) % 2`` (background bright/dark), ``ClassC`` and
+    ``ClassD`` (square in the lower/upper half in x and y). The continuous
+    factors are stored as ``ColorA, ColorB, PositionX, PositionY``. Every
+    sample also gets an ``_inverse`` twin with inverted background colour and
+    the same noise, and a mask of the inner square is written for both.
+
+    Parameters
+    ----------
+    data_config : DataConfig
+        Supplies ``dataset_path`` and ``num_samples``.
+    """
 
     def __init__(
         self,
         data_config,
         **kwargs,
     ):
-        """ """
+        """Store the data config; nothing is written until
+        ``generate_dataset``."""
         self.data_config = data_config
 
     def generate_dataset(self):
-        """ """
+        """
+        Write ``imgs/``, ``masks/`` and ``data.csv`` for the dataset and its
+        ``_inverse`` twin (``<dataset_path>_inverse``).
+
+        Existing folders are moved aside with a timestamp suffix; the csv is
+        rewritten every 100 samples.
+        """
         if os.path.exists(self.data_config.dataset_path):
             datestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             # move self.dataset_dir to self.dataset_dir + "_old_ + {datestamp}
@@ -982,32 +1136,6 @@ class SquareDatasetGenerator:
                 color_b=255 - color_b,
                 noise=noise,
             )
-            """img_inverse = np.abs(img_base - 255)
-            img_inverse[
-                position_x : position_x + SIZE_ADDED,
-                position_y : position_y + SIZE_ADDED,
-            ] = np.clip(
-                127
-                - noise[
-                    position_x : position_x + SIZE_ADDED,
-                    position_y : position_y + SIZE_ADDED,
-                ],
-                0,
-                255,
-            )
-            img_inverse[
-                position_x + SIZE_BORDER : position_x + SIZE_ADDED - SIZE_BORDER,
-                position_y + SIZE_BORDER : position_y + SIZE_ADDED - SIZE_BORDER,
-            ] = np.clip(
-                color_a
-                - noise[
-                    position_x + SIZE_BORDER : position_x + SIZE_ADDED - SIZE_BORDER,
-                    position_y + SIZE_BORDER : position_y + SIZE_ADDED - SIZE_BORDER,
-                ],
-                0,
-                255,
-            )
-            img_inverse = Image.fromarray(img_inverse.astype(dtype=np.uint8))"""
             img_inverse.save(
                 os.path.join(
                     self.data_config.dataset_path + "_inverse", "imgs", sample_name
@@ -1053,7 +1181,7 @@ class SquareDatasetGenerator:
             ]
             lines_out_inverse.append(",".join(attributes_inverse))
             if (sample_idx + 1) % 100 == 0:
-                print(sample_idx)
+                _log.info("%s", sample_idx)
                 open(
                     os.path.join(self.data_config.dataset_path, "data.csv"), "w"
                 ).write("\n".join(lines_out))
@@ -1072,6 +1200,7 @@ class SquareDatasetGenerator:
             "w",
         ).write("\n".join(lines_out_inverse))
 
+
 class SparseNumbersDatasetGenerator:
     """
     Generates a dataset of images with a 2x4 grid of 4-digit numbers.
@@ -1084,19 +1213,32 @@ class SparseNumbersDatasetGenerator:
     """
 
     def __init__(self, data_config, **kwargs):
+        """
+        Parameters
+        ----------
+        data_config : DataConfig
+            Supplies ``dataset_path``, ``num_samples`` (default 125000) and
+            ``output_split`` (number of distinct numbers, default 10000).
+        **kwargs
+            ``font_path`` overrides the DejaVu Sans TrueType font.
+        """
         self.data_config = data_config
-        self.font_path = kwargs.get("font_path", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+        self.font_path = kwargs.get(
+            "font_path", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+        )
 
     def _draw_number_in_cell(self, draw, text, box):
+        """Draw ``text`` centred in ``box`` with the largest font size that
+        fits 90 % of the cell (binary search per call)."""
         # box is (x0, y0, x1, y1)
         cell_w = box[2] - box[0]
         cell_h = box[3] - box[1]
-        
+
         # Binary search for optimal font size
         low = 1
         high = cell_h * 2
         best_size = 1
-        
+
         while low <= high:
             mid = (low + high) // 2
             try:
@@ -1105,51 +1247,61 @@ class SparseNumbersDatasetGenerator:
                 font = ImageFont.load_default()
                 best_size = mid
                 break
-                
+
             if hasattr(font, "getbbox"):
                 bbox = font.getbbox(text)
                 w = bbox[2] - bbox[0]
                 h = bbox[3] - bbox[1]
             else:
                 w, h = draw.textsize(text, font=font)
-                
+
             if w <= cell_w * 0.9 and h <= cell_h * 0.9:
                 best_size = mid
                 low = mid + 1
             else:
                 high = mid - 1
-                
+
         try:
             font = ImageFont.truetype(self.font_path, best_size)
         except OSError:
             font = ImageFont.load_default()
-            
+
         if hasattr(font, "getbbox"):
             bbox = font.getbbox(text)
             w = bbox[2] - bbox[0]
             h = bbox[3] - bbox[1]
         else:
             w, h = draw.textsize(text, font=font)
-            
+
         x = box[0] + (cell_w - w) / 2
         y = box[1] + (cell_h - h) / 2
         draw.text((x, y), text, fill=(0, 0, 0), font=font)
 
     def generate_dataset(self):
-        """Generates the sparse_numbers dataset."""
+        """Generates the sparse_numbers dataset.
 
+        Writes ``imgs/<i:06d>.png`` and ``data.csv`` with columns
+        ``imgs, Red1..Red8`` (background red intensity per slot) and
+        ``Num1..Num8`` (number per slot, -1 if empty) to
+        ``data_config.dataset_path``; an existing folder is moved aside with
+        a timestamp suffix. Uses the global ``random`` module (unseeded).
+        """
 
         dataset_path = self.data_config.dataset_path
-        print(f"DEBUG: dataset_path={dataset_path}")
+        _log.info("%s", f"DEBUG: dataset_path={dataset_path}")
         if os.path.exists(dataset_path):
             datestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             shutil.move(dataset_path, dataset_path + "_old_" + datestamp)
 
         os.makedirs(os.path.join(dataset_path, "imgs"), exist_ok=True)
 
-        num_samples = self.data_config.num_samples if self.data_config.num_samples else 125000
-        print(f"DEBUG: num_samples={num_samples}")
-        n_unique_numbers = self.data_config.output_split if self.data_config.output_split else 10000
+        num_samples = (
+            self.data_config.num_samples if self.data_config.num_samples else 125000
+        )
+        _log.info("%s", f"DEBUG: num_samples={num_samples}")
+        n_unique_numbers = (
+            self.data_config.output_split if self.data_config.output_split else 10000
+        )
         num_digits = len(str(n_unique_numbers - 1))
         # Calculate repeats to aim for 50% occupancy if num_samples changed
         # Total slots = num_samples * 8. Occupancy 50% = 4 * num_samples.
@@ -1157,26 +1309,26 @@ class SparseNumbersDatasetGenerator:
         repeats = max(1, (4 * num_samples) // n_unique_numbers)
         total_slots = num_samples * 8
         total_number_entries = min(n_unique_numbers * repeats, total_slots)
-        
+
         # Prepare all numbers
         all_numbers = []
         for n in range(n_unique_numbers):
             all_numbers.extend([n] * repeats)
         random.shuffle(all_numbers)
         all_numbers = all_numbers[:total_number_entries]
-        
+
         # Assign numbers to slots
         # Total slots = 125,000 * 8 = 1,000,000
         # We need to pick 500,000 slots to be occupied.
         occupied_indices = random.sample(range(total_slots), total_number_entries)
-        
+
         # Map indices to samples
         sample_slots = [{} for _ in range(num_samples)]
         for i, slot_idx in enumerate(occupied_indices):
             sample_idx = slot_idx // 8
             local_slot_idx = slot_idx % 8
             sample_slots[sample_idx][local_slot_idx] = all_numbers[i]
-            
+
         # Check for duplicates within samples and fix them
         # We'll use a simple swap strategy with another random sample's slot
         for s_idx in range(num_samples):
@@ -1187,54 +1339,65 @@ class SparseNumbersDatasetGenerator:
                     done = False
                     while not done:
                         other_s_idx = random.randint(0, num_samples - 1)
-                        if other_s_idx == s_idx: continue
+                        if other_s_idx == s_idx:
+                            continue
                         other_slots = sample_slots[other_s_idx]
-                        if not other_slots: continue
+                        if not other_slots:
+                            continue
                         # Pick a random slot in other_sample
                         other_local_idx = random.choice(list(other_slots.keys()))
                         other_val = other_slots[other_local_idx]
-                        
+
                         # Check if swapping causes collision in either sample
-                        if other_val not in seen and val not in set(other_slots.values()):
+                        if other_val not in seen and val not in set(
+                            other_slots.values()
+                        ):
                             # Swap
                             sample_slots[s_idx][local_idx] = other_val
                             sample_slots[other_s_idx][other_local_idx] = val
                             done = True
                 else:
                     seen[val] = local_idx
-            
+
         # Grid layout
         # Resolution 128x128. 2 columns, 4 rows.
         # Cell size: 60x30. Gaps: 8px horiz (between cols), 2px vert.
         # Padding: 2px around.
         cell_w, cell_h = 60, 30
-        col_x = [2, 66] # x-starts for col 0 and col 1
-        row_y = [2, 34, 66, 98] # y-starts for row 0, 1, 2, 3
-        
+        col_x = [2, 66]  # x-starts for col 0 and col 1
+        row_y = [2, 34, 66, 98]  # y-starts for row 0, 1, 2, 3
+
         slots_coord = []
         for r in range(4):
             for c in range(2):
-                slots_coord.append((col_x[c], row_y[r], col_x[c] + cell_w, row_y[r] + cell_h))
+                slots_coord.append(
+                    (col_x[c], row_y[r], col_x[c] + cell_w, row_y[r] + cell_h)
+                )
 
-        lines_out = ["imgs,Red1,Red2,Red3,Red4,Red5,Red6,Red7,Red8,Num1,Num2,Num3,Num4,Num5,Num6,Num7,Num8"]
-        
+        lines_out = [
+            "imgs,Red1,Red2,Red3,Red4,Red5,Red6,Red7,Red8,Num1,Num2,Num3,Num4,Num5,Num6,Num7,Num8"
+        ]
+
         for s_idx in tqdm(range(num_samples), desc="Generating samples"):
             img = Image.new("RGB", (128, 128), (255, 255, 255))
             draw = ImageDraw.Draw(img)
-            
+
             row_data = [f"{s_idx:06d}.png"]
             intensities = [random.random() for _ in range(8)]
             nums_in_sample = []
-            
+
             for i in range(8):
                 intensity = intensities[i]
                 box = slots_coord[i]
-                
+
                 # Draw background: White (255,255,255) to Red (255,0,0)
                 # color = (255, int(255*(1-intensity)), int(255*(1-intensity)))
                 # Fill the cell
-                draw.rectangle(box, fill=(255, int(255*(1-intensity)), int(255*(1-intensity))))
-                
+                draw.rectangle(
+                    box,
+                    fill=(255, int(255 * (1 - intensity)), int(255 * (1 - intensity))),
+                )
+
                 if i in sample_slots[s_idx]:
                     num = sample_slots[s_idx][i]
                     text = f"{num:0{num_digits}d}"
@@ -1242,21 +1405,643 @@ class SparseNumbersDatasetGenerator:
                     nums_in_sample.append(num)
                 else:
                     nums_in_sample.append(-1)
-            
+
             row_data.extend([f"{intt:.4f}" for intt in intensities])
             row_data.extend([str(n) for n in nums_in_sample])
             lines_out.append(",".join(row_data))
-            
+
             img.save(os.path.join(dataset_path, "imgs", f"{s_idx:06d}.png"))
-            
+
             if (s_idx + 1) % 1000 == 0:
                 with open(os.path.join(dataset_path, "data.csv"), "w") as f:
                     f.write("\n".join(lines_out))
-                    
+
         with open(os.path.join(dataset_path, "data.csv"), "w") as f:
             f.write("\n".join(lines_out))
 
-        print(f"Dataset generated at {dataset_path}")
+        _log.info("%s", f"Dataset generated at {dataset_path}")
+
+
+class OnlySparseNumbersDatasetGenerator:
+    """
+    Generates a dataset of 128x128 synthetic images with a 2×4 grid of numbers.
+
+    Dataset Properties:
+    - Images: 128×128 RGB, white background, black text
+    - Grid: 2 columns × 4 rows = 8 slots per image
+    - Numbers: Configurable range (e.g., 000–999)
+    - Uniqueness: Each number appears at most once per image
+
+    Typical Configuration:
+    - num_samples: 12,500 images (default)
+    - output_split: 1,000 unique numbers (000–999, default)
+    - occupancy: ~50% (approximately 4 numbers per image on average)
+
+    CSV Output Format:
+    - imgs: image filename
+    - Num1–Num8: per-slot labels (-1 if empty)
+
+    Algorithm Overview:
+    1. Generate a pool of numbers with repetition to achieve target occupancy
+    2. Assign numbers to sample × slot pairs, ensuring uniqueness within each image
+    3. Render each image with centered, sized-to-fit text in each slot
+    4. Write CSV with per-sample labels
+    """
+
+    def __init__(self, data_config, **kwargs):
+        """
+        Args:
+            data_config: Config object with attributes
+            **kwargs: optional 'font_path' (default: DejaVu Sans)
+        """
+        self.data_config = data_config
+        self.font_path = (
+            data_config.font_path or "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+        )
+        self.seed = getattr(data_config, "seed", 0)
+        self.rng = np.random.RandomState(self.seed)
+
+    def _compute_font_size(self, draw, max_width, max_height, sample_text, margin=0.9):
+        """
+        Binary search for the largest font size that fits the cell.
+
+        Args:
+            draw: PIL ImageDraw object
+            max_width: maximum text width (pixels)
+            max_height: maximum text height (pixels)
+            sample_text: text to measure (e.g., "9999")
+
+        Returns:
+            best_size: font size in points
+        """
+        low, high = 1, max_height * 2
+        best_size = 1
+
+        while low <= high:
+            mid = (low + high) // 2
+            try:
+                font = ImageFont.truetype(self.font_path, mid)
+            except OSError:
+                font = ImageFont.load_default()
+                best_size = mid
+                break
+
+            # Get text bounding box
+            if hasattr(font, "getbbox"):
+                bbox = font.getbbox(sample_text)
+                w = bbox[2] - bbox[0]
+                h = bbox[3] - bbox[1]
+            else:
+                w, h = draw.textsize(sample_text, font=font)
+
+            # Check if text fits with margin
+            if w <= max_width * margin and h <= max_height * margin:
+                best_size = mid
+                low = mid + 1
+            else:
+                high = mid - 1
+
+        return best_size
+
+    def _draw_number_in_cell(self, draw, text, box, font_size):
+        """
+        Draw a number centered in a cell.
+
+        Args:
+            draw: PIL ImageDraw object
+            text: text to draw (e.g., "042")
+            box: (x0, y0, x1, y1) cell bounds
+            font_size: pre-computed font size (points)
+
+        Note: Uses anchor="mm" (middle-middle) to ensure proper centering,
+        accounting for font metrics and avoiding margin issues.
+        """
+        cell_w = box[2] - box[0]
+        cell_h = box[3] - box[1]
+
+        try:
+            font = ImageFont.truetype(self.font_path, font_size)
+        except OSError:
+            font = ImageFont.load_default()
+
+        # Calculate cell center
+        center_x = box[0] + cell_w / 2
+        center_y = box[1] + cell_h / 2
+
+        # Use anchor="mm" (middle-middle) to center text at the exact cell center
+        draw.text((center_x, center_y), text, fill=(0, 0, 0), font=font, anchor="mm")
+
+    def _build_number_pool(self, num_samples, n_unique_numbers):
+        """
+        Build a shuffled pool of numbers with repetition to achieve ~50% occupancy.
+
+        Strategy:
+        - Total slots: num_samples × 8
+        - Target occupancy: 50% (4 numbers per image on average)
+        - Repeats: (4 × num_samples) // n_unique_numbers
+        - Pool is randomly shuffled to distribute numbers evenly
+
+        Args:
+            num_samples: number of images
+            n_unique_numbers: number of unique values
+
+        Returns:
+            Tuple of (all_numbers, num_digits) where:
+            - all_numbers: shuffled pool of numbers to assign
+            - num_digits: number of digits needed to format numbers
+        """
+        num_digits = len(str(n_unique_numbers - 1))
+        repeats = max(1, (4 * num_samples) // n_unique_numbers)
+        total_slots = num_samples * 8
+        total_number_entries = min(n_unique_numbers * repeats, total_slots)
+
+        # Build and shuffle pool
+        all_numbers = []
+        for n in range(n_unique_numbers):
+            all_numbers.extend([n] * repeats)
+        self.rng.shuffle(all_numbers)
+        all_numbers = all_numbers[:total_number_entries]
+
+        return all_numbers, num_digits
+
+    def _assign_numbers_to_samples(self, num_samples, all_numbers):
+        """
+        Assign numbers to sample/slot pairs, ensuring each number appears at most once per image.
+
+        Strategy:
+        1. Randomly select which slots (across all samples) to occupy
+        2. Assign numbers from the pool to those slots
+        3. Check for duplicates within each image; if found, swap with another sample to resolve
+
+        Args:
+            num_samples: number of images
+            all_numbers: shuffled pool of numbers
+
+        Returns:
+            sample_slots: list of dicts, where sample_slots[i] = {slot_idx: number}
+        """
+        total_slots = num_samples * 8
+        total_number_entries = len(all_numbers)
+
+        # Randomly select which slots to occupy
+        occupied_indices = self.rng.choice(
+            total_slots, total_number_entries, replace=False
+        )
+
+        # Map slot indices to sample/slot pairs
+        sample_slots = [{} for _ in range(num_samples)]
+        for i, slot_idx in enumerate(occupied_indices):
+            sample_idx = slot_idx // 8
+            local_slot_idx = slot_idx % 8
+            sample_slots[sample_idx][local_slot_idx] = all_numbers[i]
+
+        # Resolve collisions: if a number appears twice in the same image, swap it with another sample
+        for s_idx in range(num_samples):
+            seen = {}
+            for local_idx, val in list(sample_slots[s_idx].items()):
+                if val in seen:
+                    # Collision detected; find another sample to swap with
+                    done = False
+                    while not done:
+                        other_s_idx = self.rng.randint(0, num_samples)
+                        if other_s_idx == s_idx or not sample_slots[other_s_idx]:
+                            continue
+
+                        # Pick a random slot in the other sample
+                        other_local_idx = self.rng.choice(
+                            list(sample_slots[other_s_idx].keys())
+                        )
+                        other_val = sample_slots[other_s_idx][other_local_idx]
+
+                        # Verify swap won't create a collision in either sample
+                        other_sample_vals = set(sample_slots[other_s_idx].values())
+                        if other_val not in seen and val not in other_sample_vals:
+                            # Perform swap
+                            sample_slots[s_idx][local_idx] = other_val
+                            sample_slots[other_s_idx][other_local_idx] = val
+                            seen[other_val] = local_idx
+                            done = True
+                else:
+                    seen[val] = local_idx
+
+        return sample_slots
+
+    def generate_dataset(self):
+        """
+        Generate the dataset: images, masks, and CSV labels.
+
+        Workflow:
+        1. Prepare output directory (backup existing data with timestamp)
+        2. Build number pool with target occupancy
+        3. Assign numbers to slots, ensuring uniqueness per image
+        4. Pre-compute optimal font size for all cells
+        5. For each sample:
+
+           - Create blank 128×128 image
+           - For each slot: draw number if present, else leave empty
+           - Save PNG and update CSV
+
+        6. Write final CSV
+        """
+        dataset_path = self.data_config.dataset_path
+
+        # Back up existing dataset
+        if os.path.exists(dataset_path):
+            datestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            shutil.move(dataset_path, dataset_path + "_old_" + datestamp)
+
+        os.makedirs(os.path.join(dataset_path, "imgs"), exist_ok=True)
+
+        # Load config parameters
+        num_samples = (
+            self.data_config.num_samples if self.data_config.num_samples else 12500
+        )
+        n_unique_numbers = (
+            self.data_config.output_split if self.data_config.output_split else 1000
+        )
+        num_digits = len(str(n_unique_numbers - 1))
+
+        confounding_factors = getattr(self.data_config, "confounding_factors", None)
+        if confounding_factors and len(confounding_factors) == 2:
+
+            def _parse_num(factor_name):
+                if isinstance(factor_name, str) and factor_name.startswith("Num"):
+                    return int(factor_name[3:])
+                return int(factor_name)
+
+            target_num_a = _parse_num(confounding_factors[0])
+            target_num_b = _parse_num(confounding_factors[1])
+            other_numbers = [
+                n
+                for n in range(n_unique_numbers)
+                if n not in (target_num_a, target_num_b)
+            ]
+
+            group_size = num_samples // 4
+            sample_slots = []
+            sample_confounder_labels = []
+
+            for g_idx in range(4):
+                has_a = 1 if g_idx in (2, 3) else 0
+                has_b = 1 if g_idx in (1, 3) else 0
+
+                for _ in range(group_size):
+                    k = int(self.rng.randint(3, 6))
+                    chosen_slots = list(self.rng.choice(8, k, replace=False))
+                    slot_dict = {}
+                    slots_left = list(chosen_slots)
+
+                    if has_a:
+                        idx_a = self.rng.randint(0, len(slots_left))
+                        slot_a = slots_left.pop(idx_a)
+                        slot_dict[slot_a] = target_num_a
+
+                    if has_b:
+                        idx_b = self.rng.randint(0, len(slots_left))
+                        slot_b = slots_left.pop(idx_b)
+                        slot_dict[slot_b] = target_num_b
+
+                    rem_count = len(slots_left)
+                    if rem_count > 0:
+                        fill_nums = self.rng.choice(
+                            other_numbers, rem_count, replace=False
+                        )
+                        for s_i, num in zip(slots_left, fill_nums):
+                            slot_dict[s_i] = num
+
+                    sample_slots.append(slot_dict)
+                    sample_confounder_labels.append((has_a, has_b))
+
+            perm = self.rng.permutation(len(sample_slots))
+            sample_slots = [sample_slots[p] for p in perm]
+            sample_confounder_labels = [sample_confounder_labels[p] for p in perm]
+            header = f"imgs,Num1,Num2,Num3,Num4,Num5,Num6,Num7,Num8,{confounding_factors[0]},{confounding_factors[1]}"
+        else:
+            # Build number pool
+            all_numbers, num_digits = self._build_number_pool(
+                num_samples, n_unique_numbers
+            )
+            # Assign numbers to samples (ensuring uniqueness per image)
+            sample_slots = self._assign_numbers_to_samples(num_samples, all_numbers)
+            sample_confounder_labels = None
+            header = "imgs,Num1,Num2,Num3,Num4,Num5,Num6,Num7,Num8"
+
+        # Grid layout: 2 columns × 4 rows in 128×128 image
+        # Cell size: 60×30 pixels with 2–8 pixel padding/gaps
+        cell_w, cell_h = 60, 30
+        col_x = [2, 66]  # x-offsets for columns
+        row_y = [2, 34, 66, 98]  # y-offsets for rows
+
+        slots_coord = []
+        for r in range(4):
+            for c in range(2):
+                slots_coord.append(
+                    (col_x[c], row_y[r], col_x[c] + cell_w, row_y[r] + cell_h)
+                )
+
+        # Pre-compute optimal font size (constant across all cells)
+        sample_img = Image.new("RGB", (128, 128), (255, 255, 255))
+        sample_draw = ImageDraw.Draw(sample_img)
+        sample_text = (
+            f"{n_unique_numbers - 1:0{num_digits}d}"  # Largest possible number
+        )
+        font_size = self._compute_font_size(
+            sample_draw, cell_w, cell_h, sample_text, margin=0.6
+        )
+
+        # Generate images and CSV
+        lines_out = [header]
+
+        for s_idx in tqdm(range(num_samples), desc="Generating samples"):
+            img = Image.new("RGB", (128, 128), (255, 255, 255))
+            draw = ImageDraw.Draw(img)
+
+            row_data = [f"{s_idx:06d}.png"]
+            nums_in_sample = []
+
+            for i in range(8):
+                box = slots_coord[i]
+
+                if i in sample_slots[s_idx]:
+                    num = sample_slots[s_idx][i]
+                    text = f"{num:0{num_digits}d}"
+                    self._draw_number_in_cell(draw, text, box, font_size)
+                    nums_in_sample.append(num)
+                else:
+                    nums_in_sample.append(-1)
+
+            row_data.extend([str(n) for n in nums_in_sample])
+            if sample_confounder_labels is not None:
+                has_a, has_b = sample_confounder_labels[s_idx]
+                row_data.extend([str(has_a), str(has_b)])
+
+            lines_out.append(",".join(row_data))
+
+            # Add Gaussian noise
+            img_np = np.array(img, dtype=np.float32)
+            std = self.rng.uniform(0, 15)
+            noise = self.rng.normal(0, std, img_np.shape)
+            img_np = np.clip(img_np + noise, 0, 255)
+            img = Image.fromarray(img_np.astype(np.uint8))
+
+            img.save(os.path.join(dataset_path, "imgs", f"{s_idx:06d}.png"))
+
+            # Checkpoint: write CSV every 1000 samples
+            if (s_idx + 1) % 1000 == 0:
+                with open(os.path.join(dataset_path, "data.csv"), "w") as f:
+                    f.write("\n".join(lines_out))
+
+        # Final write
+        with open(os.path.join(dataset_path, "data.csv"), "w") as f:
+            f.write("\n".join(lines_out))
+
+        _log.info(
+            "%s",
+            f"OnlySparseNumbersDatasetGenerator: {num_samples} samples generated at {dataset_path}",
+        )
+
+
+class OnlySparseNumbersZipfDatasetGenerator(OnlySparseNumbersDatasetGenerator):
+    """
+    Variant of OnlySparseNumbersDatasetGenerator where number frequencies follow
+    Zipf's law: P(n) ∝ 1/(n+1)^s with s=1 (configurable via data_config.zipf_s).
+    Lower-numbered digits appear much more frequently than higher ones.
+    """
+
+    def _build_number_pool(self, num_samples, n_unique_numbers):
+        """
+        Sample the number pool from a Zipf distribution instead of repeating
+        every number equally.
+
+        Parameters
+        ----------
+        num_samples : int
+            Number of images.
+        n_unique_numbers : int
+            Number of distinct values.
+
+        Returns
+        -------
+        all_numbers : list of int
+            Shuffled pool of ``min(4 * num_samples, 8 * num_samples)`` entries
+            drawn with ``P(n) ~ 1 / (n + 1) ** zipf_s``.
+        num_digits : int
+            Digits needed to format the largest number.
+        """
+        num_digits = len(str(n_unique_numbers - 1))
+        total_slots = num_samples * 8
+        target_entries = min(4 * num_samples, total_slots)  # ~50% occupancy
+
+        zipf_s = (
+            getattr(self.data_config, "zipf_s", 1.0)
+            if hasattr(self, "data_config")
+            else 1.0
+        )
+
+        # Zipf weights: w(n) = 1/(n+1)^s
+        weights = np.array([1.0 / (n + 1) ** zipf_s for n in range(n_unique_numbers)])
+        probs = weights / weights.sum()
+
+        # Sample numbers according to Zipf distribution
+        all_numbers = self.rng.choice(
+            n_unique_numbers, size=target_entries, replace=True, p=probs
+        ).tolist()
+        self.rng.shuffle(all_numbers)
+
+        return all_numbers, num_digits
+
+
+class SparseNumbersZipfDatasetGenerator(SparseNumbersDatasetGenerator):
+    """
+    Variant of SparseNumbersDatasetGenerator where sparse number frequencies follow
+    Zipf's law: P(n) ∝ 1/(n+1)^s with s=1.
+    The 8 dense red-intensity background variables remain unchanged.
+    """
+
+    def generate_dataset(self):
+        """Generates the sparse_numbers dataset with Zipf-distributed numbers."""
+        dataset_path = self.data_config.dataset_path
+        _log.info("%s", f"DEBUG: dataset_path={dataset_path}")
+        if os.path.exists(dataset_path):
+            datestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            shutil.move(dataset_path, dataset_path + "_old_" + datestamp)
+
+        os.makedirs(os.path.join(dataset_path, "imgs"), exist_ok=True)
+
+        num_samples = (
+            self.data_config.num_samples if self.data_config.num_samples else 125000
+        )
+        n_unique_numbers = (
+            self.data_config.output_split if self.data_config.output_split else 10000
+        )
+        num_digits = len(str(n_unique_numbers - 1))
+        total_slots = num_samples * 8
+        target_entries = min(4 * num_samples, total_slots)
+
+        zipf_s = getattr(self.data_config, "zipf_s", 1.0)
+        rng = np.random.RandomState(getattr(self.data_config, "seed", 0))
+
+        # Zipf-distributed number pool
+        weights = np.array([1.0 / (n + 1) ** zipf_s for n in range(n_unique_numbers)])
+        probs = weights / weights.sum()
+
+        # Confounded variant, mirroring OnlySparseNumbersDatasetGenerator: four equal
+        # groups over (has_a, has_b) so that the loader's confounder_probability
+        # quota (process_confounder_data_controlled) can always be filled, with the
+        # two flag columns appended to the csv under the factor names. The remaining
+        # slots are filled Zipf-weighted rather than uniformly so the background
+        # number distribution matches the unconfounded zipf dataset.
+        confounding_factors = getattr(self.data_config, "confounding_factors", None)
+        if confounding_factors and len(confounding_factors) == 2:
+
+            def _parse_num(factor_name):
+                if isinstance(factor_name, str) and factor_name.startswith("Num"):
+                    return int(factor_name[3:])
+                return int(factor_name)
+
+            target_num_a = _parse_num(confounding_factors[0])
+            target_num_b = _parse_num(confounding_factors[1])
+            other_numbers = np.array(
+                [
+                    n
+                    for n in range(n_unique_numbers)
+                    if n not in (target_num_a, target_num_b)
+                ]
+            )
+            other_probs = probs[other_numbers] / probs[other_numbers].sum()
+
+            group_size = num_samples // 4
+            sample_slots = []
+            sample_confounder_labels = []
+            for g_idx in range(4):
+                has_a = 1 if g_idx in (2, 3) else 0
+                has_b = 1 if g_idx in (1, 3) else 0
+                for _ in range(group_size):
+                    k = int(rng.randint(3, 6))
+                    slots_left = list(rng.choice(8, k, replace=False))
+                    slot_dict = {}
+                    if has_a:
+                        slot_dict[slots_left.pop(rng.randint(0, len(slots_left)))] = (
+                            target_num_a
+                        )
+                    if has_b:
+                        slot_dict[slots_left.pop(rng.randint(0, len(slots_left)))] = (
+                            target_num_b
+                        )
+                    if slots_left:
+                        fill_nums = rng.choice(
+                            other_numbers, len(slots_left), replace=False, p=other_probs
+                        )
+                        for s_i, num in zip(slots_left, fill_nums):
+                            slot_dict[s_i] = int(num)
+                    sample_slots.append(slot_dict)
+                    sample_confounder_labels.append((has_a, has_b))
+
+            perm = rng.permutation(len(sample_slots))
+            sample_slots = [sample_slots[i] for i in perm]
+            sample_confounder_labels = [sample_confounder_labels[i] for i in perm]
+            num_samples = len(sample_slots)
+            header = (
+                "imgs,Red1,Red2,Red3,Red4,Red5,Red6,Red7,Red8,Num1,Num2,Num3,Num4,Num5,Num6,Num7,Num8,"
+                f"{confounding_factors[0]},{confounding_factors[1]}"
+            )
+        else:
+            all_numbers = rng.choice(
+                n_unique_numbers, size=target_entries, replace=True, p=probs
+            ).tolist()
+            random.shuffle(all_numbers)
+
+            # Assign numbers to slots
+            occupied_indices = random.sample(range(total_slots), target_entries)
+            sample_slots = [{} for _ in range(num_samples)]
+            for i, slot_idx in enumerate(occupied_indices):
+                sample_idx = slot_idx // 8
+                local_slot_idx = slot_idx % 8
+                sample_slots[sample_idx][local_slot_idx] = all_numbers[i]
+
+            # Resolve within-sample duplicates
+            for s_idx in range(num_samples):
+                seen = {}
+                for local_idx, val in list(sample_slots[s_idx].items()):
+                    if val in seen:
+                        done = False
+                        while not done:
+                            other_s_idx = random.randint(0, num_samples - 1)
+                            if other_s_idx == s_idx:
+                                continue
+                            other_slots = sample_slots[other_s_idx]
+                            if not other_slots:
+                                continue
+                            other_local_idx = random.choice(list(other_slots.keys()))
+                            other_val = other_slots[other_local_idx]
+                            if other_val not in seen and val not in set(
+                                other_slots.values()
+                            ):
+                                sample_slots[s_idx][local_idx] = other_val
+                                sample_slots[other_s_idx][other_local_idx] = val
+                                done = True
+                    else:
+                        seen[val] = local_idx
+            sample_confounder_labels = None
+            header = "imgs,Red1,Red2,Red3,Red4,Red5,Red6,Red7,Red8,Num1,Num2,Num3,Num4,Num5,Num6,Num7,Num8"
+
+        # Grid layout (same as SparseNumbersDatasetGenerator)
+        cell_w, cell_h = 60, 30
+        col_x = [2, 66]
+        row_y = [2, 34, 66, 98]
+        slots_coord = []
+        for r in range(4):
+            for c in range(2):
+                slots_coord.append(
+                    (col_x[c], row_y[r], col_x[c] + cell_w, row_y[r] + cell_h)
+                )
+
+        lines_out = [header]
+
+        for s_idx in tqdm(range(num_samples), desc="Generating Zipf samples"):
+            img = Image.new("RGB", (128, 128), (255, 255, 255))
+            draw = ImageDraw.Draw(img)
+
+            row_data = [f"{s_idx:06d}.png"]
+            intensities = [random.random() for _ in range(8)]
+            nums_in_sample = []
+
+            for i in range(8):
+                intensity = intensities[i]
+                box = slots_coord[i]
+                draw.rectangle(
+                    box,
+                    fill=(255, int(255 * (1 - intensity)), int(255 * (1 - intensity))),
+                )
+
+                if i in sample_slots[s_idx]:
+                    num = sample_slots[s_idx][i]
+                    text = f"{num:0{num_digits}d}"
+                    self._draw_number_in_cell(draw, text, box)
+                    nums_in_sample.append(num)
+                else:
+                    nums_in_sample.append(-1)
+
+            row_data.extend([f"{intt:.4f}" for intt in intensities])
+            row_data.extend([str(n) for n in nums_in_sample])
+            if sample_confounder_labels is not None:
+                has_a, has_b = sample_confounder_labels[s_idx]
+                row_data.extend([str(has_a), str(has_b)])
+            lines_out.append(",".join(row_data))
+
+            img.save(os.path.join(dataset_path, "imgs", f"{s_idx:06d}.png"))
+
+            if (s_idx + 1) % 1000 == 0:
+                with open(os.path.join(dataset_path, "data.csv"), "w") as f:
+                    f.write("\n".join(lines_out))
+
+        with open(os.path.join(dataset_path, "data.csv"), "w") as f:
+            f.write("\n".join(lines_out))
+
+        _log.info(
+            "%s",
+            f"SparseNumbersZipfDatasetGenerator: {num_samples} samples generated at {dataset_path}",
+        )
 
 
 class FunnyNodulesDatasetGenerator:
@@ -1279,10 +2064,26 @@ class FunnyNodulesDatasetGenerator:
     """
 
     def __init__(self, data_config, **kwargs):
+        """Store the data config (``dataset_path``, ``num_samples``,
+        ``seed``, ``confounding_factors``)."""
         self.data_config = data_config
 
     def generate_dataset(self):
-        from peal.dependencies.FunnyNodules.dataset.dataset_generator import generate_nodule
+        """
+        Render the nodules and write ``imgs/``, ``masks/`` and ``data.csv``.
+
+        Sample ``i`` gets binary labels for every name in
+        ``data_config.confounding_factors`` (default
+        ``["InternalStructure", "Roundness"]``) following a big-endian
+        counter over the sample index, so all label combinations are equally
+        frequent. Label 1 maps to a nodule parameter in {4, 5} and label 0
+        to {1, 2} (``internal_structure`` uses the label directly); the
+        remaining parameters are random. Images are 64x64 grayscale tiled to
+        RGB; ``data.csv`` has columns ``Name`` plus the factor names.
+        """
+        from peal.dependencies.FunnyNodules.dataset.dataset_generator import (
+            generate_nodule,
+        )
 
         dataset_path = self.data_config.dataset_path
         if os.path.exists(dataset_path):
@@ -1293,47 +2094,70 @@ class FunnyNodulesDatasetGenerator:
         os.makedirs(os.path.join(dataset_path, "masks"), exist_ok=True)
 
         num_samples = self.data_config.num_samples
-        confounder_probability = getattr(self.data_config, 'confounder_probability', 0.5)
+        confounding_factors = getattr(
+            self.data_config, "confounding_factors", ["InternalStructure", "Roundness"]
+        )
 
-        # Probability that the confounder does NOT match the true feature
-        # confounder_probability = 0.5 means no confounding (balanced)
-        # confounder_probability = 0.02 means 98% confounding
-        non_confounding_probability = confounder_probability
+        rng = np.random.RandomState(
+            self.data_config.seed if self.data_config.seed else 0
+        )
 
-        rng = np.random.RandomState(self.data_config.seed if self.data_config.seed else 0)
-
-        lines_out = [
-            "Name,InternalStructure,Roundness,Spiculation,EdgeSharpness,Size,Intensity"
-        ]
+        header = "Name," + ",".join(confounding_factors)
+        lines_out = [header]
 
         img_size = 64  # Default image size
 
-        for sample_idx in range(num_samples):
-            # Deterministic balancing for InternalStructure and Roundness to ensure 
-            # perfect balance in the raw pool (if num_samples % 4 == 0).
-            internal_structure = sample_idx % 2
-            roundness_label = (int(sample_idx / 2) % 2)
-            
-            if roundness_label == 1:
-                roundness = rng.randint(4, 6) # high roundness (round)
-            else:
-                roundness = rng.randint(1, 3) # low roundness (oval)
+        # Mapping from config names to FunnyNodules internal parameter names
+        name_map = {
+            "InternalStructure": "internal_structure",
+            "Roundness": "roundness",
+            "Spiculation": "spiculation",
+            "EdgeSharpness": "edge_sharpness",
+            "Size": "size_attr",
+            "Intensity": "intensity",
+        }
 
-            # Other attributes are random
-            spiculation = rng.randint(1, 6)
-            edge_sharpness = rng.randint(1, 6)
-            size_attr = rng.randint(1, 6)
-            intensity = rng.randint(1, 6)
+        for sample_idx in range(num_samples):
+            # Deterministically assign labels to span all factors in a balanced way.
+            # We want the last factor to toggle fastest (every 1 sample), following a big-endian binary pattern.
+            labels = {}
+            for i, factor_name in enumerate(confounding_factors):
+                effective_bit = len(confounding_factors) - 1 - i
+                labels[factor_name] = (sample_idx // (2**effective_bit)) % 2
+
+            # Default values (random 1-5 or 0-1) for any attribute not in confounding_factors
+            params = {
+                "roundness": rng.randint(1, 6),
+                "spiculation": rng.randint(1, 6),
+                "edge_sharpness": rng.randint(1, 6),
+                "size_attr": rng.randint(1, 6),
+                "intensity": rng.randint(1, 6),
+                "internal_structure": rng.randint(0, 2),
+            }
+
+            # Override parameters with deterministic high/low values for factors in the list
+            for factor_name in confounding_factors:
+                label = labels[factor_name]
+                param_name = name_map.get(factor_name, factor_name.lower())
+
+                if param_name == "internal_structure":
+                    params[param_name] = label
+                else:
+                    # Pick values from {1, 2} for label 0 and {4, 5} for label 1
+                    if label == 1:
+                        params[param_name] = rng.randint(4, 6)
+                    else:
+                        params[param_name] = rng.randint(1, 3)
 
             # Generate the nodule image
             img_np, mask_np, _ = generate_nodule(
                 size_px=img_size,
-                roundness=roundness,
-                spiculation=spiculation,
-                edge_sharpness=edge_sharpness,
-                size_attr=size_attr,
-                intensity=intensity,
-                internal_structure=internal_structure,
+                roundness=params["roundness"],
+                spiculation=params["spiculation"],
+                edge_sharpness=params["edge_sharpness"],
+                size_attr=params["size_attr"],
+                intensity=params["intensity"],
+                internal_structure=params["internal_structure"],
                 seed=rng.randint(0, 2**31),
             )
 
@@ -1345,29 +2169,25 @@ class FunnyNodulesDatasetGenerator:
             img_pil.save(os.path.join(dataset_path, "imgs", sample_name))
 
             # Save mask
-            mask_pil = Image.fromarray((mask_np * 255).astype(np.uint8))
-            mask_rgb = np.stack([mask_np * 255, mask_np * 255, mask_np * 255], axis=-1).astype(np.uint8)
+            mask_rgb = np.stack(
+                [mask_np * 255, mask_np * 255, mask_np * 255], axis=-1
+            ).astype(np.uint8)
             mask_pil = Image.fromarray(mask_rgb)
             mask_pil.save(os.path.join(dataset_path, "masks", sample_name))
 
-            # Normalize attributes for CSV. Note: Roundness is saved as binary label (0/1)
-            # to compatible with process_confounder_data_controlled.
-            attributes = [
-                sample_name,
-                str(internal_structure),                    # InternalStructure: 0 or 1
-                str(roundness_label),                       # Roundness: 0 (oval) or 1 (round)
-                str(round((spiculation - 1) / 4.0, 4)),    # Spiculation: normalized [0, 1]
-                str(round((edge_sharpness - 1) / 4.0, 4)), # EdgeSharpness: normalized [0, 1]
-                str(round((size_attr - 1) / 4.0, 4)),      # Size: normalized [0, 1]
-                str(round((intensity - 1) / 4.0, 4)),      # Intensity: normalized [0, 1]
-            ]
+            # Save the binary labels (0/1) for all confounding factors
+            # This ensures consistency and fulfills the requirement of matching groups.
+            attributes = [sample_name] + [str(labels[f]) for f in confounding_factors]
             lines_out.append(",".join(attributes))
 
             if (sample_idx + 1) % 100 == 0:
-                print(f"Generated {sample_idx + 1}/{num_samples} FunnyNodules samples")
+                _log.info(
+                    "%s",
+                    f"Generated {sample_idx + 1}/{num_samples} FunnyNodules samples",
+                )
                 with open(os.path.join(dataset_path, "data.csv"), "w") as f:
                     f.write("\n".join(lines_out))
 
         with open(os.path.join(dataset_path, "data.csv"), "w") as f:
             f.write("\n".join(lines_out))
-        print(f"FunnyNodules dataset generated at {dataset_path}")
+        _log.info("%s", f"FunnyNodules dataset generated at {dataset_path}")

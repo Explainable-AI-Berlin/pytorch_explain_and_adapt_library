@@ -1,0 +1,17 @@
+Bootstrap: docker
+From: continuumio/miniconda3
+
+%files
+    $PWD/peal/dependencies/PathLDM/ldm_env.yaml ldm_env.yaml
+
+    $PWD/peal/dependencies/PathLDM /PathLDM
+
+
+%post
+    cd PathLDM 
+    conda update -n base -c defaults conda -y
+    conda env create -f ldm_env.yaml -n ldm
+
+    # Source environment at runtime
+    echo ". /opt/conda/etc/profile.d/conda.sh" >> $SINGULARITY_ENVIRONMENT
+    echo "conda activate ldm" >> $SINGULARITY_ENVIRONMENT

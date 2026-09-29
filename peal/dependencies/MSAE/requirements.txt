@@ -1,0 +1,10 @@
+torch==2.2.2
+numpy==1.26.4
+tqdm==4.66.5
+torchvision==0.17.2
+scikit-learn==1.5.2
+scipy==1.12.0
+##### DEV for precompute_activations
+# datasets==3.0.1
+# transformers==4.45.2
+# git+https://github.com/openai/CLIP.git

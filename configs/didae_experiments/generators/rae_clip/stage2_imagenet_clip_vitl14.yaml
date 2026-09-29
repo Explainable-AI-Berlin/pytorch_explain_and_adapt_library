@@ -1,0 +1,102 @@
+# RAEv2 Stage 2 for imagenet_rae_clip.yaml: DDT (DiTwDDTHeadIG, the RAEv2
+# ImageNet recipe) trained with flow matching on the stage-1 CLIP latent and
+# conditioned on the 768-d CLIP image embedding through additive AdaLN
+# (conditioning.type: cls, the ADA "cls_only" variant).
+#
+# Differences from ADA's imagenet-dinov2l-k1-patch-cls-only-cache-*.yaml:
+#   encoder / latent   clipproj-vit-L, in_channels 1024, cls_dim 768.
+#   dataset            premixed latent + CLS cache (original + hflip views) on
+#                      node-local /tmp, built once by rae_pipeline; saves the
+#                      CLIP forward and JPEG decoding on every step.
+#   optimizer          adamw: gmuon's gram_newton_schulz package is not
+#                      installable on this node.
+#   epochs / schedule  46 cache epochs (92 ImageNet passes, 118M samples) with
+#                      warmup 14 / decay end 29, from the sustained 3.73 s per
+#                      optimizer step on 4 H100 (2026-09-13); RAEv2's 80/25/50
+#                      would need 8.6 days.
+stage_1:
+  target: stage1.RAE
+  params:
+    encoder_name: clipproj-vit-L
+    resolution: 256
+    decoder_config_path: <PEAL_RAEV2>/configs/decoder/ViTXL
+    pretrained_decoder_path: $PEAL_RUNS/imagenet/rae_clip/stage1_assets/decoder.pt
+    normalization_stat_path: $PEAL_RUNS/imagenet/rae_clip/stage1_assets/stats.pt
+    noise_tau: 0.0
+stage_2:
+  target: stage2.models.DDT.DiTwDDTHeadIG
+  params:
+    input_size: 16
+    patch_size: [1, 1]
+    in_channels: 1024
+    hidden_size: [1440, 2048]
+    depth: [28, 2]
+    num_heads: [20, 16]
+    mlp_ratio: 4.0
+    base_model_depth: 8
+    cls_conditioning: true
+    cls_dim: 768
+    cls_projector_hidden_mult: 4
+    cls_condition_source: clip_image_embedding
+conditioning:
+  type: cls
+  cfg_dropout_prob: 0.1
+  arch:
+    num_t_tokens: 4
+    num_c_tokens: 8
+transport:
+  prediction: x
+  time_dist_type: logit-normal_0_1
+sampler:
+  num_steps: 50
+guidance:
+  cfg:
+    scale: 1.0
+    t_min: 0.0
+    t_max: 1.0
+dataset:
+  # premixed latent + CLS cache built by rae_pipeline's cache stage; RAE_STAGE2_CACHE
+  # is exported by the pipeline (and by RAEDiffusionAutoencoder) from cache_dir.
+  target: stage2_latent_cache
+  type: stage2_latent_cache
+  root: ${oc.env:RAE_STAGE2_CACHE}
+  condition_type: cls
+  shared_tmpdir: /tmp/rae_clip_tmp
+  cache_mode: lazy
+  max_open_shards: 8
+  cls_normalization: raw
+  sampler: shard_batch
+  sampler_seed: 42
+  shard_interleave_window: 32
+  drop_last: true
+  prefetch_factor: 2
+training:
+  epochs: 46   # cache epochs (2 ImageNet passes each): 2.59 h/epoch sustained (3.73 s/step, 2026-09-13) -> ends ~2026-09-18 00:30
+  global_batch_size: 1024
+  grad_accum_steps: 8   # 32 latents per H100: ~43 GB for the 1.24B DDT (measured 2026-09-11)
+  ema_decay: 0.9995
+  num_workers: 4
+  log_interval: 100
+  checkpoint_interval: 1
+  sample_every: 5000
+  clip_grad: 1.0
+  global_seed: 42
+  optimizer:
+    type: adamw
+    lr: 0.0002
+    betas: [0.9, 0.95]
+    weight_decay: 0.0
+  scheduler:
+    type: linear
+    warmup_epochs: 14   # ADA/RAEv2 recipe 25/50 of 80, scaled to 46 epochs
+    decay_end_epoch: 29
+    base_lr: 0.0002
+    final_lr: 2.0e-05
+    warmup_from_zero: false
+  image_size: 256
+eval: null
+misc:
+  latent_size: [1024, 16, 16]
+  num_classes: 1000
+  time_dist_shift_dim: 262144
+  time_dist_shift_base: 4096

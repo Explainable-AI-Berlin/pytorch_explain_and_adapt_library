@@ -1,0 +1,35 @@
+# docker compose -f deploy/spark/docker-compose.yaml up -d
+#
+# One container, one GPU, one job at a time. /data holds the job directories
+# (uploads, runs, corrected models), the downloaded RAE / MSAE weights and the
+# Hugging Face cache, so it survives image rebuilds. Put the DGX Spark behind a
+# TLS reverse proxy or a Cloudflare Tunnel / Tailscale Funnel; the app itself
+# has no authentication.
+services:
+  peal-web:
+    build:
+      context: ../..
+      dockerfile: deploy/spark/Dockerfile
+    image: peal-web
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      PEAL_RAE_WEIGHTS: "hf://sidney1505/peal-rae-clip-imagenet@v0.1.0"   # tools/export_rae_weights.py --upload
+      PEAL_WEB_JOBS: /data/web_jobs
+      PEAL_RUNS: /data/peal_runs
+      PEAL_WEB_MAX_ZIP_MB: "4096"
+      PEAL_WEB_MAX_ONNX_MB: "2048"
+      PEAL_WEB_DEFAULT_JOB_SECONDS: "2700"
+      PEAL_WEB_FEEDBACK_TIMEOUT_S: "172800"   # a job waits up to 48 h for verdicts, then fails
+      HF_TOKEN: ""                            # only needed for a private weights repo
+    volumes:
+      - /data/peal:/data
+    shm_size: "16g"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

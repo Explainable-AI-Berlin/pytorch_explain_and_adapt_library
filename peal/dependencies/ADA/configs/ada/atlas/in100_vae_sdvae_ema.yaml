@@ -1,0 +1,34 @@
+experiment_id: v1_in100_vae_sdvae_ema_atlas
+dataset: imagenet100
+vae_type: sdvae-ema
+image_size: 256
+precision: bf16
+storage_dtype: float16
+train_root: /home/space/datasets/imagenet_torchvision/imagenet100/train
+validation_root: /home/space/datasets/imagenet_torchvision/imagenet100/val
+raw_output_root: artifacts/ada/atlas/vae_latents
+projected_output_root: artifacts/ada/atlas/vae_projected
+projection_dir: artifacts/ada/atlas/vae_projections/v1_in100_sdvae_ema_pca512_train_seed0
+support_dir: artifacts/ada/atlas/support/v1_in100_sdvae_ema_pca512_euclidean
+projection:
+  coordinate: scaled_posterior_mean_flat
+  pca_dim: 512
+  standardize: true
+  whiten: false
+  fit_split: train
+cache:
+  batch_size: 64
+  num_workers: 8
+  save_logvar: true
+  save_raw_mean: true
+  save_reconstruction_mse: false
+  allow_download: false
+support:
+  metric: euclidean
+  k_values: [5, 10, 50]
+  score_batch_size: 256
+  reference_shard_size: 20000
+notes:
+  - "Primary VAE coordinate is deterministic posterior mean, not a posterior sample."
+  - "Projection is fit using train samples only, then applied to train and validation."
+  - "Generic ADA region/support utilities currently L2-normalize embeddings internally; add VAE Euclidean scoring before making radial/prior claims."

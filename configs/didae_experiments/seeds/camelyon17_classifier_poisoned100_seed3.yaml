@@ -1,0 +1,13 @@
+model_path: $PEAL_RUNS/camelyon17/classifier_poisoned100_seed3
+data: <PEAL_BASE>/configs/didae_experiments/seeds/camelyon17_classifier_poisoned100_data_seed3.yaml
+training: <PEAL_BASE>/configs/sce_experiments/training/img_classifier.yaml
+architecture: torchvision_resnet18
+task:
+  criterions:
+    ce: 1.0
+    l2: 100.0
+  output_type: singleclass
+  output_channels: 2
+  y_selection:
+  - tumor
+seed: 3

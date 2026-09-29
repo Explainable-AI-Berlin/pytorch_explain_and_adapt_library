@@ -1,0 +1,80 @@
+# DDIM-inversion control for the run below: identical except explainer = dae_distill.yaml (DDIM
+# inversion, no sampler block), overwrite False on a copied probe, and no nested CFKD.
+# DiDAE: Automated counterfactual discovery with the OpenCLIP ViT-L/14 batch-topk SAE (Blond_Hair confounded by Male, 98% poisoned)
+# Uses DDPM (edit-friendly) inversion via dae_distill.yaml: sampler type ddpm, 20 steps, uniform spacing.
+# Usage: python -W ignore run_didae.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/celeba1kx098_resnet18_didae_sae_vit_l14.yaml"
+# continue from cache: python -W ignore run_didae.py --config  $PEAL_RUNS/celeba1k/Blond_Hair/classifier_poisoned098/didae_sae_vit_l14_ddpm/config.yaml
+# Decode budget removed 2026-09-14: every latent flip inside the empirical bounds is rendered
+# and checked for an ambient flip (comparable to classical CFKD). Budgets now raise in DiDAE.
+adaptor_type                         :  "DiDAE"
+category                             :  "adaptor"
+tracking_level                       :  5
+n_samples                            :  200
+top_k_directions                     :  10
+max_cf_per_direction                 :  5
+# The clamp to the empirical [c_min, c_max] range, not the linesearch factor,
+# is what limits the step: at factor 1.2 a median 3.6% of the requested step
+# survives it. Extra factors cost one [N, K] pass each and let a pair that is
+# not yet clamped take a bigger step; the sweep keeps the DEEPEST crossing
+# found, not the first, so a flip that barely crossed at 1.2 is replaced by
+# one that crossed decisively.
+linesearch_factors                   :  ["dynamic", 2.0, 4.0, 8.0]
+decode_batch_size                    :  32
+batch_size                           :  200
+min_train_samples                    :  800
+max_validation_samples               :  200
+finetune_iterations                  :  1
+continuous_learning                  :  "deep_feature_reweighting"
+calculate_group_accuracies           :  True
+# Chosen on TEST AGREEMENT, not on the lasso_sweep table -- on this dictionary the
+# two disagree. Train correlation is monotone the wrong way (dense fits best at
+# r 0.999 and generalises worst), so picking on MSE would pick 0.0. Measured
+# student-probe test agreement: 0.0 -> 57.5%, 0.005 -> 74.7%, 0.1 -> 72.9%,
+# 0.2 -> 72.2%. Active directions at 0.005: 3439/6144.
+overwrite                            :  False   # reuse the DDPM run's probe (copied into base_dir/distilled_probe)
+lasso_alpha                          :  0.005
+explainer                            :  <PEAL_BASE>/configs/didae_experiments/explainers/dae_distill.yaml
+training                             :  <PEAL_BASE>/configs/cfkd_experiments/training/img_finetuning.yaml
+data                                 :  <PEAL_BASE>/configs/cfkd_experiments/data/celeba1k_Blond_Hair_confounding_Male_poisoned098.yaml
+test_data                            :  <PEAL_BASE>/configs/cfkd_experiments/data/celeba.yaml
+student                              :  $PEAL_RUNS/celeba1k/Blond_Hair/classifier_poisoned098/model.cpl
+# Teacher: unpoisoned .cpl oracle (Model2ModelTeacher), automated + unattended.
+# For the LLM-as-human variant see celeba1kx098_resnet18_didae_sae_vit_l14_llmteacher.yaml (teacher: {type: llm}).
+teacher                              :  $PEAL_RUNS/celeba/Blond_Hair/classifier_unpoisoned/model.cpl
+# MSAE is a dictionary *of OpenAI CLIP ViT-L/14 space*, so the generator has to be
+# the autoencoder trained against that same frozen encoder -- not the one whose
+# latents come from the diffusion autoencoder's own semantic encoder. Swapping the
+# dictionary alone would be dimensionally valid (768 either way) and meaningless.
+# NOTE this decoder is still training; until it is done, read the latent half and
+# treat the ambient/verified columns as decoder-limited (set latent_only: True to
+# skip them entirely).
+# _slim = the same final.ckpt (step 40000) minus optimizer state and the frozen CLIP
+# encoder keys (rebuilt from clip.load()); identical weights, fits the 16 GiB cgroup.
+# Point back at diffusion_autoencoder_openai_clip_vit_l14/config.yaml on a bigger allocation.
+generator                            :  $PEAL_RUNS/celeba/diffusion_autoencoder_openai_clip_vit_l14_slim/config.yaml
+# The pretrained MSAE (arXiv:2502.20578), 6144 atoms fitted on CC3M in OpenAI CLIP
+# ViT-L/14 space, with a concept vocabulary -- so directions come out named
+# (blondes, homme, girl) instead of dim_733. The in-house alternative is
+# $PEAL_RUNS/celeba/diffusion_autoencoder_openclip_vit_l14/celeba_vit_l14_batch_topk/config.yaml,
+# which pairs with the openclip generator above and yields unlabelled directions.
+sparse_dictionary                    :  <PEAL_BASE>/configs/didae_experiments/sparse_dictionaries/msae_decomposition.yaml
+run_cfkd_on_false_directions         :  False
+base_dir                             :  $PEAL_RUNS/celeba1k/Blond_Hair/classifier_poisoned098/didae_msae_openai_clip_ddim
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [Blond_Hair]
+
+# --- decode budget -----------------------------------------------------
+# The sweep flips ~36k of the 1000 x 1536 (sample, direction) pairs in latent
+# space. Decoding all of them is a 20-step DDPM decode plus a re-encode each,
+# to rank 1463 directions of which top_k_directions=10 are ever shown to the
+# teacher. These two cap the work at 40 x 8 = 320 decodes; the ambient and
+# verified rates measured on the subsample are scaled back up to each
+# direction's full latent flip count for the ranking.
+# "deepest" spends the budget on the flips that landed furthest past the
+# boundary -- the ones most likely to still read as the other class after a
+# decode and a re-encode. Use "random" for an unbiased ambient flip rate.

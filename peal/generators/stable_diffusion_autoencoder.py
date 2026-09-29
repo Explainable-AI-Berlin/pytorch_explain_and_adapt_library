@@ -13,11 +13,9 @@ Architecture:
 
 import os
 import copy
-import math
 from pathlib import Path
 from typing import Tuple, Union
 
-import clip
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -25,6 +23,7 @@ import torchvision
 
 from diffusers import StableDiffusionPipeline, DDIMScheduler
 
+from peal._optional import require
 from peal.generators.interfaces import (
     GeneratorConfig,
     InvertibleGenerator,
@@ -45,14 +44,45 @@ from peal.dependencies.ddpm_inversion.prompt_to_prompt.ptp_classes import Attent
 from peal.dependencies.ddpm_inversion.prompt_to_prompt.ptp_utils import (
     register_attention_control,
 )
+from peal.log import get_logger
+
+_log = get_logger(__name__)
 
 
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
 
+
 class StableDiffusionAutoencoderConfig(GeneratorConfig):
-    """Configuration for the pretrained SD-based DiDAE generator."""
+    """Configuration for the pretrained SD-based DiDAE generator.
+
+    Parameters
+    ----------
+    model_id : str
+        Hugging Face id of the Stable Diffusion checkpoint.
+    data : str or DataConfig
+        Dataset the generator (and its sparse dictionary) operates on; may be
+        overridden by a ``data`` key inside the sparse dictionary config.
+    base_path : str
+        Directory for the sparse dictionary weights and component
+        explanations.
+    encoder_dimensions : int
+        Size of the CLIP embedding used as z_sem (768 for ViT-L/14).
+    num_diffusion_steps, skip : int
+        DDPM inversion steps and how many of the noisiest steps are skipped
+        when decoding (decoding starts at step ``num_diffusion_steps - skip``).
+    cfg_scale_src, cfg_scale_tar : float
+        Classifier-free guidance scale for reconstruction (``decode``) and
+        for edits (``decode_with_modified_embedding``).
+    eta : float
+        Stochasticity of the DDPM inversion sampler.
+    sparse_dictionary : str or SparseDictionaryConfig, optional
+        Config of the dictionary (typically SpLICE) that decomposes z_sem.
+    visualizations_per_component : int, optional
+        Number of images rendered per component in ``explain_all_components``.
+    """
+
     generator_type: str = "StableDiffusionAutoencoder"
     model_id: str = "CompVis/stable-diffusion-v1-4"
     data: Union[str, DataConfig] = DataConfig()
@@ -78,6 +108,7 @@ class StableDiffusionAutoencoderConfig(GeneratorConfig):
 # CLIP ViT-L/14 Encoder wrapper
 # ---------------------------------------------------------------------------
 
+
 class CLIPImageEncoder(nn.Module):
     """Wraps OpenAI CLIP ViT-L/14 as a semantic encoder.
 
@@ -86,7 +117,21 @@ class CLIPImageEncoder(nn.Module):
     """
 
     def __init__(self, device="cpu"):
+        """Load the CLIP ViT-L/14 weights onto ``device``.
+
+        Parameters
+        ----------
+        device : str, optional
+            Torch device the CLIP model is loaded onto, by default ``"cpu"``.
+
+        Raises
+        ------
+        ImportError
+            If the optional ``clip`` dependency is not installed.
+        """
         super().__init__()
+        clip = require("clip", "clip", "the OpenAI CLIP ViT-L/14 semantic encoder")
+
         # Load in float16 if on CUDA
         self.clip_model, self.preprocess = clip.load("ViT-L/14", device=device)
         # We don't call .half() explicitly here as results in LayerNorm dtype mismatches
@@ -105,19 +150,21 @@ class CLIPImageEncoder(nn.Module):
             (B, 768) L2-normalized CLIP image embeddings.
         """
         # Resize to CLIP's expected 224x224
-        x_resized = torchvision.transforms.Resize(
-            [224, 224], antialias=True
-        )(x)
+        x_resized = torchvision.transforms.Resize([224, 224], antialias=True)(x)
 
         # CLIP expects images normalized with specific mean/std
-        mean = torch.tensor([0.48145466, 0.4578275, 0.40821073],
-                            device=x.device).view(1, 3, 1, 1)
-        std = torch.tensor([0.26862954, 0.26130258, 0.27577711],
-                           device=x.device).view(1, 3, 1, 1)
+        mean = torch.tensor([0.48145466, 0.4578275, 0.40821073], device=x.device).view(
+            1, 3, 1, 1
+        )
+        std = torch.tensor([0.26862954, 0.26130258, 0.27577711], device=x.device).view(
+            1, 3, 1, 1
+        )
         x_norm = (x_resized - mean) / std
 
         with torch.no_grad():
-            features = self.clip_model.encode_image(x_norm.to(self.clip_model.visual.conv1.weight.dtype))
+            features = self.clip_model.encode_image(
+                x_norm.to(self.clip_model.visual.conv1.weight.dtype)
+            )
 
         return F.normalize(features.float(), dim=1)
 
@@ -125,6 +172,7 @@ class CLIPImageEncoder(nn.Module):
 # ---------------------------------------------------------------------------
 # StableDiffusionAutoencoder
 # ---------------------------------------------------------------------------
+
 
 class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
     """DiDAE generator using pretrained SD 1.4 + CLIP ViT-L/14 + SpLICE.
@@ -138,6 +186,29 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
     """
 
     def __init__(self, config, predictor_dataset=None, model_dir=None, device="cpu"):
+        """
+        Load CLIP, the Stable Diffusion pipeline and (optionally) the dictionary.
+
+        Parameters
+        ----------
+        config : str or StableDiffusionAutoencoderConfig
+            Generator yaml path or loaded config.
+        predictor_dataset : peal dataset, optional
+            Dataset of the classifier being explained (deep-copied, kept for
+            interface parity; the generator datasets come from ``config.data``).
+        model_dir : str, optional
+            Unused; the module needs no training run directory.
+        device : str
+            Device for CLIP and the SD pipeline; falls back to CPU without CUDA.
+            On GPU the pipeline runs in float16 with attention slicing.
+
+        Notes
+        -----
+        If ``config.sparse_dictionary`` is set, the dictionary is loaded from
+        its ``weights_path`` (derived from ``base_path`` when missing) and
+        fitted on the validation split when no weights exist yet. The CLIP
+        model instance is shared with the dictionary via ``set_clip_model``.
+        """
         super().__init__()
         self.config = load_yaml_config(config)
         self.predictor_dataset = copy.deepcopy(predictor_dataset)
@@ -146,23 +217,27 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         # --- Resolve data config override from sparse dictionary ---
         if self.config.sparse_dictionary is not None:
             sd_config = self.config.sparse_dictionary
-            
+
             # If it's a string path, load it temporarily to check for data override
             if isinstance(sd_config, str):
                 sd_config = load_yaml_config(sd_config)
-            
+
             sd_data = None
             if isinstance(sd_config, dict):
                 sd_data = sd_config.get("data")
             elif hasattr(sd_config, "data"):
                 sd_data = sd_config.data
-            
+
             if sd_data:
-                print(f"StableDiffusionAutoencoder: Overriding generator data with {sd_data} from sparse dictionary config.")
+                _log.info(
+                    "%s",
+                    f"StableDiffusionAutoencoder: Overriding generator data with {sd_data} from sparse dictionary config.",
+                )
                 self.config.data = sd_data
 
         # Ensure self.config.data is fully loaded as a DataConfig
         import types
+
         self.config.data = load_yaml_config(self.config.data, DataConfig)
         if isinstance(self.config.data, types.SimpleNamespace):
             self.config.data = DataConfig(**vars(self.config.data))
@@ -174,7 +249,9 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
                 if ds is not None:
                     ds.task_config = self.config.task_config
 
-        self.generator_dataset = self.generator_datasets[0] if self.generator_datasets else None
+        self.generator_dataset = (
+            self.generator_datasets[0] if self.generator_datasets else None
+        )
 
         # --- Setup CLIP ViT-L/14 semantic encoder ---
         self.encoder = CLIPImageEncoder(device=self.device)
@@ -182,12 +259,12 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         # --- Load Stable Diffusion pipeline ---
         # Using float16 and attention slicing to fit in limited VRAM (e.g. 4GB GPUs)
         dtype = torch.float16 if self.device != "cpu" else torch.float32
-        
+
         self.pipe = StableDiffusionPipeline.from_pretrained(
             self.config.model_id,
             torch_dtype=dtype,
         ).to(self.device)
-        
+
         if self.device != "cpu":
             self.pipe.enable_attention_slicing()
             torch.cuda.empty_cache()
@@ -202,10 +279,12 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         self.sparse_dictionary = None
         if self.config.sparse_dictionary is not None:
             self.load_sparse_dictionary()
-            
+
             # Ensure CLIP weight identity by sharing the model instance FIRST
             # This avoids double-loading weights during fit_sparse_dictionary
-            if self.sparse_dictionary is not None and hasattr(self.sparse_dictionary, 'set_clip_model'):
+            if self.sparse_dictionary is not None and hasattr(
+                self.sparse_dictionary, "set_clip_model"
+            ):
                 self.sparse_dictionary.set_clip_model(self.encoder.clip_model)
 
             # Check if it was actually loaded from disk (has image_mean)
@@ -215,7 +294,7 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
 
     def __setattr__(self, name, value):
         """Override __setattr__ to ensure dictionary consistency.
-        
+
         If a new sparse_dictionary is assigned (e.g., by CFKD), we ensure
         it inherits the correctly resolved weights_path from our config
         if one was already established.
@@ -224,19 +303,21 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             # If we already have a weights_path resolved in our config,
             # ensure the new dictionary uses it.
             if (
-                hasattr(self, "config") 
+                hasattr(self, "config")
                 and self.config.sparse_dictionary is not None
                 and self.config.sparse_dictionary.weights_path
             ):
-                if getattr(value.config, 'weights_path', None) is None:
-                    value.config.weights_path = self.config.sparse_dictionary.weights_path
+                if getattr(value.config, "weights_path", None) is None:
+                    value.config.weights_path = (
+                        self.config.sparse_dictionary.weights_path
+                    )
                     # If the file exists, load it immediately to avoid re-fitting or using internet mean
                     if os.path.exists(value.config.weights_path):
-                        if getattr(value, 'image_mean', None) is None:
+                        if getattr(value, "image_mean", None) is None:
                             value.load_from_disk(value.config.weights_path)
-            
+
             # Also ensure weight identity for the new dictionary
-            if hasattr(self, 'encoder') and hasattr(value, 'set_clip_model'):
+            if hasattr(self, "encoder") and hasattr(value, "set_clip_model"):
                 value.set_clip_model(self.encoder.clip_model)
 
         super().__setattr__(name, value)
@@ -261,12 +342,15 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         z_sem = self.encoder(x.to(self.device))
 
         # 2. Stochastic encoding via DDPM forward process
-        x0 = torchvision.transforms.Resize(
-            [512, 512], antialias=True
-        )(x.clone().to(self.device))
+        x0 = torchvision.transforms.Resize([512, 512], antialias=True)(
+            x.clone().to(self.device)
+        )
 
         # VAE encode
-        w0 = (self.pipe.vae.encode(x0.to(self.pipe.vae.dtype)).latent_dist.mode() * 0.18215)
+        w0 = (
+            self.pipe.vae.encode(x0.to(self.pipe.vae.dtype)).latent_dist.mode()
+            * 0.18215
+        )
 
         # Balanced Conditioning: Inject z_sem into a 77-token sequence.
         # Format: [<BOS>, MODIFIED_CLS] + 75 * [<EOS>]
@@ -347,14 +431,18 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         )
 
         # VAE decode
-        x_decoded = self.pipe.vae.decode((1 / 0.18215 * w0_dec).to(self.pipe.vae.dtype)).sample
+        x_decoded = self.pipe.vae.decode(
+            (1 / 0.18215 * w0_dec).to(self.pipe.vae.dtype)
+        ).sample
 
         if x_decoded.dim() < 4:
             x_decoded = x_decoded.unsqueeze(0)
 
         return x_decoded.detach().float()
 
-    def decode_with_modified_embedding(self, z_sem_modified, stochastic_code, original_shape, prompts=None):
+    def decode_with_modified_embedding(
+        self, z_sem_modified, stochastic_code, original_shape, prompts=None
+    ):
         """Decode using a modified semantic embedding for counterfactual generation.
 
         Uses the modified CLIP embedding as text conditioning for the DDPM
@@ -372,7 +460,6 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         """
         wT, zs, wts = stochastic_code
         batch_size = z_sem_modified.shape[0]
-
         if prompts is not None:
             # Benchmark Mode: Use text prompts directly
             encoder_hidden_states = encode_text(self.pipe, prompts)
@@ -383,14 +470,17 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             encoder_hidden_states = uncond_embedding.clone()
 
             # Scale match the z_sem_modified visual embedding to the text token norm it is replacing
-            target_norm = torch.norm(uncond_embedding[:, 1, :], p=2, dim=-1, keepdim=True)
+            target_norm = torch.norm(
+                uncond_embedding[:, 1, :], p=2, dim=-1, keepdim=True
+            )
             current_norm = torch.norm(z_sem_modified, p=2, dim=-1, keepdim=True)
             z_sem_scaled = z_sem_modified * (target_norm / (current_norm + 1e-8))
 
             encoder_hidden_states[:, 1, :] = z_sem_scaled
             # Explicitly replicate the <EOS> token (at index 1 of an empty prompt) 75 times
-            encoder_hidden_states[:, 2:, :] = uncond_embedding[:, 1:2, :].expand(-1, 75, -1)
-
+            encoder_hidden_states[:, 2:, :] = uncond_embedding[:, 1:2, :].expand(
+                -1, 75, -1
+            )
         # Setup attention controller
         controller = AttentionStore()
         register_attention_control(self.pipe, controller)
@@ -412,7 +502,9 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         )
 
         # VAE decode
-        x_decoded = self.pipe.vae.decode((1 / 0.18215 * w0_dec).to(self.pipe.vae.dtype)).sample
+        x_decoded = self.pipe.vae.decode(
+            (1 / 0.18215 * w0_dec).to(self.pipe.vae.dtype)
+        ).sample
 
         if x_decoded.dim() < 4:
             x_decoded = x_decoded.unsqueeze(0)
@@ -437,9 +529,13 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         return images_torch
 
     def sample_z(self, batch_size=1):
+        """Draw ``(batch_size, encoder_dimensions)`` standard-normal z_sem
+        vectors (no stochastic code; only the semantic part is sampled)."""
         return torch.randn(batch_size, self.config.encoder_dimensions)
 
     def log_prob_z(self, z):
+        """Not available for this generator; always raises
+        ``NotImplementedError``."""
         raise NotImplementedError("Log probability not available for SD autoencoder.")
 
     # -------------------------------------------------------------------
@@ -457,10 +553,12 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             and self.config.base_path
         ):
             self.config.sparse_dictionary.base_path = os.path.join(
-                self.config.base_path, "sparse_dictionaries", self.config.sparse_dictionary.sparse_dictionaries_type
+                self.config.base_path,
+                "sparse_dictionaries",
+                self.config.sparse_dictionary.sparse_dictionaries_type,
             )
             # weights_path is usually base_path + weights.ending
-            ending = getattr(self.config.sparse_dictionary, 'ending', '.pt')
+            ending = getattr(self.config.sparse_dictionary, "ending", ".pt")
             self.config.sparse_dictionary.weights_path = os.path.join(
                 self.config.sparse_dictionary.base_path, "weights" + ending
             )
@@ -476,8 +574,12 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         )
         # Save results to disk
         if self.config.sparse_dictionary.base_path:
-            Path(self.config.sparse_dictionary.base_path).mkdir(parents=True, exist_ok=True)
-            self.sparse_dictionary.save_on_disk(self.config.sparse_dictionary.weights_path)
+            Path(self.config.sparse_dictionary.base_path).mkdir(
+                parents=True, exist_ok=True
+            )
+            self.sparse_dictionary.save_on_disk(
+                self.config.sparse_dictionary.weights_path
+            )
             save_yaml_config(
                 self.config.sparse_dictionary,
                 os.path.join(self.config.sparse_dictionary.base_path, "config.yaml"),
@@ -496,6 +598,8 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         predictor: nn.Module,
         explainer_config: dict,
         predictor_datasets: list,
+        boolmask_in=None,
+        attempt_number=None,
         pbar=None,
         base_path: str = "",
         mode: str = "",
@@ -508,14 +612,49 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
 
         This follows the same flow as DiffusionAutoencoder.edit() but uses
         SD + CLIP instead of a custom trained diffusion autoencoder.
+
+        Parameters
+        ----------
+        x_in : torch.Tensor
+            Input images of shape ``(B, 3, H, W)``.
+        target_confidence_goal : float
+            Ignored; recomputed as ``1 - p(target class)`` of the original.
+        source_classes, target_classes : torch.Tensor
+            Shape ``(B,)``: predicted class and class to flip towards.
+        predictor : torch.nn.Module
+            The classifier; its last linear layer (or a distilled linear
+            probe on top of the CLIP encoder when
+            ``explainer_config.distilled_predictor`` is set) supplies the
+            edit direction ``w``.
+        explainer_config : object
+            Uses ``num_attempts`` (overwritten with the number of components
+            actually edited), ``linesearch_factors`` and
+            ``distilled_predictor``.
+        predictor_datasets : list
+            ``(train, val)`` of the classifier; the validation set scores
+            outliers, the train set's ``dataset_class`` selects the prompt
+            template in benchmark mode.
+        boolmask_in, attempt_number, pbar, mode : optional
+            Unused; kept for interface parity.
+        base_path : str
+            Where the distilled predictor is cached
+            (``<base_path>/explainer/distilled_predictor/model.cpl``).
+
+        Returns
+        -------
+        tuple of list
+            ``(x_counterfactuals, x_differences, y_target_end_confidences,
+            x_originals, [], component_indices)``; each list has
+            ``B * num_attempts`` entries ordered attempt-major, images are
+            CPU tensors of shape ``(3, H, W)``.
         """
         param_list = [p for p in predictor.parameters()]
         device = param_list[0].device
 
         # Compute initial predictions
-        pred_original = F.softmax(
-            predictor(x_in.to(device).float()), dim=-1
-        ).detach().cpu()
+        pred_original = (
+            F.softmax(predictor(x_in.to(device).float()), dim=-1).detach().cpu()
+        )
         target_confidences = [
             pred_original[i][target_classes[i]] for i in range(len(target_classes))
         ]
@@ -523,6 +662,7 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
 
         # Get validation dataset for outlier scoring
         from peal.data.dataloaders import WeightedDataloaderList
+
         if isinstance(predictor_datasets[1], WeightedDataloaderList):
             validation_dataset = predictor_datasets[1].dataloaders[0].dataset
         else:
@@ -534,12 +674,20 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         # Get editing direction from gradient predictor
         # Uses the same approach as DiffusionAutoencoder: distill classifier
         # into a linear probe on top of the encoder, then use its weights
-        if not hasattr(explainer_config, 'distilled_predictor') or explainer_config.distilled_predictor is None:
+        if (
+            not hasattr(explainer_config, "distilled_predictor")
+            or explainer_config.distilled_predictor is None
+        ):
             # Direct approach: use the last linear layer weights
             w = list(predictor.children())[-1].weight[0]
         else:
-            from peal.adaptors.counterfactual_knowledge_distillation import distill_predictor
-            distilled_path = os.path.join(base_path, "explainer", "distilled_predictor", "model.cpl")
+            from peal.adaptors.counterfactual_knowledge_distillation import (
+                distill_predictor,
+            )
+
+            distilled_path = os.path.join(
+                base_path, "explainer", "distilled_predictor", "model.cpl"
+            )
             if not os.path.exists(distilled_path):
                 self.gradient_predictor = distill_predictor(
                     predictor_distillation=explainer_config.distilled_predictor,
@@ -552,10 +700,14 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
                     ),
                     only_last_layer=True,
                     continue_training=True,
-                    task_config=TaskConfig(**explainer_config.distilled_predictor["task"]),
+                    task_config=TaskConfig(
+                        **explainer_config.distilled_predictor["task"]
+                    ),
                 )
             else:
-                self.gradient_predictor = torch.load(distilled_path, map_location=self.device)
+                self.gradient_predictor = torch.load(
+                    distilled_path, map_location=self.device
+                )
 
             w = list(self.gradient_predictor.children())[-1].weight[0]
 
@@ -572,8 +724,7 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         wT, zs, wts = stochastic_code
         wT_decoding = wT.unsqueeze(1).unsqueeze(1)
         wT_decoding = wT_decoding.tile(
-            1, z_sem_before.shape[1],
-            len(explainer_config.linesearch_factors), 1, 1, 1
+            1, z_sem_before.shape[1], len(explainer_config.linesearch_factors), 1, 1, 1
         )
         wT_decoding = wT_decoding.reshape([-1] + list(wT.shape[1:]))
 
@@ -587,65 +738,164 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         ):
             original_labels = torch.argmax(pred_original, dim=-1)
             component_strings = self.sparse_dictionary.config.component_strings
-            opposite_strings = getattr(self.sparse_dictionary.config, "opposite_component_strings", None)
-            
+            opposite_strings = getattr(
+                self.sparse_dictionary.config, "opposite_component_strings", None
+            )
+
             num_attempts = z_sem_before.shape[1]
             num_linesearch_factors = z_sem_before.shape[2]
             prompts = []
             for b in range(z_sem_before.shape[0]):
-                is_present = (original_labels[b].item() == 1)
+                is_present = original_labels[b].item() == 1
                 for a in range(num_attempts):
                     idx = a % len(component_strings)
-                    if predictor_datasets[0].dataset.config.dataset_class == "CelebADataset":
+                    if (
+                        predictor_datasets[0].dataset.config.dataset_class
+                        == "CelebADataset"
+                    ):
                         if is_present:
                             # Use provided opposite if available, else fallback to "not <concept>"
                             if idx == 0:
-                                concept_to_use = "A photo of a " + opposite_strings[0] + ", " + component_strings[3] + " " + component_strings[1] + " with " + component_strings[2]
+                                concept_to_use = (
+                                    "A photo of a "
+                                    + opposite_strings[0]
+                                    + ", "
+                                    + component_strings[3]
+                                    + " "
+                                    + component_strings[1]
+                                    + " with "
+                                    + component_strings[2]
+                                )
 
                             elif idx == 1:
-                                concept_to_use = "A photo of a " + component_strings[0] + ", " + component_strings[3] + " " + opposite_strings[1] + " with " + component_strings[2]
-                            
+                                concept_to_use = (
+                                    "A photo of a "
+                                    + component_strings[0]
+                                    + ", "
+                                    + component_strings[3]
+                                    + " "
+                                    + opposite_strings[1]
+                                    + " with "
+                                    + component_strings[2]
+                                )
+
                             elif idx == 2:
-                                concept_to_use = "A photo of a " + component_strings[0] + ", " + component_strings[3] + " " + component_strings[1] + " with " + opposite_strings[2]
-                                
+                                concept_to_use = (
+                                    "A photo of a "
+                                    + component_strings[0]
+                                    + ", "
+                                    + component_strings[3]
+                                    + " "
+                                    + component_strings[1]
+                                    + " with "
+                                    + opposite_strings[2]
+                                )
+
                             elif idx == 3:
-                                concept_to_use = "A photo of a " + component_strings[0] + ", " + opposite_strings[3] + " " + component_strings[1] + " with " + component_strings[2]
-                                
+                                concept_to_use = (
+                                    "A photo of a "
+                                    + component_strings[0]
+                                    + ", "
+                                    + opposite_strings[3]
+                                    + " "
+                                    + component_strings[1]
+                                    + " with "
+                                    + component_strings[2]
+                                )
+
                         else:
                             if idx == 0:
-                                concept_to_use = "A photo of a " + component_strings[0] + ", " + opposite_strings[3] + " " + opposite_strings[1] + " with " + opposite_strings[2]
-                            
+                                concept_to_use = (
+                                    "A photo of a "
+                                    + component_strings[0]
+                                    + ", "
+                                    + opposite_strings[3]
+                                    + " "
+                                    + opposite_strings[1]
+                                    + " with "
+                                    + opposite_strings[2]
+                                )
+
                             elif idx == 1:
-                                concept_to_use = "A photo of a " + opposite_strings[0] + ", " + opposite_strings[3] + " " + component_strings[1] + " with " + opposite_strings[2]
-                            
+                                concept_to_use = (
+                                    "A photo of a "
+                                    + opposite_strings[0]
+                                    + ", "
+                                    + opposite_strings[3]
+                                    + " "
+                                    + component_strings[1]
+                                    + " with "
+                                    + opposite_strings[2]
+                                )
+
                             elif idx == 2:
-                                concept_to_use = "A photo of a " + opposite_strings[0] + ", " + opposite_strings[3] + " " + opposite_strings[1] + " with " + component_strings[2]
-                                
+                                concept_to_use = (
+                                    "A photo of a "
+                                    + opposite_strings[0]
+                                    + ", "
+                                    + opposite_strings[3]
+                                    + " "
+                                    + opposite_strings[1]
+                                    + " with "
+                                    + component_strings[2]
+                                )
+
                             elif idx == 3:
-                                concept_to_use = "A photo of a " + opposite_strings[0] + ", " + component_strings[3] + " " + component_strings[1] + " with " + component_strings[2]
-                    
-                    elif predictor_datasets[0].dataset.config.dataset_class == "NicoPlusPlusDataset":
+                                concept_to_use = (
+                                    "A photo of a "
+                                    + opposite_strings[0]
+                                    + ", "
+                                    + component_strings[3]
+                                    + " "
+                                    + component_strings[1]
+                                    + " with "
+                                    + component_strings[2]
+                                )
+
+                    elif (
+                        predictor_datasets[0].dataset.config.dataset_class
+                        == "NicoPlusPlusDataset"
+                    ):
                         if is_present:
                             # Use provided opposite if available, else fallback to "not <concept>"
                             if idx == 0:
-                                concept_to_use = "A photo of a " + opposite_strings[idx] + " with " + component_strings[1]
+                                concept_to_use = (
+                                    "A photo of a "
+                                    + opposite_strings[idx]
+                                    + " with "
+                                    + component_strings[1]
+                                )
 
                             else:
-                                concept_to_use = "A photo of a " + component_strings[0] + " with " + opposite_strings[idx]
-                                
+                                concept_to_use = (
+                                    "A photo of a "
+                                    + component_strings[0]
+                                    + " with "
+                                    + opposite_strings[idx]
+                                )
+
                         else:
                             if idx == 0:
-                                concept_to_use = "A photo of a " + component_strings[idx] + " with " + opposite_strings[1]
-                                
+                                concept_to_use = (
+                                    "A photo of a "
+                                    + component_strings[idx]
+                                    + " with "
+                                    + opposite_strings[1]
+                                )
+
                             else:
-                                concept_to_use = "A photo of a " + opposite_strings[0] + " with " + component_strings[idx]
-                    
-                    
+                                concept_to_use = (
+                                    "A photo of a "
+                                    + opposite_strings[0]
+                                    + " with "
+                                    + component_strings[idx]
+                                )
+
                     for l in range(num_linesearch_factors):
                         prompts.append(concept_to_use)
-                        print(concept_to_use)
-                        print(concept_to_use)
-                        print(concept_to_use)
+                        _log.info("%s", concept_to_use)
+                        _log.info("%s", concept_to_use)
+                        _log.info("%s", concept_to_use)
 
         x_counterfactuals_generator = self.decode_with_modified_embedding(
             z_sem2, (wT_decoding, zs, wts), x_in.shape, prompts=prompts
@@ -653,12 +903,17 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         x_counterfactuals = x_counterfactuals_generator.detach()
 
         # Evaluate all candidates with the predictor
-        preds = F.softmax(
-            predictor(x_counterfactuals.to(device).float()), dim=-1
-        ).detach().cpu()
+        preds = (
+            F.softmax(predictor(x_counterfactuals.to(device).float()), dim=-1)
+            .detach()
+            .cpu()
+        )
         y_target_end_confidence = torch.zeros([preds.shape[0]])
+        items_per_batch = preds.shape[0] // target_classes.shape[0]
         for i in range(preds.shape[0]):
-            y_target_end_confidence[i] = preds[i, target_classes[i % target_classes.shape[0]]]
+            y_target_end_confidence[i] = preds[
+                i, target_classes[i % target_classes.shape[0]]
+            ]
 
         # Reshape to (batch, num_attempts, linesearch_steps, ...)
         x_counterfactuals = torch.reshape(
@@ -736,139 +991,208 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             dot_bb = torch.sum(b * b)
             proj = dot_ab / dot_bb * b
             reflected = a - 2 * proj
-            
-            return reflected, None, torch.norm(
-                reflected - z_sem, p=2, dim=-1, keepdim=False
+
+            return (
+                reflected,
+                None,
+                torch.norm(reflected - z_sem, p=2, dim=-1, keepdim=False),
             )
 
         else:
             # Targeted Swap Logic: Precisely swap concepts with their opposites
-            vocab = self.sparse_dictionary.get_vocabulary() if hasattr(self.sparse_dictionary, 'get_vocabulary') else None
+            vocab = (
+                self.sparse_dictionary.get_vocabulary()
+                if hasattr(self.sparse_dictionary, "get_vocabulary")
+                else None
+            )
 
             # Resolve conceptual strings from config
             orig_comp_strs = self.sparse_dictionary.config.component_strings
-            orig_opp_strs = getattr(self.sparse_dictionary.config, "opposite_component_strings", [])
-            
+            orig_opp_strs = getattr(
+                self.sparse_dictionary.config, "opposite_component_strings", []
+            )
+
             # Identify all concepts to track for comprehensive logging (union of targets and opposites)
             track_strs = list(orig_comp_strs)
             if orig_opp_strs:
                 for o in orig_opp_strs:
                     if o and o not in track_strs:
                         track_strs.append(o)
-            
+
             # Resolve all for tracking (this also triggers the loud warnings for not-found concepts)
-            track_indices = self._resolve_component_indices(self.sparse_dictionary.config, track_strs)
-            
+            track_indices = self._resolve_component_indices(
+                self.sparse_dictionary.config, track_strs
+            )
+
             # Resolve primary and opposite indices for swapping logic
-            component_indices = self._resolve_component_indices(self.sparse_dictionary.config)
+            component_indices = self._resolve_component_indices(
+                self.sparse_dictionary.config
+            )
             opp_indices = None
             if orig_opp_strs:
-                opp_indices = self._resolve_component_indices(self.sparse_dictionary.config, orig_opp_strs)
+                opp_indices = self._resolve_component_indices(
+                    self.sparse_dictionary.config, orig_opp_strs
+                )
 
             if component_indices is None or len(component_indices) == 0:
                 component_indices = list(range(num_attempts))
                 opp_indices = None
-                
-            W_all = self.sparse_dictionary.get_components().to(z_sem.device).to(z_sem.dtype)
-            
+
+            W_all = (
+                self.sparse_dictionary.get_components().to(z_sem.device).to(z_sem.dtype)
+            )
+
             # Initial decomposition for activation detection
             with torch.no_grad():
-                activations = self.sparse_dictionary.decompose(z_sem) # (B, K)
-            
+                activations = self.sparse_dictionary.decompose(z_sem)  # (B, K)
+
             # Step size modulation step
-            line_search_factors = torch.tensor(
-                explainer_config.linesearch_factors
-            ).to(z_sem.device).to(z_sem.dtype)
-            
+            line_search_factors = (
+                torch.tensor(explainer_config.linesearch_factors)
+                .to(z_sem.device)
+                .to(z_sem.dtype)
+            )
+
             z_reflected_list = []
-            
+
             # Generate candidates per targeted attempt
             for i, comp_idx in enumerate(component_indices):
-                opp_idx = opp_indices[i] if (opp_indices is not None and i < len(opp_indices)) else None
-                
+                opp_idx = (
+                    opp_indices[i]
+                    if (opp_indices is not None and i < len(opp_indices))
+                    else None
+                )
+
                 # Concept Names for reporting
                 comp_name = orig_comp_strs[i]
-                opp_name = orig_opp_strs[i] if (orig_opp_strs and i < len(orig_opp_strs)) else "None"
-                
-                print(f"\n--- Attempt {i}: Target '{comp_name}' (ID {comp_idx}) / Opposite '{opp_name}' (ID {opp_idx}) ---", flush=True)
+                opp_name = (
+                    orig_opp_strs[i]
+                    if (orig_opp_strs and i < len(orig_opp_strs))
+                    else "None"
+                )
+
+                _log.info(
+                    "%s",
+                    f"\n--- Attempt {i}: Target '{comp_name}' (ID {comp_idx}) / Opposite '{opp_name}' (ID {opp_idx}) ---",
+                )
 
                 if comp_idx is None:
-                    print(f"  !!! Skipping attempt {i} as primary concept '{comp_name}' was not found in vocabulary !!!", flush=True)
+                    _log.info(
+                        "%s",
+                        f"  !!! Skipping attempt {i} as primary concept '{comp_name}' was not found in vocabulary !!!",
+                    )
                     continue
-                
+
                 W_primary = W_all[:, comp_idx]
                 W_opp = W_all[:, opp_idx] if opp_idx is not None else None
-                
-                is_activated = (activations[:, comp_idx] > 0.01) # (B,)
-                
-                print("  Status BEFORE edit:", flush=True)
+
+                is_activated = activations[:, comp_idx] > 0.01  # (B,)
+
+                _log.info("%s", "  Status BEFORE edit:")
                 for b in range(z_sem.shape[0]):
                     scores_list = []
                     for name, idx in zip(track_strs, track_indices):
                         val = f"{activations[b, idx]:.2f}" if idx is not None else "N/A"
                         scores_list.append(f"'{name}': {val}")
-                    
-                    status = f"ACTIVE ({activations[b, comp_idx]:.2f})" if is_activated[b] else "ABSENT"
-                    print(f"    Sample {b}: '{comp_name}' is {status}. Scores -> {', '.join(scores_list)}", flush=True)
+
+                    status = (
+                        f"ACTIVE ({activations[b, comp_idx]:.2f})"
+                        if is_activated[b]
+                        else "ABSENT"
+                    )
+                    _log.info(
+                        "%s",
+                        f"    Sample {b}: '{comp_name}' is {status}. Scores -> {', '.join(scores_list)}",
+                    )
 
                 attempt_results = []
                 for factor in line_search_factors:
                     z_edit = z_sem.clone()
                     # Logic: Swap present concepts for opposites, or introduce absent concepts.
                     if factor == 0.0:
-                        z_step = z_sem # Baseline
+                        z_step = z_sem  # Baseline
                     else:
                         # Logic 1: Present -> Remove primary, Add opposite
-                        proj_primary = (torch.sum(z_sem * W_primary, dim=-1, keepdim=True)) * W_primary
+                        proj_primary = (
+                            torch.sum(z_sem * W_primary, dim=-1, keepdim=True)
+                        ) * W_primary
                         res1 = z_sem - proj_primary
                         if W_opp is not None:
                             res1 += factor * W_opp
-                        
+
                         # Logic 2: Absent -> Remove opposite (if accidentally active), Add primary
                         if W_opp is not None:
-                            proj_opp = (torch.sum(z_sem * W_opp, dim=-1, keepdim=True)) * W_opp
+                            proj_opp = (
+                                torch.sum(z_sem * W_opp, dim=-1, keepdim=True)
+                            ) * W_opp
                             res2 = z_sem - proj_opp
                         else:
                             res2 = z_sem
                         res2 += factor * W_primary
-                        
+
                         z_step = torch.where(is_activated.unsqueeze(1), res1, res2)
-                    
+
                     attempt_results.append(z_step.unsqueeze(1))
-                
+
                 # Sanity Check (Verification decomposition of candidates)
                 z_check = attempt_results[-1].squeeze(1)
                 with torch.no_grad():
                     new_activations = self.sparse_dictionary.decompose(z_check)
-                
-                print(f"  Status AFTER edit (Sanity Check, Factor {line_search_factors[-1]:.2f}):", flush=True)
+
+                _log.info(
+                    "%s",
+                    f"  Status AFTER edit (Sanity Check, Factor {line_search_factors[-1]:.2f}):",
+                )
                 for b in range(z_sem.shape[0]):
                     after_list = []
                     for name, idx in zip(track_strs, track_indices):
-                        val = f"{new_activations[b, idx]:.2f}" if idx is not None else "N/A"
+                        val = (
+                            f"{new_activations[b, idx]:.2f}"
+                            if idx is not None
+                            else "N/A"
+                        )
                         after_list.append(f"'{name}': {val}")
-                    print(f"    Sample {b}: Scores -> {', '.join(after_list)}", flush=True)
+                    _log.info(
+                        "%s", f"    Sample {b}: Scores -> {', '.join(after_list)}"
+                    )
 
                 z_reflected_list.append(torch.cat(attempt_results, dim=1).unsqueeze(1))
 
             z_reflected = torch.cat(z_reflected_list, dim=1)
             z_base = z_sem.unsqueeze(1).unsqueeze(1)
             distances = torch.norm(z_base - z_reflected, p=2, dim=-1)
-            
-            valid_indices = [idx for idx in component_indices if idx is not None]
-            out_component_indices = torch.tensor(valid_indices).to(z_sem.device).unsqueeze(0).tile(
-                [z_sem.shape[0], 1]
-            )
-            
-            return z_reflected, out_component_indices, distances
 
+            valid_indices = [idx for idx in component_indices if idx is not None]
+            out_component_indices = (
+                torch.tensor(valid_indices)
+                .to(z_sem.device)
+                .unsqueeze(0)
+                .tile([z_sem.shape[0], 1])
+            )
+
+            return z_reflected, out_component_indices, distances
 
     # -------------------------------------------------------------------
     # Component Explanation (mirroring DiffusionAutoencoder)
     # -------------------------------------------------------------------
 
     def explain_all_components(self, sparse_dictionary=None):
-        """Visualize all sparse dictionary components."""
+        """Visualize all sparse dictionary components.
+
+        Encodes the validation split once, caches the per-sample labels,
+        component activations and z_sem as ``y_list.pt``, ``c_list.pt`` and
+        ``z_list.pt`` under ``<base_path>/<sparse_dictionaries_type>/`` and
+        renders a contrastive collage for every resolved component
+        (``component_indices`` / ``component_strings`` of the dictionary
+        config, else all components).
+
+        Parameters
+        ----------
+        sparse_dictionary : SparseDictionary or SparseDictionaryConfig, optional
+            Replaces the current dictionary (an instance) or its config
+            (then the dictionary is re-loaded or fitted); a ``data`` key in
+            the config reloads the generator datasets.
+        """
         if self.sparse_dictionary is None or sparse_dictionary is not None:
             if isinstance(sparse_dictionary, SparseDictionary):
                 self.sparse_dictionary = sparse_dictionary
@@ -876,17 +1200,23 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             else:
                 if isinstance(sparse_dictionary, SparseDictionaryConfig):
                     self.config.sparse_dictionary = sparse_dictionary
-                
+
                 # Check for data override in the new sparse dictionary config
                 sd_data = getattr(self.config.sparse_dictionary, "data", None)
                 if sd_data:
-                    print(f"StableDiffusionAutoencoder: Reloading datasets from {sd_data} for component explanation.")
+                    _log.info(
+                        "%s",
+                        f"StableDiffusionAutoencoder: Reloading datasets from {sd_data} for component explanation.",
+                    )
                     import types
+
                     self.config.data = load_yaml_config(sd_data, DataConfig)
                     if isinstance(self.config.data, types.SimpleNamespace):
                         self.config.data = DataConfig(**vars(self.config.data))
                     self.generator_datasets = get_datasets(self.config.data)
-                    self.generator_dataset = self.generator_datasets[0] if self.generator_datasets else None
+                    self.generator_dataset = (
+                        self.generator_datasets[0] if self.generator_datasets else None
+                    )
 
                 self.config.sparse_dictionary.act_size = self.config.encoder_dimensions
                 self.load_sparse_dictionary()
@@ -900,8 +1230,10 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         Path(explanation_path).mkdir(parents=True, exist_ok=True)
 
         # Resolve which components to explain
-        component_indices = self._resolve_component_indices(self.config.sparse_dictionary)
-        
+        component_indices = self._resolve_component_indices(
+            self.config.sparse_dictionary
+        )
+
         if component_indices is None:
             n_comps = self.config.sparse_dictionary.n_components
             if n_comps is None or n_comps <= 0:
@@ -910,19 +1242,24 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
 
         # Filter out duplicates and invalid indices
         component_indices = sorted(list(set(component_indices)))
-        component_indices = [i for i in component_indices if i < self.sparse_dictionary.get_components().shape[1]]
+        component_indices = [
+            i
+            for i in component_indices
+            if i < self.sparse_dictionary.get_components().shape[1]
+        ]
 
         # Prepare one batch of images for visualization and cache their encodings
         viz_batch_size = self.config.visualizations_per_component or 10
         viz_dataloader = torch.utils.data.DataLoader(
-            self.generator_datasets[1],
-            batch_size=viz_batch_size,
-            shuffle=False
+            self.generator_datasets[1], batch_size=viz_batch_size, shuffle=False
         )
         viz_batch = next(iter(viz_dataloader))
         x_factual_viz = viz_batch[0].to(self.device)
         y_factual_viz = viz_batch[1].cpu() if len(viz_batch) > 1 else []
-        print(f"Pre-encoding {len(x_factual_viz)} images for {len(component_indices)} component visualizations...")
+        _log.info(
+            "%s",
+            f"Pre-encoding {len(x_factual_viz)} images for {len(component_indices)} component visualizations...",
+        )
         cached_encodings = self.encode(x_factual_viz)
 
         # Cache paths
@@ -931,13 +1268,22 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         z_list_path = os.path.join(explanation_path, "z_list.pt")
 
         # Compute or load component correlations
-        if os.path.exists(y_list_path) and os.path.exists(c_list_path) and os.path.exists(z_list_path):
-            print(f"Loading cached component correlations from {explanation_path}...")
+        if (
+            os.path.exists(y_list_path)
+            and os.path.exists(c_list_path)
+            and os.path.exists(z_list_path)
+        ):
+            _log.info(
+                "%s",
+                f"Loading cached component correlations from {explanation_path}...",
+            )
             y_list = torch.load(y_list_path)
             c_list = torch.load(c_list_path)
             z_list = torch.load(z_list_path)
         else:
-            print("Calculating component correlations (this may take a while)...")
+            _log.info(
+                "%s", "Calculating component correlations (this may take a while)..."
+            )
             y_list, c_list, z_list = [], [], []
             task_config_buffer = (
                 self.generator_datasets[1].task_config
@@ -948,39 +1294,73 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
 
             batch_size = getattr(self.config.sparse_dictionary, "batch_size", 10)
             for idx, batch in enumerate(
-                torch.utils.data.DataLoader(self.generator_datasets[1], batch_size=batch_size)
+                torch.utils.data.DataLoader(
+                    self.generator_datasets[1], batch_size=batch_size
+                )
             ):
-                print(f"{batch_size * idx}/{len(self.generator_datasets[1])}")
+                _log.info("%s", f"{batch_size * idx}/{len(self.generator_datasets[1])}")
                 x, y = batch
                 z, _ = self.encode(x.to(self.device))
-                c = z @ self.sparse_dictionary.get_components().to(self.device).to(z.dtype)
+                c = z @ self.sparse_dictionary.get_components().to(self.device).to(
+                    z.dtype
+                )
                 y_list.append(y)
                 c_list.append(c.detach().cpu())
                 z_list.append(z.detach().cpu())
 
             self.generator_datasets[1].task_config = task_config_buffer
-            
-            print(f"Saving computed correlations to {explanation_path}...")
+
+            _log.info("%s", f"Saving computed correlations to {explanation_path}...")
             torch.save(y_list, y_list_path)
             torch.save(c_list, c_list_path)
             torch.save(z_list, z_list_path)
 
         for component_idx in component_indices:
-            print(f"Explaining component {component_idx}...")
+            _log.info("%s", f"Explaining component {component_idx}...")
             self.explain_sparse_component(
-                None, # Dataloader not needed if cached
+                None,  # Dataloader not needed if cached
                 component_idx,
                 cached_encodings=cached_encodings,
                 x_factual_viz=x_factual_viz,
-                y_factual_viz=y_factual_viz
+                y_factual_viz=y_factual_viz,
             )
 
-    def explain_sparse_component(self, dataloader, component_idx, cached_encodings=None, x_factual_viz=None, y_factual_viz=None):
-        """Visualize a single sparse dictionary component."""
+    def explain_sparse_component(
+        self,
+        dataloader,
+        component_idx,
+        cached_encodings=None,
+        x_factual_viz=None,
+        y_factual_viz=None,
+    ):
+        """Visualize a single sparse dictionary component.
+
+        Writes a contrastive collage (factual vs. reflected counterfactual)
+        to ``<base_path>/<sparse_dictionaries_type>/<component_idx>/``.
+
+        Parameters
+        ----------
+        dataloader : torch.utils.data.DataLoader or None
+            Source of images when no cached encodings are given; at most
+            ``config.visualizations_per_component`` images are used.
+        component_idx : int
+            Column of the dictionary's component matrix to reflect along.
+        cached_encodings : tuple, optional
+            ``(z_sem, stochastic_code)`` of ``x_factual_viz`` from ``encode``.
+        x_factual_viz : torch.Tensor, optional
+            Images matching ``cached_encodings``.
+        y_factual_viz : torch.Tensor, optional
+            Their labels.
+
+        Returns
+        -------
+        x_factual_list, x_counterfactual_list : list of torch.Tensor
+            CPU images before and after the edit.
+        """
         x_factual_list = []
         x_counterfactual_list = []
         y_factual_list = []
-        
+
         current_base_path = os.path.join(
             self.config.base_path,
             self.config.sparse_dictionary.sparse_dictionaries_type,
@@ -993,7 +1373,9 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
             if y_factual_viz is not None:
                 y_factual_list.extend(list(y_factual_viz))
             x_counterfactual, (dot_before, dot_after) = (
-                self.explain_sparse_component_batch(x_factual_viz, component_idx, cached_encodings=cached_encodings)
+                self.explain_sparse_component_batch(
+                    x_factual_viz, component_idx, cached_encodings=cached_encodings
+                )
             )
             x_counterfactual_list.extend(list(x_counterfactual.cpu()))
         else:
@@ -1019,26 +1401,59 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
         self.generator_dataset.generate_contrastive_collage(
             x_factual_list,
             x_counterfactual_list,
-            [], [], y_factual_list, [], [],
+            [],
+            [],
+            y_factual_list,
+            [],
+            [],
             current_base_path,
             0,
         )
 
         return x_factual_list, x_counterfactual_list
 
-    def explain_sparse_component_batch(self, x_generator, component_idx, cached_encodings=None):
-        """Generate counterfactuals for a single sparse component."""
+    def explain_sparse_component_batch(
+        self, x_generator, component_idx, cached_encodings=None
+    ):
+        """Generate counterfactuals for a single sparse component.
+
+        Reflects z_sem across the hyperplane orthogonal to the (unit
+        normalised) component direction through the dictionary mean ``mu``
+        and decodes with the input's stochastic code.
+
+        Parameters
+        ----------
+        x_generator : torch.Tensor
+            Images of shape ``(B, 3, H, W)``.
+        component_idx : int
+            Component to reflect along.
+        cached_encodings : tuple, optional
+            ``(z_sem, stochastic_code)`` to reuse instead of encoding.
+
+        Returns
+        -------
+        x_counterfactuals : torch.Tensor
+            CPU images of shape ``(B, 3, H, W)``.
+        projections : tuple of torch.Tensor
+            ``(before, after)`` projection of ``z_sem - mu`` onto the
+            component, each of shape ``(B,)``.
+        """
         if cached_encodings is not None:
             z_sem, stochastic_code = cached_encodings
         else:
             z_sem, stochastic_code = self.encode(x_generator.to(self.device))
 
-        w_raw = self.sparse_dictionary.get_components()[:, component_idx].to(self.device).to(z_sem.dtype)
+        w_raw = (
+            self.sparse_dictionary.get_components()[:, component_idx]
+            .to(self.device)
+            .to(z_sem.dtype)
+        )
         w = w_raw / torch.norm(w_raw, p=2)
 
         mu = (
             self.sparse_dictionary.mu.to(self.device).to(z_sem.dtype)
-            if hasattr(self.sparse_dictionary, 'mu') and self.sparse_dictionary.mu is not None
+            if hasattr(self.sparse_dictionary, "mu")
+            and self.sparse_dictionary.mu is not None
             else torch.zeros_like(z_sem[0])
         )
 
@@ -1058,21 +1473,25 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
     def _resolve_component_indices(self, sd_config, strings_to_resolve=None):
         """Resolve component strings or config indices to vocabulary indices."""
         component_indices = None
-        
+
         # 1. Try component_indices from config
-        if hasattr(sd_config, "component_indices") and sd_config.component_indices is not None and strings_to_resolve is None:
+        if (
+            hasattr(sd_config, "component_indices")
+            and sd_config.component_indices is not None
+            and strings_to_resolve is None
+        ):
             component_indices = sd_config.component_indices
-            
+
         # 2. Try strings
         else:
             if strings_to_resolve is None:
-                 strings_to_resolve = getattr(sd_config, "component_strings", None)
-            
+                strings_to_resolve = getattr(sd_config, "component_strings", None)
+
             if strings_to_resolve is not None:
-                if hasattr(self.sparse_dictionary, 'get_vocabulary'):
+                if hasattr(self.sparse_dictionary, "get_vocabulary"):
                     vocab_list = self.sparse_dictionary.get_vocabulary()
                     vocab_list = [v.lower() for v in vocab_list]
-                    
+
                     component_indices = []
                     for search_term in strings_to_resolve:
                         search_term = search_term.lower()
@@ -1089,9 +1508,17 @@ class StableDiffusionAutoencoder(InvertibleGenerator, EditCapableGenerator):
                                     found = True
                                     break
                             if not found:
-                                print(f"!!! [SpLICE] RESOLUTION FAILED: Concept '{search_term}' not found in vocabulary !!!", flush=True)
-                                component_indices.append(None) # Keep list length consistent
+                                _log.info(
+                                    "%s",
+                                    f"!!! [SpLICE] RESOLUTION FAILED: Concept '{search_term}' not found in vocabulary !!!",
+                                )
+                                component_indices.append(
+                                    None
+                                )  # Keep list length consistent
                 else:
-                    print("Warning: Sparse dictionary does not support get_vocabulary()", flush=True)
+                    _log.info(
+                        "%s",
+                        "Warning: Sparse dictionary does not support get_vocabulary()",
+                    )
 
         return component_indices

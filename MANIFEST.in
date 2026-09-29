@@ -1,0 +1,44 @@
+# Source-distribution contents. The wheel ships only what `packages` and
+# `package_data` in setup.py select; this file governs `sdist`, which is what a
+# `pip install .` from a clone builds first.
+
+include README.md LICENSE.txt COPYING COPYING.LESSER CITATION.cff CHANGELOG.md
+include LICENSING.md
+include THIRD_PARTY_NOTICES.md
+include requirements.txt requirements-web.txt environment.yaml
+include pytest.ini
+
+# The 800 experiment configs live outside peal/ and are referenced as
+# "<PEAL_BASE>/configs/...". They are not importable package data, so they ride
+# along in the sdist and PEAL_BASE points at the unpacked tree (see
+# peal/global_utils.py:get_project_resource_dir).
+recursive-include configs *.yaml *.yml
+
+# Provenance for every vendored component.
+recursive-include peal/dependencies UPSTREAM.md ORIGIN.md LICENSE LICENSE.md LICENCE COPYING
+recursive-include tools *.py
+
+# Vendored demo material that no code path reads: 12 MB gif, 11 MB pickle,
+# teaser images, fonts and notebooks.
+global-exclude *.ipynb *.gif *.pkl *.ttf *.woff *.woff2 *.eot *.JPEG *.jpg *.jpeg
+global-exclude *.pyc *.pyo
+prune peal/dependencies/DiCE/docs
+prune peal/dependencies/ddpm_inversion/prompt_to_prompt/docs
+
+# Build and tooling droppings
+prune .venv-web
+prune .venv-tools
+prune wandb
+prune logs
+prune logs2
+prune docs/_build
+
+# Last word wins in MANIFEST.in: this prune has to come after the
+# recursive-include of provenance files above, which would otherwise re-add
+# ADA/ORIGIN.md. ADA ships in the git repository but not in the distribution
+# (see LICENSING.md).
+prune peal/dependencies/ADA
+
+# The non-commercial RAEv2 fork is its own distribution (peal-xai-rae, CC BY-NC
+# 4.0) and must not ride along in the LGPL sdist. Build it from its own folder.
+prune packages

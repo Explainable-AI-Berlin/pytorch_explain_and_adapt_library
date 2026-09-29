@@ -2,8 +2,7 @@ explainer_type : ACE
 category : explainer
 subtype: FastDiME
 method: fastdime
-num_attempts: 4
-use_clustering: false
+num_attempts: 2
 attention_resolutions: 32,16,8
 batch_size: 10
 channel_mult: ''

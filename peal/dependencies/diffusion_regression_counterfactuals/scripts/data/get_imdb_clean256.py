@@ -1,3 +1,4 @@
+import os
 from matplotlib import pyplot as plt
 import pandas as pd
 
@@ -5,7 +6,7 @@ import pandas as pd
 if __name__ == "__main__":
     # Load the dataset
     df: pd.DataFrame = pd.read_csv(
-        "/home/space/datasets/imdb-wiki-clean/imdb-clean/data/clean/imdb-clean-1024-cropped/imdb_valid_new_1024.csv"
+        os.path.join(os.environ.get("PEAL_DATA", "datasets"), "imdb-wiki-clean/imdb-clean/data/clean/imdb-clean-1024-cropped/imdb_valid_new_1024.csv")
     )
     df["x_crop_size"] = df["x_max"] - df["x_min"]
     df["y_crop_size"] = df["y_max"] - df["y_min"]

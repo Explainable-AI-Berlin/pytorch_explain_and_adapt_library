@@ -1,0 +1,27 @@
+# python run_cfkd.py --config "<PEAL_BASE>/configs/adaptors/follicles_sce_true_cfkd.yaml"
+adaptor_type                         :  "CFKD"
+category                             :  "adaptor"
+batch_size                           :  2
+tracking_level                       :  4
+min_train_samples                    :  800 #480
+finetune_iterations                  :  1
+max_validation_samples               :  200 #59
+continuous_learning                  :  "finetune"
+use_visualization                    :  True
+calculate_group_accuracies           :  True
+explainer                            :  <PEAL_BASE>/configs/explainers/follicle_pdc_pathldm.yaml
+training                             :  <PEAL_BASE>/configs/training/img_classifier_balanced_pathldm.yaml
+data                                 :  <PEAL_BASE>/configs/data/follicles_pathldm.yaml
+test_data                            :  <PEAL_BASE>/configs/data/follicles_pathldm.yaml
+student                              :  peal_runs/pathldm_classifier/model.cpl
+teacher                              :  Baseline:false 
+generator                            :  <PEAL_BASE>/configs/cfkd_fastdime_hq/generators/pathldm.yaml
+base_dir                             :  <PEAL_BASE>/peal_runs/pathldm_follicle_distilled_classifier
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [type]
+

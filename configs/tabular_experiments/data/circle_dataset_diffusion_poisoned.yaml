@@ -1,6 +1,6 @@
 dataset_class           : CircleDataset
 category                : data
-dataset_path            : datasets/circle/size_1088_radius_1_seed_0
+dataset_path            : $PEAL_DATA/circle/size_1088_radius_1_seed_0
 radius                  : 1
 noise_scale             : 0.0
 num_samples             : 128

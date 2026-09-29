@@ -1,0 +1,33 @@
+experiment_id: e8d_in100_imageclf_vit_b16_pretrained_restoration_probe
+restoration_eval_experiment_id: e8d_in100_imageclf_vit_b16_pretrained_restoration_evaluation
+model_id: vit_b16_imagenet1k_pretrained_finetune_imageclf
+architecture: torchvision_vit_b_16
+pretrained: true
+freeze_backbone: false
+allow_weight_download: false
+
+train_cache: artifacts/ada/atlas/embeddings/imagenet100/train/facebook__dinov2-with-registers-base/cls/combined_train_full_4shards
+validation_cache: artifacts/ada/atlas/embeddings/imagenet100/val/facebook__dinov2-with-registers-base/cls/cache-6ec1e8a1b614f414
+train_image_root: /home/space/datasets/imagenet_torchvision/imagenet100/train
+validation_image_root: /home/space/datasets/imagenet_torchvision/imagenet100/val
+enriched_regions_dir: artifacts/ada/actionability/regions/e4a_in100_dinov2_cls_k10_enriched_seed0
+deletion_controls_dir: artifacts/ada/actionability/restoration/e5a_in100_dinov2_cls_k10_real_restoration_pilot_seed0
+restoration_dir: artifacts/ada/actionability/restoration/e5a_in100_dinov2_cls_k10_real_restoration_pilot_seed0
+deletion_probe_output_dir: artifacts/ada/actionability/probes/e8c_in100_imageclf_vit_b16_pretrained_deletion_seed0
+probe_output_dir: artifacts/ada/actionability/probes/e8d_in100_imageclf_vit_b16_pretrained_restoration_seed0
+restoration_probe_output_dir: artifacts/ada/actionability/probes/e8d_in100_imageclf_vit_b16_pretrained_restoration_seed0
+restoration_eval_output_dir: artifacts/ada/actionability/evaluation/e8d_in100_imageclf_vit_b16_pretrained_restoration_seed0
+report_path: notes/ada/actionability/imageclf_vit_b16_pretrained_restoration_report_2026-08-10.md
+
+fixed_steps: 1000
+batch_size: 64
+eval_batch_size: 128
+lr: 0.00005
+weight_decay: 0.05
+image_size: 224
+train_augmentation: standard
+precision: bf16
+num_workers: 8
+device: auto
+support_k: 50
+overwrite: false

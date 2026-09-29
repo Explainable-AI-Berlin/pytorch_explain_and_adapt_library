@@ -1,9 +1,10 @@
 if __name__ == "__main__":
     import random
     import pandas as pd
+    import os
     import os.path as osp
 
-    data_dir = "/home/jeanner211/DATASETS/celeba"
+    data_dir = os.path.join(os.environ.get("PEAL_DATA", "datasets"), "celeba")
 
     random.seed(5)
 

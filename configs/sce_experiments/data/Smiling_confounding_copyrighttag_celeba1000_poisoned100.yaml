@@ -1,0 +1,36 @@
+dataset_path            : $PEAL_DATA/celeba_copyrighttag
+num_samples             : 1000
+split                   : [0.8,1.0]
+input_type              : image
+input_size              : [3, 128, 128]
+output_type             : multiclass
+output_size             : [41]
+confounder_probability  : 1.0
+confounding_factors     : [Smiling, Confounder]
+has_hints               : true
+
+
+    # architecture: torchvision_resnet18
+    # distill_from: predictor
+    # task:
+    #   criterions:
+    #     ce: 1.0
+    #     l2: 100.0
+    #     lc: 10.0
+    #   output_channels: 2
+    #   output_type: singleclass
+    #   y_selection:
+    #   - prediction
+    # training:
+    #   adv_training: true
+    #   class_balanced: true
+    #   label_smoothing: 0.1
+    #   learning_rate: 0.001
+    #   max_epochs: 25
+    #   mixup_alpha: 10
+    #   optimizer: adam
+    #   steps_per_epoch: 1000
+    #   test_batch_size: 32
+    #   train_batch_size: 32
+    #   use_mixup: false
+    #   val_batch_size: 4

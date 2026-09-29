@@ -1,36 +1,12 @@
-import argparse
+"""Generate a synthetic confounded dataset from a ``DataConfig`` YAML.
 
-from peal.data.interfaces import DataConfig
-from peal.global_utils import (
-    load_yaml_config,
-    add_class_arguments,
-    integrate_arguments,
-    set_random_seed,
-)
-from peal.data.dataset_generators import (
-    ConfounderDatasetGenerator,
-    SquareDatasetGenerator,
-)
+Thin wrapper. The implementation moved to ``peal.entrypoints.generate_dataset`` so that
+an installed PEAL exposes it as the ``peal-generate-dataset`` console command; this file
+is kept because the reproduction scripts, notebooks and README all invoke ``python
+generate_dataset.py ...``. See that module for the full documentation.
+"""
 
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, required=True)
-    add_class_arguments(parser, DataConfig)
-    args = parser.parse_args()
-
-    config = load_yaml_config(args.config, DataConfig)
-    integrate_arguments(args, config, exclude=["config"])
-    set_random_seed(config.seed)
-
-    if config.dataset_class == "celeba":
-        cdg = ConfounderDatasetGenerator(**config.__dict__, data_config=config)
-        cdg.generate_dataset()
-
-    elif config.dataset_class == "SquareDataset":
-        cdg = SquareDatasetGenerator(data_config=config)
-        cdg.generate_dataset()
-
+from peal.entrypoints.generate_dataset import main
 
 if __name__ == "__main__":
     main()

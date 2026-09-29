@@ -1,0 +1,38 @@
+# VALIDATION: classical Procrustes-CFKD (told Blond_Hair/Male, 2-atom dictionary, DDPM edit-friendly
+# inversion, whole-network finetuning) on the CelebA RAE generator instead of the DiffAE. Same
+# student, teacher, data, dictionary and explainer as celeba1kx098_resnet18_procrustes_openai_clip_cfkd.yaml
+# (z_sem is the same OpenAI CLIP ViT-L/14 embedding -- utils/celeba_rae_clip/check_encoder.py verifies
+# it), so the only difference is the decoder. Read gain against the DiffAE baseline (0.254 on the
+# step-375000 decoder; 0.22-0.28 across seeds). If it lands in that band the RAE renders Procrustes
+# edits and the MSAE attempt on it is worth running.
+# Usage: python utils/celeba_rae_clip/pin_stage2.py newest && python -W ignore run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/celeba1kx098_resnet18_procrustes_rae_clip_cfkd.yaml"
+adaptor_type                         :  "CFKD"
+category                             :  "adaptor"
+batch_size                           :  200
+tracking_level                       :  5
+min_train_samples                    :  800
+finetune_iterations                  :  1
+max_validation_samples               :  200
+continuous_learning                  :  "finetune"
+calculate_group_accuracies           :  True
+calculate_explainer_stats            :  True
+explainer                            :  <PEAL_BASE>/configs/didae_experiments/explainers/dae_distill_ddpm.yaml
+training                             :  <PEAL_BASE>/configs/cfkd_experiments/training/img_finetuning.yaml
+data                                 :  <PEAL_BASE>/configs/cfkd_experiments/data/celeba1k_Blond_Hair_confounding_Male_poisoned098.yaml
+test_data                            :  <PEAL_BASE>/configs/cfkd_experiments/data/celeba.yaml
+student                              :  $PEAL_RUNS/celeba1k/Blond_Hair/classifier_poisoned098/model.cpl
+teacher                              :  $PEAL_RUNS/celeba/Blond_Hair/classifier_unpoisoned/model.cpl
+# _slim = the same final.ckpt (step 40000) minus optimizer state and frozen CLIP encoder
+# keys; identical weights, fits the 16 GiB cgroup. See the README.txt in that directory.
+# pinned by utils/celeba_rae_clip/pin_stage2.py: ddpm sampler, exact edit-friendly inversion
+generator                            :  $PEAL_RUNS/celeba/rae_clip/config_pinned.yaml
+# fitted on the RAE's own z_sem by utils/celeba_rae_clip/fit_dictionary.py (the DiffAE dictionary does not transfer)
+sparse_dictionary                    :  $PEAL_RUNS/celeba/rae_clip/OrthogonalProcrustesDictionary/config.yaml
+base_dir                             :  $PEAL_RUNS/celeba1k/Blond_Hair/classifier_poisoned098/procrustes_rae_clip_cfkd_ddpm
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [Blond_Hair]

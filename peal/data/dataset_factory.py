@@ -1,3 +1,14 @@
+"""Build the train / validation / test datasets described by a ``DataConfig``.
+
+This is the entry point every PEAL training script, adaptor and explainer uses to
+turn a data yaml into ``PealDataset`` instances. It assembles the torchvision
+transform pipelines (invariance augmentations for training, deterministic
+resizing and cropping for evaluation), resolves the dataset class from
+``config.dataset_class`` or the input/output type, computes dataset statistics
+for normalization when requested, and attaches the normalization and task
+config to the returned datasets.
+"""
+
 import torch
 import os
 
@@ -6,10 +17,10 @@ from torchvision.transforms import ToTensor
 from torchvision.transforms import v2
 
 from peal.architectures.interfaces import TaskConfig
+from peal.registry import lookup, UnknownComponentError
 from peal.global_utils import (
     load_yaml_config,
     get_project_resource_dir,
-    find_subclasses,
 )
 from peal.data.transformations import (
     CircularCut,
@@ -36,21 +47,50 @@ def get_datasets(
     test_config: DataConfig = None,
     data_dir: str = None,
 ):
+    """Instantiate the train, validation and test datasets of a data config.
+
+    Parameters
+    ----------
+    config : DataConfig or str
+        Data config object or path of its yaml (resolved by
+        ``load_yaml_config``). Consumed keys: ``dataset_path``, ``input_type``,
+        ``output_type``, ``dataset_class``, ``invariances``, ``crop_size``,
+        ``input_size``, ``normalization``, ``split``, ``diffusion_augmented``,
+        ``batch_wise_augmentation`` and the diffusion augmentation keys
+        ``generator``, ``sampling_time_fraction``, ``num_discretization_steps``.
+    base_dir : str, optional
+        Root directory of the dataset; defaults to ``config.dataset_path``.
+    task_config : TaskConfig, optional
+        Stored on every returned dataset as ``task_config``.
+    return_dict : bool, default False
+        Passed through to the dataset constructors.
+    test_config : DataConfig or str, optional
+        Separate config for the test split; defaults to ``config``.
+    data_dir : str, optional
+        Passed through to the train / val dataset constructors.
+
+    Returns
+    -------
+    tuple of PealDataset
+        ``(train_data, val_data, test_data)``. When ``test_config.split`` is
+        ``[x, 1.0]`` the validation dataset object is reused as test set. Each
+        dataset gets ``normalization`` and ``task_config`` attributes.
+
+    Raises
+    ------
+    ValueError
+        If ``dataset_class`` is unknown and the ``input_type`` / ``output_type``
+        combination has no default dataset class.
+
+    Notes
+    -----
+    Augmentations are selected by name from ``config.invariances``:
+    ``circular_cut``, ``rotation``, ``rotation10``, ``hflipping``,
+    ``vflipping``, ``random_resize10/20/50``, ``color_jitter``, ``sharpness``,
+    ``blur``, ``crop``, ``horizontalflip``. An empty ``normalization`` list is
+    filled in place with the per-channel mean and std of the training split.
     """
-    This function is used to get the datasets for training, validation and testing.
-
-    Args:
-        config (_type_): _description_
-        base_dir (_type_): _description_
-
-    Raises:
-        ValueError: _description_
-
-    Returns:
-        _type_: _description_
-    """
-    config = load_yaml_config(config, DataConfig)
-
+    config = load_yaml_config(config)
     if base_dir is None:
         base_dir = config.dataset_path
 
@@ -121,6 +161,14 @@ def get_datasets(
             transform_list_train.append(
                 v2.GaussianBlur(kernel_size=(5, 9), sigma=(0.1, 5.0))
             )
+        if "crop" in config.invariances:
+            transform_list_train.append(
+                transforms.RandomCrop(
+                    224, scale=(0.7, 1.0), ratio=(0.75, 1.3333), interpolation=2
+                )
+            )
+        if "horizontalflip" in config.invariances:
+            transform_list_train.append(transforms.RandomHorizontalFlip())
 
         #
         if not config.crop_size is None:
@@ -156,15 +204,21 @@ def get_datasets(
     transform_validation = transforms.Compose(transform_list_validation)
     transform_test = transforms.Compose(transform_list_test)
 
-    dataset_class_list = find_subclasses(
-        PealDataset,
-        os.path.join(get_project_resource_dir(), "peal", "data"),
-    )
-    dataset_class_dict = {
-        dataset_class.__name__: dataset_class for dataset_class in dataset_class_list
-    }
-    if config.dataset_class in dataset_class_dict.keys():
-        dataset = dataset_class_dict[config.dataset_class]
+    dataset = None
+    if config.dataset_class:
+        try:
+            dataset = lookup(
+                "datasets",
+                config.dataset_class,
+                base_class=PealDataset,
+                scan_dir=os.path.join(get_project_resource_dir(), "peal", "data"),
+            )
+        except UnknownComponentError:
+            # Historical behaviour: an unknown dataset_class falls through to
+            # the input/output-type defaults below rather than failing here.
+            dataset = None
+    if dataset is not None:
+        pass
 
     elif config.input_type == "image" and config.output_type == "singleclass":
         dataset = Image2ClassDataset
@@ -212,7 +266,6 @@ def get_datasets(
     transform_train = transforms.Compose([transform_train, normalization])
     transform_validation = transforms.Compose([transform_validation, normalization])
     transform_test = transforms.Compose([transform_test, normalization])
-
     train_data = dataset(
         root_dir=base_dir,
         mode="train",

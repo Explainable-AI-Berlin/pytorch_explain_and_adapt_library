@@ -1,3 +1,12 @@
+"""Building blocks from which PEAL's configurable predictors are assembled.
+
+Each block is an ``nn.Sequential`` parameterised by a pydantic layer config
+(``FCConfig``, ``VGGConfig``, ``ResnetConfig``) so that classifier
+architectures can be described entirely in yaml. ``create_cnn_layer`` stacks
+``num_blocks`` VGG or ResNet blocks into one stage whose first block
+downsamples by stride 2.
+"""
+
 from torch import nn
 from typing import Union, Type
 from pydantic.types import PositiveInt
@@ -11,8 +20,20 @@ from peal.architectures.interfaces import FCConfig, VGGConfig, ResnetConfig
 
 
 class FCBlock(nn.Sequential):
-    """
-    The FCBlock class implements a fully connected block as a sequential module.
+    """Fully connected block: a 1x1 projection, optional activation and dropout.
+
+    Depending on ``layer_config.tensor_dim`` the projection is an ``nn.Linear``
+    (0) or a kernel-size-1 ``Conv1d``/``Conv2d``/``Conv3d`` (1/2/3), so the
+    same config can act on flat vectors or on feature maps.
+
+    Parameters
+    ----------
+    layer_config : FCConfig
+        Provides ``tensor_dim``, ``num_neurons`` and ``dropout``.
+    num_neurons_previous : int
+        Input width (features or channels).
+    activation : type of nn.Module, optional
+        Activation class appended after the projection; none if ``None``.
     """
 
     def __init__(
@@ -57,11 +78,24 @@ class FCBlock(nn.Sequential):
 
 
 class VGGBlock(nn.Sequential):
-    """
-    The VGGBlock class implements a VGG block as a sequential module.
+    """VGG-style block: convolution, optional batchnorm, activation.
 
-    Args:
-        nn.Sequential (nn.Module): The base class for all neural network modules.
+    Parameters
+    ----------
+    input_channels : int
+        Number of input channels.
+    activation : type of nn.Module
+        Activation class, instantiated without arguments.
+    stride : int
+        Stride of the convolution.
+    conv : type of nn.Module
+        Convolution class (``nn.Conv1d``/``Conv2d``/``Conv3d``).
+    batchnorm : type of nn.Module
+        Batchnorm class matching ``conv``; used if ``config.use_batchnorm``.
+    config : VGGConfig
+        Provides ``num_neurons`` (output channels), ``receptive_field``
+        (kernel size; padding is ``receptive_field // 2``) and
+        ``use_batchnorm``.
     """
 
     def __init__(
@@ -105,11 +139,31 @@ class VGGBlock(nn.Sequential):
 
 
 class ResnetBlock(nn.Sequential):
-    """
-    The ResnetBlock class implements a ResNet block as a sequential module.
+    """Basic residual block with two 3x3 convolutions and a skip connection.
 
-    Args:
-        nn.Sequential (nn.Module): The base class for all neural network modules.
+    The residual branch is conv-(bn)-act-conv-(bn). When ``stride > 1`` the
+    identity path is replaced by ``AvgPool2d(2)`` followed by a 1x1 convolution
+    so that shapes match; the sum is followed by a final activation.
+
+    Parameters
+    ----------
+    input_channels : int
+        Number of input channels.
+    activation : type of nn.Module
+        Activation class, instantiated without arguments.
+    stride : int
+        Stride of the first convolution (2 downsamples).
+    conv : type of nn.Module
+        Convolution class (``nn.Conv1d``/``Conv2d``/``Conv3d``).
+    batchnorm : type of nn.Module
+        Batchnorm class matching ``conv``; used if ``config.use_batchnorm``.
+    config : ResnetConfig
+        Provides ``num_neurons`` (output channels) and ``use_batchnorm``.
+
+    Notes
+    -----
+    The downsampling path always uses ``nn.AvgPool2d`` regardless of
+    ``tensor_dim``.
     """
 
     def __init__(
@@ -214,11 +268,22 @@ def create_cnn_layer(
 
 
 class TransformerBlock(nn.Sequential):
-    """
-    The TransformerBlock class implements a transformer block as a sequential module.
+    """Pre-activation transformer block: attention and position-wise MLP, each residual.
 
-    Args:
-        nn.Sequential (nn.Module): The base class for all neural network modules.
+    Sub-block 1 is ``SkipConnection(SelfAttentionLayer -> LayerNorm)``; sub-block
+    2 is ``SkipConnection(1x1 Conv1d over the embedding axis -> activation ->
+    LayerNorm)``. Inputs and outputs have shape ``(B, T, embedding_dim)``.
+
+    Parameters
+    ----------
+    embedding_dim : int
+        Token embedding width.
+    num_heads : int
+        Number of self-attention heads.
+    activation : type of nn.Module
+        Activation class for the feed-forward sub-block.
+    use_masking : bool, optional
+        Whether the attention layer applies a causal mask. Default ``False``.
     """
 
     def __init__(self, embedding_dim, num_heads, activation, use_masking=False):

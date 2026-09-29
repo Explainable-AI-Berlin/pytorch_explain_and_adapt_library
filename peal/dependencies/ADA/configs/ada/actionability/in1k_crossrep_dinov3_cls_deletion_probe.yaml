@@ -1,0 +1,20 @@
+experiment_id: e7d_in1k_crossrep_dinov3_cls_deletion_probe
+eval_experiment_id: e7d_in1k_crossrep_dinov3_cls_deletion_evaluation
+model_id: dinov3_cls_linear_probe
+feature_id: facebook__dinov3-vitb16-pretrain-lvd1689m/cls
+
+train_cache: artifacts/ada/atlas/embeddings/imagenet1k/train/facebook__dinov3-vitb16-pretrain-lvd1689m/cls/combined_train_full_8shards
+validation_cache: artifacts/ada/atlas/embeddings/imagenet1k/val/facebook__dinov3-vitb16-pretrain-lvd1689m/cls/cache-63bb2429628246b8
+enriched_regions_dir: artifacts/ada/actionability/regions/e7a_in1k_dinov2_cls_k10_enriched_seed0
+deletion_controls_dir: artifacts/ada/actionability/deletion_confirmatory/e7b_in1k_dinov2_cls_k10_confirmatory_seed0
+probe_output_dir: artifacts/ada/actionability/probes/e7d_in1k_crossrep_dinov3_cls_deletion_seed0
+eval_output_dir: artifacts/ada/actionability/evaluation/e7d_in1k_crossrep_dinov3_cls_deletion_full_seed0
+report_path: notes/ada/actionability/in1k_crossrep_dinov3_cls_deletion_evaluation_report.md
+
+fixed_steps: 1000
+batch_size: 2048
+lr: 0.01
+weight_decay: 0.0001
+device: auto
+support_k: 50
+overwrite: false

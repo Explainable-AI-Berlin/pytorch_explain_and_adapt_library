@@ -1,3 +1,15 @@
+"""
+Side-by-side comparison grids of several models on the same samples.
+
+Samples are bucketed by a set of binary criteria (e.g. class, presence of a
+confounder); one representative per bucket is picked from the dataset and
+every model listed in ``columns`` is explained on it, either with LRP
+heatmaps (``LRPExplainer``) or with counterfactuals
+(``CounterfactualExplainer``). The result is rendered into a single image by
+``peal.visualization.image_grid.make_image_grid`` with checkbox columns that
+show which criteria hold for each row.
+"""
+
 import torch
 
 from tqdm import tqdm
@@ -8,6 +20,27 @@ from peal.explainers.counterfactual_explainer import CounterfactualExplainer
 
 
 def change_all(x, target_index, current_index):
+    """
+    Build the indicator tensor of one criterion over all criterion combos.
+
+    Recursively descends the ``2 x 2 x ... x 2`` tensor ``x``; at depth
+    ``target_index`` the first half is set to 0 and the second to 1, so the
+    result marks which combinations have criterion ``target_index`` true.
+
+    Parameters
+    ----------
+    x : torch.Tensor
+        Tensor of shape ``[2] * n_criteria`` (values ignored, shape used).
+    target_index : int
+        Axis (criterion) whose indicator is built.
+    current_index : int
+        Current recursion depth; start with 0.
+
+    Returns
+    -------
+    torch.Tensor
+        Same shape as ``x``, 1 where axis ``target_index`` has index 1.
+    """
     if target_index == current_index:
         return torch.stack([torch.zeros_like(x[0]), torch.ones_like(x[1])])
 
@@ -21,6 +54,21 @@ def change_all(x, target_index, current_index):
 
 
 def create_checkbox_dict(criterion_keys):
+    """
+    Enumerate all combinations of binary criteria as checkbox columns.
+
+    Parameters
+    ----------
+    criterion_keys : iterable of str
+        Names of the criteria (``n`` of them).
+
+    Returns
+    -------
+    dict
+        ``{criterion: torch.LongTensor of shape (2 ** n,)}`` where entry
+        ``i`` says whether the criterion holds in combination ``i`` (the
+        flattened ``[2] * n`` index grid).
+    """
     checkbox_dict = {}
     for idx, key in enumerate(criterion_keys):
         x = torch.zeros(len(criterion_keys) * [2], dtype=torch.long)
@@ -37,6 +85,37 @@ def get_explanation(
     explainer,
     batch_size=1,
 ):
+    """
+    Explain every row of ``X`` with one model and return grid columns.
+
+    Parameters
+    ----------
+    X : torch.Tensor
+        Images of shape ``(N, C, H, W)``, one per criterion combination.
+    description : tuple
+        ``(explanation_type, model, target_key, base_path)``: the model to
+        explain, the criterion whose checkbox column gives the source label
+        per row, and the directory counterfactual artifacts are written to.
+    scores : torch.Tensor
+        Shape ``(N,)``: the model's softmax score for the reference class per
+        row, used to label the images.
+    checkbox_dict : dict
+        Output of ``create_checkbox_dict`` (or the caller-provided one).
+    explainer : LRPExplainer or CounterfactualExplainer
+        Decides which branch is taken. ``explainer.predictor`` must already
+        be set to the model in question.
+    batch_size : int
+        Batch size for the counterfactual branch.
+
+    Returns
+    -------
+    images : list of torch.Tensor
+        Two image stacks of shape ``(N, 3, H, W)``: ``[heatmap, overlay]``
+        for LRP or ``[counterfactual, attribution]`` for counterfactuals.
+    labels : list of str
+        One caption per row (target and score for LRP, ``before -> after``
+        confidence for counterfactuals).
+    """
     explanation_type, model, target_key, base_path = description
     lrp_target = checkbox_dict[target_key]
     if isinstance(explainer, LRPExplainer):
@@ -54,22 +133,6 @@ def get_explanation(
 
     elif isinstance(explainer, CounterfactualExplainer):
         cfkd_target = torch.abs(lrp_target - 1)
-        """if explainer_config is None:
-            student_cfkd_counterfactual_explainer = CounterfactualExplainer(
-                downstream_model=model,
-                generator=generator,
-                input_type="image",
-                dataset=dataset,
-            )
-
-        else:
-            student_cfkd_counterfactual_explainer = CounterfactualExplainer(
-                downstream_model=model,
-                generator=generator,
-                explainer_config=explainer_config,
-                input_type="image",
-                dataset=dataset,
-            )"""
 
         current_idx = 0
         while current_idx < X.shape[0]:
@@ -93,9 +156,7 @@ def get_explanation(
                 ).cpu()
 
             except Exception:
-                import pdb
-
-                pdb.set_trace()
+                raise
 
             cfkd_heatmap = torch.stack(
                 student_cfkd_counterfactual_explanation["x_attribution_list"]
@@ -148,6 +209,42 @@ def create_comparison(
     checkbox_dict_in=None,
     batch_size=1,
 ):
+    """
+    Pick one sample per criterion combination and explain it with each model.
+
+    The dataset is scanned from index 50 onwards; the first sample matching
+    each combination of ``criterions`` is kept together with every model's
+    softmax score for ``score_reference_idx``. Then ``get_explanation`` is
+    called per column and the whole thing is rendered as one image.
+
+    Parameters
+    ----------
+    explainer : LRPExplainer or CounterfactualExplainer
+        Reused for all columns; its ``predictor`` is swapped per column.
+    dataset : peal dataset
+        Indexable dataset returning ``(x, y)``.
+    criterions : dict
+        ``{name: callable(x, y) -> bool}`` defining the row buckets.
+    columns : dict
+        ``{column_name: (explanation_type, model, target_key, base_path)}``;
+        ``model`` is called on ``x.unsqueeze(0).to(device)``.
+    score_reference_idx : int
+        Class index whose softmax score is reported per row.
+    device : str or torch.device
+        Device the models run on.
+    max_samples : int
+        Maximum number of dataset indices scanned.
+    checkbox_dict_in : dict, optional
+        Explicit ``{criterion: LongTensor (n_rows,)}`` rows to look for
+        instead of the full ``2 ** n`` grid; must contain a ``"class"`` key.
+    batch_size : int
+        Batch size for the counterfactual explainer.
+
+    Returns
+    -------
+    torch.Tensor
+        The composed comparison image from ``make_image_grid``.
+    """
     scores_dict = {}
 
     if checkbox_dict_in is None:

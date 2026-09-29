@@ -1,0 +1,18 @@
+# python train_generator.py --config "<PEAL_BASE>/configs/sae_experiments/generators/sparse_numbers_diffusion_autoencoder.yaml"
+# python run_component_analysis.py --config $PEAL_RUNS/sparse_numbers/diffusion_autoencoder/config.yaml --sd_config "<PEAL_BASE>/configs/sae_experiments/sparse_dictionaries/batch_topk_sparse_numbers.yaml"
+generator_type : DiffusionAutoencoder
+category : generator
+base_path : $PEAL_RUNS/sparse_numbers/diffusion_autoencoder
+data: <PEAL_BASE>/configs/sae_experiments/data/sparse_numbers.yaml
+image_size: 128
+batch_size: 100
+save_every_samples: 20000
+total_samples: 4000001
+# total_samples: 2000001
+encoder_dimensions : 512
+# Path to the trained foundation model (resnet18 from scratch)
+encoder_path: $PEAL_RUNS/sparse_numbers/classifier_all_alltributes_predictor_focal_mixed_0.25_1_d0.01c_lr_0.0002/model.cpl
+is_torchvision_resnet: true
+# Batch Top-K SAE for direction recovery
+sparse_dictionary: <PEAL_BASE>/configs/sae_experiments/sparse_dictionaries/batch_topk_sparse_numbers.yaml
+visualizations_per_component: 1 ######## new

@@ -1,49 +1,36 @@
-""" """
+"""Group Distributionally Robust Optimization (GroupDRO) as a PEAL adaptor.
 
-import copy
+Baseline repair method (Sagawa et al., 2020) that minimises the worst-group
+loss over the (target, confounder) groups instead of the average loss. The
+adaptor either trains on a PEAL dataset with ``enable_groups()`` (labels come
+as ``(y, confounder)`` pairs) or on the paper's CelebA/Waterbirds replication
+data from ``peal.dependencies.group_dro``. Training uses the vendored
+``LossComputer`` and writes per-epoch checkpoints plus the best validation
+model to ``<model_path>/checkpoints``.
+"""
+
 from datetime import datetime
 
 import torch
 import os
-import psutil
-import types
 import shutil
-import inspect
-import platform
 import numpy as np
 import gc
 
 from pathlib import Path
 
-import torchvision.utils
-from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
-from pydantic import BaseModel, PositiveInt
 from typing import Union
 
 # from group_DRO.train import train
 from peal.data.dataset_factory import get_datasets
-from peal.data.interfaces import DataConfig
-from peal.data.datasets import Image2MixedDataset, Image2ClassDataset
-from peal.dependencies.attacks.attacks import PGD_L2
 from peal.global_utils import (
-    orthogonal_initialization,
-    move_to_device,
     load_yaml_config,
     save_yaml_config,
     reset_weights,
-    requires_grad_,
-    get_predictions,
-    replace_relu_with_leakysoftplus,
-    replace_relu_with_leakyrelu,
 )
-from peal.training.loggers import log_images_to_writer
-from peal.training.loggers import Logger
-from peal.training.criterions import get_criterions, available_criterions
 from peal.training.trainers import PredictorConfig
-from peal.data.dataloaders import create_dataloaders_from_datasource, DataloaderMixer
-from peal.generators.interfaces import Generator
-from peal.architectures.interfaces import ArchitectureConfig, TaskConfig
+from peal.architectures.interfaces import ArchitectureConfig
 from peal.architectures.predictors import (
     SequentialModel,
     TorchvisionModel,
@@ -60,6 +47,9 @@ from peal.dependencies.group_dro.data.data import prepare_data
 
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import WeightedRandomSampler
+from peal.log import get_logger
+
+_log = get_logger(__name__)
 
 
 dro_criterions = {
@@ -75,18 +65,18 @@ class GroupDROConfig(AdaptorConfig):
     Config template for running the DRO adaptor.
     """
 
+    adaptor_type: str = "GroupDRO"
     """
     The config template for an adaptor
     """
-    adaptor_type: str = "GroupDRO"
+    predictor: PredictorConfig = None
     """
     The config of the predictor to be adapted.
     """
-    predictor: PredictorConfig = None
+    is_robust: bool = False
     """
     Parameters for the Gorup_DRO loss computer
     """
-    is_robust: bool = False
     alpha: float = None
     gamma: float = 0.1
     generalization_adjustment: float = 0.0
@@ -94,43 +84,85 @@ class GroupDROConfig(AdaptorConfig):
     robust_step_size: float = 0.01
     use_normalized_loss: bool = False
     btl: bool = False
+    reweight_groups: bool = False
     """
     Reweights groups during training so the training set is balanced.
     """
-    reweight_groups: bool = False
+    replication_dataset: str = None
     """
     Use paper's datasets. Only accepts "celebA", "waterbirds" and None, with None indicating to not use the paper's 
     datasets, but rather the one specified in predictor's data config.
     """
-    replication_dataset: str = None
+    reset_weights: bool = True
     """
     Resets weights of the model if true.
     """
-    reset_weights: bool = True
+    scheduler: bool = False
     """
     Use ReduceLROnPlateau scheduler if true.
     """
-    scheduler: bool = False
+    model_path: str = None
     """
     The path where the model is to be stored. Explicitly overwrites model_path in predictor.
     """
-    model_path: str = None
+    seed: int = 0
     """
     Sets the seed of the run. Expliticly overwrites the seed parameter in predictor.
     """
-    seed: int = 0
+    kwargs: dict = {}
     """
     A dict containing all variables that could not be given with the current config structure
     """
-    kwargs: dict = {}
+    __name__: str = "peal.GroupDROConfig"
     """
     The name of the class.
     """
-    __name__: str = "peal.GroupDROConfig"
 
 
 class GroupDRO(Adaptor):
-    """GroupDRO Adaptor"""
+    """Adaptor that (re)trains a predictor with the GroupDRO objective.
+
+    Groups are ``y * output_size + confounder`` for PEAL datasets and the
+    dataset's own group index for the replication datasets. Only SGD (momentum
+    0.9, weight decay ``task.criterions["l2"]``) and a single ``ce``/``bce``/
+    ``mse``/``mae`` objective are supported.
+
+    Parameters
+    ----------
+    adaptor_config : dict or str or Path or AdaptorConfig
+        A ``GroupDROConfig`` (or yaml path); ``predictor`` supplies the
+        architecture, training, data and task configs.
+    model_path : str, optional
+        Overrides ``adaptor_config.model_path``; default is the predictor's
+        ``model_path`` with a ``DRO_`` prefix on its last component.
+    model : torch.nn.Module, optional
+        Model to adapt; built from the architecture config when ``None``
+        (``SequentialModel`` for replication runs, ``TorchvisionModel`` for
+        ``torchvision_*`` strings).
+    datasource : str or sequence of Dataset, optional
+        Dataset root or ``(train, val[, test])`` datasets; defaults to
+        ``data_config.dataset_path``. Ignored for replication datasets.
+    optimizer, criterions, logger, only_last_layer, unit_test_train_loop, unit_test_single_sample, log_frequency, gigabyte_vram, val_dataloader_weights
+        Accepted for interface compatibility with ``ModelTrainer`` but unused.
+
+    Attributes
+    ----------
+    train_dataloader, val_dataloaders, test_dataloader : DataLoader
+        Loaders created by ``_load_PEAL_dataset`` or
+        ``_load_replication_dataset``.
+    objective : torch.nn.Module
+        Per-sample (``reduction="none"``) loss selected from the task's
+        ``criterions``.
+
+    Raises
+    ------
+    NotImplementedError
+        If ``replication_dataset`` is not ``None``, ``"celeba"`` or
+        ``"waterbirds"``.
+    Exception
+        If no supported architecture is found, or the task defines several
+        non-``l2`` criteria or an unsupported one.
+    """
 
     def __init__(
         self,
@@ -150,6 +182,15 @@ class GroupDRO(Adaptor):
         gigabyte_vram=None,
         val_dataloader_weights=[1.0],
     ):
+        """Unpack the config, build the dataloaders, the model and the objective.
+
+        Resolves ``model_path``, loads either the PEAL dataset from
+        ``datasource`` or one of the replication datasets (``celeba``,
+        ``waterbirds``), instantiates the architecture when ``model`` is
+        ``None`` (optionally resetting its weights), and picks the single
+        per-sample objective from ``task.criterions``. See the class docstring
+        for the parameters and the exceptions raised.
+        """
 
         # Unpack Config
         self.adaptor_config = load_yaml_config(adaptor_config, AdaptorConfig)
@@ -195,8 +236,10 @@ class GroupDRO(Adaptor):
         if self.adaptor_config.replication_dataset is None:
             self._load_PEAL_dataset(datasource)
         elif self.adaptor_config.replication_dataset in ["celeba", "waterbirds"]:
-            print(
-                "Loading replication dataset", self.adaptor_config.replication_dataset
+            _log.info(
+                "%s %s",
+                "Loading replication dataset",
+                self.adaptor_config.replication_dataset,
             )
             self._load_replication_dataset(self.adaptor_config.replication_dataset)
         else:
@@ -271,6 +314,34 @@ class GroupDRO(Adaptor):
                     )
 
     def run(self, continue_training=False, is_initialized=False):
+        """Train for ``training.max_epochs`` epochs with the GroupDRO loss.
+
+        Side effects: an existing ``model_path`` is renamed with an ``_old_``
+        timestamp suffix (unless ``is_initialized``), ``<model_path>/config.yaml``
+        is written, ``checkpoints/<epoch>.cpl`` is saved after every epoch and
+        ``checkpoints/final.cpl`` whenever the validation ``avg_acc`` of the
+        ``LossComputer`` improves.
+
+        Parameters
+        ----------
+        continue_training : bool, optional
+            Not supported; raises ``NotImplementedError`` if ``True``.
+        is_initialized : bool, optional
+            Skip moving an existing model directory out of the way.
+
+        Raises
+        ------
+        ValueError
+            If ``generalization_adjustment`` is neither a scalar nor a list of
+            length 1 or ``n_groups``.
+        NotImplementedError
+            If the training optimizer is not ``"sgd"``.
+
+        Notes
+        -----
+        A ``ReduceLROnPlateau`` scheduler is created when ``config.scheduler``
+        is set but never stepped.
+        """
 
         # TODO: Create setup for the run. Roughly should be the contents of run_expt.py
 
@@ -428,6 +499,27 @@ class GroupDRO(Adaptor):
     def run_epoch(
         self, epoch, model, optimizer, loader, loss_computer, is_training, pbar=None
     ):
+        """Run one training or validation pass over ``loader``.
+
+        Parameters
+        ----------
+        epoch : int
+            Current epoch (only for bookkeeping).
+        model : torch.nn.Module
+            Model to evaluate/update; switched to train or eval mode.
+        optimizer : torch.optim.Optimizer
+            Stepped after every batch when ``is_training``.
+        loader : DataLoader
+            Yields ``(x, (y, confounder))`` for PEAL datasets or
+            ``(x, y, group)`` for replication datasets.
+        loss_computer : LossComputer
+            Accumulates per-group statistics; its ``avg_actual_loss`` and
+            ``avg_acc`` are printed at the end and then reset.
+        is_training : bool
+            Whether gradients are enabled and the optimizer steps.
+        pbar : tqdm
+            Progress bar advanced by one per batch; must not be ``None``.
+        """
 
         if is_training:
             model.train()
@@ -488,22 +580,9 @@ class GroupDRO(Adaptor):
     def log_memory_usage(self, pbar=None):
     """
     # Logs the memory usage of the model.
-    """
-
-        to_out = f"Memory usage: CPU: {psutil.Process(os.getpid()).memory_info().rss / 1024 ** 2:.2f} MB"
-
-        if torch.cuda.is_available():
-            allocated_memory = torch.cuda.memory_allocated() / 1024 ** 2
-            reserved_memory = torch.cuda.memory_reserved() / 1024 ** 2
-            to_out += f", GPU: {allocated_memory:.2f} MB allocated, {reserved_memory:.2f} MB reserved"
-
-        if pbar is None:
-            print(to_out)
-        else:
-            pbar.write(to_out)
-    """
 
     def _load_PEAL_dataset(self, datasource=None):
+        """Build group-aware train/val/test loaders from a PEAL dataset or path."""
         if datasource is None:
             datasource = self.data_config.dataset_path
 
@@ -574,6 +653,7 @@ class GroupDRO(Adaptor):
         )
 
     def _load_replication_dataset(self, replication_dataset):
+        """Load the original GroupDRO CelebA/CUB data from ``$PEAL_DATA``."""
 
         peal_data = os.environ.get("PEAL_DATA", "datasets")
 

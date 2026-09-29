@@ -1,30 +1,40 @@
 logs/
-notebooks/*
+logs2
+utils
+dissertation
 peal_env
 *__pycache__*
+# The three tutorials and their README are tracked; everything a run drops into
+# notebooks/ is not. A bare `notebooks` line used to exclude the directory
+# itself, which made these negations dead and kept the tutorials out of the
+# repository entirely.
+notebooks/*
+!notebooks/*.ipynb
+!notebooks/README.md
 notebooks/.ipynb_checkpoints
 notebooks/datasets
 notebooks/peal_runs
 notebooks/*.png
 notebooks/static
 notebooks/templates
-notebooks
-datasets
+datasets*
 peal_runs*
 peal_data*
 static
+!peal/web/static/
+!peal/web/static/**
 outputs
 *.fuse_hidden*
 .vscode
 *.pt
 *.pth
+*.sif
 .idea
 dime2/outputs
 peal/dependencies/ace/outputs
-environment.yaml
 $PEAL_DATA
 plots
-.agent
+.agent/tmp/
 
 !peal/dependencies/dive/src/datasets
 peal/dependencies/rrclarc/data
@@ -37,3 +47,69 @@ curate_data_compas.py
 curate_data.py:Zone.Identifier
 train_model.py
 .agents
+
+# repo cleanup: dataset/notebook/scratch files that shouldn't be tracked
+peal/mnist_data/
+diff.txt
+freeze.txt
+notes.md
+run_scripts.sh
+distill_predictor.sh
+peal/memory_issue.ipynb
+peal/method2.ipynb
+peal/method3.ipynb
+peal/sd3.ipynb
+peal/stable_diffusion.ipynb
+peal/generators/fine_tuning.ipynb
+runs/pdc_cfkd/
+maintenance/
+pretrained_models/
+counterfactuals.pt
+dino_evaluation_state.pt
+peal/peal/celebA/celeba/img_align_celeba.zip
+peal/dependencies/PathLDM/example_sampling.ipynb
+peal/dependencies/smoothdiff_experiments/python/smoothdiff.ipynb
+peal/dependencies/smoothdiff_experiments/python/assets/car.jpg
+peal/generate_from_scratch.ipynb
+wandb
+checkpoints
+.claude
+docs/paper_figures
+DiDAE_Journal_Paper
+.tools/
+
+# web demo
+.venv-web/
+web_jobs/
+
+# tooling / docs build artefacts
+.venv*/
+docs/_build/
+docs/reference/generated/
+
+# Scratch directories that runs create at the repository root
+debug_pathldm/
+sae_sweep_logs/
+
+# external/ held a hand-made RAEv2 clone. The fork the RAE generators need is now
+# tracked under packages/peal-xai-rae (CC BY-NC 4.0, see LICENSING.md); external/
+# stays ignored for older setups that still point $PEAL_RAEV2_DIR there.
+external/
+
+# Packaging output (setup.py sdist/bdist_wheel)
+build/
+dist/
+*.egg-info/
+REPRO_REPORT_old.md
+.agent
+
+# The CC BY-NC RAEv2 fork (packages/peal-xai-rae) must be tracked in full. Its
+# src/utils/ and src/eval/datasets.py match the bare `utils` and `datasets*`
+# rules above, which would silently drop 12 source files from every commit.
+# Caches and build output inside it stay ignored.
+!packages/peal-xai-rae/**
+packages/peal-xai-rae/**/__pycache__/
+packages/peal-xai-rae/**/*.py[cod]
+packages/peal-xai-rae/**/.caches/
+packages/peal-xai-rae/build/
+packages/peal-xai-rae/*.egg-info/

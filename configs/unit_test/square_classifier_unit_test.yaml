@@ -1,0 +1,14 @@
+# python train_predictor.py --config "<PEAL_BASE>/configs/unit_test/square_classifier_unit_test.yaml"
+#
+# Smoke test only: 2 epochs instead of 300. Proves predictor training runs and writes model.cpl.
+model_path        : $PEAL_RUNS/unit_test/square/classifier
+data              : <PEAL_BASE>/configs/cfkd_experiments/data/square1k_poisoned098.yaml
+training          : <PEAL_BASE>/configs/unit_test/training_unit_test.yaml
+architecture      : torchvision_resnet18
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [ClassA]

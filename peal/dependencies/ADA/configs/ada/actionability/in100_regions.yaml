@@ -1,0 +1,21 @@
+experiment_id: e4a_in100_regions_k5_k10_seed0
+train_cache: artifacts/ada/atlas/embeddings/imagenet100/train/facebook__dinov2-with-registers-base/cls/combined_train_full_4shards
+validation_cache: artifacts/ada/atlas/embeddings/imagenet100/val/facebook__dinov2-with-registers-base/cls/cache-6ec1e8a1b614f414
+output_dir: artifacts/ada/actionability/regions/e4a_in100_dinov2_cls_train_regions_k5_k10_seed0
+k_values: [5, 10]
+seed: 0
+residual_mode: tangent
+max_iter: 50
+tol: 0.00001
+local_purity_k: 50
+duplicate_distance_threshold: 0.0001
+exemplar_count: 8
+metric_batch_size: 128
+mmap: true
+overwrite: false
+eligibility:
+  min_train_count: 100
+  min_val_count: 10
+  same_class_purity: 0.90
+  min_positive_class_margin: 0.0
+  max_duplicate_fraction: 0.10

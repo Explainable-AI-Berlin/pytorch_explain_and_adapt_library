@@ -1,0 +1,18 @@
+# python train_generator.py --config "<PEAL_BASE>/configs/didae_experiments/generators/camelyon17_pathldm_autoencoder_resnet_didae.yaml"
+category                : generator
+generator_type          : PathldmAutoencoder
+plip_model_id           : "vinid/plip"
+prompt                  : ""
+data                    : "<PEAL_BASE>/configs/didae_experiments/data/camelyon17_pathldm.yaml"
+base_path               : "$PEAL_RUNS/camelyon17/didae_pathldm"
+num_diffusion_steps     : 50
+cfg_scale_src           : 3.0
+cfg_scale_tar           : 7.0
+eta                     : 1.0
+skip                    : 25
+encoder_dimensions      : 512
+vae_latent_shape        : [3, 32, 32]
+sparse_dictionary       : "<PEAL_BASE>/configs/didae_experiments/sparse_dictionaries/orthognal_camelyon17.yaml"
+# public PathLDM release (PLIP-conditioned, "epoch_3.ckpt"); see reproduction_scripts/pathldm_env.sh
+ckpt_path               : "$PEAL_RUNS/pathldm_plip/checkpoints/epoch_3.ckpt"
+config_path             : "$PEAL_RUNS/pathldm_plip/configs/08-03T09-35-project.yaml"

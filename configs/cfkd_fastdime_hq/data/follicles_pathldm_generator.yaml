@@ -1,0 +1,13 @@
+dataset_name            : follicles
+dataset_path            : $PEAL_DATA/follicles
+num_samples             : 1300
+split                   : []
+input_type              : image
+input_size              : [3, 256, 256]
+output_type             : multiclass
+output_size             : [2]
+# invariances             : [rotation, hflipping, vflipping, color_jitter, sharpness]
+confounding_factors     : [type, confounder]
+# normalization           : [[0.485, 0.456, 0.406], [0.229, 0.224, 0.225]]
+has_hints               : True
+# x_selection             : imgs_cut

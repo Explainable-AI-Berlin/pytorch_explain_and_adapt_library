@@ -1,3 +1,15 @@
+"""Pixel-space DDPM generator and the ACE/FastDiME counterfactual edit path.
+
+This module wraps the guided-diffusion UNet vendored under
+``peal.dependencies.ace`` as a PEAL ``EditCapableGenerator`` and
+``InvertibleGenerator``: it builds model and diffusion from a
+:class:`DDPMConfig`, trains it with the guided-diffusion ``TrainLoop``, and
+offers (DDIM or noising) encode, decode, repaint and sampling in pixel space.
+``DDPM.edit`` produces counterfactuals by handing the model, the diffusion and
+the (optionally distilled) classifier to the vendored ACE or FastDiME main
+functions, sweeping their attack hyper-parameters over several attempts.
+"""
+
 import os
 import types
 import shutil
@@ -10,19 +22,16 @@ from datetime import datetime
 from pathlib import Path
 
 import wget
-from mpi4py import MPI
 from torch import nn
 from types import SimpleNamespace
-from torch.utils.tensorboard import SummaryWriter
 from typing import Union
 
+from peal._optional import require
 from peal.dependencies.FastDiME_CelebA.core.sample_utils import PerceptualLoss
 from peal.generators.interfaces import EditCapableGenerator, InvertibleGenerator
-from peal.global_utils import load_yaml_config, generate_smooth_mask, save_yaml_config
+from peal.global_utils import load_yaml_config, generate_smooth_mask
 
 # from peal.dependencies.DiME.main import main as dime_main
-from peal.dependencies.FastDiME_CelebA.main import main as fastdime_main
-from peal.dependencies.ace.run_ace import main as ace_main
 from peal.dependencies.ace.guided_diffusion import logger
 from peal.dependencies.ace.guided_diffusion.resample import (
     create_named_schedule_sampler,
@@ -30,7 +39,6 @@ from peal.dependencies.ace.guided_diffusion.resample import (
 from peal.dependencies.ace.guided_diffusion.script_util import (
     create_model_and_diffusion,
 )
-from peal.dependencies.ace.guided_diffusion.train_util import TrainLoop
 from peal.data.dataloaders import get_dataloader
 from peal.data.dataset_factory import get_datasets
 from peal.explainers.counterfactual_explainer import ACEConfig
@@ -38,6 +46,9 @@ from peal.training.loggers import log_images_to_writer
 from peal.generators.interfaces import GeneratorConfig
 from peal.data.interfaces import DataConfig
 from peal.training.trainers import distill_predictor
+from peal.log import get_logger
+
+_log = get_logger(__name__)
 
 
 class DDPMConfig(GeneratorConfig):
@@ -46,22 +57,22 @@ class DDPMConfig(GeneratorConfig):
     This class defines the config of a DDPM.
     """
 
+    generator_type: str = "DDPM"
     """
     The type of generator that shall be used.
     """
-    generator_type: str = "DDPM"
+    base_path: str = "peal_runs/ddpm"
     """
     The path where the generator is stored.
     """
-    base_path: str = "peal_runs/ddpm"
+    data: DataConfig = DataConfig()
     """
     The config of the data.
     """
-    data: DataConfig = DataConfig()
+    num_channels: int = 128
     """
     The number of channels
     """
-    num_channels: int = 128
     image_size: Union[int, type(None)] = None
     num_res_blocks: int = 2
     num_heads: int = 4
@@ -109,7 +120,14 @@ class DDPMConfig(GeneratorConfig):
 def load_state_dict(path, **kwargs):
     """
     Load a PyTorch file without redundant fetches across MPI ranks.
+
+    Raises
+    ------
+    ImportError
+        If the optional ``mpi4py`` dependency is not installed.
     """
+    MPI = require("mpi4py.MPI", "mpi", "broadcasting checkpoints across MPI ranks")
+
     chunk_size = 2**30  # MPI has a relatively small size limit
     if MPI.COMM_WORLD.Get_rank() == 0:
         with bf.BlobFile(path, "rb") as f:
@@ -130,7 +148,46 @@ def load_state_dict(path, **kwargs):
 
 
 class DDPM(EditCapableGenerator, InvertibleGenerator):
+    """Pixel-space denoising diffusion model used as a PEAL generator.
+
+    Wraps the guided-diffusion UNet and gaussian diffusion created by
+    ``create_model_and_diffusion`` from the vendored ACE code. Besides plain
+    sampling it provides the invertible interface (``encode``/``decode``), a
+    ``repaint`` step that keeps everything outside a smooth change mask, and
+    ``edit``, which runs the ACE or FastDiME counterfactual attack.
+
+    Parameters
+    ----------
+    config : str or DDPMConfig
+        Config path or object; loaded with ``load_yaml_config``. The image
+        size is overwritten with the last entry of ``config.data.input_size``.
+    model_dir : str, optional
+        Run directory holding the weights, logs and outputs. Defaults to
+        ``config.base_path``.
+    device : str, optional
+        Device the UNet is moved to.
+    predictor_dataset : optional
+        Accepted for interface compatibility; unused.
+
+    Attributes
+    ----------
+    model, diffusion
+        The UNet and the gaussian diffusion process.
+    dataset
+        First dataset built from ``config.data``; used for the normalisation
+        between the model range and the pytorch default range.
+    model_path : str
+        ``final.cpl`` in the run directory if it exists, else ``final.pt``
+        (downloaded from ``config.download_weights`` when missing). If no
+        weights are found, an existing run directory is moved aside with a
+        timestamp suffix and a fresh one is created.
+    noise_fn : callable
+        ``torch.randn_like`` for stochastic sampling, ``torch.zeros_like``
+        otherwise.
+    """
+
     def __init__(self, config, model_dir=None, device="cpu", predictor_dataset=None):
+        """Load the config, build the UNet and diffusion and restore weights."""
         super().__init__()
         self.predictor_distilled = None
         self.config = load_yaml_config(config)
@@ -152,9 +209,9 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         self.model.to(device)
         self.model_path = os.path.join(self.model_dir, "final.cpl")
         if os.path.exists(self.model_path) and self.config.is_trained:
-            print("load ddpm model weights!!!")
+            _log.info("%s", "load ddpm model weights!!!")
             self.model.load_state_dict(torch.load(self.model_path, map_location=device))
-            save_yaml_config(self.config, os.path.join(self.model_dir, "config.yaml"))
+            # save_yaml_config(self.config, os.path.join(self.model_dir, "config.yaml"))
 
         else:
             self.model_path = os.path.join(self.model_dir, "final.pt")
@@ -164,11 +221,11 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
 
             if os.path.exists(self.model_path) and self.config.is_trained:
                 state_dict = load_state_dict(self.model_path, map_location=device)
-                print("load ddpm model weights!!!")
+                _log.info("%s", "load ddpm model weights!!!")
                 self.model.load_state_dict(state_dict)
 
             else:
-                print("No ddpm model weights yet!!!")
+                _log.info("%s", "No ddpm model weights yet!!!")
                 if os.path.exists(self.model_dir):
                     shutil.move(
                         self.model_dir,
@@ -184,6 +241,21 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         self.vggloss = None
 
     def sample_x(self, batch_size=None, renormalize=True):
+        """Draw images from the prior with the full ancestral sampling loop.
+
+        Parameters
+        ----------
+        batch_size : int, optional
+            Number of images; defaults to ``config.batch_size``.
+        renormalize : bool, optional
+            Map the samples from the model range into the pytorch default
+            range via ``dataset.project_to_pytorch_default``.
+
+        Returns
+        -------
+        torch.Tensor
+            Samples of shape ``(batch_size, *config.data.input_size)``.
+        """
         if batch_size is None:
             batch_size = self.config.batch_size
 
@@ -196,6 +268,31 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         return sample
 
     def encode(self, x, t=1.0, stochastic=None, num_steps=None):
+        """Map images to the noisy latent at a fraction ``t`` of the schedule.
+
+        With ``stochastic == "fully"`` the latent is a single ``q_sample``
+        draw at the respaced timestep, clamped to ``[-1, 1]``. Otherwise the
+        image is inverted deterministically by iterating
+        ``ddim_reverse_sample`` over the first ``t * timestep_respacing``
+        steps.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            Batch of images in the model range, shape ``(B, C, H, W)``.
+        t : float, optional
+            Fraction of ``config.timestep_respacing`` to noise up to.
+        stochastic : bool or str, optional
+            ``"fully"`` for one-shot noising, anything else for DDIM
+            inversion. Defaults to ``config.stochastic``.
+        num_steps : optional
+            Accepted for interface compatibility; unused.
+
+        Returns
+        -------
+        torch.Tensor
+            Latent with the same shape as ``x``.
+        """
         if stochastic is None:
             stochastic = self.config.stochastic
 
@@ -211,43 +308,35 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
                 t = torch.tensor([t] * x.size(0), device=x.device)
                 x = self.diffusion.ddim_reverse_sample(self.model, x, t)["sample"]
 
-            '''
-            timesteps = list(range(respaced_steps))[::-1]
-            def local_forward(x, t, idx, noise, steps, diffusion, model):
-                out = diffusion.p_mean_variance(model, x, t, clip_denoised=True)
-
-                x = out["mean"]
-
-                if idx != (steps - 1):
-                    x += torch.exp(0.5 * out["log_variance"]) * noise
-
-                return x
-
-            for idx, t in enumerate(timesteps):
-                t = torch.tensor([t] * x.size(0), device=x.device)
-
-                """
-                if idx == 0:
-                    x = self.diffusion.q_sample(x, t, noise=self.noise_fn(x))
-                """
-
-                if hasattr(self, "fix_noise") and self.fix_noise:
-                    noise = self.noise[idx + 1, ...].unsqueeze(dim=0)
-
-                elif stochastic == "semi":
-                    noise = torch.randn_like(x)
-
-                else:
-                    noise = torch.zeros_like(x)
-
-                x = local_forward(x, t, idx, noise, respaced_steps, self.diffusion, self.model)
-            '''
-
         # TODO why are gradients in ACE scaled???
         # t = torch.tensor([self.steps - 1] * x.size(0), device=x.device)
         return x
 
     def decode(self, z, t=1.0, stochastic=None, num_steps=None):
+        """Denoise a latent back to an image with the reverse diffusion loop.
+
+        Iterates ``p_mean_variance`` from step ``t * timestep_respacing - 1``
+        down to 0, taking the posterior mean and adding the posterior noise in
+        every step but the last when ``config.stochastic`` is set.
+
+        Parameters
+        ----------
+        z : torch.Tensor or list
+            Latent of shape ``(B, C, H, W)``; a one-element list is unwrapped.
+        t : float, optional
+            Fraction of the respaced schedule the latent was noised to; must
+            match the value used in :meth:`encode`.
+        stochastic : bool, optional
+            Defaults to ``config.stochastic``. Note that the per-step noise is
+            gated by ``config.stochastic`` rather than by this argument.
+        num_steps : optional
+            Accepted for interface compatibility; unused.
+
+        Returns
+        -------
+        torch.Tensor
+            Reconstructed images in the model range.
+        """
         if isinstance(z, list) and len(z) == 1:
             z = z[0]
 
@@ -259,11 +348,6 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         timesteps = list(range(respaced_steps))[::-1]
         for idx, t in enumerate(timesteps):
             t = torch.tensor([t] * z.size(0), device=z.device)
-
-            """
-            if idx == 0:
-                z = self.diffusion.q_sample(z, t, noise=self.noise_fn(z))
-            """
 
             out = self.diffusion.p_mean_variance(self.model, z, t, clip_denoised=True)
 
@@ -287,6 +371,48 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         max_avg_combination=0.5,
         exceptions=None,
     ):
+        """Re-diffuse an edited image while pinning the unchanged region.
+
+        A smooth change mask between ``x`` and the edited image ``pe`` is
+        built with ``generate_smooth_mask``; everything whose dilated mask
+        value stays below ``inpaint`` is considered background and is, in
+        every reverse step, replaced by the correspondingly noised original.
+        The final image also takes the background pixels straight from ``x``.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            Original images, shape ``(B, C, H, W)``.
+        pe : torch.Tensor
+            Edited ("pre-explanation") images of the same shape.
+        inpaint : float
+            Mask threshold; ``0`` disables the per-step re-injection of the
+            original but not the final composition.
+        dilation : float
+            Dilation of the change mask, passed to ``generate_smooth_mask``.
+        t : float
+            Fraction of ``config.timestep_respacing`` to restart from.
+        stochastic : bool
+            Add posterior noise during the reverse loop and noise when
+            re-injecting the original.
+        boolmask_in : torch.Tensor, optional
+            Background mask of a previous attempt; its complement is unioned
+            into the current background mask, so already-edited regions stay
+            editable.
+        max_avg_combination : float, optional
+            Mixing weight between the max and the mean channel difference in
+            ``generate_smooth_mask``.
+        exceptions : torch.Tensor, optional
+            Per-sample flags; where the entry is 1 the background mask is
+            zeroed, i.e. that sample is not repainted at all.
+
+        Returns
+        -------
+        ce : torch.Tensor
+            Repainted images.
+        boolmask : torch.Tensor
+            The background mask used, on the CPU.
+        """
         respaced_steps = int(t * int(self.config.timestep_respacing))
         indices = list(range(respaced_steps))[::-1]
         x_normalized = self.dataset.project_to_pytorch_default(x)
@@ -294,8 +420,6 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         mask, dil_mask = generate_smooth_mask(
             x_normalized, pe_normalized, dilation, max_avg_combination
         )
-        """if old_mask is not None:
-            dil_mask = dil_mask - inpaint * old_mask.to(dil_mask) * mask_momentum"""
 
         boolmask = (dil_mask < inpaint).float()
         if boolmask_in is not None:
@@ -338,6 +462,22 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
     def train_model(
         self,
     ):
+        """Train the UNet with the guided-diffusion ``TrainLoop``.
+
+        Configures the guided-diffusion logger and the schedule sampler named
+        by ``config.schedule_sampler``, builds a training dataloader whose
+        epoch length is ``config.max_steps``, logs a batch of training images
+        to ``<model_dir>/logs`` and runs the loop, which writes checkpoints
+        into ``model_dir`` every ``config.save_interval`` steps. If the model
+        was not trained before, an existing run directory is moved aside with
+        a timestamp suffix.
+
+        Notes
+        -----
+        ``config.x_selection`` overrides the dataset's ``task_config`` so that
+        the generator can be trained on a different input column than the one
+        the dataset was built for.
+        """
         if not self.config.is_trained and os.path.exists(self.model_dir):
             shutil.move(
                 self.model_dir,
@@ -356,12 +496,12 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
             self.dataset.task_config = SimpleNamespace(
                 **{"x_selection": self.config.x_selection}
             )
-            print("self.dataset.task_config1")
-            print("self.dataset.task_config1")
-            print("self.dataset.task_config1")
-            print("self.dataset.task_config1")
-            print("self.dataset.task_config1")
-            print(self.dataset.task_config)
+            _log.info("%s", "self.dataset.task_config1")
+            _log.info("%s", "self.dataset.task_config1")
+            _log.info("%s", "self.dataset.task_config1")
+            _log.info("%s", "self.dataset.task_config1")
+            _log.info("%s", "self.dataset.task_config1")
+            _log.info("%s", self.dataset.task_config)
 
         logger.log("creating data loader...")
         dataloader = get_dataloader(
@@ -373,22 +513,29 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
             ),
         )
 
+        from torch.utils.tensorboard import SummaryWriter
+
         writer = SummaryWriter(os.path.join(self.model_dir, "logs"))
         if not self.config.x_selection is None:
             self.dataset.task_config = SimpleNamespace(
                 **{"x_selection": self.config.x_selection}
             )
-            print("self.dataset.task_config2")
-            print("self.dataset.task_config2")
-            print("self.dataset.task_config2")
-            print("self.dataset.task_config2")
-            print("self.dataset.task_config2")
-            print(self.dataset.task_config)
+            _log.info("%s", "self.dataset.task_config2")
+            _log.info("%s", "self.dataset.task_config2")
+            _log.info("%s", "self.dataset.task_config2")
+            _log.info("%s", "self.dataset.task_config2")
+            _log.info("%s", "self.dataset.task_config2")
+            _log.info("%s", self.dataset.task_config)
 
         log_images_to_writer(dataloader, writer, "train")
         data = iter(dataloader)
 
         logger.log("training...")
+        # guided-diffusion's TrainLoop imports dist_util, and with it
+        # mpi4py, so it is imported at the point of use rather than
+        # making a system MPI a hard requirement of every PEAL install.
+        from peal.dependencies.ace.guided_diffusion.train_util import TrainLoop
+
         train_loop = TrainLoop(
             model=self.model,
             diffusion=self.diffusion,
@@ -421,14 +568,71 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         pbar=None,
         base_path: str = "",
         mode: str = "",
+        boolmask_in=None,
+        attempt_number=None,
     ):
+        """Create counterfactuals for ``x_in`` with ACE or FastDiME.
+
+        Trains the diffusion model first if needed, optionally distils the
+        predictor into a surrogate that supplies the guidance gradients
+        (cached at ``<base_path>/explainer/distilled_predictor/model.cpl``),
+        and then calls the vendored ``ace_main`` or ``fastdime_main``
+        depending on ``explainer_config.subtype``.
+
+        The attack is repeated ``explainer_config.num_attempts`` times. Any of
+        ``attack_iterations``, ``sampling_time_fraction`` and
+        ``sampling_inpaint`` given as a two-element list is interpolated
+        linearly between the attempts, ``dist_l1``/``dist_l2`` geometrically,
+        and the seed is incremented per attempt. All attempts are concatenated
+        into the returned batch rather than being filtered by success.
+
+        Parameters
+        ----------
+        x_in : torch.Tensor
+            Images to explain, shape ``(B, C, H, W)``.
+        target_confidence_goal : float
+            Accepted for interface compatibility; the stopping criterion is
+            taken from ``explainer_config``.
+        source_classes, target_classes : torch.Tensor
+            Current and desired class index per sample, shape ``(B,)``.
+        predictor : nn.Module
+            Classifier whose decision the counterfactual has to flip; also
+            used to score the results.
+        explainer_config : ACEConfig
+            Attack hyper-parameters; ``subtype`` selects ``"ACE"`` or
+            ``"FastDiME"``, ``l_perc``/``l_perc_layer`` enable the VGG
+            perceptual loss, ``distilled_predictor`` the surrogate.
+        predictor_datasets : list
+            ``[train, val, test]``-style datasets; entry 1 is passed to the
+            attack as the predictor's dataset and entry set is used for
+            distillation.
+        pbar : optional
+            Progress bar, unused here.
+        base_path : str, optional
+            Run directory used to cache the distilled predictor.
+        mode : str, optional
+            Unused; kept for interface compatibility.
+        boolmask_in : optional
+            Unused; kept for interface compatibility with other generators.
+        attempt_number : optional
+            Unused; attempts are looped over internally.
+
+        Returns
+        -------
+        tuple of list
+            ``(counterfactuals, differences, target confidences, originals,
+            histories, zeros)``, each with ``B * num_attempts`` entries. The
+            differences are ``x_in - counterfactual`` and the trailing zeros
+            stand in for the per-sample masks other generators return.
+
+        Raises
+        ------
+        Exception
+            If ``explainer_config.subtype`` is neither ACE nor FastDiME.
+        """
         if not self.config.is_trained:
-            print("Model not trained yet. Model will be trained now!")
-            import pdb
-
-            pdb.set_trace()
+            _log.info("%s", "Model not trained yet. Model will be trained now!")
             self.train_model()
-
         if not explainer_config.distilled_predictor is None:
             distilled_path = os.path.join(
                 base_path, "explainer", "distilled_predictor", "model.cpl"
@@ -442,9 +646,14 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
                 )
 
             else:
-                gradient_predictor = torch.load(
-                    distilled_path, map_location=self.device
-                )
+                try:
+                    gradient_predictor = torch.load(
+                        distilled_path, map_location=self.device
+                    )
+                except Exception:
+                    gradient_predictor = torch.load(
+                        distilled_path, map_location=self.device, weights_only=False
+                    )
 
         else:
             gradient_predictor = predictor
@@ -463,7 +672,7 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
         args.batch_size = x_in.shape[0]
         if explainer_config.l_perc != 0:
             if self.vggloss is None:
-                print("Loading VGG loss!")
+                _log.info("%s", "Loading VGG loss!")
                 self.vggloss = PerceptualLoss(
                     layer=explainer_config.l_perc_layer, c=explainer_config.l_perc
                 ).to(self.device)
@@ -498,8 +707,8 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
                     * multiplier
                 )
             )
-            print("args.attack_iterations")
-            print(args.attack_iterations)
+            _log.info("%s", "args.attack_iterations")
+            _log.info("%s", args.attack_iterations)
             args.sampling_time_fraction = float(
                 explainer_config.sampling_time_fraction
                 if not isinstance(explainer_config.sampling_time_fraction, list)
@@ -512,8 +721,8 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
                     * multiplier
                 )
             )
-            print("args.sampling_time_fraction")
-            print(args.sampling_time_fraction)
+            _log.info("%s", "args.sampling_time_fraction")
+            _log.info("%s", args.sampling_time_fraction)
             args.dist_l1 = float(
                 explainer_config.dist_l1
                 if not isinstance(explainer_config.dist_l1, list)
@@ -524,8 +733,8 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
                 )
                 ** idx
             )
-            print("args.dist_l1")
-            print(args.dist_l1)
+            _log.info("%s", "args.dist_l1")
+            _log.info("%s", args.dist_l1)
             args.dist_l2 = float(
                 explainer_config.dist_l2
                 if not isinstance(explainer_config.dist_l2, list)
@@ -548,8 +757,8 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
                     * multiplier
                 )
             )
-            print("args.sampling_inpaint")
-            print(args.sampling_inpaint)
+            _log.info("%s", "args.sampling_inpaint")
+            _log.info("%s", args.sampling_inpaint)
             args.__dict__.update(
                 {
                     k: v
@@ -569,17 +778,27 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
             args.seed += idx
             #
             if args.subtype == "ACE":
+                # Imported here for the same reason as FastDiME below:
+                # the vendored ACE entry point reaches mpi4py through
+                # guided-diffusion's dist_util.
+                from peal.dependencies.ace.run_ace import main as ace_main
+
                 x_counterfactuals_current, histories = ace_main(args=args)
 
             elif args.subtype == "FastDiME":
+
+                # Imported here: the vendored FastDiME package reaches
+                # mpi4py through its dist_util, and a module-level
+                # import would make a system MPI a hard requirement of
+                # every PEAL install instead of the `mpi` extra.
+                from peal.dependencies.FastDiME_CelebA.main import (
+                    main as fastdime_main,
+                )
+
                 x_counterfactuals_current, histories = fastdime_main(args=args)
 
             else:
                 raise Exception(args.subtype + " does not exist!")
-
-            """elif args.subtype == "DiME":
-                # can be done with FastDiME implementation
-                x_counterfactuals_current, histories = dime_main(args=args)"""
 
             x_counterfactuals_current = torch.cat(x_counterfactuals_current, dim=0)
 
@@ -587,14 +806,15 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
             preds = torch.nn.Softmax(dim=-1)(
                 predictor(x_counterfactuals_current.to(device)).detach().cpu()
             )
-            print(
+            _log.info(
+                "%s",
                 "preds_final: "
                 + str(
                     [
                         float(preds[i][target_classes[i]])
                         for i in range(len(target_classes))
                     ]
-                )
+                ),
             )
             y_target_end_confidence_current = torch.zeros([x_in.shape[0]])
             for i in range(x_in.shape[0]):
@@ -612,16 +832,6 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
                     [y_target_end_confidence, y_target_end_confidence_current], 0
                 )
                 x_in_out = torch.cat([x_in_out, torch.clone(x_in)], 0)
-                """for i in range(x_in.shape[0]):
-                    if y_target_end_confidence[i] < 0.51:
-                        x_counterfactuals[i] = x_counterfactuals_current[i]
-                        y_target_end_confidence[i] = y_target_end_confidence_current[i]
-
-            num_successful = torch.sum(y_target_end_confidence >= 0.51).item()
-            print("num_successful")
-            print(num_successful)
-            if num_successful == x_in.shape[0]:
-                break"""
 
         return (
             list(x_counterfactuals),
@@ -629,5 +839,5 @@ class DDPM(EditCapableGenerator, InvertibleGenerator):
             list(y_target_end_confidence),
             list(x_in),
             list(histories),
-            [0] * len(x_counterfactuals)
+            [0] * len(x_counterfactuals),
         )

@@ -1,3 +1,16 @@
+"""CFKD teacher that gathers human feedback through the ViReLay web GUI.
+
+ViReLay (with CoRelAy for the spectral analysis) is a tool for browsing
+attribution maps grouped by clusters. This teacher reuses it for counterfactual
+feedback: for every counterfactual that flipped the student it computes a
+per-channel relevance vector from the difference of an intermediate student
+activation between factual and counterfactual, writes ViReLay's HDF5 dataset,
+attribution and analysis databases plus a project yaml into ``base_dir``, serves
+the project and waits for the user to save the selected (i.e. "false") data
+point indices as ``feedback.json``. The helper functions and CoRelAy processors
+in this module are adapted from the ViReLay example scripts.
+"""
+
 import shutil
 
 import torch
@@ -8,7 +21,6 @@ import os
 import time
 import multiprocessing
 import numpy as np
-import socket
 
 from tqdm import tqdm
 from os.path import dirname, relpath
@@ -30,10 +42,25 @@ from pathlib import Path
 
 from peal.global_utils import load_yaml_config, is_port_in_use, get_intermediate_output
 from peal.teachers.interfaces import TeacherInterface
+from peal.log import get_logger
+
+_log = get_logger(__name__)
 
 
 class ImageDataset(torch.utils.data.Dataset):
-    """Shape Attribute dataset."""
+    """All images of one directory as RGB tensors with a dummy label of 0.
+
+    Used to turn the copied collage images into the HDF5 dataset ViReLay
+    displays. Files are listed with ``os.listdir`` (unsorted).
+
+    Parameters
+    ----------
+    root_dir : str
+        Directory whose every file is opened as an image.
+    transform : callable
+        Applied to the PIL image; only the first three channels of the result
+        are kept.
+    """
 
     def __init__(self, root_dir, transform=ToTensor()):
         """
@@ -50,7 +77,7 @@ class ImageDataset(torch.utils.data.Dataset):
         return len(self.urls)
 
     def __getitem__(self, idx):
-        """ """
+        """Return ``(image[:3], tensor(0.0))`` for the ``idx``-th file."""
         file = self.urls[idx]
         img = Image.open(os.path.join(self.root_dir, file))
         img = self.transform(img)[:3]
@@ -65,18 +92,26 @@ def create_dataset(
     dataloader: torch.utils.data.DataLoader,
 ) -> h5py.File:
     """Creates a new dataset HDF5 file.
+
+    The file gets a float32 ``data`` dataset of shape
+    ``(number_of_samples, *samples_shape)`` and a uint16 ``label`` dataset,
+    both filled by iterating once over ``dataloader``.
+
     Parameters
     ----------
-        dataset_file_path: str
-            The path to the dataset HDF5 file that is to be created.
-        sample_shape: torch.Size
-            The shape of the samples in the dataset.
-        number_of_samples: int
-            The number of samples in the dataset.
+    dataset_file_path : str
+        The path to the dataset HDF5 file that is to be created.
+    samples_shape : tuple
+        The shape of one sample (without the batch axis).
+    number_of_samples : int
+        The number of samples in the dataset.
+    dataloader : torch.utils.data.DataLoader
+        Yields ``(X, y)`` batches that are written in order.
+
     Returns
     -------
-        h5py.File
-            Returns the file handle to the attributions database.
+    h5py.File
+        The still open file handle of the dataset database.
     """
 
     dataset_file = h5py.File(dataset_file_path, "w")
@@ -98,6 +133,23 @@ def create_attribution_database(
 ):
     """
     Creates an attribution database file
+
+    Parameters
+    ----------
+    attribution_database_file_path : str
+        Path of the HDF5 file to create (overwritten).
+    attribution_shape : tuple
+        Shape of one attribution (without the batch axis).
+    num_classes : int
+        Width of the ``prediction`` dataset.
+    number_of_samples : int
+        Length of the ``attribution``, ``prediction`` and ``label`` datasets.
+
+    Returns
+    -------
+    h5py.File
+        The open file with empty float32 ``attribution`` and ``prediction``
+        datasets and a uint16 ``label`` dataset.
     """
     attribution_database_file = h5py.File(attribution_database_file_path, "w")
     attribution_database_file.create_dataset(
@@ -119,6 +171,19 @@ def append_attributions(
 ):
     """
     Appends attributions to the attribution database file
+
+    Parameters
+    ----------
+    attribution_database_file : h5py.File
+        File created by :func:`create_attribution_database`.
+    index : int
+        Row at which the batch is written.
+    attributions : torch.Tensor
+        Batch of attributions ``[B, *attribution_shape]``.
+    predictions : torch.Tensor
+        Batch of prediction scores ``[B, num_classes]``.
+    labels : torch.Tensor
+        Batch of labels ``[B]``.
     """
     attribution_database_file["attribution"][
         index : attributions.shape[0] + index
@@ -132,7 +197,19 @@ def append_attributions(
 
 
 def create_attribution_dataset(dataloader, attribution_database_file_path, num_classes):
-    """ """
+    """Write a sequence of single attributions into a new attribution database.
+
+    Parameters
+    ----------
+    dataloader : sequence of tuple
+        Indexable sequence of ``(attribution, prediction, label)`` triples;
+        ``attribution`` is a tensor, the other two scalars. Its length is the
+        number of samples and ``dataloader[0][0].shape`` the attribution shape.
+    attribution_database_file_path : str
+        Path of the HDF5 file to create.
+    num_classes : int
+        Width of the ``prediction`` dataset.
+    """
     number_of_samples = len(dataloader)
     with create_attribution_database(
         attribution_database_file_path=attribution_database_file_path,
@@ -157,14 +234,16 @@ class Flatten(Processor):
 
     def function(self, data: np.ndarray) -> np.ndarray:
         """Applies the flattening to the input data.
+
         Parameters
         ----------
-            data: np.ndarray
-                The input data that is to be flattened.
+        data: np.ndarray
+            The input data that is to be flattened.
+
         Returns
         -------
-            np.ndarray
-                Returns the flattened data.
+        np.ndarray
+            Returns the flattened data.
         """
 
         return data.reshape(data.shape[0], np.prod(data.shape[1:]))
@@ -175,14 +254,16 @@ class SumChannel(Processor):
 
     def function(self, data: np.ndarray) -> np.ndarray:
         """Applies the summation over the channels to the input data.
+
         Parameters
         ----------
-            data: np.ndarray
-                The input data that is to be summed over its channels.
+        data: np.ndarray
+            The input data that is to be summed over its channels.
+
         Returns
         -------
-            np.ndarray
-                Returns the data that was summed up over its channels.
+        np.ndarray
+            Returns the data that was summed up over its channels.
         """
 
         return data.sum(axis=1)
@@ -193,14 +274,16 @@ class Absolute(Processor):
 
     def function(self, data: np.ndarray) -> np.ndarray:
         """Computes the absolute value of the specified input data.
+
         Parameters
         ----------
-            data: np.ndarray
-                The input data for which the absolute value is to be computed.
+        data: np.ndarray
+            The input data for which the absolute value is to be computed.
+
         Returns
         -------
-            np.ndarray
-                Returns the absolute value of the input data.
+        np.ndarray
+            Returns the absolute value of the input data.
         """
 
         return np.absolute(data)
@@ -208,25 +291,28 @@ class Absolute(Processor):
 
 class Normalize(Processor):
     """Represents a CoRelAy processor, which normalizes its input data.
+
     Attributes
     ----------
-        axes: Param
-            A parameter of the processor, which determines the axis over which the data is to be normalized. Defaults to
-            the second and third axes.
+    axes: Param
+        A parameter of the processor, which determines the axis over which the data is to be normalized. Defaults to
+        the second and third axes.
     """
 
     axes = Param(tuple, (1, 2))
 
     def function(self, data: np.ndarray) -> np.ndarray:
         """Normalizes the specified input data.
+
         Parameters
         ----------
-            data: np.ndarray
-                The input data that is to be normalized.
+        data: np.ndarray
+            The input data that is to be normalized.
+
         Returns
         -------
-            np.ndarray
-                Returns the normalized input data.
+        np.ndarray
+            Returns the normalized input data.
         """
 
         return data / data.sum(self.axes, keepdims=True)
@@ -234,10 +320,11 @@ class Normalize(Processor):
 
 class Histogram(Processor):
     """Represents a CoRelAy processor, which computes a histogram over its input data.
+
     Attributes
     ----------
-        bins: Param
-            A parameter of the processor, which determines the number of bins that are used to compute the histogram.
+    bins: Param
+        A parameter of the processor, which determines the number of bins that are used to compute the histogram.
     """
 
     bins = Param(int, 256)
@@ -245,14 +332,16 @@ class Histogram(Processor):
     def function(self, data: np.ndarray) -> np.ndarray:
         """Computes histograms over the specified input data. One histogram is computed for each channel and each sample
         in a batch of input data.
+
         Parameters
         ----------
-            data: np.ndarray
-                The input data over which the histograms are to be computed.
+        data: np.ndarray
+            The input data over which the histograms are to be computed.
+
         Returns
         -------
-            np.ndarray
-                Returns the histograms that were computed over the input data.
+        np.ndarray
+            Returns the histograms that were computed over the input data.
         """
 
         return np.stack(
@@ -307,59 +396,38 @@ def meta_analysis(
     number_of_neighbors: int,
 ) -> None:
     """Performs a meta-analysis over the specified attribution data and writes the results into an analysis database.
+
     Parameters
     ----------
-        base_dir: str
-            The base path to the CoRelAy project.
-        attribution_database_file_path: str
-            The path to the attribution database file, that contains the attributions for which the meta-analysis is to
-            be performed.
-        analysis_file_path: str
-            The path to the analysis database file, into which the results of the meta-analysis are to be written.
-        variant: str
-            The meta-analysis variant that is to be performed. Can be one of "absspectral", "spectral", "fullspectral",
-            or "histogram".
-        class_indices: List[int]
-            The indices of the classes for which the meta-analysis is to be performed. If not specified, then the
-            meta-analysis is performed for all classes.
-        label_map_file_path: str
-            The path to the label map file, which contains a mapping between the class indices and their corresponding
-            names and WordNet IDs.
-        number_of_eigenvalues: int
-            The number of eigenvalues of the eigenvalue decomposition.
-        number_of_clusters_list: List[int]
-            A list that can contain multiple numbers of clusters. For each number of clusters in this list, all
-            clustering methods and the meta-analysis are performed.
-        number_of_neighbors: int
-            The number of neighbors that are to be considered in the k-nearest neighbor clustering algorithm.
+    base_dir: str
+        The base path to the CoRelAy project.
+    attribution_database_file_path: str
+        The path to the attribution database file, that contains the attributions for which the meta-analysis is to
+        be performed.
+    analysis_file_path: str
+        The path to the analysis database file, into which the results of the meta-analysis are to be written.
+    variant: str
+        The meta-analysis variant that is to be performed. Can be one of "absspectral", "spectral", "fullspectral",
+        or "histogram".
+    class_indices: List[int]
+        The indices of the classes for which the meta-analysis is to be performed. If not specified, then the
+        meta-analysis is performed for all classes.
+    label_map_file_path: str
+        The path to the label map file, which contains a mapping between the class indices and their corresponding
+        names and WordNet IDs.
+    number_of_eigenvalues: int
+        The number of eigenvalues of the eigenvalue decomposition.
+    number_of_clusters_list: List[int]
+        A list that can contain multiple numbers of clusters. For each number of clusters in this list, all
+        clustering methods and the meta-analysis are performed.
+    number_of_neighbors: int
+        The number of neighbors that are to be considered in the k-nearest neighbor clustering algorithm.
     """
     # Determines the pre-processing pipeline and the distance metric that are to be used for the meta-analysis
     pre_processing_pipeline = VARIANTS[variant]["preprocessing"]
     distance_metric = VARIANTS[variant]["distance"]
 
     # Creates the meta-analysis pipeline
-    """pipeline = SpectralClustering(
-        preprocessing=pre_processing_pipeline,
-        pairwise_distance=distance_metric,
-        affinity=SparseKNN(n_neighbors=number_of_neighbors, symmetric=True),
-        embedding=EigenDecomposition(
-            n_eigval=number_of_eigenvalues, is_output=True),
-        clustering=Parallel([
-            Parallel([
-                KMeans(n_clusters=number_of_clusters) for number_of_clusters in number_of_clusters_list
-            ], broadcast=True),
-            Parallel([
-                DBSCAN(eps=number_of_clusters / 10.0) for number_of_clusters in number_of_clusters_list
-            ], broadcast=True),
-            Parallel([
-                AgglomerativeClustering(n_clusters=number_of_clusters) for number_of_clusters in number_of_clusters_list
-            ], broadcast=True),
-            Parallel([
-                UMAPEmbedding(),
-                TSNEEmbedding(),
-            ], broadcast=True)
-        ], broadcast=True, is_output=True)
-    )"""
     pipeline = SpectralClustering(
         preprocessing=pre_processing_pipeline,
         pairwise_distance=distance_metric,
@@ -458,19 +526,19 @@ def meta_analysis(
         class_indices = [int(label["index"]) for label in label_map]
 
     # Truncate the analysis database
-    print(f"Truncating {analysis_file_path}")
+    _log.info("%s", f"Truncating {analysis_file_path}")
     h5py.File(analysis_file_path, "w").close()
 
     # Cycles through all classes and performs the meta-analysis for each of them
     for class_index in class_indices:
         # Loads the attribution data for the samples of the current class
-        print(f"Loading class {class_name_map[class_index]}")
+        _log.info("%s", f"Loading class {class_name_map[class_index]}")
         with h5py.File(attribution_database_file_path, "r") as attributions_file:
             (indices_of_samples_in_class,) = np.nonzero(labels == class_index)
             attribution_data = attributions_file["attribution"][
                 indices_of_samples_in_class, :
             ]
-            print("Samples in class: " + str(attribution_data.shape[0]))
+            _log.info("%s", "Samples in class: " + str(attribution_data.shape[0]))
             if "train" in attributions_file:
                 train_flag = attributions_file["train"][
                     indices_of_samples_in_class.tolist()
@@ -479,7 +547,7 @@ def meta_analysis(
                 train_flag = None
 
         # Performs the meta-analysis for the attributions of the current class
-        print(f"Computing class {class_name_map[class_index]}")
+        _log.info("%s", f"Computing class {class_name_map[class_index]}")
         (eigenvalues, embedding), (
             kmeans,
             dbscan,
@@ -488,7 +556,7 @@ def meta_analysis(
         ) = pipeline(attribution_data)
 
         # Append the meta-analysis to the analysis database
-        print(f"Saving class {class_name_map[class_index]}")
+        _log.info("%s", f"Saving class {class_name_map[class_index]}")
         with h5py.File(analysis_file_path, "a") as analysis_file:
             # The name of the analysis is the name of the class
             analysis_name = wordnet_id_map.get(class_index, f"{class_index:08d}")
@@ -563,35 +631,36 @@ def make_project(
     output_file_path: str,
 ) -> None:
     """Generates a ViRelAy project file.
+
     Parameters
     ----------
-        dataset_file_path: str
-            The path to the dataset HDF5 file.
-        attribution_database_file_path: str
-            The path to the attribution HDF5 file.
-        analysis_file_path: str
-            The path to the analysis HDF5 file.
-        label_map_file_path: str
-            The path to the label map YAML file.
-        project_name: str
-            The name of the project.
-        dataset_name: str
-            The name of the dataset that the classifier was trained on.
-        dataset_down_sampling_method: str
-            The method that is to be used to down-sample images from the dataset that are larger than the input to the
-            model. Must be one of "none", "center_crop", or "resize".
-        dataset_up_sampling_method: str
-            The method that is to be used to up-sample images from the dataset that are smaller than the input to the
-            model. Must be one of "none", "fill_zeros", "fill_ones", "edge_repeat", "mirror_edge", "wrap_around", or
-            "resize".
-        model_name: str
-            The name of the classifier model on which the project is based.
-        attribution_name: str
-            The name of the method that was used to compute the attributions.
-        analysis_name: str
-            The name of the analysis that was performed on the attributions.
-        output_file_path: str
-            The path to the YAML file into which the project will be saved.
+    dataset_file_path: str
+        The path to the dataset HDF5 file.
+    attribution_database_file_path: str
+        The path to the attribution HDF5 file.
+    analysis_file_path: str
+        The path to the analysis HDF5 file.
+    label_map_file_path: str
+        The path to the label map YAML file.
+    project_name: str
+        The name of the project.
+    dataset_name: str
+        The name of the dataset that the classifier was trained on.
+    dataset_down_sampling_method: str
+        The method that is to be used to down-sample images from the dataset that are larger than the input to the
+        model. Must be one of "none", "center_crop", or "resize".
+    dataset_up_sampling_method: str
+        The method that is to be used to up-sample images from the dataset that are smaller than the input to the
+        model. Must be one of "none", "fill_zeros", "fill_ones", "edge_repeat", "mirror_edge", "wrap_around", or
+        "resize".
+    model_name: str
+        The name of the classifier model on which the project is based.
+    attribution_name: str
+        The name of the method that was used to compute the attributions.
+    analysis_name: str
+        The name of the analysis that was performed on the attributions.
+    output_file_path: str
+        The path to the YAML file into which the project will be saved.
     """
 
     # Determines the root path of the project, which is needed to make all paths stored in the project file relative to
@@ -642,13 +711,34 @@ def make_project(
     # If an output file path was specified, then the project is saved into the specified file, otherwise, the project
     # information is written to the standard output
     if output_file_path is None:
-        print(yaml.dump(project, default_flow_style=False))
+        _log.info("%s", yaml.dump(project, default_flow_style=False))
     else:
         with open(output_file_path, "w", encoding="utf-8") as project_file:
             yaml.dump(project, project_file, default_flow_style=False)
 
 
 def run_virelay(project_path: str, output_path: str, port: int) -> None:
+    """Serve a ViReLay project until the user has saved their feedback file.
+
+    The ViReLay server runs in a separate process bound to ``0.0.0.0``; the
+    function polls once per second for ``output_path`` and terminates the
+    server once the file exists.
+
+    Parameters
+    ----------
+    project_path : str
+        The project yaml written by :func:`make_project`.
+    output_path : str
+        JSON file the user exports from the GUI; must contain
+        ``selectedDataPointIndices``.
+    port : int
+        Port to serve on.
+
+    Returns
+    -------
+    dict
+        The parsed contents of ``output_path``.
+    """
     host_name = "0.0.0.0"
     workspace = Workspace()
     workspace.add_project(project_path)
@@ -659,7 +749,7 @@ def run_virelay(project_path: str, output_path: str, port: int) -> None:
         target=lambda: app.run(host=host_name, port=port), args=()
     )
     proc.start()
-    print("ViReLay GUI is active on localhost:" + str(port))
+    _log.info("%s", "ViReLay GUI is active on localhost:" + str(port))
 
     with tqdm(range(100000)) as pbar:
         for it in pbar:
@@ -684,6 +774,27 @@ def run_virelay(project_path: str, output_path: str, port: int) -> None:
 
 
 class VirelayTeacher(TeacherInterface):
+    """Human teacher whose verdicts come from a ViReLay cluster selection.
+
+    Parameters
+    ----------
+    port : int
+        First port for the ViReLay server; incremented while occupied.
+    dataset : peal.data.datasets.ImageDataset, optional
+        Unused by this teacher beyond being stored.
+    tracking_level : int
+        Verbosity level of the surrounding run (stored only).
+    num_classes : int
+        Stored only; the analysis currently runs with a single class.
+    teacher_config : str
+        Yaml with ``meta_analysis_variant``, ``number_of_eigenvalues``,
+        ``number_of_clusters_list``, ``number_of_neighbors``,
+        ``dataset_down_sampling_method`` and ``dataset_up_sampling_method``.
+    distance_from_last_layer : int
+        Which intermediate student output (counted from the end, see
+        ``get_intermediate_output``) the relevance vectors are taken from.
+    """
+
     def __init__(
         self,
         port=2000,
@@ -693,6 +804,7 @@ class VirelayTeacher(TeacherInterface):
         teacher_config="configs/cfkd_experiments/teachers/virelay_teacher.yaml",
         distance_from_last_layer=27,  # 15, #3, #39, #2, #50,
     ):
+        """Store the settings and load ``teacher_config``; see the class docstring."""
         self.port = port
         self.dataset = dataset
         self.tracking_level = tracking_level
@@ -712,6 +824,45 @@ class VirelayTeacher(TeacherInterface):
         y_target_end_confidence_list,
         **kwargs,
     ):
+        """Build a ViReLay project for the flipped counterfactuals and collect verdicts.
+
+        Only counterfactuals with ``y_target_end_confidence > 0.5`` are shown.
+        For each of them the difference of the student's intermediate output
+        (layer ``distance_from_last_layer``) between counterfactual and factual
+        is summed spatially and L1-normalised over channels to form a
+        ``[1, C, 1, 1]`` relevance vector. ``base_dir`` is wiped and filled with
+        ``collage_greater_than_05/``, ``database.hdf5``,
+        ``attribution_database.hdf5``, ``analysis.hdf5`` and ``analysis.yaml``
+        (each step is skipped if its file already exists), then ViReLay is
+        served until ``feedback.json`` appears.
+
+        Parameters
+        ----------
+        collage_path_list : list of str
+            Collage image per counterfactual.
+        x_counterfactual_list : list of torch.Tensor
+            Counterfactual inputs.
+        x_list : list of torch.Tensor
+            Factual inputs.
+        y_list, y_source_list : list
+            Labels and source classes; currently not used for the analysis.
+        base_dir : str
+            Working directory for the ViReLay project (recreated).
+        student : torch.nn.Module
+            The classifier whose intermediate activations are attributed.
+        y_target_end_confidence_list : list of float
+            Target-class confidence of every counterfactual.
+        **kwargs
+            Further tracked values, ignored.
+
+        Returns
+        -------
+        list of str
+            One entry per input counterfactual: ``"false"`` if its index was in
+            ``selectedDataPointIndices`` of the feedback file, ``"true"`` for
+            the other shown ones and ``"Student not flipped"`` for those with
+            confidence at most 0.5.
+        """
         # filter all lists to only contain only values where y_target_end_confidence_list is greater than 0.5
         # first create a list of indices where y_target_end_confidence_list is greater than 0.5
         y_target_confidence_greater_than_05_indices = [
@@ -734,12 +885,6 @@ class VirelayTeacher(TeacherInterface):
             for i in range(len(y_target_end_confidence_list))
             if y_target_end_confidence_list[i] > 0.5
         ]
-        """y_greater_than_05_list = [
-            y_list[i] for i in range(len(y_target_end_confidence_list)) if y_target_end_confidence_list[i] > 0.5
-        ]
-        y_source_greater_than_05_list = [
-            y_source_list[i] for i in range(len(y_target_end_confidence_list)) if y_target_end_confidence_list[i] > 0.5
-        ]"""
         y_greater_than_05_list = [
             0
             for i in range(len(y_target_end_confidence_list))
@@ -758,7 +903,7 @@ class VirelayTeacher(TeacherInterface):
                     x_greater_than_05_list[0].unsqueeze(0).to("cuda"),
                     i,
                 )
-                print(str(i) + ": " + str(x_latent.shape))
+                _log.info("%s", str(i) + ": " + str(x_latent.shape))
 
             except Exception:
                 break
@@ -792,10 +937,10 @@ class VirelayTeacher(TeacherInterface):
             rel = rel.unsqueeze(-1).unsqueeze(-1)
             attributions.append(rel)
 
-        print("attributions[0].shape")
-        print("attributions[0].shape")
-        print("attributions[0].shape")
-        print(attributions[0].shape)
+        _log.info("%s", "attributions[0].shape")
+        _log.info("%s", "attributions[0].shape")
+        _log.info("%s", "attributions[0].shape")
+        _log.info("%s", attributions[0].shape)
         shutil.rmtree(base_dir, ignore_errors=True)
         Path(base_dir).mkdir(parents=True, exist_ok=True)
         if not os.path.exists(os.path.join(base_dir, "database.hdf5")):
@@ -873,7 +1018,7 @@ class VirelayTeacher(TeacherInterface):
         # TODO check if port is free
         if not os.path.exists(os.path.join(base_dir, "feedback.json")):
             while is_port_in_use(self.port):
-                print("port " + str(self.port) + " is occupied!")
+                _log.info("%s", "port " + str(self.port) + " is occupied!")
                 self.port += 1
 
             run_virelay(

@@ -1,0 +1,20 @@
+dataset_class           : ColoredMnist
+config_name             : ColoredMnistConfig
+dataset_path            : $PEAL_DATA/mnist-colored/mnist-cprob50-ctarget0
+raw_path                : $PEAL_DATA/mnist
+input_type              : image
+input_size              : [3, 28, 28]
+output_type             : singleclass
+output_size             : [10]
+downsize                : Resize
+coloring:
+  - [0, 0.5] # [class, coloring prob]
+  - [1, 0.004]
+  - [2, 0.004]
+  - [3, 0.004]
+  - [4, 0.004]
+  - [5, 0.004]
+  - [6, 0.004]
+  - [7, 0.004]
+  - [8, 0.004]
+  - [9, 0.004]

@@ -1,0 +1,34 @@
+# DiDAE-CFKD on CelebA (Blond_Hair confounded by Male, 98% poisoned) with DDPM
+# (edit-friendly) inversion instead of DDIM inversion.
+# Identical to celeba1kx098_resnet18_didae_openclip_cfkd.yaml in every respect
+# (same student, teacher, generator, Procrustes dictionary, data and task) except
+# for the explainer, which points at dae_distill_ddpm.yaml (sampler type ddpm,
+# 20 steps, uniform spacing), and base_dir. This makes it a like-for-like
+# DDIM-vs-DDPM comparison of the counterfactual sampler.
+# python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/celeba1kx098_resnet18_didae_openclip_ddpm_cfkd.yaml"
+adaptor_type                         :  "CFKD"
+category                             :  "adaptor"
+batch_size                           :  200 #4
+tracking_level                       :  5 #5
+min_train_samples                    :  800
+finetune_iterations                  :  1
+max_validation_samples               :  200
+continuous_learning                  :  "finetune" #"deep_feature_reweighting"
+calculate_group_accuracies           :  True
+calculate_explainer_stats            :  True
+explainer                            :  <PEAL_BASE>/configs/didae_experiments/explainers/dae_distill_ddpm.yaml
+training                             :  <PEAL_BASE>/configs/cfkd_experiments/training/img_finetuning.yaml
+data                                 :  <PEAL_BASE>/configs/cfkd_experiments/data/celeba1k_Blond_Hair_confounding_Male_poisoned098.yaml
+test_data                            :  <PEAL_BASE>/configs/cfkd_experiments/data/celeba.yaml
+student                              :  $PEAL_RUNS/celeba1k/Blond_Hair/classifier_poisoned098/model.cpl
+teacher                              :  $PEAL_RUNS/celeba/Blond_Hair/classifier_unpoisoned/model.cpl
+generator                            :  $PEAL_RUNS/celeba/diffusion_autoencoder/config.yaml
+sparse_dictionary                    :  $PEAL_RUNS/celeba/diffusion_autoencoder/OrthogonalProcrustesDictionary/config.yaml
+base_dir                             :  $PEAL_RUNS/celeba1k/Blond_Hair/classifier_poisoned098/openclip_didae_ddpm_cfkd
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [Blond_Hair]

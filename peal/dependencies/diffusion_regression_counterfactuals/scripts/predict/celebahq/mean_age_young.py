@@ -1,9 +1,10 @@
+import os
 import json
 import pandas as pd
 
 # Define the path to the CSV file
-csv_file_path = (
-    "/home/space/datasets/CelebAMask-HQ/CelebAMask-HQ/CelebAMask-HQ-attribute-anno.txt"
+csv_file_path = os.path.join(
+    os.environ.get("PEAL_DATA", "datasets"), "CelebAMask-HQ/CelebAMask-HQ/CelebAMask-HQ-attribute-anno.txt"
 )
 
 # Load the CSV file, skipping the first two lines and without a header

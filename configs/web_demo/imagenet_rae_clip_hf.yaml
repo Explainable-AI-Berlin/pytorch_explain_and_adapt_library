@@ -1,0 +1,52 @@
+# Web-demo generator: the ImageNet RAE (RAEv2 two stage, frozen OpenAI CLIP
+# ViT-L/14 encoder) loaded from a published weights folder instead of a
+# training run. `weights` is substituted by peal/web/config_builder.py from
+# $PEAL_RAE_WEIGHTS (an hf://<repo> or a local folder holding decoder.pt,
+# stats.pt and stage2_ema.pt, see tools/export_rae_weights.py). Edit-friendly
+# DDPM inversion as in the 2026-09-15 ImageNet shortcut renders; the step
+# count, guidance scale and precision below are the web demo's own (see the
+# note above the sampler).
+generator_type : RAEDiffusionAutoencoder
+category : generator
+base_path : $PEAL_RUNS/web_demo/imagenet_rae_clip
+weights: hf://sidney1505/peal-rae-clip-imagenet@v0.1.0
+data:
+  dataset_class     : Image2MixedDataset
+  dataset_path      : null          # the job's dataset (set by the config builder)
+  num_samples       : null
+  input_type        : image
+  input_size        : [3, 256, 256]
+  output_type       : singleclass
+  output_size       : [2]
+  downsize          : Resize
+  x_selection       : imgs
+  confounding_factors : [Class]
+  normalization     : [0.5, 0.5]
+image_size: 256
+encoder_dimensions : 768
+encoder: "clip:ViT-L/14"
+encoder_input_space: pytorch_default
+stage1_config: <PEAL_BASE>/configs/didae_experiments/generators/rae_clip/stage1_imagenet_clip_vitl14.yaml
+stage2_config: <PEAL_BASE>/configs/didae_experiments/generators/rae_clip/stage2_imagenet_clip_vitl14.yaml
+stage1_experiment: clip_vitl14_vitxl
+stage2_experiment: ddt_xl_cls
+stage1_precision: bf16
+stage2_precision: bf16
+keep_checkpoints: 0
+cache_dir: /tmp/rae_clip_stage2_cache
+# Settings from the Waterbirds search of 2026-09-28/29 (~/peal_data/hparam_search):
+# bf16 inversion and replay give the same reconstruction (17.94 vs 17.94 dB)
+# and flips at 2.9x the speed; 25 steps cost 0.3 dB and render 2x faster than 50;
+# guidance 3 realises more of an edit than 2 (0.46 vs 0.37) and, with concept
+# pairs, ranked a background direction first at 25 and 50 steps. NOTE: the web
+# builder copies this sampler into the explainer, because the sweep resets the
+# step count to 50 when the explainer has no sampler (it always did before).
+sampler:
+  type: ddpm
+  num_steps: 25
+stage2_weights: ema
+render_noise: inverted
+guidance_scale: 3.0
+sde_autocast: true
+batch_size: 16
+continue_training: false

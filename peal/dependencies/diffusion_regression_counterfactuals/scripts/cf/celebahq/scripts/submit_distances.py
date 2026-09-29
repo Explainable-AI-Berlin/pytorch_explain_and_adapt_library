@@ -1,9 +1,9 @@
 import os
 
 
-GMODEL_PATH = "/home/tha/diffae/checkpoints/ffhq256_autoenc/last.ckpt"
-RMODEL_PATH = "/home/tha/thesis_runs/regressor/imdb_wiki_densenet_linear_only-256/version_0/checkpoints/last.ckpt"
-RORACLE_PATH = "/home/tha/thesis_runs/regressor/imdb_wiki_densenet_fullft-256/version_0/checkpoints/last.ckpt"
+GMODEL_PATH = os.path.join(os.environ.get("PEAL_RUNS", "peal_runs"), "diffae/checkpoints/ffhq256_autoenc/last.ckpt")
+RMODEL_PATH = os.path.join(os.environ.get("PEAL_RUNS", "peal_runs"), "regressor/imdb_wiki_densenet_linear_only-256/version_0/checkpoints/last.ckpt")
+RORACLE_PATH = os.path.join(os.environ.get("PEAL_RUNS", "peal_runs"), "regressor/imdb_wiki_densenet_fullft-256/version_0/checkpoints/last.ckpt")
 
 
 def construct_args(dist, dist_type):
@@ -28,7 +28,7 @@ def construct_args(dist, dist_type):
         f"CelebaHQ_FR-lr={args['lr']}-bt={args['backward_t']}-dist={args['dist']}+"
         f"{args['dist_type']}-opt={args['optimizer']}"
     )
-    args["result_dir"] = f"/home/tha/thesis_runs/cf/celebahq/dists/{name}"
+    args["result_dir"] = os.path.join(os.environ.get("PEAL_RUNS", "peal_runs"), "cf/celebahq/dists", name)
 
     print("Running with args:", args)
     return args
@@ -43,7 +43,7 @@ def get_full_sbatch_cmd(args: dict):
 #SBATCH --ntasks-per-node=2
 #SBATCH --constraint=80gb
 #SBATCH --output=logs/job-%j-{dist_name}.out
-#SBATCH --chdir=/home/tha/master-thesis-xai/diff_cf_ir/scripts/cf/celebahq
+#SBATCH --chdir={os.path.dirname(os.path.dirname(os.path.abspath(__file__)))}
 #SBATCH --signal=SIGUSR1@600
 
 """
@@ -52,7 +52,7 @@ def get_full_sbatch_cmd(args: dict):
     cmd = " ".join(
         [
             "apptainer run",
-            "-B /home/space/datasets-sqfs/CelebAMask-HQ.sqfs:/data/CelebAMask-HQ:image-src=/",
+            f"-B {os.environ.get('PEAL_DATA', 'datasets')}/CelebAMask-HQ.sqfs:/data/CelebAMask-HQ:image-src=/",
             "--nv",
             "~/apptainers/thesis.sif",
             "python run_diffeocf_dae_celebahq.py",

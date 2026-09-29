@@ -1,0 +1,35 @@
+# python train_predictor.py --config "<PEAL_BASE>/configs/didae_experiments/predictors/celeba1k_foundation_linear_poisoned098.yaml"
+#
+# Trains the CelebA probe student, a linear head on the frozen CLIP encoder, that
+# every CelebA probe result in the paper is measured on:
+#   Table 4 (tab:quantitative_base_models) "CelebA-Blond / Probe", Gain 70.6
+#   Table 7 (tab:sota_comparison_foundation_model_fixing) "Blond" column,
+#           Projection 22.6 and DiDAE-CFKD 70.6
+# Its consumers are celeba1kx098_openclip_didae_cfkd.yaml (the 70.6 cell) and
+# celeba1kx098_didae_projection.yaml (the 22.6 cell), both of which read
+# $PEAL_RUNS/celeba1k/Blond_Hair/openclip_linear_poisoned098/model.cpl, so
+# model_path below must not be renamed.
+#
+# Aligned 2026-09-26 on the user's instruction: the architecture now names OpenAI CLIP
+# ViT-L/14 explicitly, which is the encoder the paper's Table 1 and hyperparameter table
+# state, and which matches the generator and dictionary the two adaptor configs now use
+# (both 768-d). A bare `torchvision_open_clip` silently fell back to OpenCLIP ViT-B-32 at
+# 512-d. This writes to a NEW run directory, so the old 512-d probe and every number taken
+# from it stay on disk for comparison.
+#
+# Content is identical to celeba1k_Blond_Hair_openclip_linear_poisoned098.yaml,
+# which no reproduction script references; this is the name the script calls, and
+# it matches the committed celeba1k_foundation_linear_poisoned098_dfr.yaml.
+model_path        : $PEAL_RUNS/celeba1k/Blond_Hair/openai_clip_vit_l14_linear_poisoned098
+data              : <PEAL_BASE>/configs/cfkd_experiments/data/celeba1k_Blond_Hair_confounding_Male_poisoned098.yaml
+training          : <PEAL_BASE>/configs/cfkd_experiments/training/img_finetuning_adamw.yaml
+architecture      : torchvision_open_clip:ViT-L-14:openai
+continue_training : True
+only_last_layer   : True
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [Blond_Hair]

@@ -1,38 +1,12 @@
-import argparse
+"""Visualise every component of a sparse dictionary fitted on a generator.
 
-from peal.global_utils import load_yaml_config, set_random_seed
-from peal.generators.generator_factory import get_generator
+Thin wrapper. The implementation moved to ``peal.entrypoints.run_component_analysis`` so
+that an installed PEAL exposes it as the ``peal-component-analysis`` console command;
+this file is kept because the reproduction scripts, notebooks and README all invoke
+``python run_component_analysis.py ...``. See that module for the full documentation.
+"""
 
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, required=True)
-    parser.add_argument("--is_loaded", type=bool, default=True)
-    parser.add_argument("--sd_config", type=str, default=None)
-    # add_class_arguments(parser, ModelConfig)
-    args = parser.parse_args()
-
-    generator_config = load_yaml_config(args.config)
-    if hasattr(generator_config, "is_loaded"):
-        generator_config.is_loaded = args.is_loaded
-
-    if not args.sd_config is None:
-        sparse_dictionary_config = load_yaml_config(args.sd_config)
-        
-        # Force the generator to use this specific sparse dictionary during init
-        generator_config.sparse_dictionary = sparse_dictionary_config
-        # Also ensure the generator data matches the dictionary data
-        if hasattr(sparse_dictionary_config, "data") and sparse_dictionary_config.data:
-            generator_config.data = sparse_dictionary_config.data
-
-    else:
-        sparse_dictionary_config = None
-
-    set_random_seed(generator_config.seed)
-
-    generator = get_generator(generator_config)
-    generator.explain_all_components(sparse_dictionary_config)
-
+from peal.entrypoints.run_component_analysis import main
 
 if __name__ == "__main__":
     main()

@@ -1,3 +1,14 @@
+"""Base dataset class and the pydantic ``DataConfig`` shared by all PEAL data.
+
+``PealDataset`` extends ``torch.utils.data.Dataset`` with the hooks the rest of
+PEAL relies on: mapping samples between the dataset's processed format and the
+"pytorch default" format generators work in, rendering original/counterfactual
+collages for teachers, and (optional) distance/variance/flip-rate metrics used
+by explainer evaluation. ``DataConfig`` is the yaml-facing description of a
+dataset (shapes, splits, normalisation, confounder layout, augmentation) that
+``dataset_factory`` and every generator/explainer consume.
+"""
+
 from typing import Union
 
 import torch
@@ -9,11 +20,15 @@ from peal.generators.interfaces import Generator
 
 
 class PealDataset(torch.utils.data.Dataset):
-    """
-    This is the base class for all datasets in PEAL. It is a wrapper around
+    """Base class of every dataset in PEAL.
 
-    Args:
-        torch.utils.data.Dataset (nn.Module): The parent class for all datasets in PEAL
+    Subclasses (see ``peal.data.datasets`` and ``custom_datasets``) hold a
+    ``config`` (``DataConfig``) and usually a ``normalization`` transform. The
+    methods defined here are defaults/hooks: most return placeholders and are
+    meant to be overridden when a dataset supports the corresponding feature.
+    ``project_to_pytorch_default``/``project_from_pytorch_default`` are the
+    bridge between the classifier's input format and the generator's image
+    format and are used by every counterfactual explainer.
     """
 
     def generate_contrastive_collage(
@@ -32,15 +47,36 @@ class PealDataset(torch.utils.data.Dataset):
         feedback_list=None,
         **kwargs: dict,
     ):
-        """
-        This function generates a collage of the input and the counterfactual
+        """Render original/counterfactual pairs for teachers and tracking (hook).
 
-        Args:
-            batch_in (torch.tensor): The input batch
-            counterfactual (torch.tensor): The counterfactual batch
+        Subclasses write one collage image per pair under ``base_path`` and
+        return the paths plus per-sample attribution maps; teachers such as
+        ``BaselineTeacher`` or ``Model2ModelTeacher`` call this to show or log
+        the counterfactuals they judge.
 
-        Returns:
-            torch.tensor: The collage
+        Parameters
+        ----------
+        x_list, x_counterfactual_list : list of torch.Tensor
+            Originals and their counterfactuals, in dataset format.
+        y_target_list, y_source_list, y_list : list
+            Target class of the edit, class predicted for the original, and
+            ground-truth label.
+        y_target_start_confidence_list, y_target_end_confidence_list : list
+            Student confidence in the target class before and after the edit.
+        base_path : str
+            Directory to write the collages to.
+        start_idx : int
+            Offset used to number the written files.
+        y_counterfactual_teacher_list, y_original_teacher_list : list, optional
+            Teacher-model predictions, if available.
+        feedback_list : list, optional
+            Feedback strings to print onto the collage.
+
+        Returns
+        -------
+        torch.Tensor
+            This base implementation only returns a ``(3, 64, 64)`` zero tensor.
+            Overrides return ``(collage_paths, attribution_list)``.
         """
         return torch.zeros([3, 64, 64])
 
@@ -54,7 +90,6 @@ class PealDataset(torch.utils.data.Dataset):
             y_list (list): The list of labels
             sample_names (list, optional): The list of sample names. Defaults to None.
         """
-        pass
 
     def project_to_pytorch_default(self, x):
         """
@@ -99,46 +134,67 @@ class PealDataset(torch.utils.data.Dataset):
         return {}
 
     def distribution_distance(self, x_list):
-        pass
+        """Hook: distance of ``x_list`` to the data distribution (returns None)."""
 
     def pair_wise_distance(self, x1, x2):
-        pass
+        """Hook: distance between two samples in dataset units (returns None)."""
 
     def variance(self, x_list):
-        pass
+        """Hook: diversity/variance of a list of samples (returns None)."""
 
     def flip_rate(self, y_list, y_counterfactual_list):
-        pass
+        """Hook: fraction of counterfactuals whose label differs (returns None)."""
 
 
 class DataConfig(BaseModel):
-    """
-    This class defines the config of a dataset.
+    """Pydantic description of a dataset, loadable from yaml.
+
+    The individual fields are documented by the string literals that precede
+    them in the source. The fields without such a literal configure diffusion
+    based data augmentation and are consumed by ``dataset_factory`` and
+    ``peal.data.transformations.DiffusionAugmentation``.
+
+    Parameters
+    ----------
+    generator : str or object or None
+        Generator (config path, config or instance) used for augmentation.
+    diffusion_augmented : bool
+        If ``True`` the training transform noises every sample with
+        ``generator`` and denoises it again (a stochastic augmentation).
+    sampling_time_fraction : float
+        Fraction of the diffusion schedule to noise to (default 0.3).
+    num_discretization_steps : int
+        Number of denoising steps used by the augmentation (default 20).
+    batch_wise_augmentation : bool
+        If ``True`` (default) the per-sample ``DiffusionAugmentation``
+        transform is not added to the dataset; augmentation is expected to be
+        applied to whole batches elsewhere.
     """
 
+    config_name: str = "DataConfig"
     """
     The type of config. This is necessary to find config class from yaml config
     """
-    config_name: str = "DataConfig"
+    input_type: str = "image"
     """
     The input type of the data:
     Options: ['image', 'sequence', 'symbolic']
     """
-    input_type: str = "image"
+    output_type: str = "singleclass"
     """
     The output type of the data.
     Options: ['singleclass', 'multiclass', 'continuous', 'mixed']
     'mixed' is a hybrid between binary multiclass classification and continuous and
     requires 'output_split' to be set
     """
-    output_type: str = "singleclass"
+    input_size: list[PositiveInt] = [3, 128, 128]
     """
     The input size of data.
     For images: [Channels, Height, Width]
     For sequences: [MaxLength, NumTokens]
     For symbolic: [NumVariables]
     """
-    input_size: list[PositiveInt] = [3, 128, 128]
+    output_size: list[PositiveInt] = [2]
     """
     The output size of the model.
     For singleclass: [NumClasses]
@@ -146,102 +202,102 @@ class DataConfig(BaseModel):
     For continuous: [NumVariables]
     For mixed: [NumBinaryClasses + NumVariables]
     """
-    output_size: list[PositiveInt] = [2]
+    dataset_path: Union[type(None), str] = None
     """
     The path to the dataset.
     """
-    dataset_path: Union[type(None), str] = None
+    dataset_origin_path: Union[type(None), str] = None
     """
     The path to the dataset origin this dataset got derived from.
     """
-    dataset_origin_path: Union[type(None), str] = None
+    num_samples: Union[type(None), int] = None
     """
     The number of samples in the dataset.
     Sometimes important when executing specific experiments.
     """
-    num_samples: Union[type(None), int] = None
+    dataset_class: Union[type(None), str] = None
     """
     The name of the dataset.
     Only necessary to tell dataset factory which customized dataset class to use
     """
-    dataset_class: Union[type(None), str] = None
+    split: list[float] = [0.8, 0.9]
     """
     The split between train, validation and test set.
     """
-    split: list[float] = [0.8, 0.9]
+    has_hints: Union[type(None), bool] = False
     """
     Whether the dataset contains spatial annotations where the true feature is.
     """
-    has_hints: Union[type(None), bool] = False
+    normalization: Union[type(None), list] = None
     """
     The applied normalization.
     Options: ['mean0std1']
     """
-    normalization: Union[type(None), list] = None
+    invariances: list[str] = []
     """
     A list of the invariances exploited for data augmentation:
     Options: ['hflipping', 'vflipping', 'rotation', 'circlecut']
     """
-    invariances: list[str] = []
+    output_split: Union[type(None), int] = None
     """
     The number of binary multiclass variables in the mixed setting.
     Has to be smaller than output_size.
     """
-    output_split: Union[type(None), int] = None
+    downsize: Union[type(None), str] = None
     """
     The way how to downsize an sample if required.
     Options: ['Downsample', 'RandomCrop', 'CenterCrop']
     """
-    downsize: Union[type(None), str] = None
+    confounding_factors: Union[type(None), list[str]] = []
     """
     A pair of known confounding factors, one usually being the target.
     This knowledge helps for controlled sampling of confounders for experiments.
     """
-    confounding_factors: Union[type(None), list[str]] = []
+    foreground: Union[type(None), list[str]] = None
     """
     The foreground categories to use for the experiment.
     """
-    foreground: Union[type(None), list[str]] = None
+    background: Union[type(None), list[str]] = None
     """
     The background contexts to use for the experiment.
     """
-    background: Union[type(None), list[str]] = None
+    confounder_probability: Union[type(None), float] = None
     """
     The correlation strength of the target and the confounding variable.
     """
-    confounder_probability: Union[type(None), float] = None
+    full_confounder_config: Union[type(None), list[float]] = None
     """
     alternative to confounder_probability, specify individual group sizes, e.g. [0.25, 0.25, 0.25, 0.25]
     """
-    full_confounder_config: Union[type(None), list[float]] = None
+    class_ratios: Union[type(None), list] = None
     """
     The ratio of the classes in the dataset.
     """
-    class_ratios: Union[type(None), list] = None
+    seed: Union[type(None), int] = 0
     """
     The seed the dataset was generated with.
     Only relevant for generated datasets!
     """
-    seed: Union[type(None), int] = 0
+    label_noise: Union[type(None), float] = None
     """
     The label noise of a generated dataset.
     Necessary to mimic real dataset behauviour and avoid trivial non-robust solutions.
     """
-    label_noise: Union[type(None), float] = None
+    set_negative_to_zero: bool = True
     """
     Whether to set negative values to zero.
     """
-    set_negative_to_zero: bool = False
+    font_path: Union[type(None), str] = None
     """
-    The delimiter used for the csv file.
+    The path to the font file.
     """
     delimiter: Union[type(None), str] = ","
     """
-    The number of classes in the dataset.
+    The delimiter used for the csv file.
     """
     crop_size: Union[type(None), int] = None
     """
-    The path of the original dataset.
+    The number of classes in the dataset.
     """
     dataset_origin_path: Union[type(None), str] = None
     """
@@ -249,36 +305,38 @@ class DataConfig(BaseModel):
     """
     inverse: Union[type(None), str] = None
     """
-    Where the label path is relative to the dataset path.
+    The path of the original dataset.
     """
     label_rel_path: str = "data.csv"
+    """
+    Where the label path is relative to the dataset path.
+    """
+    x_selection: str = "imgs"
     """
     The name of the folder where the images are stored.
     The header of the column in the underlying csv either has to be called like this as well or the path to the images
     has to be in the first column.
     """
-    x_selection: str = "imgs"
+    in_memory: bool = False
     """
     Whether to load all datasets into the RAM or not. Careful with big datasets!
     """
-    in_memory: bool = False
+    spray_label_file: Union[str, type(None)] = None
     """
     Path to spray label csv file. When set, use spray labels instead of true confounder labels.
     Samples without a spray label will be dropped
     """
-    spray_label_file: Union[str, type(None)] = None
+    spray_groups_balanced: bool = False
     """
     Whether to re-balance group sizes after dropping samples without a spray label
     """
-    spray_groups_balanced: bool = False
-
     generator: Union[type(None), str, object] = None
     diffusion_augmented: bool = False
     sampling_time_fraction: float = 0.3
     num_discretization_steps: int = 20
     batch_wise_augmentation: bool = True
+    tabular_preprocessing: Union[type(None), list[str]] = None
     """
     List of preprocessing methods to apply to tabular datasets.
-    Options: ['minmax_-1_1']
+    Options: ``['minmax_-1_1']``
     """
-    tabular_preprocessing: Union[type(None), list[str]] = None

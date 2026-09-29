@@ -1,17 +1,48 @@
+"""Interactive Flask teacher that asks a human to label counterfactual collages.
+
+PEAL teachers turn counterfactual explanations into feedback for the adaptor.
+:class:`Human2ModelTeacher` serves each collage in a small web page (templates
+``feedback_loop.html`` / ``information.html``) and blocks in
+:meth:`Human2ModelTeacher.get_feedback` until the person has answered
+"True Counterfactual", "False Counterfactual" or "Out of Distribution" for
+every image. Collages are copied into a local ``static`` folder for serving.
+"""
+
+import tempfile
 import threading
 import shutil
 import os
 import copy
 import time
 
-from flask import Flask, render_template, request
 from tqdm import tqdm
 
+from peal._optional import require
 from peal.teachers.interfaces import TeacherInterface
-from peal.global_utils import get_project_resource_dir, is_port_in_use
+from peal.global_utils import is_port_in_use
+from peal.log import get_logger
+
+_log = get_logger(__name__)
 
 
 class DataStore:
+    """Mutable state shared between the Flask route and the training thread.
+
+    Attributes
+    ----------
+    i : int
+        Index of the next collage to show.
+    collage_paths : list of str
+        Paths under ``static/`` of the collages awaiting feedback.
+    feedback : list of str
+        Collected answers (``"true"``, ``"false"``, ``"ood"`` or an automatic
+        ``"student incorrect!"`` / ``"student not swapped!"`` entry).
+    y_target_end_confidence_list : list of float
+        Confidence of the student in the target class after the edit.
+    student_correct_list : list of bool
+        Whether the student's source prediction matched the label.
+    """
+
     i = None
     collage_paths = None
     feedback = None
@@ -20,33 +51,63 @@ class DataStore:
 
 
 class Human2ModelTeacher(TeacherInterface):
-    """ """
+    """Teacher whose feedback comes from a human through a local web form.
+
+    Parameters
+    ----------
+    port : int
+        Preferred port for the Flask app; incremented until a free port is found.
+
+    Notes
+    -----
+    The constructor wipes and recreates a ``static`` directory in the current
+    working directory, starts the Flask server on ``0.0.0.0`` in a daemon-less
+    background thread and never stops it. Collages whose student prediction is
+    wrong or whose target confidence stays below 0.5 are skipped and answered
+    automatically instead of being shown.
+    """
 
     def __init__(self, port):
-        """ """
-        # TODO fix bug with reloading
-        shutil.rmtree("static", ignore_errors=True)
-        os.makedirs("static")
+        """Create the ``static`` folder, pick a free port and start the server.
+
+        Raises
+        ------
+        ImportError
+            If the optional ``flask`` dependency is not installed.
+        """
+        flask = require("flask", "web", "the interactive feedback web app")
+        Flask = flask.Flask
+        render_template = flask.render_template
+        request = flask.request
+
+        # A per-instance temporary directory for the collages the browser is
+        # served. This used to delete a *relative* ``static`` folder, i.e. one
+        # in whatever the caller's working directory happened to be - a library
+        # must not do that.
+        self.static_dir = tempfile.mkdtemp(prefix="peal_feedback_")
         self.port = port
         while is_port_in_use(self.port):
-            print("port " + str(self.port) + " is occupied!")
+            _log.info("%s", "port " + str(self.port) + " is occupied!")
             self.port += 1
 
-        print("Start feedback loop!")
+        _log.info("%s", "Start feedback loop!")
         #
         # host_name = "localhost"
         host_name = "0.0.0.0"
-        app = Flask("feedback_loop")
+        app = Flask(
+            "feedback_loop", static_folder=self.static_dir, static_url_path="/static"
+        )
 
         self.data = DataStore()
         self.data.i = 0
         self.data.collage_paths = []
         self.data.feedback = []
 
-        app.config.UPLOAD_FOLDER = "static"
+        app.config.UPLOAD_FOLDER = self.static_dir
 
         @app.route("/", methods=["GET", "POST"])
         def index():
+            """Record the submitted answer and render the next collage."""
             if request.method == "POST":
                 if request.form["submit_button"] == "True Counterfactual":
                     self.data.feedback.append("true")
@@ -105,7 +166,7 @@ class Human2ModelTeacher(TeacherInterface):
             )
         )
         self.thread.start()
-        print("Feedback GUI is active on localhost:" + str(self.port))
+        _log.info("%s", "Feedback GUI is active on localhost:" + str(self.port))
 
     def get_feedback(
         self,
@@ -113,15 +174,40 @@ class Human2ModelTeacher(TeacherInterface):
         y_target_end_confidence_list,
         y_source_list,
         y_list,
-        **kwargs
+        **kwargs,
     ):
-        """ """
-        print("start collecting feedback!!!")
+        """Show every collage to the human and wait for one answer each.
+
+        Parameters
+        ----------
+        collage_path_list : list of str
+            Collage images; each is copied to ``static/<basename>``.
+        y_target_end_confidence_list : list of float
+            Student confidence in the target class after the counterfactual edit.
+        y_source_list : list
+            Student predictions on the original samples.
+        y_list : list
+            Ground-truth labels; compared with ``y_source_list`` to mark samples
+            the student got wrong.
+        **kwargs
+            Ignored; present for interface compatibility with other teachers.
+
+        Returns
+        -------
+        list of str
+            One entry per collage: ``"true"``, ``"false"``, ``"ood"``,
+            ``"student incorrect!"`` or ``"student not swapped!"``. Polls once a
+            second (up to 100000 times) until the list is complete, then resets
+            the shared :class:`DataStore`.
+        """
+        _log.info("%s", "start collecting feedback!!!")
         collage_paths_static = []
         for path in collage_path_list:
-            collage_path_static = os.path.join("static", path.split("/")[-1])
-            shutil.copy(path, collage_path_static)
-            collage_paths_static.append(collage_path_static)
+            # Copy into the served directory; the template gets the URL path,
+            # which Flask maps onto static_folder.
+            name = path.split("/")[-1]
+            shutil.copy(path, os.path.join(self.static_dir, name))
+            collage_paths_static.append(os.path.join("static", name))
 
         self.data.collage_paths = collage_paths_static
         self.data.y_target_end_confidence_list = y_target_end_confidence_list

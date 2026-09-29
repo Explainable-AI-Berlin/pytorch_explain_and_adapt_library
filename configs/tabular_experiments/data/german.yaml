@@ -1,6 +1,6 @@
 dataset_class: GermanDataset
 category: data
-dataset_path: datasets/german
+dataset_path: $PEAL_DATA/german
 output_size: [ 1 ]
 input_size: [ 20 ]
 input_type: "symbolic"

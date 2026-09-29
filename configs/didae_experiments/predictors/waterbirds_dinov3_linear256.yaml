@@ -1,0 +1,31 @@
+# DINOv3 ViT-L/16 linear probe on Waterbirds at 256x256 (frozen backbone, only the
+# fc head trains). Replaces $PEAL_RUNS/waterbirds/dinov3_linear, whose saved model
+# is its epoch-0 checkpoint: the trainer of 2026-07/08 computed the "epoch"
+# validation accuracy on the last validation batch only (4 images), which read
+# 1.0 from epoch 0 on, so no later epoch was ever saved (fixed on dev 2026-09-09).
+# python train_predictor.py --config "<PEAL_BASE>/configs/didae_experiments/predictors/waterbirds_dinov3_linear256.yaml"
+model_path        : $PEAL_RUNS/waterbirds/dinov3_linear256
+data              : <PEAL_BASE>/configs/didae_experiments/data/waterbirds256.yaml
+# the linear-probe settings of dinov3_linear_probe.yaml, with ~1 pass over the
+# 4795 training images per epoch (150 x 32) and more epochs for the larger set
+training:
+  dropout          : 0.0
+  learning_rate    : 1.0e-03
+  max_epochs       : 10
+  optimizer        : adamw
+  steps_per_epoch  : 150
+  test_batch_size  : 64
+  train_batch_size : 32
+  val_batch_size   : 32
+architecture      : torchvision_dino_v3
+# True: fit() calls reset_weights() on the whole model otherwise, which would
+# re-initialise the pretrained DINOv3 backbone.
+continue_training : True
+only_last_layer   : True
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [y]

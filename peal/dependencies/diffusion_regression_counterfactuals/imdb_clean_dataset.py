@@ -224,4 +224,4 @@ if __name__ == "__main__":
         create_cropped_images_old(args.root, args.output)
 
     # Example: Run in container
-    # apptainer run -B /home/space/datasets:/home/space/datasets  ~/apptainers/thesis.sif python imdb_clean_dataset.py /home/space/datasets/imdb-wiki-clean/imdb-clean /home/space/datasets/imdb-wiki-clean/imdb-clean/data/imdb-clean-1024-cropped
+    # apptainer run -B $PEAL_DATA:$PEAL_DATA  ~/apptainers/thesis.sif python imdb_clean_dataset.py $PEAL_DATA/datasets/imdb-wiki-clean/imdb-clean $PEAL_DATA/datasets/imdb-wiki-clean/imdb-clean/data/imdb-clean-1024-cropped

@@ -7,5 +7,4 @@ sampling_inpaint: 0.7
 attack_step: 1
 dist_l1: 0.001
 y_target_goal_confidence: 1.1
-num_attempts: 4
-use_clustering: false
+num_attempts: 2

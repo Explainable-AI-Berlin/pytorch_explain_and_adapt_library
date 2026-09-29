@@ -1,0 +1,30 @@
+# python run_cfkd.py --config "<PEAL_BASE>/configs/cfkd_fastdime_hq/adaptors/imagenet_egyptian_cat_vs_persian_cat_sd3_cfkd.yaml"
+# Egyptian Cat = class 0 (ImageNet index 285)
+# Persian Cat = class 1 (ImageNet index 283)
+adaptor_type                         :  "CFKD"
+category                             :  "adaptor"
+batch_size                           :  1
+tracking_level                       :  3
+min_train_samples                    :  900
+finetune_iterations                  :  0
+max_validation_samples               :  100
+continuous_learning                  :  "retrain"
+replace_model                        :  True
+use_visualization                    :  True
+calculate_group_accuracies           :  False
+explainer                            :  <PEAL_BASE>/configs/cfkd_fastdime_hq/explainers/imagenet_egyptian_cat_vs_persian_cat_sd3.yaml
+training                             :  <PEAL_BASE>/configs/training/img_finetuning.yaml
+data                                 :  <PEAL_BASE>/configs/cfkd_fastdime_hq/data/imagenet_egyptian_cat_vs_persian_cat.yaml
+test_data                            :  <PEAL_BASE>/configs/cfkd_fastdime_hq/data/imagenet_egyptian_cat_vs_persian_cat.yaml
+student                              :  $PEAL_RUNS/imagenet/egyptian_cat_vs_persian_cat_classifier/model.onnx
+teacher                              :  $PEAL_RUNS/imagenet/egyptian_cat_vs_persian_cat_classifier/model.onnx
+generator                            :  <PEAL_BASE>/configs/cfkd_fastdime_hq/generators/stable_diffusion_3_egyptian_cat_vs_persian_cat.yaml
+base_dir                             :  <PEAL_BASE>/peal_runs/fast_dim_imagenet_egyptian_cat_vs_persian_cat
+seed                                 : 42
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [Class]

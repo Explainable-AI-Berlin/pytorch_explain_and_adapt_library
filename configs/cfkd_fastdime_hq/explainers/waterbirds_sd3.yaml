@@ -1,0 +1,25 @@
+explainer_type : SCE
+attack_iterations: 100
+attack_step: 1.0
+category: explainer
+distilled_predictor: <PEAL_BASE>/configs/predictors/sensitive_distillation_waterbird.yaml
+sampling_inpaint: 0.0
+y_target_goal_confidence: 0.8
+dist_l1: 1.0e-08
+timestep_respacing: 100
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [y]
+
+sampling_time_fraction: 0.4
+learning_rate: 1.0
+merge_clusters: concatenate
+momentum: 0.9
+num_attempts: 2
+num_discretization_steps: 20
+optimizer: SGD
+replace_with_activation: leakysoftplus

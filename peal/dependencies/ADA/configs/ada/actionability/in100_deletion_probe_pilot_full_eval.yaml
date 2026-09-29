@@ -1,0 +1,14 @@
+experiment_id: e4a_in100_k10_deletion_probe_pilot_full_eval_seed0
+train_cache: artifacts/ada/atlas/embeddings/imagenet100/train/facebook__dinov2-with-registers-base/cls/combined_train_full_4shards
+validation_cache: artifacts/ada/atlas/embeddings/imagenet100/val/facebook__dinov2-with-registers-base/cls/cache-6ec1e8a1b614f414
+enriched_regions_dir: artifacts/ada/actionability/regions/e4a_in100_dinov2_cls_k10_enriched_seed0
+deletion_controls_dir: artifacts/ada/actionability/deletion_pilot/e4a_in100_dinov2_cls_k10_controlled_seed0
+probe_output_dir: artifacts/ada/actionability/probes/e4a_in100_dinov2_cls_k10_deletion_probe_pilot_seed0
+eval_output_dir: artifacts/ada/actionability/evaluation/e4a_in100_dinov2_cls_k10_deletion_probe_pilot_full_seed0
+fixed_steps: 1000
+batch_size: 2048
+lr: 0.01
+weight_decay: 0.0001
+device: auto
+support_k: 50
+overwrite: false

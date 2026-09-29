@@ -27,7 +27,7 @@ from typing import Optional, Union, Tuple, List, Callable, Dict
 
 # from IPython.display import display
 from tqdm import tqdm
-
+from einops import rearrange, repeat
 
 """def text_under_image(image: np.ndarray, text: str, text_color: Tuple[int, int, int] = (0, 0, 0)):
     h, w, c = image.shape
@@ -81,27 +81,56 @@ def view_images(images, num_rows=1, offset_ratio=0.02):
     return pil_img
 
 
+def _get_text_conditioning(model, prompt: List[str]):
+    if hasattr(model, "get_learned_conditioning"):
+        return model.get_learned_conditioning(prompt)
+
+    text_input = model.tokenizer(
+        prompt,
+        padding="max_length",
+        max_length=model.tokenizer.model_max_length,
+        truncation=True,
+        return_tensors="pt",
+    )
+    return model.text_encoder(text_input.input_ids.to(model.device))[0]
+
+
+def _predict_noise(model, latents, t, encoder_hidden_states):
+    if hasattr(model, "apply_model"):
+        return model.apply_model(latents, t, encoder_hidden_states)
+
+    noise_pred = model.unet(latents, t, encoder_hidden_states=encoder_hidden_states)
+    if isinstance(noise_pred, dict):
+        return noise_pred["sample"]
+    if hasattr(noise_pred, "sample"):
+        return noise_pred.sample
+    return noise_pred
+
+
+def _scheduler_step(model, noise_pred, t, latents):
+    step_out = model.scheduler.step(noise_pred, t, latents)
+    if isinstance(step_out, dict):
+        return step_out["prev_sample"]
+    if hasattr(step_out, "prev_sample"):
+        return step_out.prev_sample
+    return step_out
+
+
 def diffusion_step(
     model, controller, latents, context, t, guidance_scale, low_resource=False
 ):
     if low_resource:
-        noise_pred_uncond = model.unet(latents, t, encoder_hidden_states=context[0])[
-            "sample"
-        ]
-        noise_prediction_text = model.unet(
-            latents, t, encoder_hidden_states=context[1]
-        )["sample"]
+        noise_pred_uncond = _predict_noise(model, latents, t, context[0])
+        noise_prediction_text = _predict_noise(model, latents, t, context[1])
     else:
         latents_input = torch.cat([latents] * 2)
-        noise_pred = model.unet(latents_input, t, encoder_hidden_states=context)[
-            "sample"
-        ]
+        noise_pred = _predict_noise(model, latents_input, t, context)
         noise_pred_uncond, noise_prediction_text = noise_pred.chunk(2)
     cfg_scales_tensor = torch.Tensor(guidance_scale).view(-1, 1, 1, 1).to(model.device)
     noise_pred = noise_pred_uncond + cfg_scales_tensor * (
         noise_prediction_text - noise_pred_uncond
     )
-    latents = model.scheduler.step(noise_pred, t, latents)["prev_sample"]
+    latents = _scheduler_step(model, noise_pred, t, latents)
     latents = controller.step_callback(latents)
     return latents
 
@@ -226,6 +255,7 @@ def register_attention_control(model, controller):
             batch_size, sequence_length, dim = x.shape
             h = self.heads
             q = self.to_q(x)
+
             is_cross = context is not None
             context = context if is_cross else x
             k = self.to_k(context)
@@ -272,7 +302,10 @@ def register_attention_control(model, controller):
         return count
 
     cross_att_count = 0
-    sub_nets = model.unet.named_children()
+    try:
+        sub_nets = model.unet.named_children()
+    except AttributeError:
+        sub_nets = model.model.diffusion_model.named_children()
     for net in sub_nets:
         if "down" in net[0]:
             cross_att_count += register_recr(net[1], 0, "down")
@@ -280,7 +313,90 @@ def register_attention_control(model, controller):
             cross_att_count += register_recr(net[1], 0, "up")
         elif "mid" in net[0]:
             cross_att_count += register_recr(net[1], 0, "mid")
+    controller.num_att_layers = cross_att_count
 
+
+def register_attention_control_pathldm(model, controller):
+    """
+    PathLDM-compatible registration for CrossAttention modules.
+
+    Note: PathLDM's UNetModel uses different module names than Diffusers:
+    - "input_blocks" (PathLDM) vs "down_blocks" (Diffusers)
+    - "output_blocks" (PathLDM) vs "up_blocks" (Diffusers)
+    - "middle_block" (PathLDM) vs "mid_block" (Diffusers)
+    """
+
+    def ca_forward(self, place_in_unet):
+        to_out = self.to_out
+        if type(to_out) is torch.nn.modules.container.ModuleList:
+            to_out = self.to_out[0]
+        else:
+            to_out = self.to_out
+
+        def forward(x, context=None, mask=None):
+            b, n, dim = x.shape
+            h = self.heads
+            q = self.to_q(x)
+            is_cross = context is not None
+            context = context if is_cross else x
+            k = self.to_k(context)
+            v = self.to_v(context)
+
+            q = rearrange(q, "b n (h d) -> (b h) n d", h=h)
+            k = rearrange(k, "b n (h d) -> (b h) n d", h=h)
+            v = rearrange(v, "b n (h d) -> (b h) n d", h=h)
+
+            sim = torch.einsum("b i d, b j d -> b i j", q, k) * self.scale
+
+            if mask is not None:
+                mask = rearrange(mask, "b ... -> b (...)")
+                max_neg_value = -torch.finfo(sim.dtype).max
+                mask = repeat(mask, "b j -> (b h) () j", h=h)
+                sim.masked_fill_(~mask, max_neg_value)
+
+            attn = sim.softmax(dim=-1)
+            attn = controller(attn, is_cross, place_in_unet)
+
+            out = torch.einsum("b i j, b j d -> b i d", attn, v)
+            out = rearrange(out, "(b h) n d -> b n (h d)", h=h)
+            return to_out(out)
+
+        return forward
+
+    class DummyController:
+        def __call__(self, *args):
+            return args[0]
+
+        def __init__(self):
+            self.num_att_layers = 0
+
+    if controller is None:
+        controller = DummyController()
+
+    def register_recr(net_, count, place_in_unet):
+        if net_.__class__.__name__ == "CrossAttention":
+            net_.forward = ca_forward(net_, place_in_unet)
+            return count + 1
+        elif hasattr(net_, "children"):
+            for net__ in net_.children():
+                count = register_recr(net__, count, place_in_unet)
+        return count
+
+    cross_att_count = 0
+    try:
+        sub_nets = model.unet.named_children()
+    except AttributeError:
+        sub_nets = model.model.diffusion_model.named_children()
+    for net in sub_nets:
+        # PathLDM uses "input_blocks" instead of Diffusers' "down_blocks"
+        if "input_blocks" in net[0]:
+            cross_att_count += register_recr(net[1], 0, "down")
+        # PathLDM uses "output_blocks" instead of Diffusers' "up_blocks"
+        elif "output_blocks" in net[0]:
+            cross_att_count += register_recr(net[1], 0, "up")
+        # PathLDM uses "middle_block" instead of Diffusers' "mid_block"
+        elif "middle_block" in net[0]:
+            cross_att_count += register_recr(net[1], 0, "mid")
     controller.num_att_layers = cross_att_count
 
 

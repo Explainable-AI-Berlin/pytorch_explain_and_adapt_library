@@ -1,0 +1,110 @@
+{
+ "title": "From 6K unlabeled SAE atoms to the five a probe really uses \u2014 one atom switched at a time, ranked by verified counterfactual flips",
+ "probe_line": "DINOv3 ViT-L/16 linear probe, ImageNet fireboat vs lifeboat (99.2 % test acc.)\npublic MSAE on CLIP ViT-L/14 (6,144 atoms), no SAE training\n2,340 images swept \u00b7 one atom driven to its bound \u00b7 46,903 renders (fresh noise)",
+ "n_show": 3,
+ "rows": [
+  {
+   "rank": 1,
+   "name": "orange hull ON",
+   "atoms": "#240 orange (label atom, F1 0.94)",
+   "flip": "fireboat \u2192 lifeboat",
+   "verdict": "unknown",
+   "latent": 85,
+   "ambient": 43,
+   "verified": 20,
+   "orig": [
+    "docs/paper_figures/fig1_assets_fireboat_single/rank1_0_orig.png",
+    "docs/paper_figures/fig1_assets_fireboat_single/rank1_1_orig.png",
+    "docs/paper_figures/fig1_assets_fireboat_single/rank1_2_orig.png"
+   ],
+   "cf": [
+    "docs/paper_figures/fig1_assets_fireboat_single/rank1_0_cf.png",
+    "docs/paper_figures/fig1_assets_fireboat_single/rank1_1_cf.png",
+    "docs/paper_figures/fig1_assets_fireboat_single/rank1_2_cf.png"
+   ]
+  },
+  {
+   "rank": 2,
+   "name": "lifeboat livery OFF",
+   "atoms": "#1483 (RNLI orange/white)",
+   "flip": "lifeboat \u2192 fireboat",
+   "verdict": "unknown",
+   "latent": 137,
+   "ambient": 41,
+   "verified": 10,
+   "orig": [
+    "docs/paper_figures/fig1_assets_fireboat_single/rank2_0_orig.png",
+    "docs/paper_figures/fig1_assets_fireboat_single/rank2_1_orig.png",
+    "docs/paper_figures/fig1_assets_fireboat_single/rank2_2_orig.png"
+   ],
+   "cf": [
+    "docs/paper_figures/fig1_assets_fireboat_single/rank2_0_cf.png",
+    "docs/paper_figures/fig1_assets_fireboat_single/rank2_1_cf.png",
+    "docs/paper_figures/fig1_assets_fireboat_single/rank2_2_cf.png"
+   ]
+  },
+  {
+   "rank": 3,
+   "name": "water jet OFF",
+   "atoms": "#5717 squirting",
+   "flip": "fireboat \u2192 lifeboat",
+   "verdict": "spurious",
+   "latent": 74,
+   "ambient": 34,
+   "verified": 7,
+   "orig": [
+    "docs/paper_figures/fig1_assets_fireboat_single/rank3_0_orig.png",
+    "docs/paper_figures/fig1_assets_fireboat_single/rank3_1_orig.png",
+    "docs/paper_figures/fig1_assets_fireboat_single/rank3_2_orig.png"
+   ],
+   "cf": [
+    "docs/paper_figures/fig1_assets_fireboat_single/rank3_0_cf.png",
+    "docs/paper_figures/fig1_assets_fireboat_single/rank3_1_cf.png",
+    "docs/paper_figures/fig1_assets_fireboat_single/rank3_2_cf.png"
+   ]
+  },
+  {
+   "rank": 4,
+   "name": "striped hull ON",
+   "atoms": "#516 rainbow",
+   "flip": "fireboat \u2192 lifeboat",
+   "verdict": "unknown",
+   "latent": 10,
+   "ambient": 9,
+   "verified": 7,
+   "orig": [
+    "docs/paper_figures/fig1_assets_fireboat_single/rank4_0_orig.png",
+    "docs/paper_figures/fig1_assets_fireboat_single/rank4_1_orig.png",
+    "docs/paper_figures/fig1_assets_fireboat_single/rank4_2_orig.png"
+   ],
+   "cf": [
+    "docs/paper_figures/fig1_assets_fireboat_single/rank4_0_cf.png",
+    "docs/paper_figures/fig1_assets_fireboat_single/rank4_1_cf.png",
+    "docs/paper_figures/fig1_assets_fireboat_single/rank4_2_cf.png"
+   ]
+  },
+  {
+   "rank": 5,
+   "name": "red hull OFF",
+   "atoms": "#2882 red",
+   "flip": "fireboat \u2192 lifeboat",
+   "verdict": "unknown",
+   "latent": 49,
+   "ambient": 19,
+   "verified": 6,
+   "orig": [
+    "docs/paper_figures/fig1_assets_fireboat_single/rank5_0_orig.png",
+    "docs/paper_figures/fig1_assets_fireboat_single/rank5_1_orig.png",
+    "docs/paper_figures/fig1_assets_fireboat_single/rank5_2_orig.png"
+   ],
+   "cf": [
+    "docs/paper_figures/fig1_assets_fireboat_single/rank5_0_cf.png",
+    "docs/paper_figures/fig1_assets_fireboat_single/rank5_1_cf.png",
+    "docs/paper_figures/fig1_assets_fireboat_single/rank5_2_cf.png"
+   ]
+  }
+ ],
+ "footer": "single-atom sweep (no concept replacement, fresh-noise renderer): the water jet of Neuhaus et al. (2022) is rank 3\nwith 7 verified flips \u2014 switching #5717 off removes the spray and the probe says lifeboat. The hull-colour atoms\naround it are not in the paper's list; whether they are shortcuts is the teacher's call (not judged in this run).\nFresh noise regenerates the scene, so pairs differ in layout; the guided single-atom renderer flipped too few images to rank.",
+ "fix_samples_json": "docs/paper_figures/fig1_assets_fireboat_single/fix_samples/samples.json",
+ "out": "docs/paper_figures/figure1_didae_fireboat_single"
+}

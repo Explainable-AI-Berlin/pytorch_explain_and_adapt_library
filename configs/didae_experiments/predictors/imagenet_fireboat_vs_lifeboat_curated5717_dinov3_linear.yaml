@@ -1,0 +1,20 @@
+# DINOv3 ViT-L/16 linear probe on the ImageNet pair fireboat vs lifeboat
+# (frozen backbone, only the fc head trains). The "new foundation model" whose
+# shortcut DiDAE is asked to find; expected shortcut for fireboat: "water jet".
+# python train_predictor.py --config "<PEAL_BASE>/configs/didae_experiments/predictors/imagenet_fireboat_vs_lifeboat_curated5717_dinov3_linear.yaml"
+model_path        : $PEAL_RUNS/imagenet_probes/fireboat_vs_lifeboat_curated5717_dinov3_linear
+data              : <PEAL_BASE>/configs/didae_experiments/data/imagenet_fireboat_vs_lifeboat_curated5717.yaml
+training          : <PEAL_BASE>/configs/didae_experiments/training/dinov3_linear_probe.yaml
+architecture      : torchvision_dino_v3
+# True: ModelTrainer.fit() calls reset_weights() on the whole model when this is
+# False, which re-initialises the pretrained DINOv3 backbone (65% val accuracy
+# instead of >99%). Same reason waterbirds_dinov3_linear.yaml sets it.
+continue_training : True
+only_last_layer   : True
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [Class]

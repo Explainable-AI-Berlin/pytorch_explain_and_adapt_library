@@ -1,0 +1,5 @@
+experiment_id: e7a_in1k_excluded_development_wnids_in100
+manifest: artifacts/ada/atlas/embeddings/imagenet100/train/facebook__dinov2-with-registers-base/cls/combined_train_full_4shards/manifest.csv
+output_dir: artifacts/ada/actionability/exclusions/e7a_in1k_excluded_development_wnids_in100
+source_name: imagenet100_development_set
+overwrite: false

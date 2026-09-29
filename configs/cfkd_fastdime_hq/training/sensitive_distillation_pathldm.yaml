@@ -1,0 +1,31 @@
+# train_batch_size        : 32
+# val_batch_size          : 16
+# test_batch_size         : 32
+# mixup_alpha             : 10
+# max_epochs              : 100
+# steps_per_epoch         : 100
+# learning_rate           : 0.000001
+# optimizer               : adam
+# adv_training            : True
+# class_balanced          : True
+# use_mixup               : False
+# label_smoothing         : 0.0
+# dropout                 : 0.5
+# early_stopping_goal     : average_accuracy
+# attack_epsilon          : 1.0
+# attack_num_steps        : 5
+
+
+train_batch_size        : 32
+val_batch_size          : 16
+test_batch_size         : 32
+mixup_alpha             : 10
+max_epochs              : 50
+steps_per_epoch         : 16
+learning_rate           : 0.001
+optimizer               : adam
+adv_training            : False
+class_balanced          : False
+use_mixup               : True
+label_smoothing         : 0.05
+dropout                 : 0.5

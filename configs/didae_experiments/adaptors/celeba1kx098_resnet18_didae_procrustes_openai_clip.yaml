@@ -1,0 +1,60 @@
+# DiDAE control run for celeba1kx098_resnet18_didae_sae_vit_l14.yaml: SAME student,
+# data, teacher, generator (OpenAI CLIP ViT-L/14 diffusion autoencoder), sampler,
+# decode budget and -- via overwrite: False on a copied distilled_probe/ -- the SAME
+# distilled probe; only the direction set differs. Instead of the 6144 MSAE atoms
+# this sweeps the 40 OrthogonalProcrustes components fitted to the 40 CelebA
+# attributes in the generator's z_sem space (weights next to the generator, fitted
+# by scratchpad/gen_check_and_fit_procrustes.py on 2026-09-11).
+#
+# Question it answers: are the near-zero ambient flips of the MSAE run (9/320
+# decodes, 0/8 on 'homme'/Male) a property of the MSAE directions, or of the
+# decoder + edit path, which the Procrustes Male component would then share.
+#
+# Usage:
+#   mkdir -p $PEAL_RUNS/celeba1k/Blond_Hair/classifier_poisoned098/didae_procrustes_openai_clip_ddpm
+#   cp -r $PEAL_RUNS/celeba1k/Blond_Hair/classifier_poisoned098/didae_msae_openai_clip_ddpm/distilled_probe \
+#         $PEAL_RUNS/celeba1k/Blond_Hair/classifier_poisoned098/didae_procrustes_openai_clip_ddpm/
+#   python -W ignore run_didae.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/celeba1kx098_resnet18_didae_procrustes_openai_clip.yaml"
+# Decode budget removed 2026-09-14: every latent flip inside the empirical bounds is rendered
+# and checked for an ambient flip (comparable to classical CFKD). Budgets now raise in DiDAE.
+adaptor_type                         :  "DiDAE"
+category                             :  "adaptor"
+tracking_level                       :  5
+n_samples                            :  200
+top_k_directions                     :  10
+max_cf_per_direction                 :  5
+linesearch_factors                   :  ["dynamic", 2.0, 4.0, 8.0]
+decode_batch_size                    :  32
+batch_size                           :  200
+min_train_samples                    :  800
+max_validation_samples               :  200
+finetune_iterations                  :  1
+continuous_learning                  :  "deep_feature_reweighting"
+calculate_group_accuracies           :  True
+# Reuse the MSAE run's probe (copied into base_dir/distilled_probe) so the
+# boundary being crossed is identical; lasso_alpha is then unused.
+overwrite                            :  False
+lasso_alpha                          :  0.005
+explainer                            :  <PEAL_BASE>/configs/didae_experiments/explainers/dae_distill_ddpm.yaml
+training                             :  <PEAL_BASE>/configs/cfkd_experiments/training/img_finetuning.yaml
+data                                 :  <PEAL_BASE>/configs/cfkd_experiments/data/celeba1k_Blond_Hair_confounding_Male_poisoned098.yaml
+test_data                            :  <PEAL_BASE>/configs/cfkd_experiments/data/celeba.yaml
+student                              :  $PEAL_RUNS/celeba1k/Blond_Hair/classifier_poisoned098/model.cpl
+teacher                              :  $PEAL_RUNS/celeba/Blond_Hair/classifier_unpoisoned/model.cpl
+# _slim = the same final.ckpt (step 40000) minus optimizer state and the frozen CLIP
+# encoder keys (rebuilt from clip.load()); identical weights, fits the 16 GiB cgroup.
+# Point back at diffusion_autoencoder_openai_clip_vit_l14/config.yaml on a bigger allocation.
+generator                            :  $PEAL_RUNS/celeba/diffusion_autoencoder_openai_clip_vit_l14_slim/config.yaml
+sparse_dictionary                    :  $PEAL_RUNS/celeba/diffusion_autoencoder_openai_clip_vit_l14/OrthogonalProcrustesDictionary40Comps/config.yaml
+base_dir                             :  $PEAL_RUNS/celeba1k/Blond_Hair/classifier_poisoned098/didae_procrustes_openai_clip_ddpm
+# Discovery half only: step 9 (nested CFKD) is what hits the 16 GiB cgroup cap.
+run_cfkd_on_false_directions         :  False
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [Blond_Hair]
+# Same decode budget as the MSAE run. 40 components -> every direction that
+# flips anything gets decoded, 8 deepest flips each, at most 320 decodes.

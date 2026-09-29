@@ -1,0 +1,87 @@
+{
+  "format": "ada-raev2-model-bundle-v1",
+  "model_family": "RAEv2 DDT over DINOv2-L K=1 patch latents",
+  "stage1_assets": {
+    "artifact_path": "stage1/imagenet/dinov2l-k1",
+    "files": {
+      "decoder.pt": {
+        "bytes": 1662766063,
+        "sha256": "12e40ca9d74b7c45441256d00ada5e6a6b109c1af13f520faf838f13387c861b"
+      },
+      "stats.pt": {
+        "bytes": 2098901,
+        "sha256": "b82fe80fae9b27f07e324ecf4222c3aa1a190dba8536343d1a500a718a21b90d"
+      }
+    },
+    "repo_id": "nyu-visionx/RAEv2-models",
+    "revision": "9770b7b980fa1875c8e6d65f226c615c0ce908a8"
+  },
+  "variants": [
+    {
+      "bytes": 4967724972,
+      "checkpoint_epoch": 33,
+      "checkpoint_step": 41283,
+      "conditioning": "cls",
+      "config": "config.yaml",
+      "config_sha256": "acf44ce06dad131cc83129d07e9d59ff6aca04ee59a975f1130c7ccbec8ff763",
+      "experiment": "in1k_raev2_dinov2l_k1_patch_cls_only_premix64_80ep_4gpu_b1024",
+      "file": "ema.pt",
+      "format": "ada-raev2-stage2-ema-v1",
+      "optimizer_state_included": false,
+      "parameter_count": 1241897684,
+      "scheduler_state_included": false,
+      "sha256": "2336def9777ff66fb9c1a89f4904c66dd710eded4b2af170fa617df35e260f67",
+      "source_checkpoint": "ep-0000033.pt",
+      "source_numbered_epoch": 33,
+      "source_repo_commit": "19310779db7db2f5c30e5eeb515af80c03f521c1",
+      "tensor_bytes": 4967590736,
+      "tensor_count": 391,
+      "variant": "cls_only",
+      "weights": "ema"
+    },
+    {
+      "bytes": 4973491113,
+      "checkpoint_epoch": 33,
+      "checkpoint_step": 41283,
+      "conditioning": "class+cls",
+      "config": "config.yaml",
+      "config_sha256": "11d7d0a4d5adb701f49ae5c2dff296796df03ce18663e3be55f8b90e5028be25",
+      "experiment": "in1k_raev2_dinov2l_k1_patch_cls_class_premix64_80ep_4gpu_b1024",
+      "file": "ema.pt",
+      "format": "ada-raev2-stage2-ema-v1",
+      "optimizer_state_included": false,
+      "parameter_count": 1243339124,
+      "scheduler_state_included": false,
+      "sha256": "225934dbe592f04f51b0b870eeab0640c5b3fbc916aa25d2cdae44c4dc5fa35e",
+      "source_checkpoint": "ep-0000033.pt",
+      "source_numbered_epoch": 33,
+      "source_repo_commit": "19310779db7db2f5c30e5eeb515af80c03f521c1",
+      "tensor_bytes": 4973356496,
+      "tensor_count": 392,
+      "variant": "cls_class",
+      "weights": "ema"
+    },
+    {
+      "bytes": 4916685960,
+      "checkpoint_epoch": 33,
+      "checkpoint_step": 41283,
+      "conditioning": "class",
+      "config": "config.yaml",
+      "config_sha256": "5b27d4729500a1468a99d74b696b6249da4c19c3eebcb4c90f4d7168d9d6da63",
+      "experiment": "in1k_raev2_dinov2l_k1_patch_class_only_premix64_80ep_4gpu_b1024",
+      "file": "ema.pt",
+      "format": "ada-raev2-stage2-ema-v1",
+      "optimizer_state_included": false,
+      "parameter_count": 1229138260,
+      "scheduler_state_included": false,
+      "sha256": "9f9ed1924baef3d67f9119bf1ab6782455957c6137ac1e507f8e3afefc30bf02",
+      "source_checkpoint": "ep-0000033.pt",
+      "source_numbered_epoch": 33,
+      "source_repo_commit": "19310779db7db2f5c30e5eeb515af80c03f521c1",
+      "tensor_bytes": 4916553040,
+      "tensor_count": 387,
+      "variant": "class_only",
+      "weights": "ema"
+    }
+  ]
+}

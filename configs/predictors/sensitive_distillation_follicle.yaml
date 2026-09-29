@@ -1,0 +1,15 @@
+training          : <PEAL_BASE>/configs/training/sensitive_distillation_pathldm.yaml
+is_loaded         : False
+continue_training : False
+distill_from      : predictor
+model_path        : <PEAL_BASE>/peal_runs/pathldm_distilled_classifier
+# data              : <PEAL_BASE>/configs/data/follicles_pathldm.yaml
+continue_training : False
+is_loaded         : False
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [prediction]

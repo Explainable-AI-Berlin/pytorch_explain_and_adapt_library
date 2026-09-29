@@ -1,0 +1,9 @@
+category: explainer
+explainer_type: DAEdistill
+distilled_predictor: <PEAL_BASE>/configs/didae_experiments/predictors/dae_distill_predictor.yaml
+num_attempts: 2
+linesearch_factors: ["dynamic"]
+sampler:
+  type: ddpm
+  num_steps: 20
+  spacing: uniform

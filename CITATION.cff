@@ -1,0 +1,76 @@
+cff-version: 1.2.0
+title: "PEAL: PyTorch Explain and Adapt Library"
+message: "If you use this software, please cite the paper corresponding to the method you used. The projects were supervised by Marco Morik, Grégoire Montavon and Klaus-Robert Müller (listed as supervisors in the Zenodo record)."
+type: software
+authors:
+  - family-names: Bender
+    given-names: Sidney
+    orcid: "https://orcid.org/0009-0007-1727-8577"
+  - family-names: Kunz
+    given-names: Benedikt
+    orcid: "https://orcid.org/0009-0006-9404-6924"
+  - family-names: Zeid
+    given-names: Ahmed
+    orcid: "https://orcid.org/0009-0001-4375-6356"
+  - family-names: Delzer
+    given-names: Ole
+version: 0.1.0
+date-released: 2026-09-29
+license: LGPL-3.0-or-later
+repository-code: "https://github.com/Explainable-AI-Berlin/pytorch_explain_and_adapt_library"
+abstract: >-
+  PEAL is a PyTorch library for generating visual counterfactual explanations and for
+  correcting classifiers and foundation-model probes with them. It contains the official
+  implementations of Smoothed Counterfactual Explorer (SCE), Counterfactual Knowledge
+  Distillation (CFKD) and Disentangled Diffusion Autoencoders (DiDAE), alongside
+  reimplementations of commonly used counterfactual explainers and robustification methods.
+keywords:
+  - explainable AI
+  - counterfactual explanations
+  - spurious correlations
+  - diffusion models
+  - sparse autoencoders
+preferred-citation:
+  type: article
+  title: "Towards Desiderata-Driven Design of Visual Counterfactual Explainers"
+  authors:
+    - family-names: Bender
+      given-names: Sidney
+    - family-names: Herrmann
+      given-names: Jan
+    - family-names: "Müller"
+      given-names: Klaus-Robert
+    - family-names: Montavon
+      given-names: "Grégoire"
+  year: 2025
+  journal: "arXiv preprint arXiv:2506.14698"
+  url: "https://arxiv.org/pdf/2506.14698"
+references:
+  - type: article
+    title: "Mitigating Clever Hans Strategies in Image Classifiers through Generating Counterexamples"
+    authors:
+      - family-names: Bender
+        given-names: Sidney
+      - family-names: Delzer
+        given-names: Ole
+      - family-names: Herrmann
+        given-names: Jan
+      - family-names: Marxfeld
+        given-names: "Heike Antje"
+      - family-names: "Müller"
+        given-names: Klaus-Robert
+      - family-names: Montavon
+        given-names: "Grégoire"
+    year: 2025
+    journal: "arXiv preprint arXiv:2510.17524"
+    url: "https://arxiv.org/pdf/2510.17524"
+  - type: article
+    title: "Visual Disentangled Diffusion Autoencoders: Scalable Counterfactual Generation for Foundation Models"
+    authors:
+      - family-names: Bender
+        given-names: Sidney
+      - family-names: Morik
+        given-names: Marco
+    year: 2026
+    journal: "arXiv preprint arXiv:2601.21851"
+    url: "https://arxiv.org/pdf/2601.21851"

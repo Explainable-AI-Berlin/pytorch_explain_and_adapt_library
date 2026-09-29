@@ -1,0 +1,92 @@
+# DiDAE on the pretrained MSAE (arXiv:2502.20578) of OpenAI CLIP ViT-L/14 space,
+# fixing the poisoned resnet18 on NICO++ crocodile-vs-lizard (label confounded by
+# context at 0.98). The RAE twin of
+# nico_crocodile_vs_lizard_500_poisoned098_didae_openai_clip_dae_msae.yaml: same
+# student, same data, same teacher, same dictionary -- only the rendering
+# autoencoder differs. Here it is the ImageNet Representation Autoencoder
+# (RAEv2, imagenet_rae_clip.yaml: ViT-XL decoder on the CLIP patch tokens plus a
+# DDT flow-matching model conditioned on the 768-d CLIP image embedding)
+# instead of the DiffAE-style diffusion autoencoder. Its z_sem is the CLIP
+# image embedding, the space the MSAE was fitted in, and the stage-2 model is
+# conditioned on exactly that vector, so the 6144 MSAE atoms stay both
+# meaningful as edit directions and decodable. NICO++ crocodile-vs-lizard has
+# ~1100 images, far too few to train a decoder on, so the ImageNet RAE does the
+# rendering exactly as the DINOv2 DiffAE does for the RA-SAE branch.
+#
+# NOTE this is OpenAI CLIP ("clip:ViT-L/14"), not open_clip's LAION ViT-L-14:
+# same architecture, same 768 dimensions, different weights, different space, and
+# nothing about the shapes catches the swap.
+#
+# Run nico_crocodile_vs_lizard_500_poisoned098_didae_openai_clip_msae_stage1.yaml
+# first (latent_only, needs no decoder) and set lasso_alpha below from its
+# distilled_probe/lasso_sweep.txt. The stage-1 run is shared with the _dae_msae
+# twin: both edit the same CLIP embedding, only the decoder behind it differs.
+#
+# Usage: python -W ignore run_didae.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/nico_crocodile_vs_lizard_500_poisoned098_didae_openai_clip_rae_msae.yaml"
+# Resume from cache: python -W ignore run_didae.py --config $PEAL_RUNS/nico_crocodile_vs_lizard_500/classifier_poisoned098/openai_clip_rae_didae_msae/config.yaml
+# Decode budget removed 2026-09-14: every latent flip inside the empirical bounds is rendered
+# and checked for an ambient flip (comparable to classical CFKD). Budgets now raise in DiDAE.
+adaptor_type                         :  "DiDAE"
+category                             :  "adaptor"
+tracking_level                       :  4
+n_samples                            :  100
+top_k_directions                     :  10
+max_cf_per_direction                 :  5
+linesearch_factors                   :  ["dynamic"]
+decode_batch_size                    :  32
+batch_size                           :  2
+min_train_samples                    :  400
+max_validation_samples               :  100
+finetune_iterations                  :  1
+continuous_learning                  :  "finetune"
+calculate_group_accuracies           :  True
+# Re-set from the MSAE stage-1 run's distilled_probe/lasso_sweep.txt.
+lasso_alpha                          :  0.01
+# The generator is a general-purpose ImageNet autoencoder, so its dataset carries
+# ImageNet labels, not label/context. Match concepts on the adaptor's data.
+use_generator_data_for_matching      :  False
+# The sweep decodes one counterfactual per (sample, direction) that flips in
+# latent space. With 6144 MSAE atoms that is more than the run can render, and
+# only top_k_directions are ever shown to the teacher; these cap the work.
+# Pairs, not single directions: deactivate one active concept, activate one
+# inactive one. The single-direction sweep on this dataset was clamp-bound --
+# 100% of steps hit [c_min, c_max] and a median 2.5% of the requested step
+# survived, for 1775 latent flips. Replacement targets the bounds themselves, and
+# took the flippable sample count from 109/500 to 465/500.
+concept_replacement                  :  True
+# Each concept deactivated at most once and activated at most once, greedily down
+# the ranking so the strongest pair survives. "matching" maximises the total
+# instead and drops it.
+concept_replacement_unique           :  True
+concept_replacement_unique_strategy  :  "greedy"
+concept_replacement_candidates       :  256
+explainer                            :  <PEAL_BASE>/configs/didae_experiments/explainers/dae_distill.yaml
+training                             :  <PEAL_BASE>/configs/cfkd_experiments/training/img_finetuning.yaml
+data                                 :  <PEAL_BASE>/configs/cfkd_experiments/data/nico_crocodile_vs_lizard_500_poisoned098.yaml
+test_data                            :  <PEAL_BASE>/configs/cfkd_experiments/data/nico_crocodile_vs_lizard_unpoisoned.yaml
+student                              :  $PEAL_RUNS/nico_crocodile_vs_lizard_500/classifier_poisoned098/model.cpl
+# Teacher: the unpoisoned classifier as an automated oracle (Model2ModelTeacher).
+# For the LLM-as-human variant add teacher: {type: llm} as in the _llmteacher
+# configs -- note that needs tracking_level >= 4, which this config already has.
+teacher                              :  $PEAL_RUNS/nico_crocodile_vs_lizard/classifier_unpoisoned/model.cpl
+# The RAE run dir: written by `python train_generator.py --config
+# <PEAL_BASE>/configs/didae_experiments/generators/imagenet_rae_clip.yaml`
+# (peal/generators/rae_pipeline.py copies the generator yaml to
+# $PEAL_RUNS/imagenet/rae_clip/config.yaml and trains stage1 -> stats -> stage2
+# under it). It is loaded through generator_type RAEDiffusionAutoencoder
+# (peal/generators/rae_diffusion_autoencoder.py): z_sem = the CLIP image
+# embedding, x_T = the stage-2 latent state at t=1 from an ODE (ddim) or
+# edit-friendly stochastic (ddpm) inversion, decode = sampler + ViT-XL decoder.
+# It needs stage1_assets/{decoder.pt,stats.pt} and a stage2/ddt_xl_cls
+# checkpoint under that run dir; without them only encode(only_semantic=True)
+# works and this run fails at the first decode.
+generator                            :  $PEAL_RUNS/imagenet/rae_clip/config.yaml
+sparse_dictionary                    :  <PEAL_BASE>/configs/didae_experiments/sparse_dictionaries/msae_decomposition.yaml
+base_dir                             :  $PEAL_RUNS/nico_crocodile_vs_lizard_500/classifier_poisoned098/openai_clip_rae_didae_msae
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [label]

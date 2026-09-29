@@ -12,11 +12,11 @@ training                             :  <PEAL_BASE>/configs/tabular_experiments/
 data                                 :  <PEAL_BASE>/configs/tabular_experiments/data/german.yaml
 
 test_data                            :  <PEAL_BASE>/configs/tabular_experiments/data/german.yaml
-student                              :  peal_runs/german/classifier_poisoned/model.cpl
+student                              :  $PEAL_RUNS/german/classifier_poisoned/model.cpl
 
 teacher                              :
   type: "symbolic"
-  model: peal_runs/german/classifier_poisoned/model.cpl
+  model: $PEAL_RUNS/german/classifier_poisoned/model.cpl
   confounder_name: "sex"
 
 

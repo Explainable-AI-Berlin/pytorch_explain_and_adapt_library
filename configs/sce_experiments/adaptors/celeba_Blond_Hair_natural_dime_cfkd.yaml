@@ -2,7 +2,7 @@
 adaptor_type                         :  "CFKD"
 category                             :  "adaptor"
 batch_size                           :  1
-tracking_level                       :  3
+tracking_level                       :  4
 min_train_samples                    :  900
 finetune_iterations                  :  0
 max_validation_samples               :  100
@@ -16,7 +16,8 @@ test_data                            :  <PEAL_BASE>/configs/sce_experiments/data
 student                              :  $PEAL_RUNS/celeba/Blond_Hair/classifier_natural/model.cpl
 teacher                              :  $PEAL_RUNS/celeba/Blond_Hair/classifier_natural/model.cpl
 generator                            :  $PEAL_RUNS/celeba/ddpm/config.yaml
-base_dir                             :  $PEAL_RUNS/celeba/Blond_Hair/classifier_natural/dime_cfkd
+# base_dir                             :  $PEAL_RUNS/celeba/Blond_Hair/classifier_natural/dime_cfkd
+base_dir                             :  $PEAL_RUNS/blond_other_methods/dime_cfkd
 task:
   criterions:
     ce     : 1.0

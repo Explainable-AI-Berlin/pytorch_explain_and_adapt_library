@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "actionable-data-atlas"
+version = "0.1.0"
+description = "Actionable representation atlases for causal data valuation and targeted repair"
+readme = "README.md"
+license = {text = "CC-BY-NC-4.0"}
+authors = [{name = "David Drexlin"}]
+requires-python = ">=3.10"
+dependencies = [
+  "numpy>=1.24",
+  "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+analysis = [
+  "matplotlib>=3.7",
+  "pandas>=2.0",
+  "Pillow>=10.0",
+  "scikit-learn>=1.3",
+  "scipy>=1.10",
+]
+vision = [
+  "diffusers>=0.30",
+  "huggingface-hub>=0.24",
+  "safetensors>=0.4",
+  "torch>=2.1",
+  "torchvision>=0.16",
+  "tqdm>=4.66",
+  "transformers>=4.49",
+]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.6",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"

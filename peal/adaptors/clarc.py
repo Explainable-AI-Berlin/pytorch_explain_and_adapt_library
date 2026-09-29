@@ -1,5 +1,23 @@
+"""Class Artifact Compensation (ClArC) adaptors for removing known shortcuts.
+
+ClArC (Anders et al.) corrects a classifier that relies on an artifact (a
+spurious "confounder" feature) by estimating a Concept Activation Vector (CAV)
+for the artifact from group-annotated activations and then either
+
+* projecting the artifact direction out of the activations at a chosen layer
+  (:class:`PClArC`, optionally followed by fine-tuning the downstream head), or
+* fine-tuning the downstream head with a right-for-the-right-reasons penalty
+  that pushes the input gradient orthogonal to the CAV (:class:`RRClArC`).
+
+Both are PEAL adaptors driven by a :class:`ClArCConfig`: they load a trained
+predictor, sweep ``layer_index`` x ``correction_strength``, evaluate group
+accuracies on the validation (and optionally an unpoisoned test) split, write
+one csv per evaluation dataset plus ``best_model_result.txt`` into
+``base_dir`` and save every corrected model as ``*.cpl``. Module-level helpers
+split a model into feature extractor / head and compute pattern or SVM CAVs.
+"""
+
 import copy
-import json
 import math
 import os
 import pathlib
@@ -9,7 +27,6 @@ from collections import defaultdict, namedtuple
 
 from sklearn.svm import LinearSVC
 from torch.nn import Module, CrossEntropyLoss, Sequential
-from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
 from torchvision.models import ResNet
 from tqdm import tqdm
@@ -24,9 +41,51 @@ from peal.training.interfaces import TrainingConfig
 import torch
 import numpy as np
 import pandas as pd
+from peal.log import get_logger
+
+_log = get_logger(__name__)
 
 
 class ClArCConfig(AdaptorConfig):
+    """Configuration shared by the ClArC adaptors.
+
+    Parameters
+    ----------
+    model_path : str
+        ``torch.load``-able predictor; a wrapping ``.model`` attribute is
+        unwrapped.
+    base_dir : str
+        Output directory for csv results, corrected models and logs.
+    data : DataConfig
+        Training / validation data with ``has_confounder`` group labels; if
+        ``data.spray_label_file`` is set the labels are treated as SpRAy
+        (estimated) rather than true annotations.
+    unpoisoned_data : DataConfig, optional
+        Extra clean test set evaluated as ``"unpoisoned-test"``.
+    training : TrainingConfig
+        Supplies ``learning_rate``, ``max_epochs`` and ``test_batch_size``.
+    task : TaskConfig
+        Task description handed to the dataloader factory.
+    projection_type : str, default "pcav"
+        CAV estimator: ``"pcav"`` (pattern CAV), ``"svm"`` (LinearSVC) or
+        ``"simple"`` (mean difference projection, P-ClArC only).
+    layer_index : list of int, default [-1]
+        Layers (indices into the flattened child list) at which to correct;
+        ``0`` means the input.
+    correction_strength : list of float, default [1]
+        Scaling of the projection (P-ClArC) or RR loss weight (RR-ClArC).
+    attacked_class : int, default 0
+        Class whose samples are used to estimate the CAV; None uses all.
+    cav_mode : str, optional
+        How conv activations are pooled before the CAV: ``"cavs_max"``,
+        ``"cavs_mean"`` or None (flatten everything).
+    save_model : bool, default True
+        Save every corrected model into ``base_dir``.
+    max_samples : int, default 999999
+        Cap on confounder / non-confounder activations collected per group.
+    reverse_cav_direction : bool, default False
+        Swap the group labels before estimating the CAV.
+    """
 
     __name__: str = "peal.AdaptorConfig"
     category: str = "adaptor"
@@ -47,11 +106,32 @@ class ClArCConfig(AdaptorConfig):
 
 
 class PClArCConfig(ClArCConfig):
+    """Config of :class:`PClArC`.
+
+    Parameters
+    ----------
+    finetune : bool, default False
+        Fine-tune the downstream head after inserting the projection layer.
+    """
+
     adaptor_type: str = "PClArC"
     finetune: bool = False
 
 
 class RRClArCConfig(ClArCConfig):
+    """Config of :class:`RRClArC`.
+
+    Parameters
+    ----------
+    gradient_target : str, default "all"
+        Which logits are differentiated for the RR penalty: ``"max"``,
+        ``"attacked_class"``, ``"all"`` or ``"all_random"`` (random signs).
+    mean_grad : bool, default False
+        Spatially average the gradient before projecting it on the CAV.
+    rrc_loss : str, default "l2"
+        Penalty form: ``"l2"`` (squared projection) or ``"cosine"``.
+    """
+
     adaptor_type: str = "RRClArC"
     gradient_target: str = "all"
     mean_grad: bool = False
@@ -59,17 +139,43 @@ class RRClArCConfig(ClArCConfig):
 
 
 class ClArC(Adaptor):
+    """Base class of the ClArC adaptors: data setup, sweep loop and evaluation.
+
+    Subclasses implement :meth:`_run` (one correction for a given layer and
+    strength) and :meth:`get_evaluation_filename`.
+
+    Parameters
+    ----------
+    adaptor_config : ClArCConfig
+        See :class:`ClArCConfig`.
+
+    Attributes
+    ----------
+    original_model : torch.nn.Module
+        The loaded, uncorrected predictor; ``model`` is a deep copy that is
+        reset after every sweep step.
+    train_dataloader, val_dataloader, test_dataloader
+        Built with ``create_dataloaders_from_datasource``; train and val return
+        dict batches with ``x``, ``y`` and ``has_confounder`` and the train set
+        is restricted to ``attacked_class`` when that is set.
+    test_data_unpoisoned : DataLoader or None
+        Test loader of ``config.unpoisoned_data``.
+    cav_cache : CavCache
+        CAV, annotations and activations of the last processed layer so a
+        layer is only encoded once across correction strengths.
+    """
 
     def __init__(self, adaptor_config: ClArCConfig):
+        """Load the model, build the dataloaders and create ``base_dir``."""
         pathlib.Path(adaptor_config.base_dir).mkdir(exist_ok=True)
 
         self.config = adaptor_config
         torch.manual_seed(self.config.seed)
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        print("running on device: ", self.device)
+        _log.info("%s %s", "running on device: ", self.device)
         self.original_model = torch.load(
-            self.config.model_path, map_location=self.device
+            self.config.model_path, map_location=self.device, weights_only=False
         )
         if hasattr(self.original_model, "model"):
             self.original_model = self.original_model.model
@@ -115,6 +221,15 @@ class ClArC(Adaptor):
             )
 
     def run(self):
+        """Sweep all layers and correction strengths and record the results.
+
+        Evaluates the uncorrected model first, then every
+        ``(layer_index, correction_strength)`` pair via :meth:`_run`, keeping
+        the model with the best ``avg_group_acc`` on ``original-val``. Writes
+        one csv per evaluation dataset (named by
+        :meth:`get_evaluation_filename`) and ``best_model_result.txt`` into
+        ``config.base_dir``.
+        """
 
         eval_dataloaders = [("original-val", self.val_dataloader)]
         # eval_dataloaders.append(("original-test", self.test_dataloader))
@@ -149,7 +264,7 @@ class ClArC(Adaptor):
 
                     for k, v in self.get_stats(dataloader, model).items():
                         if k == "accuracy":
-                            print("accuracy: ", v)
+                            _log.info("%s %s", "accuracy: ", v)
                         evaluation[description][k].append(v)
 
                 current_acc = evaluation["original-val"]["avg_group_acc"][-1]
@@ -179,21 +294,39 @@ class ClArC(Adaptor):
                 f"worst group accuracy: {model_stats.get('worst_group_acc', '---')}"
             )
 
-        print(result)
+        _log.info("%s", result)
         with open(
             os.path.join(self.config.base_dir, "best_model_result.txt"), "w"
         ) as result_file:
             result_file.write(result)
 
     def _run(self, *args, **kwargs) -> (Module, int):
-        pass
+        """Apply one correction; return ``(corrected_model, epochs_finetuned)``."""
 
     def get_evaluation_filename(self, dataset_name: str) -> str:
-        pass
+        """Return the csv file name for the results on ``dataset_name``."""
 
     def get_annotations_and_activations(
         self, feature_extractor: Module = None
     ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Collect pooled activations and artifact labels from the train loader.
+
+        Parameters
+        ----------
+        feature_extractor : torch.nn.Module, optional
+            Prefix of the model up to the correction layer; None means the raw
+            input is used as activation.
+
+        Returns
+        -------
+        activations : torch.Tensor
+            Shape ``(N, D)``; non-confounder samples first, then confounder
+            samples, each group capped at ``config.max_samples``. Pooling
+            follows ``config.cav_mode``.
+        annotations : torch.Tensor
+            Shape ``(N,)`` with 0 for non-confounder and 1 for confounder
+            (flipped if ``config.reverse_cav_direction``).
+        """
 
         confounders = []
         non_confounders = []
@@ -228,19 +361,39 @@ class ClArC(Adaptor):
         ).to(self.device)
 
         num_artifact_samples = torch.sum(annotations == 1).item()
-        print(
-            f"Number of artifact samples: {num_artifact_samples}; Number of non-artifact samples: {len(annotations) - num_artifact_samples}"
+        _log.info(
+            "%s",
+            f"Number of artifact samples: {num_artifact_samples}; Number of non-artifact samples: {len(annotations) - num_artifact_samples}",
         )
         return activations, annotations
 
     @torch.no_grad()
     def get_stats(self, dataloader: DataLoader, model: Module) -> dict:
+        """Compute accuracy per class and artifact group on a dataloader.
+
+        Parameters
+        ----------
+        dataloader : DataLoader
+            Yields dict batches with ``x``, ``y`` and ``has_confounder``.
+        model : torch.nn.Module
+            Model to evaluate (switched to eval mode).
+
+        Returns
+        -------
+        dict
+            ``n``, ``artifact_freq``, ``accuracy``, ``artifact_accuracy``,
+            ``non-artifact_accuracy`` plus per class ``c{y}_n``,
+            ``c{y}_artifact_freq``, ``c{y}_accuracy``,
+            ``c{y}_artifact_accuracy``, ``c{y}_non-artifact_accuracy``, and the
+            aggregates ``avg_group_acc`` / ``worst_group_acc`` over all
+            (class, artifact) groups that are non-empty.
+        """
         model.eval()
         annotations = []
         targets = []
         acc = []
         with tqdm(dataloader) as pbar:
-            pbar.set_description(f"evaluation")
+            pbar.set_description("evaluation")
             for batch in pbar:
                 x = batch["x"].to(self.device)
                 y = batch["y"].to(self.device).squeeze()
@@ -288,7 +441,7 @@ class ClArC(Adaptor):
             group_accuracies.append(results[f"c{y.item()}_non-artifact_accuracy"])
             # print(f"class {y}: {results[f'c{y.item()}_n']} items, artfiact freq: {results[f'c{y.item()}_artifact_freq']}")
 
-        print(f"group accuracies:", group_accuracies)
+        _log.info("%s %s", "group accuracies:", group_accuracies)
         group_accuracies = [num for num in group_accuracies if not math.isnan(num)]
         results["avg_group_acc"] = np.mean(group_accuracies).item()
         results["worst_group_acc"] = np.min(group_accuracies).item()
@@ -296,12 +449,24 @@ class ClArC(Adaptor):
 
 
 class PClArC(ClArC):
+    """Projective ClArC: remove the CAV direction from activations at a layer.
+
+    Inserts a :class:`CavProjection` (or :class:`SimpleProjection`) between the
+    feature extractor and the downstream head, optionally fine-tunes the head
+    with SGD on cross entropy, and saves the corrected ``nn.Sequential``.
+
+    Parameters
+    ----------
+    adaptor_config : PClArCConfig
+        See :class:`PClArCConfig`.
+    """
 
     def __init__(self, adaptor_config: PClArCConfig):
         super().__init__(adaptor_config)
         self.adaptor_config = adaptor_config
 
     def get_evaluation_filename(self, dataset_name: str) -> str:
+        """Build ``correction_<dataset>-dataset_<labels>_<proj>...csv``."""
         attacked_class = (
             f"_attacked-c{self.adaptor_config.attacked_class}"
             if self.adaptor_config.attacked_class is not None
@@ -318,15 +483,34 @@ class PClArC(ClArC):
         return f"correction_{dataset_name}-dataset_{label_type}_{self.adaptor_config.projection_type}-projection_mode-{self.adaptor_config.cav_mode}{attacked_class}{finetune}.csv"
 
     def run(self, *args, **kwargs):
+        """Run the sweep of :meth:`ClArC.run`; extra arguments are ignored."""
         super().run()
 
     def _run(
         self, layer_index: int = -1, correction_strength: float = 1.0, **kwargs
     ) -> (Module, int):
+        """Correct the model at one layer with one strength.
+
+        Parameters
+        ----------
+        layer_index : int, default -1
+            Split point for :func:`split_model`; ``0`` projects the input.
+        correction_strength : float, default 1.0
+            Scaling of the CAV inside :class:`CavProjection`.
+
+        Returns
+        -------
+        model : torch.nn.Module
+            ``Sequential(feature_extractor, projection, head)``; also saved to
+            ``base_dir/corrected_model_*.cpl`` when ``save_model`` is set.
+        number_epochs_finetuned : int
+            Epoch of the best fine-tuned head, 0 without fine-tuning.
+        """
         torch.manual_seed(self.config.seed)
 
-        print(
-            f"\n\nperforming p-clarc in layer {layer_index} with correction strength {correction_strength} and projection type {self.adaptor_config.projection_type}"
+        _log.info(
+            "%s",
+            f"\n\nperforming p-clarc in layer {layer_index} with correction strength {correction_strength} and projection type {self.adaptor_config.projection_type}",
         )
         self.model.eval()
 
@@ -387,7 +571,7 @@ class PClArC(ClArC):
             )
             filename = f"corrected_model{attacked_class}_{self.adaptor_config.projection_type}{layer_index}_mode-{self.adaptor_config.cav_mode}_cs{correction_strength}_epoch{number_epochs_finetuned}.cpl"
             corrected_model_path = os.path.join(self.adaptor_config.base_dir, filename)
-            print("saving corrected model to: " + corrected_model_path)
+            _log.info("%s", "saving corrected model to: " + corrected_model_path)
             torch.save(self.model.to("cpu"), corrected_model_path)
             self.model.to(self.device)
 
@@ -399,6 +583,30 @@ class PClArC(ClArC):
         downstream_head: Module,
         feature_extractor: Module = None,
     ) -> (Module, int):
+        """Fine-tune the head behind a frozen projection with cross entropy.
+
+        Parameters
+        ----------
+        projection_layer : torch.nn.Module
+            Frozen CAV projection.
+        downstream_head : torch.nn.Module
+            Part of the model that is trained (SGD, momentum 0.9, weight decay
+            1e-4, ``training.learning_rate``).
+        feature_extractor : torch.nn.Module, optional
+            Frozen prefix; None when projecting at the input.
+
+        Returns
+        -------
+        best_model : torch.nn.Module
+            Deep copy of the head with the best validation ``avg_group_acc``.
+        number_epochs_trained : int
+            Epoch at which that best head was found (0 = untouched head).
+
+        Notes
+        -----
+        Temporarily lifts the class restriction of the train loader and
+        re-enables it afterwards; a failing backward pass returns early.
+        """
 
         if feature_extractor is not None:
             feature_extractor.eval()
@@ -420,8 +628,9 @@ class PClArC(ClArC):
             else Sequential(projection_layer, downstream_head)
         )
         val_accuracies = self.get_stats(self.val_dataloader, composite)
-        print(
-            f"Epoch 0: avg_group_acc={val_accuracies['avg_group_acc']}, worst_group_acc={val_accuracies['worst_group_acc']}"
+        _log.info(
+            "%s",
+            f"Epoch 0: avg_group_acc={val_accuracies['avg_group_acc']}, worst_group_acc={val_accuracies['worst_group_acc']}",
         )
         best_model = copy.deepcopy(downstream_head)
         best_val_group_acc = val_accuracies["avg_group_acc"]
@@ -448,8 +657,8 @@ class PClArC(ClArC):
                     ce_loss = loss(prediction, y)
                     try:
                         ce_loss.backward()
-                    except:
-                        print(traceback.format_exc())
+                    except Exception:
+                        _log.info("%s", traceback.format_exc())
                         if self.config.attacked_class is not None:
                             self.train_dataloader.dataset.enable_class_restriction(
                                 self.attacked_class
@@ -480,8 +689,9 @@ class PClArC(ClArC):
                 best_model = copy.deepcopy(downstream_head)
                 number_epochs_trained = epoch + 1
 
-            print(
-                f"Epoch {epoch+1}: train_acc={epoch_accuracy}, avg_group_acc={val_accuracies['avg_group_acc']}, worst_group_acc={val_accuracies['worst_group_acc']}, ce_loss={epoch_ce_loss}"
+            _log.info(
+                "%s",
+                f"Epoch {epoch+1}: train_acc={epoch_accuracy}, avg_group_acc={val_accuracies['avg_group_acc']}, worst_group_acc={val_accuracies['worst_group_acc']}, ce_loss={epoch_ce_loss}",
             )
 
         if self.config.attacked_class is not None:
@@ -491,37 +701,73 @@ class PClArC(ClArC):
 
 
 class RRClArC(ClArC):
+    """Right-for-the-right-reasons ClArC.
+
+    Instead of projecting, fine-tunes the downstream head with
+    ``ce_loss + correction_strength * rrc_loss`` where ``rrc_loss`` penalises
+    the alignment between the gradient of the logits w.r.t. the layer
+    activations and the CAV. Training curves go to TensorBoard under
+    ``base_dir/finetuning-logs``.
+
+    Parameters
+    ----------
+    adaptor_config : RRClArCConfig
+        See :class:`RRClArCConfig`.
+    """
 
     def __init__(self, adaptor_config: RRClArCConfig):
         super().__init__(adaptor_config)
         self.adaptor_config = adaptor_config
+        from torch.utils.tensorboard import SummaryWriter
+
         self.log_writer = SummaryWriter(
             log_dir=self.adaptor_config.base_dir + "/finetuning-logs"
         )
 
     def get_evaluation_filename(self, dataset_name: str) -> str:
+        """Build the csv name including loss type, gradient target and epochs."""
         attacked_class = (
             f"_attacked-c{self.adaptor_config.attacked_class}"
             if self.adaptor_config.attacked_class is not None
             else ""
         )
-        mean_grad = f"_mean-grad" if self.adaptor_config.mean_grad else ""
+        mean_grad = "_mean-grad" if self.adaptor_config.mean_grad else ""
         label_type = (
             "true" if self.config.data.spray_label_file is None else "spray"
         ) + "-group-labels"
         return f"correction_{dataset_name}-dataset_{label_type}_{self.adaptor_config.projection_type}-projection_mode-{self.adaptor_config.cav_mode}{attacked_class}_{self.adaptor_config.rrc_loss}-loss_target-{self.adaptor_config.gradient_target}{mean_grad}_{self.adaptor_config.training.max_epochs}-epochs.csv"
 
     def run(self):
+        """Run the sweep of :meth:`ClArC.run` and close the TensorBoard writer."""
         super().run()
         self.log_writer.close()
 
     def _run(
         self, layer_index: int = -2, correction_strength: float = 1.0
     ) -> (Module, int):
+        """Estimate the CAV at ``layer_index`` and RR-fine-tune the head.
+
+        Parameters
+        ----------
+        layer_index : int, default -2
+            Split point for :func:`split_model`; ``0`` uses the whole model as
+            head and the input as representation.
+        correction_strength : float, default 1.0
+            Weight ``lamb`` of the RR penalty.
+
+        Returns
+        -------
+        model : torch.nn.Module
+            Corrected model (saved as ``base_dir/<model_name>.cpl`` when
+            ``save_model`` is set).
+        number_epochs_finetuned : int
+            Epoch of the selected head.
+        """
 
         torch.manual_seed(self.config.seed)
-        print(
-            f"\n\nperforming rr-clarc in layer {layer_index} with cav_mode={self.adaptor_config.cav_mode} and correction_strength={correction_strength}"
+        _log.info(
+            "%s",
+            f"\n\nperforming rr-clarc in layer {layer_index} with cav_mode={self.adaptor_config.cav_mode} and correction_strength={correction_strength}",
         )
 
         attacked_class = (
@@ -529,7 +775,7 @@ class RRClArC(ClArC):
             if self.adaptor_config.attacked_class is not None
             else ""
         )
-        mean_grad = f"_mean-grad" if self.adaptor_config.mean_grad else ""
+        mean_grad = "_mean-grad" if self.adaptor_config.mean_grad else ""
         model_name = f"corrected_model_layer-{layer_index}_mode-{self.adaptor_config.cav_mode}_lamb{correction_strength}_{self.adaptor_config.rrc_loss}-loss{mean_grad}{attacked_class}_{self.adaptor_config.training.max_epochs}-epochs"
 
         self.model.eval()
@@ -573,7 +819,7 @@ class RRClArC(ClArC):
             corrected_model_path = os.path.join(
                 self.adaptor_config.base_dir, model_name + ".cpl"
             )
-            print("saving corrected model to: " + corrected_model_path)
+            _log.info("%s", "saving corrected model to: " + corrected_model_path)
             torch.save(self.model.to("cpu"), corrected_model_path)
             self.model.to(self.device)
 
@@ -587,6 +833,36 @@ class RRClArC(ClArC):
         feature_extractor: Module = None,
         model_name: str = "corrected_model",
     ):
+        """Fine-tune the head with cross entropy plus the CAV-gradient penalty.
+
+        Parameters
+        ----------
+        cav : torch.Tensor
+            Unit CAV in the (pooled) activation space of the split layer.
+        downstream_head : torch.nn.Module
+            Module trained with SGD (momentum 0.95, ``training.learning_rate``).
+        lamb : float
+            Weight of the RR penalty.
+        feature_extractor : torch.nn.Module, optional
+            Frozen prefix producing the representation; None uses the input.
+        model_name : str
+            Prefix of the TensorBoard scalar tags.
+
+        Returns
+        -------
+        best_model : torch.nn.Module
+            Head with the best validation ``avg_group_acc`` (ties broken by
+            lower epoch RR loss).
+        number_epochs_finetuned : int
+            Epoch at which it was selected.
+
+        Notes
+        -----
+        The penalty is ``mean((grad . cav) ** 2)`` for ``rrc_loss="l2"`` or the
+        mean absolute cosine similarity for ``"cosine"``; with ``cav_mode`` set
+        the gradient is rearranged to ``(B*H*W, C)`` so the CAV lives in channel
+        space. A NaN / inf total loss aborts the epoch.
+        """
 
         best_model = copy.deepcopy(downstream_head)
         best_rrc_loss = sys.maxsize
@@ -713,8 +989,9 @@ class RRClArC(ClArC):
                 model_name + "/train/rrc_loss", epoch_rrc_loss, epoch
             )
 
-            print(
-                f"Epoch {epoch+1}: train_accuracy={epoch_accuracy}, val_accuracy={val_accuracies['accuracy']}, avg_group_acc={val_accuracies['avg_group_acc']}, worst_group_acc={val_accuracies['worst_group_acc']}, ce_loss={epoch_ce_loss}, rrc_loss={epoch_rrc_loss}"
+            _log.info(
+                "%s",
+                f"Epoch {epoch+1}: train_accuracy={epoch_accuracy}, val_accuracy={val_accuracies['accuracy']}, avg_group_acc={val_accuracies['avg_group_acc']}, worst_group_acc={val_accuracies['worst_group_acc']}, ce_loss={epoch_ce_loss}, rrc_loss={epoch_rrc_loss}",
             )
 
         self.log_writer.flush()
@@ -726,6 +1003,17 @@ class RRClArC(ClArC):
         return best_model, number_epochs_finetuned
 
     def get_gradient_target(self, prediction):
+        """Reduce logits ``(B, K)`` to the scalar per sample that is differentiated.
+
+        Selected by ``config.gradient_target``: ``"max"`` (top logit),
+        ``"attacked_class"`` (that class' logit), ``"all"`` (sum of logits) or
+        ``"all_random"`` (sum with random signs).
+
+        Raises
+        ------
+        NotImplementedError
+            For any other value.
+        """
         if self.adaptor_config.gradient_target == "max":
             return prediction.max(1)[0]
         elif self.adaptor_config.gradient_target == "attacked_class":
@@ -739,8 +1027,27 @@ class RRClArC(ClArC):
 
 
 def split_model(model: Module, split_at: int, device) -> (Module, Module):
+    """Split a model into ``Sequential`` feature extractor and downstream head.
+
+    Parameters
+    ----------
+    model : torch.nn.Module
+        Model whose (recursively flattened) children are split.
+    split_at : int
+        Index into the flattened child list; children before it form the
+        feature extractor, the rest the head.
+    device
+        Device both parts are moved to.
+
+    Returns
+    -------
+    (torch.nn.Module, torch.nn.Module)
+        ``(feature_extractor, downstream_head)``. For torchvision ``ResNet``
+        a ``Flatten`` is inserted before the final ``fc`` layer since the
+        flattening is not a child module.
+    """
     children_list = extract_all_children(model)[0]
-    print(f"splitting model into {len(children_list)} children")
+    _log.info("%s", f"splitting model into {len(children_list)} children")
 
     # for i, node in enumerate(children_list):
     #     print(f"layer {i+1}: {node}")
@@ -760,6 +1067,21 @@ def split_model(model: Module, split_at: int, device) -> (Module, Module):
 
 
 def extract_all_children(model: Module, prefix: str = "") -> (list[Module], list[str]):
+    """Flatten nested ``nn.Sequential`` containers into a list of leaf children.
+
+    Parameters
+    ----------
+    model : torch.nn.Module
+        Model to walk with ``named_children``.
+    prefix : str
+        Dotted name prefix used for recursion.
+
+    Returns
+    -------
+    (list of torch.nn.Module, list of str)
+        Modules in forward order and their dotted names. Only ``Sequential``
+        is descended into; other containers are returned as single children.
+    """
     children = []
     children_names = []
     for name, child in model.named_children():
@@ -780,12 +1102,34 @@ def extract_all_children(model: Module, prefix: str = "") -> (list[Module], list
 
 
 def get_layer_name(model: Module, layer_index: int) -> str:
+    """Return the dotted name of the child at 1-based ``layer_index``."""
     return extract_all_children(model)[1][layer_index - 1]
 
 
 def calculate_cav(
     activations: torch.Tensor, annotations: torch.Tensor, projection_type: str
 ) -> torch.Tensor:
+    """Dispatch to :func:`calculate_pcav` or :func:`calculate_svm_cav`.
+
+    Parameters
+    ----------
+    activations : torch.Tensor
+        Shape ``(N, D)``.
+    annotations : torch.Tensor
+        Shape ``(N,)`` with 0 / 1 artifact labels.
+    projection_type : str
+        ``"pcav"`` or ``"svm"``.
+
+    Returns
+    -------
+    torch.Tensor
+        Unit-norm CAV of shape ``(1, D)`` (pcav) or ``(D,)`` (svm).
+
+    Raises
+    ------
+    NotImplementedError
+        For other projection types.
+    """
     if projection_type == "pcav":
         return calculate_pcav(activations, annotations)
     elif projection_type == "svm":
@@ -797,6 +1141,23 @@ def calculate_cav(
 def calculate_pcav(
     activations: torch.Tensor, annotations: torch.Tensor
 ) -> torch.Tensor:
+    """Pattern CAV: covariance of activations with the +-1 artifact label.
+
+    The labels are mapped to ``{-1, +1}``, both sides are centred and the CAV
+    is ``cov(activations, labels) / var(labels)``, normalised to unit length.
+
+    Parameters
+    ----------
+    activations : torch.Tensor
+        Shape ``(N, D)``.
+    annotations : torch.Tensor
+        Shape ``(N,)`` with 0 / 1 labels (not modified in place).
+
+    Returns
+    -------
+    torch.Tensor
+        Shape ``(1, D)``.
+    """
     actvs_centered = activations - activations.mean(dim=0)[None]
 
     annotations = annotations.clone()
@@ -811,11 +1172,18 @@ def calculate_pcav(
     w = (covar / vary)[None]
 
     cav = w / torch.sqrt((w**2).sum())
-    print("cav shape:", cav.shape)
+    _log.info("%s %s", "cav shape:", cav.shape)
     return cav
 
 
 def calculate_svm_cav(activations, annotations) -> torch.Tensor:
+    """CAV from the normal of a balanced ``LinearSVC`` (C=1, up to 10000 iters).
+
+    Returns
+    -------
+    torch.Tensor
+        Unit-norm weight vector of shape ``(D,)`` on CPU (float64).
+    """
     activations = activations.cpu()
     annotations = annotations.cpu()
     model = LinearSVC(
@@ -824,11 +1192,32 @@ def calculate_svm_cav(activations, annotations) -> torch.Tensor:
     model.fit(activations, annotations)
 
     cav = torch.tensor(model.coef_[0])
-    print("cav shape:", cav.shape)
+    _log.info("%s %s", "cav shape:", cav.shape)
     return cav / ((cav**2).sum() ** 0.5).item()
 
 
 class CavProjection(torch.nn.Module):
+    """Layer that projects the CAV direction out of its input.
+
+    Computes ``x - x cav cav^T + z`` where ``z`` is the projection of the mean
+    non-artifact activation onto the CAV, followed by a ReLU. With a
+    ``cav_mode`` the projection coefficient is computed on spatially pooled
+    activations and broadcast over ``H, W``.
+
+    Parameters
+    ----------
+    activations : torch.Tensor
+        Shape ``(N, D)`` activations used for the clean mean.
+    annotations : torch.Tensor
+        Shape ``(N,)``; samples with label 0 define the clean mean.
+    cav : torch.Tensor
+        CAV, reshaped to ``(D, 1)`` and scaled by ``correction_strength``.
+    cav_mode : str, optional
+        None (flat input), ``"cavs_max"`` or ``"cavs_mean"``.
+    correction_strength : float, default 1.0
+        Multiplier of the CAV; values other than 1 give a partial correction.
+    """
+
     def __init__(
         self,
         activations: torch.Tensor,
@@ -848,6 +1237,13 @@ class CavProjection(torch.nn.Module):
         self.z = z @ self.cav @ self.cav.T
 
     def forward(self, x):
+        """Project the CAV direction out of ``x`` and apply ReLU.
+
+        Raises
+        ------
+        NotImplementedError
+            For an unknown ``cav_mode``.
+        """
 
         out = x + 0
         if self.cav_mode is None:
@@ -871,6 +1267,18 @@ class CavProjection(torch.nn.Module):
 
 
 class SimpleProjection(torch.nn.Module):
+    """Layer that subtracts the mean artifact minus non-artifact activation.
+
+    Parameters
+    ----------
+    activations : torch.Tensor
+        Shape ``(N, ...)``; flattened per sample.
+    annotations : torch.Tensor
+        Shape ``(N,)`` with 0 / 1 labels.
+    **kwargs
+        Ignored (accepts the :class:`CavProjection` keyword arguments).
+    """
+
     def __init__(self, activations: torch.Tensor, annotations: torch.Tensor, **kwargs):
         super().__init__()
         activations = activations.flatten(start_dim=1)
@@ -879,10 +1287,14 @@ class SimpleProjection(torch.nn.Module):
         ].mean(0)
 
     def forward(self, x):
+        """Subtract the stored difference vector, ReLU, restore ``x.shape``."""
         x_flat = x.flatten(start_dim=1)
         out = x_flat - self.difference
         out = torch.nn.functional.relu(out)
         return out.reshape(x.shape)
 
 
+#: Memo of the CAV estimated for one layer: ``layer`` (int), ``cav``,
+#: ``annotations`` and ``activations`` (tensors from
+#: :meth:`ClArC.get_annotations_and_activations`).
 CavCache = namedtuple("CavCache", ["layer", "cav", "annotations", "activations"])

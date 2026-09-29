@@ -1,0 +1,3 @@
+category: generator
+generator_type: DiffusionGenerator
+data: <PEAL_BASE>/configs/sce_experiments/data/square_poisoned100.yaml

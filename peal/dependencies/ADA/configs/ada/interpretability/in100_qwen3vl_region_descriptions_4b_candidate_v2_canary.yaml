@@ -1,0 +1,26 @@
+experiment_id: i7d_qwen3vl_4b_region_description_candidate_v2_canary
+
+model_name: Qwen/Qwen3-VL-4B-Instruct
+model_path: external/models/Qwen__Qwen3-VL-4B-Instruct/snapshots/ebb281ec70b05090aa6165b016eac8ec08e71b17
+model_revision: ebb281ec70b05090aa6165b016eac8ec08e71b17
+dtype: bf16
+device: auto
+run_inference: false
+include_swapped_order: true
+include_null_control: true
+deterministic_repeats: 2
+prompt_variant: candidate
+
+interpretability_manifest_dir: artifacts/ada/interpretability/manifests/in100_eight_causal_regions
+region_cards_dir: artifacts/ada/interpretability/i0_in100_siglip2_region_language/region_cards
+region_cards_csv: artifacts/ada/interpretability/i0_in100_siglip2_region_language/region_cards/region_language_cards.csv
+qwen_output_dir: artifacts/ada/interpretability/i7d_qwen3vl_4b_region_description_candidate_v2_canary
+train_image_root: /home/space/datasets/imagenet_torchvision/imagenet100/train
+validation_image_root: /home/space/datasets/imagenet_torchvision/imagenet100/val
+
+max_regions: 2
+images_per_set: 6
+max_new_tokens: 2048
+temperature: 0.0
+top_p: 1.0
+overwrite: true

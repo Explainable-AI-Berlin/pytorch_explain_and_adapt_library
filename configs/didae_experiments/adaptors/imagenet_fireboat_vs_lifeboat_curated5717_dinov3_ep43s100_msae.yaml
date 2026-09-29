@@ -1,0 +1,71 @@
+# JET-ONLY single-atom run (g2_single_jet_bs3, generator config_ep43_guided_g2_s100.yaml): one concept at a time, minimal by construction. 2026-09-16.
+# GUIDED EDIT-FRIENDLY twin (guidance_scale 2, 2026-09-15): ddpm sampler, edit-friendly
+# inversion and classifier-free guidance on z_sem (config_ep12_guided_g*.yaml), so a z_sem
+# edit is realised while the inverted noise keeps the input (audit on 16 freight cars: small-edit
+# realisation 0.07 -> 0.21 at scale 2, 15.6 dB). Scale 1 = unguided ddpm control. The
+# edit-friendly noise maps (50 x 1024x16x16 fp32 = 52 MB per sample) stay on the GPU, so the
+# sweep pool is 400 + 100 samples instead of the whole split (same as the NICO guided twin).
+# Full DiDAE (latent sweep + rendering) on the DINOv3 linear probe for fireboat vs
+# lifeboat: the probe is distilled into OpenAI CLIP ViT-L/14 space, every MSAE atom /
+# concept replacement is swept over ALL training samples, and EVERY latent flip that
+# survives the empirical [c_min, c_max] clamp is rendered by the ImageNet RAE
+# (stage-2 checkpoint pinned in $PEAL_RUNS/imagenet/rae_clip/config_ep43_guided_g2_s100.yaml; point
+# `generator` at $PEAL_RUNS/imagenet/rae_clip/config.yaml once stage 2 has finished)
+# and re-encoded to verify the flip in pixel space. The expected shortcut for fireboat
+# is "water jet" (arXiv:2212.04871).
+#
+# Rendering budget: no max_decode_* caps and a sweep pool of the whole train+val
+# split (min_train_samples + max_validation_samples = 2080 + 260), so the number of
+# decodes equals the number of latent flips -- read "[DiDAE Sweep] Decoding N
+# counterfactual candidates" in the log for the count.
+#
+# Usage: python -W ignore run_didae.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/imagenet_fireboat_vs_lifeboat_curated5717_dinov3_didae_openai_clip_rae_guided_g2_single_jet_bs3_msae.yaml"
+# Resume from cache: python -W ignore run_didae.py --config $PEAL_RUNS/imagenet_probes/fireboat_vs_lifeboat_curated5717_dinov3_linear/openai_clip_rae_guided_g2_single_jet_bs3_didae_msae/config.yaml
+adaptor_type                         :  "DiDAE"
+category                             :  "adaptor"
+tracking_level                       :  4
+top_k_directions                     :  10
+max_cf_per_direction                 :  5
+linesearch_factors                   :  ["dynamic"]
+decode_batch_size                    :  32
+batch_size                           :  10
+# whole train split + whole val split of the 2600-image pair (split 0.8 / 0.9)
+min_train_samples                    :  400
+max_validation_samples               :  100
+finetune_iterations                  :  1
+continuous_learning                  :  "finetune"
+calculate_group_accuracies           :  False
+lasso_alpha                          :  0.01
+use_generator_data_for_matching      :  False
+# SINGLE-ATOM twin: every MSAE concept is driven to its own empirical bound on its
+# own (no OFF->ON replacement pairs), so each rendered flip changes exactly one
+# named concept (the confounder alone, without touching the label atom).
+concept_replacement                  :  False
+# jet-only counterfactuals: the water-jet atom (and the hull/livery atoms for comparison) driven
+# alone to 3x its empirical range; every latent flip of these atoms is rendered
+sweep_atom_subset                    :  [5717, 240, 1483, 2882, 3029, 1223]
+component_bounds_scale               :  3.0
+# no caps: render every latent flip inside the empirical range
+max_decode_directions                :  null
+max_decode_per_direction             :  null
+decode_selection                     :  "deepest"
+explainer                            :  <PEAL_BASE>/configs/didae_experiments/explainers/dae_distill.yaml
+training                             :  <PEAL_BASE>/configs/cfkd_experiments/training/img_finetuning.yaml
+data                                 :  <PEAL_BASE>/configs/didae_experiments/data/imagenet_fireboat_vs_lifeboat_curated5717.yaml
+test_data                            :  <PEAL_BASE>/configs/didae_experiments/data/imagenet_fireboat_vs_lifeboat_curated5717.yaml
+student                              :  $PEAL_RUNS/imagenet_probes/fireboat_vs_lifeboat_curated5717_dinov3_linear/model.cpl
+# No oracle exists for an ImageNet shortcut; the probe itself stands in as the
+# teacher, so every direction is judged "true" and the run ends after the ranking,
+# the rendered flips and the collages (no CFKD). Replace with teacher: {type: llm}
+# or cluster@8000 (web labeller) to judge the directions.
+teacher                              :  $PEAL_RUNS/imagenet_probes/fireboat_vs_lifeboat_curated5717_dinov3_linear/model.cpl
+generator                            :  $PEAL_RUNS/imagenet/rae_clip/config_ep43_guided_g2_s100.yaml
+sparse_dictionary                    :  <PEAL_BASE>/configs/didae_experiments/sparse_dictionaries/msae_decomposition.yaml
+base_dir                             :  $PEAL_RUNS/imagenet_probes/fireboat_vs_lifeboat_curated5717_dinov3_linear/openai_clip_rae_guided_g2_single_jet_bs3_ep43s100_didae_msae
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [Class]

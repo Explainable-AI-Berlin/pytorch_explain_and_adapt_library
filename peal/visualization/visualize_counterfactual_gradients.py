@@ -1,21 +1,41 @@
+"""Debug grids for gradient-based counterfactual search.
+
+While a counterfactual explainer optimises an image (or a generator latent)
+against the predictor, :func:`visualize_step` writes one labelled image grid
+per step showing the input, the encoded/decoded images, the pixel and latent
+gradients as heatmaps, the masks in play and the best counterfactual found so
+far. :func:`create_label_image` renders the row captions as image tensors so
+the whole grid can be saved with ``torchvision.utils.save_image``.
+"""
+
 import torch
 import torchvision
 
 from peal.global_utils import high_contrast_heatmap
 from typing import Optional
 from PIL import Image, ImageDraw, ImageFont
-import numpy as np
 
 
 def create_label_image(text, image_size, font_size=50):
-    """
-    Create a tensor containing a text label image.
-    Args:
-        text: Text to display
-        image_size: Tuple (C, H, W) of the target image size
-        font_size: Size of the font
-    Returns:
-        label_tensor: Tensor of shape (1, C, H, W)
+    """Render a text caption as an image tensor of a given size.
+
+    The text is drawn centred in black on a white canvas (RGB when ``C == 3``,
+    greyscale otherwise) with ``arial.ttf`` if available, else PIL's default
+    font.
+
+    Parameters
+    ----------
+    text : str
+        Caption to draw.
+    image_size : tuple of int
+        ``(C, H, W)`` of the target image.
+    font_size : int, optional
+        Font size in pixels. Default 50.
+
+    Returns
+    -------
+    torch.Tensor
+        Tensor of shape ``(1, C, H, W)`` with values in ``[0, 1]``.
     """
     transform = torchvision.transforms.ToTensor()
     C, H, W = image_size
@@ -58,6 +78,49 @@ def visualize_step(
     best_z=None,
     best_mask=None,
 ):
+    """Save a labelled image grid summarising one counterfactual search step.
+
+    Each row is one quantity (input, encoded image, predictor input, gradient
+    heatmaps, masks, best image so far) prefixed by a caption tile; the
+    columns are the batch elements. Latent-resolution tensors are decoded with
+    ``latent_decoder`` when given and resized to the input resolution.
+    Gradients are read from ``.grad`` of ``img_predictor_unnormalized`` and of
+    ``z[0]``, so the caller must have run ``backward()`` first. The short grid
+    (no image gradients or masks) is written when both ``z`` and ``boolmask``
+    are ``None``; note that ``z`` is tested with ``if z:`` and the code that
+    computes ``gradient_z`` only runs when ``z`` is truthy.
+
+    Parameters
+    ----------
+    x_original : torch.Tensor
+        Original images, shape ``(B, C, H, W)``.
+    z_encoded : torch.Tensor
+        Generator encoding of the input, decoded back to image space.
+    img_predictor : torch.Tensor
+        Current image as fed to the predictor.
+    img_predictor_unnormalized : torch.Tensor
+        Leaf tensor of the predictor input whose ``.grad`` is drawn as the
+        "Img Gradients" row.
+    pe : torch.Tensor
+        Current counterfactual image, resized to the input size if needed.
+    filename : str
+        Path the grid is written to.
+    z : list of torch.Tensor, optional
+        Optimised latents; ``z[0]`` supplies the "Clean New" image and its
+        ``.grad`` the "Z Gradients" row.
+    clean_img_old : torch.Tensor, optional
+        Image before the current update.
+    boolmask, boolmask_in : torch.Tensor, optional
+        Current and input masks; single-channel masks are repeated to RGB.
+    latent_decoder : callable, optional
+        Decodes latent-resolution tensors to image resolution.
+    latent_encoder : callable, optional
+        Unused; kept for call-site symmetry.
+    best_z : torch.Tensor
+        Best counterfactual image found so far (shown as "Best Image").
+    best_mask : torch.Tensor
+        Mask belonging to ``best_z``.
+    """
     transform = torchvision.transforms.Resize(x_original.size()[2])
     original_vs_counterfactual = []
     for it in range(x_original.shape[0]):

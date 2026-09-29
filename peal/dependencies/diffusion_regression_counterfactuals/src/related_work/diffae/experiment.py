@@ -1,9 +1,13 @@
 import copy
 import json
+import math
 import re
 import numpy as np
 
 import lightning as L
+from peal.dependencies.edit_friendly_ddpm_inversion.edit_friendly_ddpm_inversion import (
+    DiffusionSampler,
+)
 import torch
 from lightning.pytorch.loggers import TensorBoardLogger
 from lightning.pytorch.callbacks import ModelCheckpoint, LearningRateMonitor
@@ -12,9 +16,10 @@ from torch.optim.optimizer import Optimizer
 from torch.utils.data.dataset import TensorDataset
 from torchvision.utils import make_grid, save_image
 from tqdm import tqdm
+import lpips
 
 from .lmdb_writer import *
-#from .metrics import evaluate_fid, evaluate_lpips
+from .metrics import evaluate_fid, evaluate_lpips
 from .renderer import *
 
 
@@ -33,7 +38,9 @@ class LitModel(L.LightningModule):
         if not conf.encoder is None:
             self.model.encoder = conf.encoder
 
-        self.first_encoder_parameter = torch.tensor(list(self.model.encoder.parameters())[0])
+        self.first_encoder_parameter = torch.tensor(
+            list(self.model.encoder.parameters())[0]
+        )
         self.ema_model = copy.deepcopy(self.model)
         self.ema_model.requires_grad_(False)
         self.ema_model.eval()
@@ -47,6 +54,7 @@ class LitModel(L.LightningModule):
             conf.make_diffusion_conf().make_sampler()
         )
         self.eval_sampler = conf.make_eval_diffusion_conf().make_sampler()
+        self.ddpm_sampler = self.create_ddpm_sampler()
 
         # this is shared for both model and latent
         self.T_sampler = conf.make_T_sampler()
@@ -80,6 +88,9 @@ class LitModel(L.LightningModule):
         else:
             self.conds_mean = None
             self.conds_std = None
+
+        self.best_lpips = float("inf")
+        self.best_fid = float("inf")
 
     def normalize(self, cond):
         cond = (cond - self.conds_mean.to(self.device)) / self.conds_std.to(self.device)
@@ -157,6 +168,20 @@ class LitModel(L.LightningModule):
             self.ema_model, x, model_kwargs={"cond": cond}
         )
         return out["sample"]
+
+    def encode_ddpm_inversion(self, x, z_sem):
+        xT, zs = self.ddpm_sampler.ddpm_edit_friendly_invert(x, z_sem, self.ema_model)
+        return xT, zs
+
+    def decode_ddpm_inversion(self, xT, zs, z_sem):
+        x = self.ddpm_sampler.ddpm_edit_friendly_sample(xT, zs, z_sem, self.ema_model)
+        return x
+
+    def create_ddpm_sampler(self, T=20, spacing="uniform"):
+        device = next(self.model.parameters()).device
+        betas = torch.from_numpy(self.sampler.betas).to(device)
+        sampler = DiffusionSampler(betas)
+        return DiffusionSampler.respaced(sampler, num_steps=T, spacing=spacing)
 
     def forward(self, noise=None, x_start=None, ema_model: bool = False):
         if ema_model:
@@ -397,13 +422,40 @@ class LitModel(L.LightningModule):
             if key in losses:
                 losses[key] = self.all_gather(losses[key]).mean()
 
-        if self.global_rank == 0:
-            self.log("loss", losses["loss"], True)
-            for key in ["vae", "latent", "mmd", "chamfer", "arg_cnt"]:
-                if key in losses:
-                    self.log(f"loss/{key}", losses[key])
+        # Logged on EVERY rank: the values were all_gather-averaged above, so
+        # they are identical everywhere, and ModelCheckpoint(monitor="loss")
+        # needs the key on every rank. Logging on rank 0 only made rank 0 alone
+        # decide to save and block in Trainer.save_checkpoint's barrier while
+        # the other ranks never entered it (DDP deadlock at the first save).
+        self.log("loss", losses["loss"], True)
+        for key in ["vae", "latent", "mmd", "chamfer", "arg_cnt"]:
+            if key in losses:
+                self.log(f"loss/{key}", losses[key])
 
         return {"loss": loss}
+
+    def on_train_start(self) -> None:
+        """
+        Evaluate and log step 0 baseline before training begins.
+        """
+        if self.global_step == 0:
+            print("[Step 0 Baseline] Evaluating initial model before training...")
+            x_start = None
+            if not self.conf.train_mode.require_dataset_infer():
+                try:
+                    dataloader = self.trainer.train_dataloader
+                    if dataloader is not None:
+                        first_batch = next(iter(dataloader))
+                        if isinstance(first_batch, dict) and "x" in first_batch:
+                            x_start = first_batch["x"].to(self.device)
+                        elif isinstance(first_batch, (tuple, list)):
+                            x_start = first_batch[0].to(self.device)
+                except Exception as e:
+                    print(f"[Step 0 Baseline] Could not fetch first batch: {e}")
+
+            self.log_sample(x_start=x_start)
+            if getattr(self.conf, "eval_fid", True):
+                self.evaluate_scores()
 
     def on_train_batch_end(self, outputs, batch, batch_idx: int) -> None:
         """
@@ -427,18 +479,22 @@ class LitModel(L.LightningModule):
                 imgs = None
             else:
                 imgs = batch["x"]
-            self.log_sample(x_start=imgs)
-            #self.evaluate_scores()
+
+            if self.conf.sample_every_samples > 0 and is_time(
+                self.num_samples,
+                self.conf.sample_every_samples,
+                self.conf.batch_size_effective,
+            ):
+                self.log_sample(x_start=imgs)
+                if getattr(self.conf, "eval_fid", True):
+                    self.evaluate_scores()
 
     def on_before_optimizer_step(self, optimizer: Optimizer) -> None:
         # fix the fp16 + clip grad norm problem with pytorch lightinng
         # this is the currently correct way to do it
         if self.conf.grad_clip > 0:
-            # from trainer.params_grads import grads_norm, iter_opt_params
             params = [p for group in optimizer.param_groups for p in group["params"]]
-            # print('before:', grads_norm(iter_opt_params(optimizer)))
             torch.nn.utils.clip_grad_norm_(params, max_norm=self.conf.grad_clip)
-            # print('after:', grads_norm(iter_opt_params(optimizer)))
 
     def log_sample(self, x_start):
         """
@@ -461,9 +517,15 @@ class LitModel(L.LightningModule):
                 loader = DataLoader(all_x_T, batch_size=batch_size)
 
                 Gen = []
+                curr_idx = 0
                 for x_T in loader:
-                    if use_xstart:
-                        _xstart = x_start[: len(x_T)]
+                    if use_xstart and x_start is not None:
+                        _xstart = x_start[curr_idx : curr_idx + len(x_T)]
+                        if len(_xstart) == 0:
+                            break
+                        if len(x_T) > len(_xstart):
+                            x_T = x_T[: len(_xstart)]
+                        curr_idx += len(_xstart)
                     else:
                         _xstart = None
 
@@ -487,7 +549,7 @@ class LitModel(L.LightningModule):
                             )
                             cond = model.noise_to_cond(cond)
                         else:
-                            if interpolate:
+                            if interpolate and _xstart is not None:
                                 cond = model.encoder(_xstart)
                                 i = torch.randperm(len(cond))
                                 cond = (cond + cond[i]) / 2
@@ -498,15 +560,16 @@ class LitModel(L.LightningModule):
                         )
                     Gen.append(gen)
 
-                gen = torch.cat(Gen)
-                gen = self.all_gather(gen)
+                gen_local = torch.cat(Gen)
+                gen = self.all_gather(gen_local)
                 if gen.dim() == 5:
                     # (n, c, h, w)
                     gen = gen.flatten(0, 1)
 
-                if save_real and use_xstart:
+                if save_real and use_xstart and x_start is not None:
                     # save the original images to the tensorboard
-                    real = self.all_gather(_xstart)
+                    x_start_local = x_start[: len(gen_local)]
+                    real = self.all_gather(x_start_local)
                     if real.dim() == 5:
                         real = real.flatten(0, 1)
 
@@ -516,10 +579,49 @@ class LitModel(L.LightningModule):
                             f"sample{postfix}/real", grid_real, self.num_samples
                         )
 
+                if use_xstart and x_start is not None:
+                    # Calculate pairwise reconstruction metrics (MSE, PSNR, L1, LPIPS) for Stage 1 autoencoding
+                    x_start_local = x_start[: len(gen_local)]
+                    mse_val = torch.mean((x_start_local - gen_local) ** 2).item()
+                    psnr_val = 20 * math.log10(2.0 / (math.sqrt(mse_val) + 1e-8))
+                    l1_val = torch.mean(torch.abs(x_start_local - gen_local)).item()
+                    # LPIPS is computed on every rank and averaged across ranks,
+                    # so that self.log(sync_dist=True) and the final.ckpt
+                    # decision below are taken by all ranks together. Both are
+                    # collectives (Trainer.save_checkpoint ends in a barrier);
+                    # calling them from rank 0 only deadlocked DDP runs.
+                    if not hasattr(self, "_dino_eval"):
+                        from peal.global_utils import DINOEvaluator
+                        self._dino_eval = DINOEvaluator(device=self.device)
+                    lpips_local = torch.as_tensor(
+                        float(self._dino_eval.compute_lpips(x_start_local, gen_local)),
+                        device=self.device,
+                    )
+                    lpips_val = self.all_gather(lpips_local).float().mean().item()
+                    if self.global_rank == 0:
+                        self.logger.experiment.add_scalar(f"rec_loss{postfix}/mse", mse_val, self.num_samples)
+                        self.logger.experiment.add_scalar(f"rec_loss{postfix}/psnr", psnr_val, self.num_samples)
+                        self.logger.experiment.add_scalar(f"rec_loss{postfix}/l1", l1_val, self.num_samples)
+                        self.logger.experiment.add_scalar(f"rec_loss{postfix}/lpips", lpips_val, self.num_samples)
+                    self.log("lpips", lpips_val, sync_dist=True)
+
+                    # Outer diffusion model: Update final.ckpt if LPIPS is minimal
+                    if lpips_val < self.best_lpips:
+                        self.best_lpips = lpips_val
+                        final_ckpt_path = os.path.join(self.conf.logdir, "final.ckpt")
+                        if hasattr(self, "trainer") and self.trainer is not None:
+                            # every rank calls it; Lightning writes on rank 0
+                            self.trainer.save_checkpoint(final_ckpt_path)
+                            if self.global_rank == 0:
+                                print(f"[Best LPIPS] Updated final.ckpt with LPIPS={lpips_val:.4f} at sample {self.num_samples}")
+
                 if self.global_rank == 0:
-                    # save samples to the tensorboard
+                    # save samples to single samples directory
                     grid = (make_grid(gen) + 1) / 2
-                    sample_dir = os.path.join(self.conf.logdir, f"sample{postfix}")
+                    sample_dir = os.path.join(
+                        self.conf.logdir,
+                        "samples" if not postfix else f"samples{postfix}",
+                    )
                     if not os.path.exists(sample_dir):
                         os.makedirs(sample_dir)
                     path = os.path.join(sample_dir, "%d.png" % self.num_samples)
@@ -529,49 +631,46 @@ class LitModel(L.LightningModule):
                     )
             model.train()
 
-        if self.conf.sample_every_samples > 0 and is_time(
-            self.num_samples,
-            self.conf.sample_every_samples,
-            self.conf.batch_size_effective,
-        ):
-
-            if self.conf.train_mode.require_dataset_infer():
+        if self.conf.train_mode.require_dataset_infer():
+            do(self.model, "", use_xstart=False)
+            do(self.ema_model, "_ema", use_xstart=False)
+        else:
+            if self.conf.model_type.has_autoenc() and self.conf.model_type.can_sample():
                 do(self.model, "", use_xstart=False)
                 do(self.ema_model, "_ema", use_xstart=False)
+                # autoencoding mode
+                do(self.model, "_enc", use_xstart=True, save_real=True)
+                do(self.ema_model, "_enc_ema", use_xstart=True, save_real=True)
+            elif self.conf.train_mode.use_latent_net():
+                do(self.model, "", use_xstart=False)
+                do(self.ema_model, "_ema", use_xstart=False)
+                # autoencoding mode
+                do(self.model, "_enc", use_xstart=True, save_real=True)
+                do(
+                    self.model,
+                    "_enc_nodiff",
+                    use_xstart=True,
+                    save_real=True,
+                    no_latent_diff=True,
+                )
+                do(self.ema_model, "_enc_ema", use_xstart=True, save_real=True)
             else:
-                if (
-                    self.conf.model_type.has_autoenc()
-                    and self.conf.model_type.can_sample()
-                ):
-                    do(self.model, "", use_xstart=False)
-                    do(self.ema_model, "_ema", use_xstart=False)
-                    # autoencoding mode
-                    do(self.model, "_enc", use_xstart=True, save_real=True)
-                    do(self.ema_model, "_enc_ema", use_xstart=True, save_real=True)
-                elif self.conf.train_mode.use_latent_net():
-                    do(self.model, "", use_xstart=False)
-                    do(self.ema_model, "_ema", use_xstart=False)
-                    # autoencoding mode
-                    do(self.model, "_enc", use_xstart=True, save_real=True)
-                    do(
-                        self.model,
-                        "_enc_nodiff",
-                        use_xstart=True,
-                        save_real=True,
-                        no_latent_diff=True,
-                    )
-                    do(self.ema_model, "_enc_ema", use_xstart=True, save_real=True)
-                else:
-                    do(self.model, "", use_xstart=True, save_real=True)
-                    do(self.ema_model, "_ema", use_xstart=True, save_real=True)
+                do(self.model, "", use_xstart=True, save_real=True)
+                do(self.ema_model, "_ema", use_xstart=True, save_real=True)
+
+        # Always save checkpoint when images are created
+        # All ranks must call save_checkpoint (it ends in a barrier); Lightning
+        # writes the file on rank 0 only.
+        if hasattr(self, "trainer") and self.trainer is not None:
+            last_ckpt_path = os.path.join(self.conf.logdir, "last.ckpt")
+            self.trainer.save_checkpoint(last_ckpt_path)
+            if self.global_rank == 0:
+                print(f"[Checkpoint] Always saved last.ckpt at sample {self.num_samples}")
 
     def evaluate_scores(self):
         """
-        evaluate FID and other scores during training (put to the tensorboard)
-        For, FID. It is a fast version with 5k images (gold standard is 50k).
-        Don't use its results in the paper!
+        evaluate FID and other scores during training (logged when sampling images)
         """
-
         def fid(model, postfix):
             score = evaluate_fid(
                 self.eval_sampler,
@@ -584,56 +683,39 @@ class LitModel(L.LightningModule):
                 conds_mean=self.conds_mean,
                 conds_std=self.conds_std,
             )
+            # evaluate_fid computes the score on rank 0; make every rank agree
+            # on it before the collective calls below (self.log with a
+            # checkpoint monitor, Trainer.save_checkpoint's barrier).
+            if hasattr(self, "trainer") and self.trainer is not None:
+                score = self.trainer.strategy.broadcast(
+                    float(score) if self.global_rank == 0 else 0.0, src=0
+                )
+            self.log(f"FID{postfix}", score, prog_bar=True)
             if self.global_rank == 0:
-                self.log(f"FID{postfix}", score, prog_bar=True)
+                self.logger.experiment.add_scalar(f"FID{postfix}", score, self.num_samples)
                 if not os.path.exists(self.conf.logdir):
                     os.makedirs(self.conf.logdir)
                 with open(os.path.join(self.conf.logdir, "eval.txt"), "a") as f:
-                    metrics = {
+                    metrics_dict = {
                         f"FID{postfix}": score,
                         "num_samples": self.num_samples,
                     }
-                    f.write(json.dumps(metrics) + "\n")
+                    f.write(json.dumps(metrics_dict) + "\n")
 
-        def lpips(model, postfix):
-            if self.conf.model_type.has_autoenc() and self.conf.train_mode.is_autoenc():
-                # {'lpips', 'ssim', 'mse'}
-                score = evaluate_lpips(
-                    self.eval_sampler,
-                    model,
-                    self.conf,
-                    device=self.device,
-                    val_data=self.val_data,
-                    latent_sampler=self.eval_latent_sampler,
-                )
+            # Latent / Outer model: Update final.ckpt if FID is minimal
+            # (all ranks: save_checkpoint is a collective; rank 0 writes)
+            if score < self.best_fid:
+                self.best_fid = score
+                final_ckpt_path = os.path.join(self.conf.logdir, "final.ckpt")
+                if hasattr(self, "trainer") and self.trainer is not None:
+                    self.trainer.save_checkpoint(final_ckpt_path)
+                    if self.global_rank == 0:
+                        print(f"[Best FID] Updated final.ckpt with FID={score:.4f} at sample {self.num_samples}")
 
-                if self.global_rank == 0:
-                    for key, val in score.items():
-                        self.log(f"{key}{postfix}", val)
-
-        if (
-            self.conf.eval_every_samples > 0
-            and self.num_samples > 0
-            and is_time(
-                self.num_samples,
-                self.conf.eval_every_samples,
-                self.conf.batch_size_effective,
-            )
-        ):
-            print(f"eval fid @ {self.num_samples}")
-            lpips(self.model, "")
-            fid(self.model, "")
-
-        if (
-            self.conf.eval_ema_every_samples > 0
-            and self.num_samples > 0
-            and is_time(
-                self.num_samples,
-                self.conf.eval_ema_every_samples,
-                self.conf.batch_size_effective,
-            )
-        ):
-            print(f"eval fid ema @ {self.num_samples}")
+        print(f"eval fid @ {self.num_samples}")
+        fid(self.model, "")
+        if hasattr(self, "ema_model"):
+            fid(self.ema_model, "_ema")
             fid(self.ema_model, "_ema")
             # it's too slow
             # lpips(self.ema_model, '_ema')
@@ -641,7 +723,9 @@ class LitModel(L.LightningModule):
     def configure_optimizers(self):
         out = {}
         print(f"Optimizer {self.conf.optimizer} with lr {self.conf.lr}")
-        self.first_encoder_parameter2 = torch.tensor(list(self.model.encoder.parameters())[0])
+        self.first_encoder_parameter2 = torch.tensor(
+            list(self.model.encoder.parameters())[0]
+        )
         for param in self.model.encoder.parameters():
             param.requires_grad = False
 
@@ -649,7 +733,11 @@ class LitModel(L.LightningModule):
             parameters = self.model.parameters()
 
         else:
-            parameters = [param for param in self.model.parameters() if param not in set(self.model.encoder.parameters())]
+            parameters = [
+                param
+                for param in self.model.parameters()
+                if param not in set(self.model.encoder.parameters())
+            ]
 
         if self.conf.optimizer == OptimizerType.adam:
             optim = torch.optim.Adam(
@@ -925,6 +1013,12 @@ def is_time(num_samples, every, step_size):
     return num_samples - closest < step_size
 
 
+class EMAModelCheckpoint(ModelCheckpoint):
+    @property
+    def state_key(self) -> str:
+        return f"{super().state_key}_ema"
+
+
 def train(
     conf: TrainConfig,
     nodes=1,
@@ -933,26 +1027,36 @@ def train(
     checkpoint_name="last.ckpt",
 ):
     print("conf:", conf)
+    # Fixed input shapes (batch, 3, img_size, img_size) all run long: let cuDNN
+    # autotune the conv algorithms once instead of using the heuristic pick.
+    torch.backends.cudnn.benchmark = True
     # assert not (conf.fp16 and conf.grad_clip > 0
     #             ), 'pytorch lightning has bug with amp + gradient clipping'
 
     # If we are not using latent diffusion, we can use strict loading
     # Otherwise we init an untrained latent model and train it now
     strict_loading = not conf.train_mode is TrainMode.latent_diffusion
-    checkpoint_path = (
-        f"{conf.logdir}/{checkpoint_name}" if not conf.pretrain else conf.pretrain.path
-    )
+    # Always resume from this stage's own logdir. A conf.pretrain (the latent
+    # stage initialised from the trained autoencoder) is loaded with
+    # strict=False inside LitModel.__init__; handing that path to
+    # trainer.fit(ckpt_path=...) instead made Lightning restore it strictly,
+    # which fails on the missing latent_net / conds_* keys and also drags the
+    # autoencoder's optimizer and loop state into the fresh latent training.
+    checkpoint_path = f"{conf.logdir}/{checkpoint_name}"
     print("ckpt path:", checkpoint_path)
+    resume_ckpt = None
     if os.path.exists(checkpoint_path):
-        resume = checkpoint_path
-        print("resume!")
-        model = LitModel.load_from_checkpoint(resume, conf=conf, strict=strict_loading)
+        resume_ckpt = checkpoint_path
+        print("resume from checkpoint:", resume_ckpt)
+        model = LitModel.load_from_checkpoint(
+            resume_ckpt, conf=conf, strict=strict_loading
+        )
     else:
-        if conf.continue_from is not None:
-            # continue from a checkpoint
-            resume = conf.continue_from.path
+        if conf.continue_from is not None and os.path.exists(conf.continue_from.path):
+            resume_ckpt = conf.continue_from.path
+            print("resume from continue_from path:", resume_ckpt)
             model = LitModel.load_from_checkpoint(
-                resume, conf=conf, strict=strict_loading
+                resume_ckpt, conf=conf, strict=strict_loading
             )
         else:
             model = LitModel(conf=conf)
@@ -965,47 +1069,71 @@ def train(
     print("save train steps:", save_train_steps)
 
     checkpoint = ModelCheckpoint(
-        monitor="FID",
         dirpath=f"{conf.logdir}",
         save_last=True,
         save_top_k=2,
+        monitor="loss",
         every_n_train_steps=save_train_steps,
         verbose=True,
-        filename="{step:07d}-{FID:.2f}",
+        filename="{step:07d}",
+        # Overwrite last.ckpt on every save instead of writing last-v1.ckpt,
+        # last-v2.ckpt, ... after a resume (Lightning refuses to clobber a
+        # last.ckpt it did not write itself). train() resumes from
+        # <logdir>/last.ckpt unconditionally, so with the version counter
+        # on, every restart silently rewound to the first crash.
+        enable_version_counter=False,
     )
-    checkpoint_ema = ModelCheckpoint(
-        monitor="FID_ema",
+    checkpoint_ema = EMAModelCheckpoint(
         dirpath=os.path.join(conf.logdir, "ema"),
         save_last=True,
         save_top_k=2,
+        monitor="loss",
         every_n_train_steps=save_train_steps,
         verbose=True,
-        filename="{step:07d}-{FID_ema:.2f}",
+        filename="{step:07d}",
+        # Overwrite last.ckpt on every save instead of writing last-v1.ckpt,
+        # last-v2.ckpt, ... after a resume (Lightning refuses to clobber a
+        # last.ckpt it did not write itself). train() resumes from
+        # <logdir>/last.ckpt unconditionally, so with the version counter
+        # on, every restart silently rewound to the first crash.
+        enable_version_counter=False,
     )
 
-    tb_logger = TensorBoardLogger(save_dir=conf.logdir, name=None)
+    tb_logger = TensorBoardLogger(save_dir=conf.logdir, name="", version="")
 
     max_steps = conf.total_samples // conf.batch_size_effective
     print("max steps:", max_steps)
     trainer = L.Trainer(
         max_steps=max_steps,
         num_nodes=nodes,
-        precision=16 if conf.fp16 else 32,
+        accelerator="gpu" if torch.cuda.is_available() else "cpu",
+        devices="auto" if torch.cuda.is_available() else 1,
+        strategy=(
+            "ddp_find_unused_parameters_true"
+            if torch.cuda.is_available() and torch.cuda.device_count() > 1
+            else "auto"
+        ),
+        # conf.precision (a Lightning string such as "bf16-mixed") overrides the
+        # legacy fp16 flag; bf16 needs no loss scaler and cannot overflow.
+        precision=(conf.precision or (16 if conf.fp16 else 32)),
         callbacks=[
             checkpoint,
             checkpoint_ema,
             LearningRateMonitor(),
         ],
-        # clip in the model instead
-        # gradient_clip_val=conf.grad_clip,
         logger=tb_logger,
         accumulate_grad_batches=conf.accum_batches,
         log_every_n_steps=5,
-        max_time=max_time,
+        max_time=max_time or conf.max_time,
     )
 
     if mode == "train":
-        trainer.fit(model)
+        trainer.fit(
+            model,
+            ckpt_path=(
+                resume_ckpt if (resume_ckpt and os.path.exists(resume_ckpt)) else None
+            ),
+        )
     elif mode == "eval":
         # load the latest checkpoint
         # perform lpips

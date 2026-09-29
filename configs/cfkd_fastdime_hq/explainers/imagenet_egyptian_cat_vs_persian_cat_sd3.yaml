@@ -1,0 +1,31 @@
+# python -W ignore run_explainer.py --config "<PEAL_BASE>/configs/cfkd_fastdime_hq/explainers/imagenet_egyptian_cat_vs_persian_cat_sd3.yaml"
+# Egyptian Cat = class 0 (ImageNet index 285)
+# Persian Cat = class 1 (ImageNet index 283)
+predictor: <PEAL_BASE>/configs/cfkd_fastdime_hq/predictors/imagenet_egyptian_cat_vs_persian_cat_classifier.yaml
+data_config: <PEAL_BASE>/configs/cfkd_fastdime_hq/data/imagenet_egyptian_cat_vs_persian_cat.yaml
+generator: <PEAL_BASE>/configs/cfkd_fastdime_hq/generators/stable_diffusion_3_egyptian_cat_vs_persian_cat.yaml
+validate_generator: True
+transition_restrictions: [[0,1], [1,0]]  # Egyptian Cat <-> Persian Cat
+explanations_dir: <PEAL_BASE>/peal_runs/fast_dim_imagenet_egyptian_cat_vs_persian_cat
+y_target_goal_confidence: 1.1
+batch_size: 1
+attack_step: 5
+category: explainer
+dilation: 15
+dist_l1: 0.0
+explainer_type: PDC
+explanation_type: PDCConfig
+gradient_steps: 15
+greedy: false
+inpaint: 0.2
+iterationwise_encoding: True
+learning_rate: 200.0
+mask_momentum: 0.2
+momentum: 0.999
+num_attempts: 1
+num_discretization_steps: 3
+optimizer: SGD
+sampling_time_fraction: 0.3
+stochastic: fully
+temperature: 3.0
+visualize_gradients: True

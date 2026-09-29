@@ -1,0 +1,31 @@
+# python -W ignore run_explainer.py --config "<PEAL_BASE>/configs/explainers/imagenet_ace.yaml"
+distilled_predictor: <PEAL_BASE>/configs/predictors/imagenet_resnet18_classifier_distillation.yaml
+predictor: <PEAL_BASE>/configs/predictors/imagenet_resnet18_classifier.yaml
+data_config: <PEAL_BASE>/configs/data/imagenet.yaml
+generator: <PEAL_BASE>/configs/generators/stable_diffusion_3.yaml
+validate_generator: True
+transition_restrictions: [[248,250], [250,248]] # 248 -> Eskimo Dog, 250 -> Siberian Husky, 269 -> grey wolf, 270 -> white wolf
+explanations_dir: <PEAL_BASE>/peal_runs/fast_dim_imagenet_distilled_eskimo_huskey
+y_target_goal_confidence: 1.1
+batch_size: 1
+attack_step: 5
+category: explainer
+dilation: 15
+dist_l1: 0.0
+explainer_type: PDC
+explanation_type: PDCConfig
+gradient_steps: 15
+greedy: false
+inpaint: 0.2
+iterationwise_encoding: True
+learning_rate: 1.0
+mask_momentum: 0.2
+momentum: 0.999
+num_attempts: 1
+num_discretization_steps: 3
+optimizer: SGD
+sampling_time_fraction: 0.3
+stochastic: fully
+temperature: 3.0
+visualize_gradients: True
+y_target_goal_confidence: null

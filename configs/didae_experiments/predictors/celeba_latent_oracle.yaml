@@ -1,0 +1,13 @@
+# python train_predictor.py --config "<PEAL_BASE>/configs/didae_experiments/predictors/celeba_latent_oracle.yaml"
+model_path        : $PEAL_RUNS/celeba/latent_oracle
+data              : <PEAL_BASE>/configs/cfkd_experiments/data/celeba_Blond_Hair_confounding_Male_unpoisoned.yaml
+training          : <PEAL_BASE>/configs/cfkd_experiments/training/img_classifier.yaml
+architecture      : torchvision_open_clip
+continue_training : True
+task:
+  criterions:
+    bce    : 1.0
+    l2     : 100.0
+  output_type             : multiclass
+  output_channels         : 40
+  y_selection             : [5_o_Clock_Shadow,Arched_Eyebrows,Attractive,Bags_Under_Eyes,Bald,Bangs,Big_Lips,Big_Nose,Black_Hair,Blond_Hair,Blurry,Brown_Hair,Bushy_Eyebrows,Chubby,Double_Chin,Eyeglasses,Goatee,Gray_Hair,Heavy_Makeup,High_Cheekbones,Male,Mouth_Slightly_Open,Mustache,Narrow_Eyes,No_Beard,Oval_Face,Pale_Skin,Pointy_Nose,Receding_Hairline,Rosy_Cheeks,Sideburns,Smiling,Straight_Hair,Wavy_Hair,Wearing_Earrings,Wearing_Hat,Wearing_Lipstick,Wearing_Necklace,Wearing_Necktie,Young]

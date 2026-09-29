@@ -1,0 +1,12 @@
+experiment_id: e7a_in1k_dinov2_cls_k10_region_enrichment_seed0
+train_cache: artifacts/ada/atlas/embeddings/imagenet1k/train/facebook__dinov2-with-registers-base/cls/combined_train_full_8shards
+regions_dir: artifacts/ada/actionability/regions/e7a_in1k_dinov2_cls_train_regions_k5_k10_seed0
+output_dir: artifacts/ada/actionability/regions/e7a_in1k_dinov2_cls_k10_enriched_seed0
+report_path: notes/ada/actionability/in1k_k10_region_enrichment_report.md
+primary_k: 10
+parent_k: 5
+support_k: 50
+global_neighbor_k: 50
+margin_core_k: 10
+mmap: true
+overwrite: false

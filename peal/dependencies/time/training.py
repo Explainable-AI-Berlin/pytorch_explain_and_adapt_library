@@ -55,7 +55,7 @@ def arguments():
     parser.add_argument("--mini_batch_size", type=int, default=4)
     parser.add_argument("--image_size", type=int, default=512)
     parser.add_argument(
-        "--data_dir", type=str, default="/home/2017025/gjeann01/save/celeba"
+        "--data_dir", type=str, default=os.path.join(os.environ.get("PEAL_DATA", "datasets"), "celeba")
     )
     parser.add_argument("--partition", type=str, default="train")
     parser.add_argument("--dataset", type=str, default="CelebAHQ")

@@ -30,5 +30,5 @@ transition_restrictions: null
 use_clustering: false
 use_masking: true
 validate_generator: false
-visualize_gradients: true
+visualize_gradients: false
 y_target_goal_confidence: null

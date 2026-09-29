@@ -58,6 +58,9 @@ class TrainConfig(BaseConfig):
     manipulate_znormalize: bool = False
     manipulate_seed: int = 0
     accum_batches: int = 1
+    continue_training: bool = False
+    eval_fid: bool = True
+    eval_lpips: bool = True
     autoenc_mid_attn: bool = True
     batch_size: int = 16
     batch_size_eval: int = None
@@ -87,6 +90,12 @@ class TrainConfig(BaseConfig):
     eval_ema_every_samples: int = 200_000
     fid_use_torch: bool = True
     fp16: bool = False
+    # Lightning precision string ("bf16-mixed", "16-mixed", "32-true"); when set
+    # it overrides fp16 in train(). max_time ("DD:HH:MM:SS") is Lightning's
+    # wall-clock budget for one train() call, so a long run stops cleanly and
+    # the follow-up stages (infer, latent DPM) still get to run.
+    precision: str = None
+    max_time: str = None
     grad_clip: float = 1
     img_size: int = 64
     lr: float = 0.0001
@@ -340,10 +349,9 @@ class TrainConfig(BaseConfig):
             sampler=sampler,
             # with sampler, use the sample instead of this option
             shuffle=False if sampler else shuffle,
-            num_workers=num_worker or self.num_workers,
+            num_workers=num_worker if num_worker is not None else self.num_workers,
             pin_memory=True,
             drop_last=drop_last,
-            multiprocessing_context=get_context("fork"),
         )
 
     def make_model_conf(self):

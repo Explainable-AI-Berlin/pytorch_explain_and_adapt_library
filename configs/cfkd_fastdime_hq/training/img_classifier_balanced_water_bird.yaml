@@ -1,0 +1,42 @@
+# train_batch_size        : 64 #128
+# val_batch_size          : 64 #128
+# test_batch_size         : 16 #128
+# max_epochs              : 50
+# steps_per_epoch         : 50
+# learning_rate           : 0.0001
+# optimizer               : sgd
+# momentum                : 0.9
+# class_balanced          : False
+# # weight_decay            : 0.001
+# # pretrained             : True
+# dropout                 : 0.2
+# # label_smoothing         : 0.05
+# regulization_level      : 1
+
+
+adv_training: false
+attack_epsilon: 1.0
+attack_num_steps: 5
+class_balanced: true
+concatenate_batches: true
+dropout: 0.0
+early_stopping_goal: worst_group_accuracy
+epoch: 79
+global_train_step: 12000
+global_validation_step: 0
+input_noise_std: 0.1
+label_smoothing: 0.0
+learning_rate: 0.0001
+max_epochs: 80
+mixup_alpha: 1.0
+no_grad_attack: false
+num_noise_vec: 1
+optimizer: adam
+regulization_level: 1.1
+steps_per_epoch: null
+test_batch_size: 16
+train_batch_size: 32
+train_on_test: false
+use_mixup: false
+val_batch_size: 64
+weights_path: null
