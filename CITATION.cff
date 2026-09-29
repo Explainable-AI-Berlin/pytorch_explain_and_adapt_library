@@ -15,6 +15,10 @@ authors:
   - family-names: Delzer
     given-names: Ole
 version: 0.1.0
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.23048182
+    description: "Zenodo archive of release 0.1.0"
 date-released: 2026-09-29
 license: LGPL-3.0-or-later
 repository-code: "https://github.com/Explainable-AI-Berlin/pytorch_explain_and_adapt_library"

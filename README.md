@@ -639,14 +639,14 @@ software itself, use the Zenodo record of the release you used:
   year         = {2026},
   publisher    = {Zenodo},
   version      = {0.1.0},
-  doi          = {10.5281/zenodo.XXXXXXX},
+  doi          = {10.5281/zenodo.23048182},
   url          = {https://github.com/Explainable-AI-Berlin/pytorch_explain_and_adapt_library}
 }
 ```
 
-<!-- TODO(release): replace 10.5281/zenodo.XXXXXXX above and in CITATION.cff with the
-     DOI Zenodo mints for the v0.1.0 release, and add the badge:
-     [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.XXXXXXX.svg)](https://doi.org/10.5281/zenodo.XXXXXXX) -->
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23048181.svg)](https://doi.org/10.5281/zenodo.23048181)
+
+The badge is the concept DOI that always resolves to the latest version; the entry above cites the version used.
 
 ## Contribution guidelines
 
