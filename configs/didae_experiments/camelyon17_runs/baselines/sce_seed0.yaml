@@ -1,0 +1,278 @@
+# SCE on the seed-0 (original) Camelyon17 poisoned100 student: the paper run.
+# Exported from /home/space/datasets/peal_ahmed/experiments_results_paper/classifier_poisoned_camelyon100/sce_cfkd/config.yaml (result fields removed).
+# The paper run's results are in /home/space/datasets/peal_ahmed/camelyon17_paper_results/sce/seed0 (group cluster); base_dir writes a new run under $PEAL_RUNS.
+adaptor_type: CFKD
+attribution_threshold: 0.0
+base_dir: $PEAL_RUNS/camelyon17/paper_runs/sce/seed0
+batch_size: 4
+calculate_group_accuracies: true
+category: adaptor
+continuous_learning: finetune
+counterfactual_type: 1sided
+data:
+  class_ratios: null
+  config_name: DataConfig
+  confounder_probability: 1.0
+  confounding_factors:
+  - tumor
+  - hospital
+  crop_size: null
+  dataset_class: Camelyon17AugmentedDataset
+  dataset_origin_path: null
+  dataset_path: $PEAL_DATA/camelyon17
+  delimiter: ','
+  downsize: Resize
+  has_hints: false
+  input_size:
+  - 3
+  - 128
+  - 128
+  input_type: image
+  invariances: []
+  inverse: null
+  label_noise: null
+  label_rel_path: data.csv
+  normalization: null
+  num_samples: 34000
+  output_size:
+  - 2
+  output_split: null
+  output_type: multiclass
+  seed: 0
+  set_negative_to_zero: false
+  split:
+  - 0.8
+  - 0.9
+  x_selection: imgs
+explainer:
+  allow_overlap: false
+  batch_size: 1
+  category: explainer
+  clustering_strategy: highest_activation
+  data_config: null
+  dilation: 13
+  dist_l1: 0.0005
+  distilled_predictor:
+    distill_from: predictor
+    task:
+      criterions:
+        ce: 1.0
+        l2: 100.0
+      output_channels: 2
+      output_type: singleclass
+      y_selection:
+      - prediction
+    training:
+      adv_training: true
+      class_balanced: true
+      label_smoothing: 0.05
+      learning_rate: 0.001
+      max_epochs: 10
+      mixup_alpha: 10
+      optimizer: adam
+      steps_per_epoch: 1000
+      test_batch_size: 32
+      train_batch_size: 32
+      use_mixup: true
+      val_batch_size: 4
+  explainer_type: SCE
+  explanations_dir: explanations
+  generator: null
+  gradient_clipping: 1000000000000.0
+  gradient_steps: 50
+  greedy: false
+  inpaint: 0.15
+  iterationwise_encoding: true
+  learning_rate: 300.0
+  mask_momentum: 0.0
+  max_samples: null
+  merge_clusters: concatenate
+  momentum: 0.9
+  num_attempts: 2
+  num_discretization_steps: 20
+  optimizer: SGD
+  port: 8000
+  predictor: null
+  predictor_path: null
+  replace_with_activation: leakysoftplus
+  sampling_time_fraction: 0.3
+  seed: 0
+  stochastic: fully
+  temperature: 3.0
+  tracking_level: 5
+  transition_restrictions: null
+  use_clustering: true
+  use_masking: true
+  validate_generator: false
+  visualize_gradients: true
+  y_target_goal_confidence: null
+finetune_iterations: 1
+generator:
+  attention_resolutions: 32,16,8
+  base_path: $PEAL_RUNS/camelyon17/ddpm
+  batch_size: 100
+  best_fid: 1000000000.0
+  category: generator
+  channel_mult: ''
+  class_cond: false
+  current_fid: 214.42575073242188
+  data:
+    class_ratios: null
+    config_name: DataConfig
+    confounder_probability: null
+    confounding_factors: []
+    crop_size: null
+    dataset_class: Camelyon17Dataset
+    dataset_origin_path: null
+    dataset_path: $PEAL_DATA/camelyon17
+    delimiter: null
+    downsize: null
+    has_hints: false
+    input_size:
+    - 3
+    - 128
+    - 128
+    input_type: image
+    invariances: []
+    inverse: null
+    label_noise: null
+    label_rel_path: data.csv
+    normalization:
+    - 0.5
+    - 0.5
+    num_samples: null
+    output_size:
+    - 2
+    output_split: null
+    output_type: multiclass
+    seed: null
+    set_negative_to_zero: false
+    split:
+    - 1.0
+    - 1.0
+    x_selection: imgs
+  diffusion_steps: 1000
+  dropout: 0.0
+  ema_rate: '0.9999'
+  fp16_scale_growth: 0.001
+  generator_type: DDPM
+  gpus: ''
+  image_size: 128
+  is_trained: true
+  learn_sigma: true
+  log_interval: 10
+  lr: 0.0001
+  lr_anneal_steps: 0
+  max_steps: 10000000
+  microbatch: -1
+  noise_schedule: linear
+  num_channels: 128
+  num_head_channels: -1
+  num_heads: 4
+  num_heads_upsample: -1
+  num_res_blocks: 2
+  output_path: peal_runs/ddpm/outputs
+  predict_xstart: false
+  resblock_updown: true
+  rescale_learned_sigmas: false
+  rescale_timesteps: false
+  resume_checkpoint: ''
+  save_interval: 10000
+  schedule_sampler: uniform
+  seed: 0
+  stochastic: true
+  timestep_respacing: '66'
+  use_checkpoint: false
+  use_fp16: false
+  use_hdf5: false
+  use_kl: false
+  use_new_attention_order: false
+  use_scale_shift_norm: true
+  weight_decay: 0.0
+  x_selection: null
+generator_performance:
+  fid: 34.93449020385742
+is_loaded: false
+lazy_feedback: true
+max_test_batches: null
+max_validation_samples: 200
+min_train_samples: 800
+mixing_ratio: 0.5
+model_path: ''
+overwrite: false
+seed: 0
+student: $PEAL_RUNS/camelyon17/classifier_poisoned100/model.cpl
+task:
+  config_name: TaskConfig
+  criterions:
+    ce: 1.0
+    l2: 100.0
+  output_channels: 2
+  output_type: singleclass
+  x_selection: null
+  y_selection:
+  - tumor
+teacher: $PEAL_RUNS/camelyon17/classifier_unpoisoned/model.cpl
+test_data:
+  class_ratios: null
+  config_name: DataConfig
+  confounder_probability: 0.5
+  confounding_factors:
+  - tumor
+  - hospital
+  crop_size: null
+  dataset_class: Camelyon17AugmentedDataset
+  dataset_origin_path: null
+  dataset_path: $PEAL_DATA/camelyon17
+  delimiter: ','
+  downsize: Resize
+  has_hints: false
+  input_size:
+  - 3
+  - 128
+  - 128
+  input_type: image
+  invariances: []
+  inverse: null
+  label_noise: null
+  label_rel_path: data.csv
+  normalization: null
+  num_samples: 68000
+  output_size:
+  - 2
+  output_split: null
+  output_type: multiclass
+  seed: 0
+  set_negative_to_zero: false
+  split:
+  - 0.8
+  - 0.9
+  x_selection: imgs
+tracking_level: 3
+training:
+  adv_training: false
+  attack_epsilon: 1.0
+  attack_num_steps: 5
+  class_balanced: true
+  concatenate_batches: true
+  dropout: 0.5
+  early_stopping_goal: average_accuracy
+  epoch: -1
+  global_train_step: 0
+  global_validation_step: 0
+  input_noise_std: 0.1
+  label_smoothing: 0.0
+  learning_rate: 0.01
+  max_epochs: 50
+  mixup_alpha: 1.0
+  no_grad_attack: false
+  num_noise_vec: 1
+  optimizer: sgd
+  steps_per_epoch: 1000
+  test_batch_size: 100
+  train_batch_size: 32
+  train_on_test: false
+  use_mixup: false
+  val_batch_size: 4
+use_confusion_matrix: false
+validation_runs: 1

@@ -296,6 +296,13 @@ class CFKDConfig(AdaptorConfig):
     correct_clusters: list = [0]
     use_true_counterfactuals: bool = False
     seed: Union[int, type(None)] = 0
+    """
+    Optional. If True (and seed is set), get_batch reseeds from seed * 1000003 + a per-call
+    counter instead of OS entropy, so the choice of samples is reproducible per seed and each
+    call still draws a different shuffle. Used by the Camelyon17 seed-variability runs.
+    False (the default) keeps the original behaviour: torch.manual_seed(torch.seed()).
+    """
+    reproducible_sampling: bool = False
     visualize_latent_sparsity: bool = True
     """
     Whether to visualize the individual latent sparsity scores as collages.
@@ -1037,7 +1044,11 @@ class CFKD(Adaptor):
         idx_batch = []
         sample_idx = 0
         cm_idx = self.output_size * cm_idx_in
-        torch.manual_seed(torch.seed())
+        self._get_batch_calls = getattr(self, "_get_batch_calls", 0) + 1
+        if self.adaptor_config.reproducible_sampling and self.adaptor_config.seed is not None:
+            torch.manual_seed(int(self.adaptor_config.seed) * 1000003 + self._get_batch_calls)
+        else:
+            torch.manual_seed(torch.seed())
         if self.adaptor_config.use_confusion_matrix:
             error_distribution = torch.distributions.Categorical(error_matrix)
 

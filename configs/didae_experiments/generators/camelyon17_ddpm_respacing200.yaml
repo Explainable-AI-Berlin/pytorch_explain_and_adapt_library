@@ -1,0 +1,93 @@
+
+attention_resolutions: 32,16,8
+base_path: $PEAL_RUNS/camelyon17/ddpm
+batch_size: 100
+best_fid: 1000000000.0
+category: generator
+channel_mult: ''
+class_cond: false
+current_fid: 214.42575073242188
+data:
+  batch_wise_augmentation: true
+  class_ratios: null
+  config_name: DataConfig
+  confounder_probability: null
+  confounding_factors: []
+  crop_size: null
+  dataset_class: Camelyon17Dataset
+  dataset_origin_path: null
+  dataset_path: $PEAL_DATA/camelyon17
+  delimiter: null
+  diffusion_augmented: false
+  downsize: null
+  full_confounder_config: null
+  generator: null
+  has_hints: false
+  in_memory: false
+  input_size:
+  - 3
+  - 128
+  - 128
+  input_type: image
+  invariances: []
+  inverse: null
+  label_noise: null
+  label_rel_path: data.csv
+  normalization:
+  - 0.5
+  - 0.5
+  num_discretization_steps: 20
+  num_samples: null
+  output_size:
+  - 2
+  output_split: null
+  output_type: multiclass
+  sampling_time_fraction: 0.3
+  seed: null
+  set_negative_to_zero: false
+  split:
+  - 1.0
+  - 1.0
+  spray_groups_balanced: false
+  spray_label_file: null
+  x_selection: imgs
+diffusion_steps: 1000
+download_weights: null
+dropout: 0.0
+ema_rate: '0.9999'
+fp16_scale_growth: 0.001
+generator_type: DDPM
+gpus: ''
+image_size: 128
+is_trained: true
+learn_sigma: true
+log_interval: 10
+lr: 0.0001
+lr_anneal_steps: 0
+max_steps: 10000000
+microbatch: -1
+noise_schedule: linear
+num_channels: 128
+num_head_channels: -1
+num_heads: 4
+num_heads_upsample: -1
+num_res_blocks: 2
+output_path: peal_runs/ddpm/outputs
+predict_xstart: false
+resblock_updown: true
+rescale_learned_sigmas: false
+rescale_timesteps: false
+resume_checkpoint: ''
+save_interval: 10000
+schedule_sampler: uniform
+seed: 0
+stochastic: true
+timestep_respacing: '200'
+use_checkpoint: false
+use_fp16: false
+use_hdf5: false
+use_kl: false
+use_new_attention_order: false
+use_scale_shift_norm: true
+weight_decay: 0.0
+x_selection: null

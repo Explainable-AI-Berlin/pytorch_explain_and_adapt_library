@@ -1,0 +1,32 @@
+# DAE baseline (as dae_original_cfkd on square/CelebA/Camelyon-1k): DAEdistill explainer dae_distill.yaml,
+# NO sparse dictionary, so the counterfactual reflects z along the distilled probe weight w.
+# Generator: the DAE trained for the seed runs (didae_camelyon17/dae_generator, frozen UNI encoder,
+# 22.4 M samples). This differs from the other datasets' baseline DAEs, which learned their own encoder.
+adaptor_type                         :  "CFKD"
+reproducible_sampling                :  True   # get_batch reseeds from seed (the seed patch these runs used)
+seed                                 :  3
+overwrite                            :  False
+category                             :  "adaptor"
+batch_size                           :  4
+tracking_level                       :  5
+min_train_samples                    :  800
+finetune_iterations                  :  1
+max_validation_samples               :  200
+continuous_learning                  :  "finetune"
+calculate_explainer_stats            :  True
+calculate_group_accuracies           :  True
+explainer                            :  <PEAL_BASE>/configs/didae_experiments/explainers/dae_distill.yaml
+training                             :  <PEAL_BASE>/configs/didae_experiments/training/img_finetuning_camelyon_resnet_baselines.yaml
+data                                 :  <PEAL_BASE>/configs/didae_experiments/data/camelyon17_poisoned100_negzero_false.yaml
+test_data                            :  <PEAL_BASE>/configs/didae_experiments/data/camelyon17_unpoisoned_negzero_false.yaml
+student                              :  $PEAL_RUNS/camelyon17/classifier_poisoned100_seed3/model.cpl
+teacher                              :  $PEAL_RUNS/camelyon17/classifier_unpoisoned/model.cpl
+generator                            :  $PEAL_RUNS/camelyon17/dae_generator/config.yaml
+base_dir                             :  "$PEAL_RUNS/camelyon17/paper_runs/dae/seed3"
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [tumor]

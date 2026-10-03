@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+### Notebooks
+
+- The tutorial notebooks are rewritten as working examples that run on Google Colab against the
+  PyPI package (`peal-xai` 0.1.0): a shared first cell installs PEAL, fetches the config files and
+  the dictionary vocabulary the wheel lacks, and sets `PEAL_BASE` / `PEAL_DATA` / `PEAL_RUNS`.
+- `00_tour_of_peal_with_trains.ipynb` replaces the Waterbirds tour: a DINOv3 probe trained on a
+  freight-car split where every freight car carries graffiti, the shortcut found by the MSAE
+  dictionary and by DiDAE, and corrected with DFR (held-out graffiti counterfactuals no longer fool
+  it). It adapts to GPUs under 20 GB (Colab T4).
+- `01_explain_and_correct_with_sce.ipynb` (SCE + CFKD with the pretrained ImageNet DDPM),
+  `02_bring_your_own_model_and_data.ipynb` (class folders and the ONNX contract) and
+  `03_explain_an_onnx_model_with_didae.ipynb` replace the three walkthrough notebooks that needed a
+  repository checkout, user data and, for SCE, GPU-days of generator training.
+
 ## 0.1.0 (2026-09-29)
 
 First public release of `peal-xai`: the PEAL library (SCE, CFKD, DiDAE), the

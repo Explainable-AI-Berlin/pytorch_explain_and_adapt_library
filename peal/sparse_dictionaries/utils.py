@@ -169,3 +169,55 @@ def plot_component_ground_truth_correlations(
     plt.savefig(filename, dpi=300)
     plt.close()
     _log.info("%s", f"Analysis saved to {filename}")
+
+
+def select_dictionary_components(sparse_dictionary, explainer_config, num_attempts):
+    """Return (W, selected): the dictionary columns the counterfactual attempts steer along.
+
+    W has shape [Dim, num_attempts]; selected is the list of column indices.
+    If explainer_config.component_indices is set, attempt k uses column
+    component_indices[k]. Otherwise attempt k uses column k, which is the original
+    behaviour (get_components()[:, :num_attempts]).
+    """
+    custom = getattr(explainer_config, "component_indices", None)
+    if custom:
+        selected = [int(i) for i in custom]
+        if len(selected) != num_attempts:
+            raise ValueError(
+                f"component_indices has {len(selected)} entries but num_attempts is "
+                f"{num_attempts}; they must match (attempt k uses component_indices[k])."
+            )
+    else:
+        selected = list(range(num_attempts))
+    W_all = sparse_dictionary.get_components()
+    if isinstance(W_all, torch.Tensor):
+        W_all = W_all.detach()
+    if max(selected) >= W_all.shape[1]:
+        raise ValueError(
+            f"component_indices {selected} out of range: the dictionary has "
+            f"{W_all.shape[1]} components."
+        )
+    return W_all[:, selected], selected
+
+
+def read_component_bounds(c_min_max_path, selected, device, bounds_scale=1.0):
+    """Read c_min_and_maxes.txt and return (c_mins, c_maxs) for the selected columns.
+
+    bounds_scale (optional, default 1.0) widens each [c_min, c_max] range around its centre,
+    as component_bounds_scale on the dev branch. At 1.0 the bounds are returned unchanged.
+    """
+    c_mins, c_maxs = [], []
+    with open(c_min_max_path, "r") as file:
+        for line in file:
+            parts = line.strip().split("min=")
+            if len(parts) > 1:
+                c_mins.append(float(parts[1].split(",")[0]))
+                c_maxs.append(float(line.strip().split("max=")[1]))
+    c_mins = torch.tensor(c_mins, device=device)[selected]
+    c_maxs = torch.tensor(c_maxs, device=device)[selected]
+    bounds_scale = float(bounds_scale if bounds_scale is not None else 1.0)
+    if bounds_scale != 1.0:
+        mid = 0.5 * (c_mins + c_maxs)
+        half = 0.5 * (c_maxs - c_mins) * bounds_scale
+        c_mins, c_maxs = mid - half, mid + half
+    return c_mins, c_maxs

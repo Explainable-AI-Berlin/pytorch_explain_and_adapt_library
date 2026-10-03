@@ -754,6 +754,8 @@ def inversion_reverse_process_pathldm(
     encoder_hidden_states: torch.Tensor = None,
     debug: bool = False,
     debug_dir: str = "debug_pathldm",
+    ref_encoder_hidden_states: torch.Tensor = None,
+    edit_guidance_scale: float = None,
 ):
     """PathLDM-compatible reverse inversion process.
 
@@ -761,6 +763,14 @@ def inversion_reverse_process_pathldm(
     - `model.get_learned_conditioning(...)` for text embeddings
     - `model.apply_model(...)` for noise prediction
     - direct model-level scheduler fields for DDPM math
+
+    Optional edit guidance: when ref_encoder_hidden_states (the unedited
+    conditioning) and edit_guidance_scale (lambda) are both given, the noise is
+        uncond + cfg * (eps_ref - uncond) + lambda * (eps_edit - eps_ref)
+    with cfg = cfg_scales (pass the inversion scale). Without an edit
+    (eps_edit == eps_ref) this reproduces the inverted image for any lambda;
+    lambda only amplifies the edit. Without these arguments the behaviour is
+    unchanged: uncond + cfg * (eps_edit - uncond).
     """
     batch_size = len(prompts)
 
@@ -882,7 +892,16 @@ def inversion_reverse_process_pathldm(
         if z is not None:
             z = z.expand(batch_size, -1, -1, -1)
 
-        noise_pred = uncond_out + cfg_scales_tensor * (cond_out - uncond_out)
+        if ref_encoder_hidden_states is not None and edit_guidance_scale is not None:
+            with torch.no_grad():
+                ref_out = model.apply_model(xt, t_batch, ref_encoder_hidden_states)
+            noise_pred = (
+                uncond_out
+                + cfg_scales_tensor * (ref_out - uncond_out)
+                + edit_guidance_scale * (cond_out - ref_out)
+            )
+        else:
+            noise_pred = uncond_out + cfg_scales_tensor * (cond_out - uncond_out)
 
         if debug:
             try:

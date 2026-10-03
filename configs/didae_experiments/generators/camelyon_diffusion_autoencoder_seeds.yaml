@@ -1,0 +1,16 @@
+# Shared Camelyon DAE for the seed-variability DAE runs (seeds 0-3). Same recipe as
+# peal_runs/camelyon/diffusion_autoencoder (Jan 2026), trained to 22.4 M samples,
+# the length of the checkpoint that the January DAE runs used. Seed 0.
+# Encoder: UNI linear probe trained on poisoned100 (camelyon17_uni_linear_poisoned100.yaml);
+# the DAE removes its head (fc = Identity), so it uses the frozen UNI backbone.
+# Train with the DDIM-only driver train_dae_ddim_only.py (repository root).
+generator_type : DiffusionAutoencoder
+category : generator
+seed : 0
+base_path : $PEAL_RUNS/camelyon17/dae_generator
+data: <PEAL_BASE>/configs/didae_experiments/data/camelyon17_generator_split090.yaml
+batch_size: 40
+save_every_samples: 20000
+total_samples: 22400000
+encoder_dimensions : 1024
+encoder_path: $PEAL_RUNS/camelyon17/encoder_uni_linear_poisoned100/model.cpl

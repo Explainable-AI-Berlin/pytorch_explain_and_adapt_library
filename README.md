@@ -78,10 +78,13 @@ Every method runs from one config file, so the same experiment can be driven thr
 
 **Tutorial notebooks**
 
-The walkthroughs below also exist as runnable notebooks in `notebooks/`, which derive the config
-files for you and plot the resulting counterfactuals: `01_explain_your_classifier_with_sce.ipynb`,
-`02_bring_your_own_onnx_predictor_sce.ipynb` and `03_explain_an_onnx_probe_with_didae.ipynb`.
-See `notebooks/README.md` for which one to start with.
+Runnable notebooks in `notebooks/` (each opens on Google Colab and installs PEAL from PyPI) build
+the workflows from the library's config classes and factories, with a default example and a cell to
+plug in your own data, model or generator at every step:
+`00_tour_of_peal_with_trains.ipynb` (start here: find and fix the graffiti shortcut of a
+freight-car classifier with DiDAE), `01_explain_and_correct_with_sce.ipynb`,
+`02_bring_your_own_model_and_data.ipynb` and `03_explain_an_onnx_model_with_didae.ipynb`.
+See `notebooks/README.md`.
 
 **Install from PyPI**
 

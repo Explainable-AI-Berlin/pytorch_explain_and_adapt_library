@@ -17,21 +17,27 @@ BG = "#f7f8fa"
 # (name, latent, ambient, verified, is_confounder)   -- is_confounder = teacher verdict "false"
 # Sources (2026-09-16): sweep_results.pt + direction_feedback.txt of each run dir.
 data = {
-    "Sparse Numbers\n(batch top-K SAE, DiffAE)": [
+    "Sparse Numbers\n(batch top-K SAE)": [
         ("Num128  ✓", 900, 39, 30, False),
         ("Num713  ✗", 453, 15, 2, True),
         ("Num797", 8, 1, 0, False),
         ("Num813", 13, 0, 0, False),
         ("Num757", 4, 1, 0, False),
     ],
-    "NICO++  Crocodile vs Lizard\n(MSAE concept pairs, CLIP-RAE)": [
+    "NICO++\nCrocodile vs Lizard": [
         ("crocodile→lizard  ✓", 178, 41, 38, False),
         ("lizard→crocodile  ✓", 218, 31, 31, False),
         ("rocks→pasture  ✗", 35, 25, 23, True),
         ("vanuatu→rocks  ✗", 22, 15, 13, True),
         ("swinging→outdoors  ✗", 7, 6, 6, True),
     ],
-    "ImageNet  Fireboat vs Lifeboat\n(MSAE single atoms, DINOv3 probe)": [
+    "ImageNet, natural\nFreight vs Passenger Car": [
+        ("bin  ✓", 337, 72, 54, False),
+        ("tracks  ✗", 288, 76, 40, True),
+        ("graffiti  ✗", 85, 30, 22, True),
+        ("travelling  ✓", 230, 41, 21, False),
+    ],
+    "ImageNet, planted jet\nFireboat vs Lifeboat": [
         ("squirting  ✗", 444, 109, 92, True),
         ("orange  ✓", 60, 18, 12, False),
         ("red  ✓", 50, 14, 9, False),
@@ -40,7 +46,7 @@ data = {
     ],
 }
 # AVERAGE group accuracy before -> after; gain = (after - before) / (1 - before), the
-# normalised improvement CFKD logs as `gain`. Third field = caption.
+# normalised improvement CFKD logs as `gain`, printed in percent like the paper's tables. Third field = caption.
 #   sparse numbers: only_sparse_numbers1k/.../classifier_poisoned100/didae (groups 0.668/0.975/0.995/0.330 -> 0.738/1.0/0.988/0.745)
 #   celeba: didae_procrustes_free40_openai_clip_ddpm (0.645/0.949/0.953/0.436 -> 0.797/0.940/0.884/0.776); classical Procrustes CFKD 0.810
 #   nico: openai_clip_rae_sde_g2_didae_msae_ep12, held-out 624 images (croc_grass/croc_rock/liz_grass/liz_rock
@@ -48,32 +54,41 @@ data = {
 #   imagenet fireboat: fireboat_vs_lifeboat_curated5717_dinov3_linear/openai_clip_rae_guided_g2_single_jet_bs3_ep43s100_didae_msae
 #         curated probe (every training fireboat carries a jet); AGA over the four (class x jet) groups on n=520
 #         (0.972/0.940/1.000/0.909 -> 0.983/0.988/1.000/0.955); CFKD on the single ✗ direction #5717 with 26 counterfactuals;
-#         jet-free group alone 0.934 -> 0.981, overall test accuracy 0.973 -> 0.992
+#         all no-jet images 0.934 -> 0.981 (jet-free fireboats 0.940 -> 0.988, jet images 0.988 -> 0.993), overall test accuracy 0.973 -> 0.992
 # CelebA Procrustes is withheld: the orthogonal-dictionary re-run ranks correctly but its
 # CFKD repair is starved (40 counterfactuals vs 347) and regresses, so no honest tile exists yet.
+# Means over the four groups above; 3-decimal group accuracies, so Gain is good to ~0.1.
+def _aga(*g):
+    return sum(g) / len(g)
+
+
 gains = {
-    0: (0.7419, 0.8675, "CFKD on ✗ dir #713"),
-    1: (0.573, 0.643, "CFKD on ✗ dirs · n=624"),
-    2: (0.9553, 0.9814, "CFKD on ✗ dir #5717 · jet-free .93→.98"),
+    0: (_aga(0.668, 0.975, 0.995, 0.330), _aga(0.738, 1.0, 0.988, 0.745), "CFKD on ✗ #713"),
+    1: (_aga(0.800, 0.240, 0.344, 0.909), _aga(0.900, 0.336, 0.477, 0.859), "CFKD on ✗ dirs"),
+    # freight car (natural probe), 2026-10-01 re-run of the tracks repair (the 2026-09-17 one never
+    # trained): groups class x tracks atom #1661 active, n=520, 0.9643/0.9828/0.9412/0.9669 ->
+    # 1.0/0.9742/0.9412/0.9711; overnight_group_eval.json of ..._ep40s100_didae_msae
+    2: (_aga(0.9643, 0.9828, 0.9412, 0.9669), _aga(1.0, 0.9742, 0.9412, 0.9711), "CFKD on ✗ tracks"),
+    3: (0.9553, 0.9814, "CFKD on ✗ dirs"),
 }
 
 # Authored at the final print width of an IEEEtran two-column figure* (7.16 in), so the
 # figure is included at width=\textwidth with scale 1 and the font sizes below are the
 # sizes that actually appear on the page. 2x2 rather than 1x4 for exactly that reason.
-NC = 3
+NC = 4
 NR = 1
 FS_T, FS_Y, FS_N, FS_X = 6.4, 5.6, 5.4, 5.4
-fig = plt.figure(figsize=(7.16, 2.95))
+fig = plt.figure(figsize=(7.16, 2.35))
 gs = fig.add_gridspec(
     2,
     NC,
-    height_ratios=[3.0, 0.9],
-    hspace=0.55,
-    wspace=0.42,
-    left=0.105,
+    height_ratios=[3.0, 1.3],
+    hspace=0.3,
+    wspace=0.62,
+    left=0.085,
     right=0.99,
-    top=0.84,
-    bottom=0.12,
+    top=0.80,
+    bottom=0.13,
 )
 # No in-figure title: journal figures carry their explanation in the caption.
 
@@ -84,14 +99,15 @@ for idx, (title, rows) in enumerate(data.items()):
     ax.set_facecolor(BG)
     names = [r[0] for r in rows]
     y = np.arange(len(rows))[::-1]
+    xmax = max(max(r[1], r[2], r[3]) for r in rows)
     h = 0.26
     for r, yy in zip(rows, y):
         _, L, A, V, conf = r
-        ax.barh(yy + h, max(L, 0.7), height=h, color=C_L, zorder=3)
-        ax.barh(yy, max(A, 0.7), height=h, color=C_A, zorder=3)
-        ax.barh(yy - h, max(V, 0.7), height=h, color=C_V, zorder=3)
+        ax.barh(yy + h, L, height=h, color=C_L, zorder=3)
+        ax.barh(yy, A, height=h, color=C_A, zorder=3)
+        ax.barh(yy - h, V, height=h, color=C_V, zorder=3)
         ax.text(
-            max(V, 0.7) * 1.3 if V > 0 else 1.35,
+            V + 0.03 * xmax,
             yy - h,
             ("%d" % V) if V > 0 else "0",
             va="center",
@@ -106,14 +122,12 @@ for idx, (title, rows) in enumerate(data.items()):
         if r[4]:
             tick.set_color(RED)
             tick.set_fontweight("bold")
-    ax.set_xscale("log")
-    ax.set_xlim(0.7, 2000)
+    # linear bars without an x axis: the verified count printed beside its bar is the ranking key
+    ax.set_xlim(0, xmax * 1.02)
+    ax.set_xticks([])
     ax.set_title(title, fontsize=FS_T, fontweight="bold", linespacing=1.3, pad=4)
-    ax.set_xlabel("flips  (log scale)", fontsize=FS_X)
-    ax.tick_params(axis="x", labelsize=FS_X - 0.6, pad=1.5)
-    for s in ("top", "right"):
+    for s in ("top", "right", "bottom"):
         ax.spines[s].set_visible(False)
-    ax.grid(axis="x", ls=":", color="#cfd4da", zorder=0)
 
     axg = fig.add_subplot(gs[gr + 1, col])
     axg.set_facecolor(BG)
@@ -174,10 +188,10 @@ for idx, (title, rows) in enumerate(data.items()):
         sign = "+" if up else "−"
         axg.text(
             0.5,
-            0.00,
-            f"gain {sign}{abs(a-b)/(1-b):.2f}  ({sign}{abs(a-b)*100:.1f} pts)  ·  {src}",
+            0.13,
+            f"Gain {sign}{100*abs(a-b)/(1-b):.1f} ({sign}{abs(a-b)*100:.1f} pts)\n{src}",
             ha="center",
-            va="bottom",
+            va="top",
             fontsize=FS_X - 0.7,
             color=after_c,
             fontweight="bold",

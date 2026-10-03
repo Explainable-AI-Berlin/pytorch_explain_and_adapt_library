@@ -48,7 +48,11 @@ from peal.dependencies.ddpm_inversion.ddm_inversion.inversion_utils import (
 from peal.dependencies.ddpm_inversion.prompt_to_prompt.ptp_utils import (
     register_attention_control_pathldm,
 )
-from peal.sparse_dictionaries.utils import plot_component_ground_truth_correlations
+from peal.sparse_dictionaries.utils import (
+    plot_component_ground_truth_correlations,
+    read_component_bounds,
+    select_dictionary_components,
+)
 from peal.log import get_logger
 
 _log = get_logger(__name__)
@@ -225,6 +229,11 @@ class PathldmAutoencoderConfig(GeneratorConfig):
     eta: float = 1.0
     skip: int = 36
     guidence_scale: float = 0.0
+    # Optional edit guidance for counterfactual decoding (off by default). When set,
+    # decoding uses uncond + cfg_scale_src * (eps(z) - uncond) + lambda * (eps(z_edit) - eps(z)):
+    # the unedited part at the inversion scale (exact reconstruction) and only the
+    # edit amplified by lambda. cfg_scale_tar is then not used for counterfactuals.
+    edit_guidance_scale: Union[float, None] = None
 
     # Sparse dictionary (SpLICE)
     sparse_dictionary: Union[str, SparseDictionaryConfig, None] = None
@@ -1472,12 +1481,26 @@ class PathldmAutoencoder(InvertibleGenerator, EditCapableGenerator):
         # controller = AttentionStore()
         # register_attention_control_pathldm(self.model, controller)
         xT = self._get_starting_latent(wT, wts, batch_size)
+        # Optional edit guidance: unedited part at the inversion scale, edit amplified by
+        # edit_guidance_scale. The reference conditioning equals the one encode() inverted with.
+        use_edit_guidance = (
+            getattr(self.config, "edit_guidance_scale", None) is not None
+            and prompts is None
+            and z_sem_ref is not None
+        )
+        ref_encoder_hidden_states = None
+        if use_edit_guidance:
+            ref_encoder_hidden_states, _ = self._build_balanced_conditioning(
+                batch_size, z_sem_ref, z_sem_ref=z_sem_ref
+            )
         w0_dec, _ = inversion_reverse_process_pathldm(
             self.model,
             xT=xT.to(self.model.dtype),
             etas=self.config.eta,
             prompts=batch_size * [""],
-            cfg_scales=[self.config.cfg_scale_tar],
+            cfg_scales=[
+                self.config.cfg_scale_src if use_edit_guidance else self.config.cfg_scale_tar
+            ],
             prog_bar=False,
             zs=(
                 zs[: (self.config.num_diffusion_steps - self.config.skip)]
@@ -1489,6 +1512,10 @@ class PathldmAutoencoder(InvertibleGenerator, EditCapableGenerator):
             num_inference_steps=self.config.num_diffusion_steps,
             debug=False,
             debug_dir=debug_dir,
+            ref_encoder_hidden_states=ref_encoder_hidden_states,
+            edit_guidance_scale=(
+                self.config.edit_guidance_scale if use_edit_guidance else None
+            ),
         )
 
         x_decoded = self.vae_latent_decoder(w0_dec)
@@ -2589,12 +2616,12 @@ class PathldmAutoencoder(InvertibleGenerator, EditCapableGenerator):
             )
 
         else:
-            component_indices = range(num_attempts)
-            W_all = self.sparse_dictionary.get_components()[:, :num_attempts]
-            if component_indices is not None:
-                W = W_all[:, component_indices].to(z_sem.device)
-            else:
-                W = W_all.to(z_sem.device)
+            # Attempt k steps along column k, or along component_indices[k] when the
+            # explainer config sets it (optional; e.g. chosen atoms of an SAE).
+            W, selected_components = select_dictionary_components(
+                self.sparse_dictionary, explainer_config, num_attempts
+            )
+            W = W.to(z_sem.device)
 
             # --- CHANGED: Calculate "Cross-Projection" to target Classifier Flip ---
 
@@ -2636,27 +2663,25 @@ class PathldmAutoencoder(InvertibleGenerator, EditCapableGenerator):
                 os.environ.get("PEAL_PATHLDM_DYNAMIC_CMINMAX", "1") == "1"
             )
 
-            if (
-                USE_DYNAMIC_C_MIN_MAX
-                and "dynamic" in explainer_config.linesearch_factors
+            # "-dynamic" (optional) targets the opposite bound: the step goes to the
+            # other side of the probe, so the linesearch can let the student pick the side.
+            if USE_DYNAMIC_C_MIN_MAX and any(
+                f in ("dynamic", "-dynamic") for f in explainer_config.linesearch_factors
             ):
                 c_min_max_path = os.path.join(
                     self.sparse_dictionary.config.base_path, "c_min_and_maxes.txt"
                 )
-                c_mins, c_maxs = [], []
-                with open(c_min_max_path, "r") as file:
-                    for line in file:
-                        parts = line.strip().split("min=")
-                        if len(parts) > 1:
-                            c_mins.append(float(parts[1].split(",")[0]))
-                            c_maxs.append(float(line.strip().split("max=")[1]))
-                c_mins = torch.tensor(c_mins, device=z_sem.device)[: W.shape[1]]
-                c_maxs = torch.tensor(c_maxs, device=z_sem.device)[: W.shape[1]]
+                c_mins, c_maxs = read_component_bounds(
+                    c_min_max_path,
+                    selected_components,
+                    z_sem.device,
+                    bounds_scale=getattr(explainer_config, "component_bounds_scale", 1.0),
+                )
 
             z_base = z_sem.unsqueeze(1)  # [Batch, 1, Dim]
             z_reflected_list = []
             for f in explainer_config.linesearch_factors:
-                if f == "dynamic" and USE_DYNAMIC_C_MIN_MAX:
+                if f in ("dynamic", "-dynamic") and USE_DYNAMIC_C_MIN_MAX:
                     c_factual = torch.matmul(z_sem, W)  # [Batch, K]
                     u_norm_sq = torch.sum(W * W, dim=0).unsqueeze(0)  # [1, K]
                     # c_int: where concept activation lands with factor=1 step
@@ -2666,6 +2691,12 @@ class PathldmAutoencoder(InvertibleGenerator, EditCapableGenerator):
                         c_maxs.unsqueeze(0),
                         c_mins.unsqueeze(0),
                     )
+                    if f == "-dynamic":
+                        c_target = torch.where(
+                            c_int > c_factual,
+                            c_mins.unsqueeze(0),
+                            c_maxs.unsqueeze(0),
+                        )
                     step = ((c_factual - c_target) / u_norm_sq).unsqueeze(
                         -1
                     ) * W.permute(1, 0).unsqueeze(
@@ -2678,6 +2709,8 @@ class PathldmAutoencoder(InvertibleGenerator, EditCapableGenerator):
                     # for numeric factors (factor=1.0), relying purely on
                     # _build_balanced_conditioning's norm scaling.
                     z_reflected_list.append(z_base - projections)
+                elif f == "-dynamic":
+                    z_reflected_list.append(z_base + projections)
                 else:
                     z_reflected_list.append(z_base - float(f) * projections)
 

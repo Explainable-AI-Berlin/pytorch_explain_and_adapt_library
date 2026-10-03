@@ -1,0 +1,378 @@
+# Exported from /home/space/datasets/peal_ahmed/didae_camelyon17/cfkd_signed_seeds/sae_pmdynamic_x2_lambda7_skip5/seed2/config.yaml
+# Result fields removed. reproducible_sampling: True. base_dir writes a new run under $PEAL_RUNS (the paper's results: see camelyon17_runs/MANIFEST.md).
+# The run trains its own probe and distilled predictor.
+adaptor_type: CFKD
+attribution_threshold: 0.0
+base_dir: $PEAL_RUNS/camelyon17/paper_runs/didae_sae/seed2
+batch_size: 4
+calculate_explainer_stats: true
+calculate_group_accuracies: true
+category: adaptor
+clustering_strategy: null
+continuous_learning: finetune
+correct_clusters:
+- 0
+counterfactual_type: 1sided
+data:
+  background: null
+  batch_wise_augmentation: true
+  class_ratios: null
+  config_name: DataConfig
+  confounder_probability: 1.0
+  confounding_factors:
+  - tumor
+  - hospital
+  crop_size: null
+  dataset_class: Camelyon17AugmentedDataset
+  dataset_origin_path: null
+  dataset_path: $PEAL_DATA/camelyon17
+  delimiter: ','
+  diffusion_augmented: false
+  downsize: Resize
+  font_path: null
+  foreground: null
+  full_confounder_config: null
+  generator: null
+  has_hints: false
+  in_memory: false
+  input_size:
+  - 3
+  - 128
+  - 128
+  input_type: image
+  invariances: []
+  inverse: null
+  label_noise: null
+  label_rel_path: data.csv
+  normalization: null
+  num_discretization_steps: 20
+  num_samples: 34000
+  output_size:
+  - 2
+  output_split: null
+  output_type: multiclass
+  sampling_time_fraction: 0.3
+  seed: 2
+  set_negative_to_zero: true
+  split:
+  - 0.8
+  - 0.9
+  spray_groups_balanced: false
+  spray_label_file: null
+  tabular_preprocessing: null
+  x_selection: imgs
+explainer:
+  category: explainer
+  clustering_strategy: highest_activation
+  component_bounds_scale: 2.0
+  component_indices:
+  - 240
+  - 440
+  data_config: null
+  distilled_predictor:
+    architecture: torchvision_resnet18
+    distill_from: predictor
+    task:
+      criterions:
+        bce: 1.0
+        l2: 100.0
+      output_channels: 1
+      output_type: multiclass
+      y_selection:
+      - prediction
+    training:
+      adv_training: false
+      learning_rate: 0.001
+      max_epochs: 5
+      optimizer: sgd
+      steps_per_epoch: 1000
+      test_batch_size: 32
+      train_batch_size: 32
+      val_batch_size: 4
+  explainer_type: DAEdistill
+  explanations_dir: explanations
+  generator: null
+  linesearch_factors:
+  - dynamic
+  - -dynamic
+  max_samples: null
+  merge_clusters: concatenate
+  num_attempts: 2
+  parallel_attempts: 1
+  port: 8000
+  predictor_path: null
+  seed: 2
+  temperature: 3.0
+  tracking_level: 3
+  transition_restrictions: null
+  use_clustering: true
+  validate_generator: false
+explainer_stats_clusters:
+- 0
+- 1
+finetune_iterations: 1
+generator:
+  adam_weight_decay: 0.0
+  base_path: $PEAL_RUNS/camelyon17/didae_pathldm
+  batch_size: 1
+  category: generator
+  cfg_scale_src: 3.0
+  cfg_scale_tar: 3.0
+  checkpointing_steps: 500
+  ckpt_path: $PEAL_RUNS/pathldm_plip/checkpoints/epoch_3.ckpt
+  config_path: $PEAL_RUNS/pathldm_plip/configs/08-03T09-35-project.yaml
+  current_fid: .inf
+  data:
+    background: null
+    batch_wise_augmentation: true
+    class_ratios: null
+    config_name: DataConfig
+    confounder_probability: null
+    confounding_factors: []
+    crop_size: null
+    dataset_class: Camelyon17AugmentedDataset
+    dataset_origin_path: null
+    dataset_path: $PEAL_DATA/camelyon17
+    delimiter: ','
+    diffusion_augmented: false
+    downsize: null
+    font_path: null
+    foreground: null
+    full_confounder_config: null
+    generator: null
+    has_hints: false
+    in_memory: false
+    input_size:
+    - 3
+    - 256
+    - 256
+    input_type: image
+    invariances: []
+    inverse: null
+    label_noise: null
+    label_rel_path: data.csv
+    normalization:
+    - 0.5
+    - 0.5
+    num_discretization_steps: 20
+    num_samples: null
+    output_size:
+    - 2
+    output_split: null
+    output_type: multiclass
+    sampling_time_fraction: 0.3
+    seed: 2
+    set_negative_to_zero: true
+    split:
+    - 0.8
+    - 1.0
+    spray_groups_balanced: false
+    spray_label_file: null
+    tabular_preprocessing: null
+    x_selection: imgs
+  dataloader_num_workers: 0
+  debug: false
+  drop_last: false
+  edit_guidance_scale: 7.0
+  encoder_dimensions: 512
+  eta: 1.0
+  generator_type: PathldmAutoencoder
+  gradient_accumulation_steps: 1
+  guidence_scale: 0.0
+  learning_rate: 0.0001
+  lora_alpha: null
+  max_grad_norm: 1.0
+  max_train_steps: null
+  num_diffusion_steps: 50
+  num_train_epochs: 1
+  plip_model_id: vinid/plip
+  prompt: ''
+  rank: 4
+  seed: 2
+  skip: 5
+  sparse_dictionary:
+    act_size: 512
+    aux_penalty: 0.03125
+    base_path: $PEAL_RUNS/camelyon17/sae/pathldm_plip_batch_topk
+    batch_size: 5000
+    category: sparse_dictionaries
+    cfg: {}
+    comp_max: -1
+    comp_min: -1
+    component_strings: null
+    data: null
+    device: cuda
+    dtype: torch.float32
+    eval_epoch_interval: 50
+    input_unit_norm: false
+    l1_coeff: 0.0
+    lr: 0.001
+    model_batch_size: 32
+    n_batches_to_dead: 100
+    n_components: 1024
+    name: BatchTopKSAE_camelyon
+    num_tokens: 15000000
+    orth_coeff: 0.0
+    seed: 2
+    sparse_dictionaries_type: BatchTopKSAE
+    top_k: 16
+    top_k_aux: 4
+    visualizations_per_component: 100
+    weights_name: sae_weights.npz
+    weights_path: $PEAL_RUNS/camelyon17/sae/pathldm_plip_batch_topk/sae_weights.npz
+  task_config: null
+  train: true
+  train_batch_size: 1
+  trained_model_path: null
+  use_lora: true
+  vae_latent_shape:
+  - 3
+  - 32
+  - 32
+  visualizations_per_component: 10
+generator_performance:
+  dino_fid: 3017.982421875
+  fid: 78.2374267578125
+in_memory: false
+is_loaded: false
+lazy_feedback: true
+max_test_batches: null
+max_validation_samples: 200
+min_train_samples: 800
+mixing_ratio: 0.5
+model_path: ''
+overwrite: false
+reproducible_sampling: true
+seed: 2
+sparse_dictionary:
+  act_size: 512
+  aux_penalty: 0.03125
+  base_path: $PEAL_RUNS/camelyon17/sae/pathldm_plip_batch_topk
+  batch_size: 5000
+  category: sparse_dictionaries
+  cfg: {}
+  comp_max: -1
+  comp_min: -1
+  component_strings: null
+  data: null
+  device: cuda
+  dtype: torch.float32
+  eval_epoch_interval: 50
+  input_unit_norm: false
+  l1_coeff: 0.0
+  lr: 0.001
+  model_batch_size: 32
+  n_batches_to_dead: 100
+  n_components: 1024
+  name: BatchTopKSAE_camelyon
+  num_tokens: 15000000
+  orth_coeff: 0.0
+  seed: 2
+  sparse_dictionaries_type: BatchTopKSAE
+  top_k: 16
+  top_k_aux: 4
+  visualizations_per_component: 100
+  weights_name: sae_weights.npz
+  weights_path: $PEAL_RUNS/camelyon17/sae/pathldm_plip_batch_topk/sae_weights.npz
+student: $PEAL_RUNS/camelyon17/classifier_poisoned100_seed2/model.cpl
+task:
+  bce_mse_mix: 1.0
+  class_restriction: null
+  config_name: TaskConfig
+  criterions:
+    ce: 1.0
+    l2: 100.0
+  focal_alpha: 0.25
+  focal_gamma: 1.0
+  focal_mse_mix: 1.0
+  mixed_bce_pos_weight: 1.0
+  output_channels: 2
+  output_type: singleclass
+  x_selection: null
+  y_selection:
+  - tumor
+teacher: $PEAL_RUNS/camelyon17/classifier_unpoisoned/model.cpl
+test_data:
+  background: null
+  batch_wise_augmentation: true
+  class_ratios: null
+  config_name: DataConfig
+  confounder_probability: 0.5
+  confounding_factors:
+  - tumor
+  - hospital
+  crop_size: null
+  dataset_class: Camelyon17AugmentedDataset
+  dataset_origin_path: null
+  dataset_path: $PEAL_DATA/camelyon17
+  delimiter: ','
+  diffusion_augmented: false
+  downsize: Resize
+  font_path: null
+  foreground: null
+  full_confounder_config: null
+  generator: null
+  has_hints: false
+  in_memory: false
+  input_size:
+  - 3
+  - 128
+  - 128
+  input_type: image
+  invariances: []
+  inverse: null
+  label_noise: null
+  label_rel_path: data.csv
+  normalization: null
+  num_discretization_steps: 20
+  num_samples: 68000
+  output_size:
+  - 2
+  output_split: null
+  output_type: multiclass
+  sampling_time_fraction: 0.3
+  seed: 2
+  set_negative_to_zero: true
+  split:
+  - 0.8
+  - 0.9
+  spray_groups_balanced: false
+  spray_label_file: null
+  tabular_preprocessing: null
+  x_selection: imgs
+tracking_level: 3
+training:
+  adv_training: false
+  attack_epsilon: 1.0
+  attack_num_steps: 5
+  class_balanced: true
+  concatenate_batches: true
+  diffusion_augmented: false
+  dropout: 0.5
+  early_stopping_goal: average_accuracy
+  epoch: -1
+  global_train_step: 0
+  global_validation_step: 0
+  input_noise_std: 0.1
+  label_smoothing: 0.0
+  learning_rate: 0.01
+  max_epochs: 20
+  mixup_alpha: 1.0
+  no_grad_attack: false
+  num_discretization_steps: 20
+  num_noise_vec: 1
+  optimizer: sgd
+  regulization_level: 1.3
+  sampling_time_fraction: 0.3
+  steps_per_epoch: 1000
+  test_batch_size: 20
+  train_batch_size: 32
+  train_on_test: false
+  use_mixup: false
+  val_batch_size: 4
+transition_restrictions: null
+use_confusion_matrix: false
+use_true_counterfactuals: false
+validation_runs: 1
+visualize_latent_diversity: true
+visualize_latent_sparsity: true

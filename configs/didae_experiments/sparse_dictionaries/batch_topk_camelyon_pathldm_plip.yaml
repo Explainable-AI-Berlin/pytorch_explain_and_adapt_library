@@ -1,0 +1,18 @@
+# BatchTopK SAE on the PathLDM (PLIP, 512-d) semantic latent for Camelyon17: the dictionary of the
+# DiDAE paper runs (atoms 240 and 440). Fit with fit_sae_components.py.
+# Sizes follow the CelebA SAE (celeba_vit_l14_batch_topk): ~2x latent atoms, top_k 16, 15 M tokens.
+sparse_dictionaries_type: BatchTopKSAE
+category: sparse_dictionaries
+name: BatchTopKSAE_camelyon
+act_size: 512
+n_components: 1024
+top_k: 16
+top_k_aux: 4
+aux_penalty: 0.03125
+lr: 0.001
+batch_size: 5000
+num_tokens: 15000000
+seed: 42
+base_path: $PEAL_RUNS/camelyon17/sae/pathldm_plip_batch_topk
+weights_name: sae_weights.npz
+weights_path: $PEAL_RUNS/camelyon17/sae/pathldm_plip_batch_topk/sae_weights.npz

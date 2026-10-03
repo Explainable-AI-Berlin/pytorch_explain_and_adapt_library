@@ -1,0 +1,334 @@
+# ACE on the seed-0 (original) Camelyon17 poisoned100 student: the paper run.
+# Exported from /home/space/datasets/peal_ahmed/experiments_results_paper/classifier_poisoned_camelyon100/ace_cfkd_peal_runs_sce/config.yaml (result fields removed).
+# The paper run's results are in /home/space/datasets/peal_ahmed/camelyon17_paper_results/ace/seed0 (group cluster); base_dir writes a new run under $PEAL_RUNS.
+# The paper run sampled from peal_ahmed/camelyon17/ddpm (50 respaced steps), a copy that no longer exists;
+# the generator now points at $PEAL_RUNS/camelyon17/ddpm, the same architecture the other baselines use.
+adaptor_type: CFKD
+attribution_threshold: 0.0
+base_dir: $PEAL_RUNS/camelyon17/paper_runs/ace/seed0
+batch_size: 4
+calculate_group_accuracies: true
+category: adaptor
+continuous_learning: finetune
+counterfactual_type: 1sided
+data:
+  class_ratios: null
+  config_name: DataConfig
+  confounder_probability: 1.0
+  confounding_factors:
+  - tumor
+  - hospital
+  crop_size: null
+  dataset_class: Camelyon17AugmentedDataset
+  dataset_origin_path: null
+  dataset_path: $PEAL_DATA/camelyon17
+  delimiter: ','
+  downsize: Resize
+  has_hints: false
+  input_size:
+  - 3
+  - 128
+  - 128
+  input_type: image
+  invariances: []
+  inverse: null
+  label_noise: null
+  label_rel_path: data.csv
+  normalization: null
+  num_samples: 34000
+  output_size:
+  - 2
+  output_split: null
+  output_type: multiclass
+  seed: 0
+  set_negative_to_zero: false
+  split:
+  - 0.8
+  - 0.9
+  x_selection: imgs
+explainer:
+  attack_checkpoint_backward_steps: 1
+  attack_epsilon: 255
+  attack_iterations: 100
+  attack_joint: true
+  attack_joint_checkpoint: false
+  attack_joint_shortcut: false
+  attack_method: PGD
+  attack_step: 1.0
+  attempts: 1
+  attention_resolutions:
+  - 32
+  - 16
+  - 8
+  base_path: ''
+  batch_size: 1
+  category: explainer
+  channel_mult: ''
+  chunk: 0
+  chunks: 1
+  class_cond: false
+  classifier_path: null
+  classifier_scales:
+  - 8
+  - 10
+  - 15
+  clip_denoised: true
+  clustering_strategy: highest_activation
+  cudnn_deterministic: false
+  data_config: null
+  data_dir: null
+  dataset: CelebA
+  diffusion_steps: 500
+  dilation: 5
+  dist_l1: 0.001
+  dist_l2: 0.0
+  dist_schedule: none
+  distilled_predictor: null
+  dropout: 0.0
+  exp_name: example_name
+  explainer_type: ACE
+  explanations_dir: explanations
+  generator: null
+  gpu: '0'
+  guided_iterations: 9999999
+  image_size: 128
+  l1_loss: 0.05
+  l2_loss: 0.0
+  l_perc: 30.0
+  l_perc_layer: 18
+  learn_sigma: true
+  loss_fn: null
+  masking_threshold: 0.15
+  max_samples: null
+  merge_and_eval: false
+  merge_chunks: false
+  merge_clusters: best
+  method: fastdime
+  model_path: null
+  n_samples: 1000
+  noise_schedule: linear
+  num_attempts: 2
+  num_batches: 1
+  num_channels: 128
+  num_chunks: 1
+  num_head_channels: -1
+  num_heads: 4
+  num_heads_upsample: -1
+  num_res_blocks: 2
+  num_samples: 500000000000
+  oracle_path: null
+  output_path: null
+  percentage: 0.5
+  port: 8000
+  predict_xstart: false
+  predictor: null
+  query_label: 31
+  replace_with_activation: ''
+  resblock_updown: true
+  rescale_learned_sigmas: false
+  rescale_timesteps: false
+  sampling_dilation: 17
+  sampling_inpaint: 0.7
+  sampling_scale: 1.0
+  sampling_stochastic: true
+  sampling_time_fraction: 0.3
+  save_images: false
+  save_x_t: true
+  save_z_t: true
+  scale_grads: false
+  seed: 4
+  self_optimized_masking: true
+  shortcut_label_name: Smiling
+  start_step: 60
+  subtype: ACE
+  target_label: -1
+  task_label: 39
+  task_label_name: Young
+  temperature: 3.0
+  timestep_respacing: 50
+  tracking_level: 3
+  transition_restrictions: null
+  use_checkpoint: false
+  use_clustering: true
+  use_ddim: false
+  use_fp16: true
+  use_kl: false
+  use_logits: true
+  use_new_attention_order: false
+  use_sampling_on_x_t: true
+  use_scale_shift_norm: true
+  use_train: false
+  validate_generator: false
+  warmup_step: 30
+  y_target_goal_confidence: 1.1
+finetune_iterations: 1
+generator:
+  attention_resolutions: 32,16,8
+  base_path: $PEAL_RUNS/camelyon17/ddpm
+  batch_size: 100
+  best_fid: 1000000000.0
+  category: generator
+  channel_mult: ''
+  class_cond: false
+  current_fid: 214.42575073242188
+  data:
+    class_ratios: null
+    config_name: DataConfig
+    confounder_probability: null
+    confounding_factors: []
+    crop_size: null
+    dataset_class: Camelyon17Dataset
+    dataset_origin_path: null
+    dataset_path: $PEAL_DATA/camelyon17
+    delimiter: null
+    downsize: null
+    has_hints: false
+    input_size:
+    - 3
+    - 128
+    - 128
+    input_type: image
+    invariances: []
+    inverse: null
+    label_noise: null
+    label_rel_path: data.csv
+    normalization:
+    - 0.5
+    - 0.5
+    num_samples: null
+    output_size:
+    - 2
+    output_split: null
+    output_type: multiclass
+    seed: null
+    set_negative_to_zero: false
+    split:
+    - 1.0
+    - 1.0
+    x_selection: imgs
+  diffusion_steps: 1000
+  dropout: 0.0
+  ema_rate: '0.9999'
+  fp16_scale_growth: 0.001
+  generator_type: DDPM
+  gpus: ''
+  image_size: 128
+  is_trained: true
+  learn_sigma: true
+  log_interval: 10
+  lr: 0.0001
+  lr_anneal_steps: 0
+  max_steps: 10000000
+  microbatch: -1
+  noise_schedule: linear
+  num_channels: 128
+  num_head_channels: -1
+  num_heads: 4
+  num_heads_upsample: -1
+  num_res_blocks: 2
+  output_path: peal_runs/ddpm/outputs
+  predict_xstart: false
+  resblock_updown: true
+  rescale_learned_sigmas: false
+  rescale_timesteps: false
+  resume_checkpoint: ''
+  save_interval: 10000
+  schedule_sampler: uniform
+  seed: 0
+  stochastic: true
+  timestep_respacing: '50'
+  use_checkpoint: false
+  use_fp16: false
+  use_hdf5: false
+  use_kl: false
+  use_new_attention_order: false
+  use_scale_shift_norm: true
+  weight_decay: 0.0
+  x_selection: null
+generator_performance: {}
+is_loaded: false
+lazy_feedback: false
+max_test_batches: null
+max_validation_samples: 200
+min_start_target_percentile: 0.0
+min_train_samples: 800
+mixing_ratio: 0.5
+model_path: ''
+overwrite: false
+seed: null
+student: $PEAL_RUNS/camelyon17/classifier_poisoned100/model.cpl
+task:
+  config_name: TaskConfig
+  criterions:
+    ce: 1.0
+    l2: 100.0
+  output_channels: 2
+  output_type: singleclass
+  x_selection: null
+  y_selection:
+  - tumor
+teacher: $PEAL_RUNS/camelyon17/classifier_unpoisoned/model.cpl
+test_data:
+  class_ratios: null
+  config_name: DataConfig
+  confounder_probability: 0.5
+  confounding_factors:
+  - tumor
+  - hospital
+  crop_size: null
+  dataset_class: Camelyon17AugmentedDataset
+  dataset_origin_path: null
+  dataset_path: $PEAL_DATA/camelyon17
+  delimiter: ','
+  downsize: Resize
+  has_hints: false
+  input_size:
+  - 3
+  - 128
+  - 128
+  input_type: image
+  invariances: []
+  inverse: null
+  label_noise: null
+  label_rel_path: data.csv
+  normalization: null
+  num_samples: 68000
+  output_size:
+  - 2
+  output_split: null
+  output_type: multiclass
+  seed: 0
+  set_negative_to_zero: false
+  split:
+  - 0.8
+  - 0.9
+  x_selection: imgs
+tracking_level: 4
+training:
+  adv_training: false
+  attack_epsilon: 1.0
+  attack_num_steps: 5
+  class_balanced: true
+  concatenate_batches: true
+  dropout: 0.5
+  early_stopping_goal: average_accuracy
+  epoch: -1
+  global_train_step: 0
+  global_validation_step: 0
+  input_noise_std: 0.1
+  label_smoothing: 0.0
+  learning_rate: 0.01
+  max_epochs: 50
+  mixup_alpha: 1.0
+  no_grad_attack: false
+  num_noise_vec: 1
+  optimizer: sgd
+  steps_per_epoch: 1000
+  test_batch_size: 100
+  train_batch_size: 32
+  train_on_test: false
+  use_mixup: false
+  val_batch_size: 4
+use_confusion_matrix: false
+use_visualization: true
+validation_runs: 1

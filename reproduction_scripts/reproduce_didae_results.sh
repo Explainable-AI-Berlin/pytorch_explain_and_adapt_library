@@ -1,7 +1,8 @@
-# This script is meant to be able to reproduce the results of the PDC paper (ARXIV_LINK).
-# The results were reproduced with the following software versions: (GIT_HASH)
-# the batch sizes are optimized for a GPU with 80gb VRAM, but can be decreased for smaller GPUs
-# this script was executed at commit TODO
+# Reproduces the results of the DiDAE journal paper.
+# Code version: PEAL release v0.1.0 (git tag v0.1.0, Zenodo DOI 10.5281/zenodo.23048182). The
+# Camelyon17 block of Table 2 was added after the release and needs a later commit.
+# The batch sizes are tuned for a GPU with 80 GB VRAM and can be decreased for smaller GPUs.
+# Every run reads its inputs from and writes its outputs to $PEAL_DATA and $PEAL_RUNS.
 
 
 # ---------------------------------------------------------------------------
@@ -92,7 +93,7 @@ python train_generator.py --config "<PEAL_BASE>/configs/didae_experiments/genera
 python run_component_analysis.py --config $PEAL_RUNS/celeba/diffusion_autoencoder/config.yaml --sd_config configs/didae_experiments/sparse_dictionaries/procrustes_sae_celeba.yaml
 # run CFKD with original DAE
 python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/celeba1kx098_resnet18_dae_original_cfkd.yaml"
-# run DiME CFKDconfigs/didae_experiments/predictors/celeba_latent_oracle.yaml
+# run DiME CFKD
 python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/celeba1kx098_resnet18_dime_cfkd.yaml"
 # run ACE CFKD
 python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/celeba1kx098_resnet18_ace_cfkd.yaml"
@@ -109,36 +110,61 @@ python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predict
 python train_generator.py --config "<PEAL_BASE>/configs/cfkd_experiments/generators/camelyon17_1k_ddpm_poisoned098.yaml"
 python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/camelyon17_1k_classifier_poisoned098.yaml"
 python train_predictor.py --config "<PEAL_BASE>/configs/didae_experiments/predictors/camelyon17_latent_oracle.yaml"
-# Camelyon (ResNet18, fully poisoned/full-data variant) -- this is the setting of the Camelyon block
-# of Table 2: the shared student below is used by the four baselines and by the DiDAE-PathLDM run.
+# Camelyon (ResNet18, fully poisoned/full-data variant) -- the setting of the Camelyon block of
+# Table 2: the seed-0 student below is shared by the five baselines (DAE, DiME, ACE, FastDiME, SCE)
+# and by DiDAE (PathLDM generator with a BatchTopK SAE).
 python train_predictor.py --config "<PEAL_BASE>/configs/didae_experiments/predictors/camelyon17_classifier_poisoned100.yaml"
-# Baselines (DiME, ACE, FastDiME, SCE). NOTE: the published rows were generated with a Camelyon DDPM
-# that only existed on a co-author's machine; the configs now point at the DDPM trained two lines
-# above ($PEAL_RUNS/camelyon17_1k/ddpm, FID 295). With it, FastDiME seed 0 gives Gain -20.3 instead
-# of the published 16.3, so treat the Camelyon baseline rows as re-measurements, not reproductions.
-python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/camelyon17_poisoned100_resnet18_dime_cfkd.yaml"
-python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/camelyon17_poisoned100_resnet18_ace_cfkd.yaml"
-python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/camelyon17_poisoned100_resnet18_fastdime_cfkd.yaml"
-python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/camelyon17_poisoned100_resnet18_sce_cfkd.yaml"
-# DiDAE CFKD (PathLDM + PLIP generator, ResNet18 student, fully poisoned data).
-# The generator is the public PathLDM release used as-is (no LoRA finetuning; train_generator.py is
-# NOT run for it), conditioned on the PLIP image embedding through the inverse text projection.
-# Download + environment: see reproduction_scripts/pathldm_env.sh (checkpoint into
-# $PEAL_RUNS/pathldm_plip, --no-deps extras, PL 2.x shim). Then:
+# Camelyon17 poisoned100 paper results (September 2026): DAE, DiME, ACE, FastDiME, SCE and DiDAE (SAE),
+# each on the seed-0 student and, where the table reports n=4, on seed students 1-3.
+# Run configs: configs/didae_experiments/camelyon17_runs/ (MANIFEST.md lists the original run of each
+# and where its archived results are). Every run writes under $PEAL_RUNS/camelyon17/.
+# Seed students 1-3 (seed 0 is the student trained above)
+for S in 1 2 3; do
+  python train_predictor.py --config "<PEAL_BASE>/configs/didae_experiments/predictors/camelyon17_classifier_poisoned100_seed${S}.yaml"
+done
+# The Camelyon17 DDPM the four gradient baselines sample from ($PEAL_RUNS/camelyon17/ddpm)
+python train_generator.py --config "<PEAL_BASE>/configs/sce_experiments/generators/camelyon17_ddpm.yaml"
+# DiME, ACE, FastDiME and SCE CFKD on the seed-0 student (the paper runs)
+for M in dime ace fastdime sce; do
+  python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/camelyon17_runs/baselines/${M}_seed0.yaml"
+done
+# FastDiME CFKD on seed students 1-3
+for S in 1 2 3; do
+  python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/camelyon17_poisoned100_seed${S}_resnet18_fastdime_cfkd.yaml"
+done
+# DAE baseline (as dae_original_cfkd on the other datasets): encoder, DAE, then CFKD on seeds 0-3.
+# The DAE code needs lightning 2.1.4 and lmdb, which PEAL's own environment does not contain. Install
+# them into a side directory once and point PEAL_LIGHTNING_ENV at it (default below):
+#   pip install --target "$PEAL_RUNS/pyenv_lightning" lightning==2.1.4 lmdb
+LIGHTNING=${PEAL_LIGHTNING_ENV:-$PEAL_RUNS/pyenv_lightning}
+python train_predictor.py --config "<PEAL_BASE>/configs/didae_experiments/predictors/camelyon17_uni_linear_poisoned100.yaml"
+PYTHONPATH=$LIGHTNING:$PYTHONPATH python train_dae_ddim_only.py --config "<PEAL_BASE>/configs/didae_experiments/generators/camelyon_diffusion_autoencoder_seeds.yaml"
+for S in 0 1 2 3; do
+  PYTHONPATH=$LIGHTNING:$PYTHONPATH python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/camelyon17_poisoned100_seed${S}_resnet18_dae_baseline_cfkd.yaml"
+done
+# DiDAE (ours): the public PathLDM release conditioned on PLIP (used as-is, nothing is trained on it)
+# with a BatchTopK SAE (atoms 240 and 440), signed linesearch (+-dynamic), edit guidance lambda 7,
+# skip 5. reproduction_scripts/pathldm_env.sh lists the checkpoint download and the extra packages;
+# it is sourced in a subshell so that its PYTHONPATH does not reach the runs further down.
+(
 source reproduction_scripts/pathldm_env.sh
-# (a) fit the [tumor, hospital] orthogonal Procrustes dictionary on PLIP embeddings and measure the
-#     empirical component bounds (writes $PEAL_RUNS/camelyon17/didae_pathldm/sparse_dictionaries/...)
+# (a) the [tumor, hospital] orthogonal Procrustes dictionary on PLIP embeddings that the control run uses
 python run_component_analysis.py --config "<PEAL_BASE>/configs/didae_experiments/generators/camelyon17_pathldm_autoencoder_resnet_didae.yaml" --sd_config configs/didae_experiments/sparse_dictionaries/orthognal_camelyon17.yaml
-# (b) CFKD. finetune_iterations must be 1 (the committed value 0 stops before the Gain is computed).
-python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/camelyon17_poisoned100_resnet18_pathldm_didae_cfkd.yaml"
-# REPRODUCIBILITY STATUS (2026-09-21): with the current code and the public checkpoint this run gives
-# NAFR 80.0 / Diversity 1.0 / Sparsity 37.7 / NA 81.2 / Unbiasedness 49.3 / Gain 19.4 (seed 0),
-# not the published 75.0 / 26.7 / 59.9 / 89.8 / 72.4 / 26.4. Both dictionary directions decode into a
-# stain-like change that the oracle reads as "less tumor" (diversity ~1 under every variant tried:
-# linesearch [1.1], [1.1, dynamic], dynamic targeting off, and the pre-2026-07-28 per-candidate
-# conditioning renormalisation, env PEAL_PATHLDM_ZSEM_REF=0). The published run used a generator
-# directory and dictionary weights that no longer exist ($PEAL_RUNS is the only surviving root),
-# so the difference could not be pinned to a code change; see .agent/handoff.md.
+# (b) the control run: its probe is reused by seed 0, its generator is the one the SAE is fitted on
+python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/camelyon17_runs/control/newlinesearch_bs4.yaml"
+# (c) the BatchTopK SAE
+python fit_sae_components.py --generator_config "<PEAL_BASE>/configs/didae_experiments/camelyon17_runs/control/newlinesearch_bs4.yaml" --sd_config "<PEAL_BASE>/configs/didae_experiments/sparse_dictionaries/batch_topk_camelyon_pathldm_plip.yaml"
+# (d) DiDAE CFKD on seeds 0-3; seed 0 starts from the control run's probe and distilled predictor
+CONTROL=$PEAL_RUNS/camelyon17/didae_control/newlinesearch_bs4/0
+SEED0=$PEAL_RUNS/camelyon17/paper_runs/didae_sae/seed0/0
+mkdir -p "$SEED0/explainer"
+[ -e "$SEED0/explainer/distilled_predictor" ] || cp -r "$CONTROL/explainer/distilled_predictor" "$SEED0/explainer/"
+[ -e "$SEED0/distilled_predictor" ] || cp -r "$CONTROL/distilled_predictor" "$SEED0/"
+python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/camelyon17_runs/didae_sae/seed0.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/camelyon17_runs/didae_sae/seed1.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/camelyon17_runs/didae_sae/seed2.yaml"
+python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/camelyon17_runs/didae_sae/seed3.yaml"
+)
 # evaluation
 # to see the results on has to look into the tensorboard files in the PEAL_RUNS folder
 python peal/visualization/create_didae_table1.py
@@ -424,14 +450,7 @@ for SEED in 1 2 3; do
     python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/celeba1kx098_resnet18_${METHOD}_cfkd.yaml" --seed $SEED
   done
 
-  # -- Camelyon: FastDiME and the PathLDM DiDAE row. The DiDAE run needs the
-  #    PathLDM environment, so it is sourced inside the loop.
-  # python train_predictor.py --config "<PEAL_BASE>/configs/cfkd_experiments/predictors/camelyon17_classifier_unpoisoned.yaml" --seed $SEED
-  # python train_predictor.py --config "<PEAL_BASE>/configs/didae_experiments/predictors/camelyon17_classifier_poisoned100.yaml" --seed $SEED
-  # (camelyon17_1k/ddpm and camelyon17/didae_pathldm are linked from seed 0 the same way)
-  # python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/camelyon17_poisoned100_resnet18_fastdime_cfkd.yaml" --seed $SEED
-  # source reproduction_scripts/pathldm_env.sh
-  # python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/camelyon17_poisoned100_resnet18_pathldm_didae_cfkd.yaml" --seed $SEED
+  # -- Camelyon: seeds 1-3 are run by the Camelyon17 block of Table 2 above.
 done
 
 export PEAL_RUNS="${PEAL_RUNS_SEED0}"
@@ -444,7 +463,7 @@ python peal/visualization/create_didae_table1.py
 
 
 # ===========================================================================
-# Tables from the runs above  (appended 2026-09-22; nothing above was changed)
+# Tables from the runs above  (appended 2026-09-22)
 # ===========================================================================
 # Everything below only *reads* finished run directories under $PEAL_RUNS.
 # It trains nothing and writes nothing into $PEAL_RUNS. The point is that the

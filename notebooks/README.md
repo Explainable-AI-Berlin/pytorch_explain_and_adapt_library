@@ -1,34 +1,40 @@
 # PEAL tutorial notebooks
 
-Notebook versions of the walkthroughs in the top-level `README.md`. Each one derives its config
-files from the shipped ones rather than asking you to copy and edit by hand, and ends by loading the
-run's outputs so you can look at the counterfactuals in place.
+Working examples of the PEAL library (`pip install peal-xai`). Each notebook builds its pipeline from
+PEAL's own building blocks - config classes (`DataConfig`, `PredictorConfig`, `DiDAEConfig`, ...) and
+factories (`get_datasets`, `get_predictor`, `get_generator`, `get_adaptor`, ...) - so that you can see
+which object does what and swap any of them for your own. Every step has a default example and an
+"Option B" cell for your own data, model or generator.
 
-Run them from a kernel with the `peal` environment active. They `chdir` to the repository root in
-their first cell, because every PEAL entry point expects that as the working directory.
-
-| notebook | what it does | trains anything? |
+| notebook | what it shows | time on one GPU (measured on an H100) |
 |---|---|---|
-| `00_tour_of_peal_with_waterbirds.ipynb` | **Start here.** The whole workflow with the library's own config classes and factories: Waterbirds (downloads itself), a DINOv3 linear probe, the RAE generator and MSAE dictionary, DiDAE, your verdicts and a last-layer correction (DFR), with worst-group accuracy before and after. Every step has a default and a "your own" cell. | the probe (~9 min); ~45 min in total on one GPU |
-| `01_explain_your_classifier_with_sce.ipynb` | Your images and labels in, SCE counterfactuals out. PEAL trains both the DDPM generator and the classifier. | yes, both (GPU-days for the generator) |
-| `02_bring_your_own_onnx_predictor_sce.ipynb` | You supply a trained model as ONNX; SCE explains it. Uses the shipped ImageNet DDPM unless you opt into your own. | only the generator, and only if you opt in |
-| `03_explain_an_onnx_probe_with_didae.ipynb` | DiDAE ranks the dictionary directions your ONNX probe actually reads, with before/after pairs as evidence. | no |
+| [`00_tour_of_peal_with_trains.ipynb`](00_tour_of_peal_with_trains.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Explainable-AI-Berlin/pytorch_explain_and_adapt_library/blob/master/notebooks/00_tour_of_peal_with_trains.ipynb) | **Start here.** A DINOv3 probe that tells freight cars from passenger cars, and its graffiti shortcut: data, probe, the RAE generator, the MSAE concept dictionary, DiDAE's ranking, your verdicts, and a last-layer correction (DFR) that stops held-out graffiti counterfactuals from fooling it. | 10-15 min + downloads; peak 19.5 GB, 14 GB in its small-GPU mode |
+| [`01_explain_and_correct_with_sce.ipynb`](01_explain_and_correct_with_sce.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Explainable-AI-Berlin/pytorch_explain_and_adapt_library/blob/master/notebooks/01_explain_and_correct_with_sce.ipynb) | The other explainer family: SCE counterfactuals from a pretrained ImageNet diffusion model, run through the CFKD adaptor, and how CFKD corrects a model with a teacher's verdicts. Uses the model and data of notebook 02. | ~20+ min + 2.1 GB download; needs a large GPU (A100); see the notebook |
+| [`02_bring_your_own_model_and_data.ipynb`](02_bring_your_own_model_and_data.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Explainable-AI-Berlin/pytorch_explain_and_adapt_library/blob/master/notebooks/02_bring_your_own_model_and_data.ipynb) | The two contracts: a folder of images per class (ingested like a web-demo upload) and a model as ONNX (export, check with onnxruntime, load with `get_predictor`, match the normalization). Example: a pretrained ResNet-18 cut down to the two train classes. | < 1 min |
+| [`03_explain_an_onnx_model_with_didae.ipynb`](03_explain_an_onnx_model_with_didae.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Explainable-AI-Berlin/pytorch_explain_and_adapt_library/blob/master/notebooks/03_explain_an_onnx_model_with_didae.ipynb) | DiDAE on the ONNX model of notebook 02, without training anything: which concepts change its decision, how well the distilled probe matches it, the evidence per concept. | 4-11 min + downloads; peak 19 GB (smaller pool on small GPUs) |
 
-Notebook 3 is the cheapest place to start if you already have a model: it reuses a pretrained
-generator and a pretrained sparse dictionary and only ever calls your model forward.
+Suggested order: 00, then 02 -> 03 (or 02 -> 01).
 
-Two things that trip people up, both covered in the notebooks:
+## Running them
 
-* PEAL hands an ONNX graph exactly the tensor the data config produces, with no normalization of its
-  own, so `input_size` and `normalization` have to match what your model expects.
-* An ONNX student can usually be fine-tuned too: PEAL converts the graph into a trainable torch
-  module with `onnx2torch`. When a graph uses an operator the converter does not implement, PEAL
-  warns and falls back to an inference-only `onnxruntime` closure, which can be explained and ranked
-  but not repaired. The DINOv3 probes from the ImageNet experiments fall back this way, on a `Size`
-  node. Notebook 3 shows how to keep the ONNX file for the sweep and point at a PyTorch checkpoint
-  for the repair, which is what you need in that case.
-* Notebook 3 trains nothing, but it is not dependency-free: its reference generator is a
-  `RAEDiffusionAutoencoder`, which needs the separate, non-commercial RAEv2 fork (`pip install "peal-xai[rae]"` or `python tools/install_rae.py`)
-  and a published weights folder in `$PEAL_RAE_WEIGHTS`.
-* Notebooks 2 and 3 need `onnx` and `onnxruntime`, which the base `peal` environment does not carry.
-  Install the web extras (`pip install -r requirements-web.txt`) or use the `.venv-web` interpreter.
+**On Google Colab:** open a notebook with its badge, choose *Runtime -> Change runtime type -> GPU*
+(a free T4 is enough) and run the first cell. It installs PEAL from PyPI and restarts the runtime
+once (PEAL needs `numpy < 2`); run it again and continue. Two things the first cell takes care of:
+
+* PEAL 0.1.0 declares Python < 3.12 while Colab runs 3.12, so it installs with
+  `--ignore-requires-python` (PEAL runs on 3.12).
+* The pip package carries the library, not the config files, so the cell makes a small sparse clone
+  of this repository (`configs/` and the dictionary's vocabulary) and points `$PEAL_BASE` at it.
+
+**The images** of notebooks 00 and 02 are two ImageNet classes. ImageNet may not be redistributed,
+so you fetch them from Hugging Face yourself: accept the terms of
+[`ILSVRC/imagenet-1k`](https://huggingface.co/datasets/ILSVRC/imagenet-1k) with your account and log
+in (a Colab secret `HF_TOKEN`, or `huggingface_hub.notebook_login()`). Only the parts of the train
+split that hold the two classes are downloaded. Or point the notebooks at your own images.
+
+**Locally:** `pip install "peal-xai[rae,onnx]" git+https://github.com/openai/CLIP.git` (Python 3.9-3.11)
+and run the notebooks from this folder; the first cell then uses the repository's `configs/`.
+`$PEAL_DATA` and `$PEAL_RUNS` default to `~/peal_data/datasets` and `~/peal_data/runs`.
+
+Every notebook saves its results under `$PEAL_RUNS` and skips finished steps when run again
+(`REUSE = True`).

@@ -1,0 +1,31 @@
+# python run_cfkd.py --config "<PEAL_BASE>/configs/didae_experiments/adaptors/camelyon17_poisoned100_seed1_resnet18_fastdime_cfkd.yaml"
+# Seed-variability run: student trained with seed 1; every seed in the run is 1.
+adaptor_type                         :  "CFKD"
+reproducible_sampling                :  True   # get_batch reseeds from seed (the seed patch these runs used)
+seed                                 :  1
+clustering_strategy                  :  null   # keep the explainer's highest_activation, as in the original run
+overwrite                            :  False
+category                             :  "adaptor"
+batch_size                           :  4
+tracking_level                       :  5
+min_train_samples                    :  800
+finetune_iterations                  :  1
+max_validation_samples               :  200
+continuous_learning                  :  "finetune"
+calculate_explainer_stats            :  True
+calculate_group_accuracies           :  True
+explainer                            :  "<PEAL_BASE>/configs/didae_experiments/explainers/fastdime_default_camelyon_resnet.yaml"
+training                             :  <PEAL_BASE>/configs/didae_experiments/training/img_finetuning_camelyon_resnet_baselines.yaml
+data                                 :  <PEAL_BASE>/configs/didae_experiments/data/camelyon17_poisoned100_negzero_false.yaml
+test_data                            :  <PEAL_BASE>/configs/didae_experiments/data/camelyon17_unpoisoned_negzero_false.yaml
+student                              :  $PEAL_RUNS/camelyon17/classifier_poisoned100_seed1/model.cpl
+teacher                              :  $PEAL_RUNS/camelyon17/classifier_unpoisoned/model.cpl
+generator                            :  <PEAL_BASE>/configs/didae_experiments/generators/camelyon17_ddpm_respacing200.yaml
+base_dir                             :  "$PEAL_RUNS/camelyon17/paper_runs/fastdime/seed1"
+task:
+  criterions:
+    ce     : 1.0
+    l2     : 100.0
+  output_type             : singleclass
+  output_channels         : 2
+  y_selection             : [tumor]
